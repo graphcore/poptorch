@@ -144,9 +144,9 @@ function(run_poptorch_install_command cmd working_directory cmd_name)
   install(CODE
     "set(ENV{LD_LIBRARY_PATH} ${popart_LIB_DIR}:${POPLAR_DIR}:$ENV{LD_LIBRARY_PATH})
     set(ENV{POPTORCH_SMALL_IPU_MODEL} 1)
-    execute_process( COMMAND ${cmd} WORKING_DIRECTORY ${working_directory} RESULT_VARIABLE RETVAL )
+    execute_process( COMMAND ${cmd} WORKING_DIRECTORY ${working_directory} RESULT_VARIABLE RETVAL OUTPUT_VARIABLE OUTPUT ERROR_VARIABLE OUTPUT)
     if(RETVAL AND NOT RETVAL EQUAL 0)
-      message(FATAL_ERROR \"${cmd_name} FAILED (See above)\")
+      message(FATAL_ERROR \"${cmd_name} FAILED: \${OUTPUT}\")
     endif()")
 endfunction()
 

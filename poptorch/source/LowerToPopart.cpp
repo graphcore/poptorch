@@ -49,9 +49,9 @@ std::string getModelProtoFilename() {
 // stored flattened).
 class ValueMap {
 public:
-  using TensorList = std::vector<poptorch::TensorId>;
+  using TensorList = std::vector<popart_compiler::TensorId>;
 
-  poptorch::TensorId tensor(torch::jit::Value *value) const;
+  popart_compiler::TensorId tensor(torch::jit::Value *value) const;
   const TensorList &listTuple(torch::jit::Value *value) const;
 
   // Return the list of tensors without checking if it's a tuple, list or a
@@ -62,29 +62,30 @@ public:
     return _map.count(value) == 1;
   }
 
-  void setTensor(torch::jit::Value *value, poptorch::TensorId id);
+  void setTensor(torch::jit::Value *value, popart_compiler::TensorId id);
   void setList(torch::jit::Value *value, const TensorList &tensors);
   void setTuple(torch::jit::Value *value, const TensorList &tensors);
 
 private:
   struct Data {
-    explicit Data(poptorch::TensorId id) : type(OutputElemType::Tensor) {
+    explicit Data(popart_compiler::TensorId id)
+        : type(popart_compiler::OutputElemType::Tensor) {
       tensors.push_back(id);
     }
 
-    Data(TensorList tuple, OutputElemType type_)
+    Data(TensorList tuple, popart_compiler::OutputElemType type_)
         : type(type_), tensors(std::move(tuple)) {}
-    OutputElemType type;
+    popart_compiler::OutputElemType type;
     TensorList tensors;
   };
   std::unordered_map<torch::jit::Value *, Data> _map;
 };
 
-poptorch::TensorId ValueMap::tensor(torch::jit::Value *value) const {
+popart_compiler::TensorId ValueMap::tensor(torch::jit::Value *value) const {
   auto it = _map.find(value);
   ERROR_ON_MSG(it == _map.end(), value->debugName()
                                      << " not found in ValueMap");
-  ERROR_ON_MSG(it->second.type != OutputElemType::Tensor,
+  ERROR_ON_MSG(it->second.type != popart_compiler::OutputElemType::Tensor,
                value->debugName() << " is not a tensor");
   ERROR_ON(it->second.tensors.size() != 1);
   return it->second.tensors.front();
@@ -95,8 +96,8 @@ ValueMap::listTuple(torch::jit::Value *value) const {
   auto it = _map.find(value);
   ERROR_ON_MSG(it == _map.end(), value->debugName()
                                      << " not found in ValueMap");
-  ERROR_ON_MSG((it->second.type != OutputElemType::Tuple &&
-                it->second.type != OutputElemType::List),
+  ERROR_ON_MSG((it->second.type != popart_compiler::OutputElemType::Tuple &&
+                it->second.type != popart_compiler::OutputElemType::List),
                value->debugName() << " is not a tuple or list");
   return it->second.tensors;
 }
@@ -108,21 +109,26 @@ const ValueMap::TensorList &ValueMap::tensors(torch::jit::Value *value) const {
   return it->second.tensors;
 }
 
-void ValueMap::setTensor(torch::jit::Value *value, poptorch::TensorId id) {
+void ValueMap::setTensor(torch::jit::Value *value,
+                         popart_compiler::TensorId id) {
   ERROR_ON_MSG(!_map.emplace(value, Data(id)).second,
                "Value " << value->debugName() << " already present in the map");
 }
 
 void ValueMap::setList(torch::jit::Value *value,
                        const ValueMap::TensorList &tensors) {
-  ERROR_ON_MSG(!_map.emplace(value, Data(tensors, OutputElemType::List)).second,
-               "Value " << value->debugName() << " already present in the map");
+  ERROR_ON_MSG(
+      !_map.emplace(value, Data(tensors, popart_compiler::OutputElemType::List))
+           .second,
+      "Value " << value->debugName() << " already present in the map");
 }
 
 void ValueMap::setTuple(torch::jit::Value *value,
                         const ValueMap::TensorList &tensors) {
   ERROR_ON_MSG(
-      !_map.emplace(value, Data(tensors, OutputElemType::Tuple)).second,
+      !_map.emplace(value,
+                    Data(tensors, popart_compiler::OutputElemType::Tuple))
+           .second,
       "Value " << value->debugName() << " already present in the map");
 }
 
@@ -164,44 +170,44 @@ std::vector<int64_t> getTensorDimensions(const at::Tensor &tensor) {
   return dims;
 }
 
-at::ScalarType fromPopartType(const poptorch::PopartType type) {
+at::ScalarType fromPopartType(const popart_compiler::PopartType type) {
   switch (type) {
-  case poptorch::PopartType::UINT8: {
+  case popart_compiler::PopartType::UINT8: {
     return at::ScalarType::Byte;
   }
-  case poptorch::PopartType::INT8: {
+  case popart_compiler::PopartType::INT8: {
     return at::ScalarType::Char;
   }
-  case poptorch::PopartType::INT16:
-  case poptorch::PopartType::UINT16: {
+  case popart_compiler::PopartType::INT16:
+  case popart_compiler::PopartType::UINT16: {
     return at::ScalarType::Short;
   }
-  case poptorch::PopartType::INT32:
-  case poptorch::PopartType::UINT32: {
+  case popart_compiler::PopartType::INT32:
+  case popart_compiler::PopartType::UINT32: {
     return at::ScalarType::Int;
   }
-  case poptorch::PopartType::INT64: {
+  case popart_compiler::PopartType::INT64: {
     return at::ScalarType::Long;
   }
-  case poptorch::PopartType::BOOL: {
+  case popart_compiler::PopartType::BOOL: {
     return at::ScalarType::Bool;
   }
-  case poptorch::PopartType::FLOAT: {
+  case popart_compiler::PopartType::FLOAT: {
     return at::ScalarType::Float;
   }
-  case poptorch::PopartType::FLOAT16: {
+  case popart_compiler::PopartType::FLOAT16: {
     return at::ScalarType::Half;
   }
-  case poptorch::PopartType::BFLOAT16: {
+  case popart_compiler::PopartType::BFLOAT16: {
     return at::ScalarType::BFloat16;
   }
-  case poptorch::PopartType::DOUBLE: {
+  case popart_compiler::PopartType::DOUBLE: {
     return at::ScalarType::Double;
   }
-  case poptorch::PopartType::COMPLEX64: {
+  case popart_compiler::PopartType::COMPLEX64: {
     return at::ScalarType::ComplexFloat;
   }
-  case poptorch::PopartType::COMPLEX128: {
+  case popart_compiler::PopartType::COMPLEX128: {
     return at::ScalarType::ComplexDouble;
   }
   default:
@@ -209,43 +215,43 @@ at::ScalarType fromPopartType(const poptorch::PopartType type) {
   }
 }
 
-PopartType toPopartType(const at::ScalarType type) {
+popart_compiler::PopartType toPopartType(const at::ScalarType type) {
   switch (type) {
   case at::ScalarType::Byte: {
-    return PopartType::UINT8;
+    return popart_compiler::PopartType::UINT8;
   }
   case at::ScalarType::Char: {
-    return PopartType::INT8;
+    return popart_compiler::PopartType::INT8;
   }
   case at::ScalarType::Short: {
-    return PopartType::INT16;
+    return popart_compiler::PopartType::INT16;
   }
   case at::ScalarType::Int: {
-    return PopartType::INT32;
+    return popart_compiler::PopartType::INT32;
   }
   case at::ScalarType::Long: {
-    return PopartType::INT64;
+    return popart_compiler::PopartType::INT64;
   }
   case at::ScalarType::Bool: {
-    return PopartType::BOOL;
+    return popart_compiler::PopartType::BOOL;
   }
   case at::ScalarType::Float: {
-    return PopartType::FLOAT;
+    return popart_compiler::PopartType::FLOAT;
   }
   case at::ScalarType::Half: {
-    return PopartType::FLOAT16;
+    return popart_compiler::PopartType::FLOAT16;
   }
   case at::ScalarType::BFloat16: {
-    return PopartType::BFLOAT16;
+    return popart_compiler::PopartType::BFLOAT16;
   }
   case at::ScalarType::Double: {
-    return PopartType::DOUBLE;
+    return popart_compiler::PopartType::DOUBLE;
   }
   case at::ScalarType::ComplexFloat: {
-    return PopartType::COMPLEX64;
+    return popart_compiler::PopartType::COMPLEX64;
   }
   case at::ScalarType::ComplexDouble: {
-    return PopartType::COMPLEX128;
+    return popart_compiler::PopartType::COMPLEX128;
   }
   default:
     ERROR("Unsupported PyTorch scalar type " << toString(type));
@@ -253,7 +259,7 @@ PopartType toPopartType(const at::ScalarType type) {
 }
 
 void platformAgnosticTypeInfoFromIRType(
-    torch::jit::Value *value, std::vector<poptorch::PopartType> *types,
+    torch::jit::Value *value, std::vector<popart_compiler::PopartType> *types,
     std::vector<std::vector<std::size_t>> *shapes) {
   std::shared_ptr<c10::TensorType> tensor_type =
       value->type()->expect<c10::TensorType>();
@@ -279,8 +285,9 @@ namespace detail {
 class LowerToPopartImpl {
 public:
   LowerToPopartImpl(torch::jit::Graph *g, InplaceGraphInfo &&inplace_info,
-                    bool training, std::vector<Optimizer> &&opt,
-                    const SessionOptions &options,
+                    bool training,
+                    std::vector<popart_compiler::Optimizer> &&opt,
+                    const popart_compiler::SessionOptions &options,
                     const py::function &attribute_accessor,
                     CPUCallbackMap &&callback, const AnchorList &&anchors);
   void setParameters(const std::vector<at::Tensor> &params,
@@ -288,13 +295,13 @@ public:
 
   void lower(std::vector<at::Tensor> *in_tensors);
 
-  std::shared_ptr<poptorch::PoplarExecutable> compile();
-  std::shared_ptr<poptorch::PoplarExecutable>
+  std::shared_ptr<PoplarExecutable> compile();
+  std::shared_ptr<PoplarExecutable>
   loadExecutableFromFile(const std::string &input_filename);
 
 private:
   void printWasLoweredDebug(const torch::jit::Node *node,
-                            poptorch::TensorId first_output_tensor);
+                            popart_compiler::TensorId first_output_tensor);
   torch::jit::Graph &_graph;
 
   bool _lowered;
@@ -304,23 +311,24 @@ private:
   std::vector<std::string> _parameter_names;
   InplaceGraphInfo _inplace_info;
 
-  std::vector<poptorch::TensorId> _input_tensor_hooks;
+  std::vector<popart_compiler::TensorId> _input_tensor_hooks;
 
-  std::vector<poptorch::TensorId> _output_tensor_hooks;
+  std::vector<popart_compiler::TensorId> _output_tensor_hooks;
 
   ValueMap _value_map;
 
   // Optimizer from the user.
-  const std::vector<Optimizer> _optimizers;
+  const std::vector<popart_compiler::Optimizer> _optimizers;
 
   // Tensors to be anchored other than outputs
   const AnchorList &_anchors;
 
-  using FunctionType = std::function<poptorch::TensorId(
-      const std::vector<poptorch::TensorId> &inputs, torch::jit::Node *)>;
+  using FunctionType = std::function<popart_compiler::TensorId(
+      const std::vector<popart_compiler::TensorId> &inputs,
+      torch::jit::Node *)>;
   std::unordered_map<c10::Symbol, FunctionType> _functionToImplementation;
 
-  poptorch::Compiler _compiler;
+  popart_compiler::Compiler _compiler;
 
   CPUCallbackMap _callbacks;
 
@@ -337,7 +345,7 @@ private:
                                    std::int64_t num_tensors);
   std::string tensorTypesAndShapes(const ValueMap::TensorList &tensors);
 
-  void validateOutputShapeAndType(poptorch::TensorId output_tensor,
+  void validateOutputShapeAndType(popart_compiler::TensorId output_tensor,
                                   torch::jit::Node *node,
                                   std::uint64_t node_output);
 };
@@ -371,7 +379,7 @@ void LowerToPopartImpl::setParameters(
 /*
  * Lower to popart impl.
  */
-std::shared_ptr<poptorch::PoplarExecutable> LowerToPopartImpl::compile() {
+std::shared_ptr<PoplarExecutable> LowerToPopartImpl::compile() {
   ERROR_ON_MSG(!_lowered, "You need to lower() the graph first");
 
   logging::LogContext ctx("LowerToPopart::compile");
@@ -385,13 +393,13 @@ std::shared_ptr<poptorch::PoplarExecutable> LowerToPopartImpl::compile() {
     data_types.emplace_back(fromPopartType(_compiler.getPopartType(id)));
   }
 
-  return std::make_shared<poptorch::PoplarExecutable>(
+  return std::make_shared<PoplarExecutable>(
       std::move(_compiler), std::move(_input_tensor_hooks),
       std::move(_output_tensor_hooks), std::move(data_types), _parameter_names,
       std::move(_inplace_info));
 }
 
-std::shared_ptr<poptorch::PoplarExecutable>
+std::shared_ptr<PoplarExecutable>
 LowerToPopartImpl::loadExecutableFromFile(const std::string &input_filename) {
   logging::LogContext ctx("LowerToPopart::loadExecutableFromFile");
   // Init the session, this also involves compiling to poplar.
@@ -403,7 +411,7 @@ LowerToPopartImpl::loadExecutableFromFile(const std::string &input_filename) {
     data_types.emplace_back(fromPopartType(_compiler.getPopartType(id)));
   }
 
-  return std::make_shared<poptorch::PoplarExecutable>(
+  return std::make_shared<PoplarExecutable>(
       std::move(_compiler), std::move(_input_tensor_hooks),
       std::move(_output_tensor_hooks), std::move(data_types), _parameter_names,
       std::move(_inplace_info));
@@ -424,7 +432,8 @@ void LowerToPopartImpl::lower(std::vector<at::Tensor> *in_tensors) {
 }
 
 void LowerToPopartImpl::printWasLoweredDebug(
-    const torch::jit::Node *node, poptorch::TensorId first_output_tensor) {
+    const torch::jit::Node *node,
+    popart_compiler::TensorId first_output_tensor) {
   logging::debug(
       "{} was lowered to {} [{},{}]", nodeToString(node),
       tensorNames(first_output_tensor, node->outputs().size()),
@@ -435,7 +444,7 @@ void LowerToPopartImpl::printWasLoweredDebug(
 void LowerToPopartImpl::lowerReturn() {
   // Used to encode the number of (actual) outputs
   _compiler.addOutputType(
-      {OutputElemType::Tuple,
+      {popart_compiler::OutputElemType::Tuple,
        static_cast<std::int64_t>(_inplace_info.num_normal_outputs)});
 
   // Recursively go through the output's type to flatten its structure and
@@ -448,13 +457,13 @@ void LowerToPopartImpl::lowerReturn() {
   process_type = [this, &process_type](const c10::TypePtr &type) {
     switch (type->kind()) {
     case c10::TypeKind::TensorType: {
-      _compiler.addOutputType({OutputElemType::Tensor});
+      _compiler.addOutputType({popart_compiler::OutputElemType::Tensor});
       break;
     }
     case c10::TypeKind::TupleType: {
       auto tuple_type = type->expect<c10::TupleType>();
       _compiler.addOutputType(
-          {OutputElemType::Tuple,
+          {popart_compiler::OutputElemType::Tuple,
            static_cast<std::int64_t>(tuple_type->elements().size())});
       for (const auto &elt_type : tuple_type->elements()) {
         process_type(elt_type);
@@ -470,11 +479,11 @@ void LowerToPopartImpl::lowerReturn() {
       ERROR_ON(!list_type);
 
       _compiler.addOutputType(
-          {OutputElemType::List,
+          {popart_compiler::OutputElemType::List,
            static_cast<std::int64_t>(list_type->numElements())});
 
       for (size_t i = 0; i < list_type->numElements(); i++) {
-        _compiler.addOutputType({OutputElemType::Tensor});
+        _compiler.addOutputType({popart_compiler::OutputElemType::Tensor});
       }
       break;
     }
@@ -496,10 +505,11 @@ void LowerToPopartImpl::lowerReturn() {
       ERROR_ON_MSG(elt_kind != c10::TypeKind::TensorType,
                    "Unsupported list type " << c10::typeKindToString(elt_kind));
       std::int64_t num_tensors = static_cast<std::int64_t>(tensors.size());
-      _compiler.addOutputType({OutputElemType::List, num_tensors});
+      _compiler.addOutputType(
+          {popart_compiler::OutputElemType::List, num_tensors});
       logging::trace("List with num tensors: {}", num_tensors);
       for (std::int64_t i = 0; i < num_tensors; ++i) {
-        _compiler.addOutputType({OutputElemType::Tensor});
+        _compiler.addOutputType({popart_compiler::OutputElemType::Tensor});
       }
     } else {
       process_type(value->type());
@@ -511,7 +521,7 @@ void LowerToPopartImpl::lowerReturn() {
       ERROR_ON(!_graph.return_node()->hasAttribute(overlap_symbol));
       auto overlap_str = _graph.return_node()->s(overlap_symbol);
 
-      _compiler.addOutputTensor(id, PopartOutputMode::N, 1,
+      _compiler.addOutputTensor(id, popart_compiler::PopartOutputMode::N, 1,
                                 overlap_str.c_str());
       _output_tensor_hooks.push_back(id);
       output_num++;
@@ -521,14 +531,15 @@ void LowerToPopartImpl::lowerReturn() {
 
   for (const auto &anchor : _anchors) {
     const char *name = anchor.name.c_str();
-    PopartOutputMode output_mode = static_cast<PopartOutputMode>(anchor.mode);
+    popart_compiler::PopartOutputMode output_mode =
+        static_cast<popart_compiler::PopartOutputMode>(anchor.mode);
     size_t return_period = anchor.period;
 
     logging::debug("  anchor ( {} {}/{} )", name,
                    outputModeToString(output_mode), return_period);
 
     auto id = _compiler.createTensorId(name);
-    _compiler.addOutputType({OutputElemType::Tensor});
+    _compiler.addOutputType({popart_compiler::OutputElemType::Tensor});
     _compiler.addOutputTensor(id);
     _output_tensor_hooks.push_back(id);
   }
@@ -580,7 +591,7 @@ LowerToPopartImpl::tensorTypesAndShapes(const ValueMap::TensorList &tensors) {
       auto dtype_chars = _compiler.getTensorDTypeString(tensor);
       shape_str << dtype_chars.get();
 
-      if (tensor_shape == Compiler::invalid_size) {
+      if (tensor_shape == popart_compiler::Compiler::invalid_size) {
         shape_str << shape_inf_failed;
       } else {
         shape_str << "(";
@@ -603,7 +614,7 @@ LowerToPopartImpl::tensorTypesAndShapes(const ValueMap::TensorList &tensors) {
 }
 
 void LowerToPopartImpl::validateOutputShapeAndType(
-    poptorch::TensorId output_tensor, torch::jit::Node *node,
+    popart_compiler::TensorId output_tensor, torch::jit::Node *node,
     std::uint64_t node_output) {
   torch::jit::Value *output = node->output(node_output);
   JitTensorInfo jit_output(output);
@@ -613,7 +624,7 @@ void LowerToPopartImpl::validateOutputShapeAndType(
   auto popart_size = _compiler.getSize(output_tensor);
   bool match = (popart_type == jit_output.scalar_type);
   // Only validate shape if PopART's shape inference worked.
-  if (match && popart_size != Compiler::invalid_size) {
+  if (match && popart_size != popart_compiler::Compiler::invalid_size) {
     match = (popart_size == jit_output.dims);
   }
   ERROR_ON_MSG(!match, "Output[" << node_output << "] mismatch: "
@@ -649,7 +660,7 @@ void LowerToPopartImpl::lowerBody() {
     auto itr = _functionToImplementation.find(kind);
     if (itr != _functionToImplementation.end()) {
       // Get the torch jit SSA for the input/output values.
-      std::vector<poptorch::TensorId> inputs;
+      std::vector<popart_compiler::TensorId> inputs;
       std::transform(node->inputs().begin(), node->inputs().end(),
                      std::back_inserter(inputs), [&](torch::jit::Value *val) {
                        // Tuples aren't supported here but it's ok because
@@ -659,14 +670,14 @@ void LowerToPopartImpl::lowerBody() {
                      });
 
       // Call the callback
-      poptorch::TensorId first_output_tensor = itr->second(inputs, node);
+      popart_compiler::TensorId first_output_tensor = itr->second(inputs, node);
 
       // The callback only returns the ID of the first tensor, but we know
       // the generated tensors have contiguous IDs, so we can infer the other
       // IDs.
       for (std::uint64_t i = 0; i < node->outputs().size(); ++i) {
         torch::jit::Value *output = node->output(i);
-        poptorch::TensorId output_tensor = first_output_tensor + i;
+        popart_compiler::TensorId output_tensor = first_output_tensor + i;
         ERROR_ON_MSG(!_compiler.tensorIdIsValid(output_tensor),
                      "Output " << i << " doesn't exist of Node " << *node);
         // TODO(T66614): JIT graph doesn't have any shape inference so we can't
@@ -684,7 +695,7 @@ void LowerToPopartImpl::lowerBody() {
       _compiler.startSubgraph();
       logging::debug("{} was lowered", nodeToString(node));
     } else if (kind == symbols::poptorch::end_for_loop) {
-      std::vector<poptorch::TensorId> inputs =
+      std::vector<popart_compiler::TensorId> inputs =
           _value_map.tensors(node->input(0));
 
       // Popart needs to know the number of outputs even though it's in the
@@ -695,13 +706,13 @@ void LowerToPopartImpl::lowerBody() {
           static_cast<std::int32_t>(node->i(c10::Symbol::attr("trip_count")));
 
       // Call the callback. This will pop the subgraphs from the stack.
-      poptorch::TensorId first_output_tensor =
+      popart_compiler::TensorId first_output_tensor =
           _compiler.endForLoop(trip_count, num_outputs, inputs);
 
       // The callback only returns the ID of the first tensor, but we know
       // the generated tensors have contiguous IDs, so we can infer the other
       // IDs.
-      std::vector<poptorch::TensorId> outs;
+      std::vector<popart_compiler::TensorId> outs;
       outs.resize(num_outputs);
       for (std::uint64_t i = 0; i < num_outputs; ++i) {
         outs[i] = first_output_tensor + i;
@@ -710,7 +721,7 @@ void LowerToPopartImpl::lowerBody() {
       _value_map.setTuple(node->output(), outs);
       printWasLoweredDebug(node, first_output_tensor);
     } else if (kind == symbols::poptorch::add_untyped_input_tensor) {
-      poptorch::TensorId out = _compiler.addUntypedInputTensor();
+      popart_compiler::TensorId out = _compiler.addUntypedInputTensor();
       _value_map.setTensor(node->output(), out);
       printWasLoweredDebug(node, out);
     } else if (kind == symbols::poptorch::begin_ipu_block) {
@@ -722,14 +733,14 @@ void LowerToPopartImpl::lowerBody() {
     } else if (kind == symbols::poptorch::pop_name_scope) {
       _compiler.popNameScope();
     } else if (kind == symbols::poptorch::set_matmul_serialization) {
-      poptorch::TensorId input = _value_map.tensor(node->input());
+      popart_compiler::TensorId input = _value_map.tensor(node->input());
       _compiler.setMatMulSerialization(
           input, node->s(c10::Symbol::attr("mode")).c_str(),
           node->i(c10::Symbol::attr("factor")),
           node->i(c10::Symbol::attr("keep_precision")));
       _value_map.setTensor(node->output(), input);
     } else if (kind == symbols::poptorch::optimizer_group) {
-      std::vector<poptorch::TensorId> inputs;
+      std::vector<popart_compiler::TensorId> inputs;
       std::transform(node->inputs().begin(), node->inputs().end(),
                      std::back_inserter(inputs), [&](torch::jit::Value *val) {
                        return _value_map.tensor(val);
@@ -740,7 +751,7 @@ void LowerToPopartImpl::lowerBody() {
 
     } else if (kind == symbols::poptorch::set_available_memory) {
       // Get the torch jit SSA for the input/output values.
-      std::vector<std::set<poptorch::TensorId>> inputs;
+      std::vector<std::set<popart_compiler::TensorId>> inputs;
       for (auto *input : node->inputs()) {
         inputs.emplace_back();
         auto outputs = input->node()->outputs();
@@ -762,7 +773,7 @@ void LowerToPopartImpl::lowerBody() {
       ERROR_ON_MSG(node->hasAttribute(c10::attr::value),
                    "Only None constants should be left in the graph after the "
                    "CanonicaliseConstants pass");
-      _value_map.setTensor(node->output(), NoneTensor);
+      _value_map.setTensor(node->output(), popart_compiler::NoneTensor);
     } else if (kind == c10::prim::TupleConstruct ||
                kind == c10::prim::ListConstruct) {
       // Get the torch jit SSA for the input/output values.
@@ -843,7 +854,7 @@ void LowerToPopartImpl::lowerBody() {
       _value_map.setTensor(node->output(), _value_map.tensor(node->input()));
 
     } else if (kind == symbols::poptorch::multi_conv_part) {
-      std::vector<poptorch::TensorId> inputs;
+      std::vector<popart_compiler::TensorId> inputs;
       std::transform(node->inputs().begin(), node->inputs().end(),
                      std::back_inserter(inputs), [&](torch::jit::Value *val) {
                        return _value_map.tensor(val);
@@ -894,7 +905,7 @@ void LowerToPopartImpl::lowerBody() {
       }
 
       torch::jit::ArrayRef<torch::jit::Value *> node_outputs = node->outputs();
-      std::vector<poptorch::TensorId> outputs = _compiler.endMultiConv();
+      std::vector<popart_compiler::TensorId> outputs = _compiler.endMultiConv();
       ERROR_ON_MSG(outputs.size() != node_outputs.size(),
                    "Wrong number of outputs for MultiConv. Expected "
                        << node_outputs.size() << " outputs but only received "
@@ -909,11 +920,11 @@ void LowerToPopartImpl::lowerBody() {
       // CPU callbacks are referenced by an string identifier.
       std::string id = node->s(c10::Symbol::attr("ID"));
 
-      std::vector<poptorch::PopartType> input_types;
+      std::vector<popart_compiler::PopartType> input_types;
       std::vector<std::vector<std::size_t>> input_shapes;
 
       // Get the torch jit SSA for the input/output values.
-      std::vector<poptorch::TensorId> inputs;
+      std::vector<popart_compiler::TensorId> inputs;
       std::transform(node->inputs().begin(), node->inputs().end(),
                      std::back_inserter(inputs), [&](torch::jit::Value *val) {
                        // Append type info from the inputs.
@@ -923,7 +934,7 @@ void LowerToPopartImpl::lowerBody() {
                        return _value_map.tensor(val);
                      });
 
-      std::vector<poptorch::PopartType> output_types;
+      std::vector<popart_compiler::PopartType> output_types;
       std::vector<std::vector<std::size_t>> output_shapes;
 
       for (torch::jit::Value *value : node->outputs()) {
@@ -931,13 +942,13 @@ void LowerToPopartImpl::lowerBody() {
                                            &output_shapes);
       }
 
-      poptorch::TensorId first_output_tensor =
+      popart_compiler::TensorId first_output_tensor =
           _compiler.addCPUCallback(inputs, _callbacks[id], input_types,
                                    input_shapes, output_types, output_shapes);
 
       for (std::uint64_t i = 0; i < node->outputs().size(); ++i) {
         torch::jit::Value *output = node->output(i);
-        poptorch::TensorId output_tensor = first_output_tensor + i;
+        popart_compiler::TensorId output_tensor = first_output_tensor + i;
         ERROR_ON_MSG(!_compiler.tensorIdIsValid(output_tensor),
                      "Output " << i << " doesn't exist of Node " << *node);
         _value_map.setTensor(output, output_tensor);
@@ -977,9 +988,9 @@ void LowerToPopartImpl::lowerParameters(std::vector<at::Tensor> *in_tensors) {
     ERROR_ON_MSG(in_tensors != nullptr,
                  "[Internal] Inputs expected to be in the graph.");
     // Bind to the DispatchTracer functions.
-    is_parameter = poptorch::isParameter;
-    is_parameter_tensor = poptorch::isParameter;
-    get_data_ptr = poptorch::getDataSourceForValue;
+    is_parameter = isParameter;
+    is_parameter_tensor = isParameter;
+    get_data_ptr = getDataSourceForValue;
     get_parameter_name = [](torch::jit::Value *value) {
       auto name = getParameterName(value);
       ERROR_ON_MSG(name.empty(), "No parameter name available for value %"
@@ -1211,13 +1222,14 @@ std::vector<float> convertType(const std::vector<double> &v) {
   return result;
 }
 
-PopartConstant convertTensorConstantNode(const torch::jit::Node *node) {
+popart_compiler::PopartConstant
+convertTensorConstantNode(const torch::jit::Node *node) {
   logging::LogContext ctx("convertTensorConstantNode: processing " +
                           nodeToString(node));
 
   ERROR_ON_MSG(
       node->kind() != symbols::poptorch::tensor_constant,
-      "Only a poptorch::tensor_constant can be converted into a popart "
+      "Only a popart_compiler::tensor_constant can be converted into a popart "
       "constant");
   auto output_type =
       *node->output()->type()->expect<c10::TensorType>()->scalarType();
@@ -1235,13 +1247,14 @@ PopartConstant convertTensorConstantNode(const torch::jit::Node *node) {
           getTensorDimensions(tensor)};
 }
 
-HostSideConstant
+popart_compiler::HostSideConstant
 convertHostSideTensorConstantNode(const torch::jit::Node *node) {
   logging::LogContext ctx("convertHostSideTensorConstantNode: processing " +
                           nodeToString(node));
-  ERROR_ON_MSG(node->kind() != symbols::poptorch::host_side_tensor_constant,
-               "Only a poptorch::host_side_tensor_constant can be converted "
-               "into a host side constant constant");
+  ERROR_ON_MSG(
+      node->kind() != symbols::poptorch::host_side_tensor_constant,
+      "Only a popart_compiler::host_side_tensor_constant can be converted "
+      "into a host side constant constant");
 
   auto tensor = getNodeTensorAttrValue(node);
   ERROR_ON(!tensor.is_contiguous());
@@ -1262,7 +1275,8 @@ float pyFloatToFloatWithRangeCheck(const pybind11::handle &pyFloat) {
 
 void processListAttribute(
     const char *name,
-    const std::shared_ptr<std::vector<PopartAttribute>> &attributes,
+    const std::shared_ptr<std::vector<popart_compiler::PopartAttribute>>
+        &attributes,
     const py::list &elements) {
   ERROR_ON(elements.empty());
   const auto &first_element = static_cast<py::object>(elements[0]);
@@ -1300,7 +1314,7 @@ void processListAttribute(
   ERROR("Invalid type for Popart attribute.");
 }
 
-std::shared_ptr<std::vector<PopartAttribute>>
+std::shared_ptr<std::vector<popart_compiler::PopartAttribute>>
 convertCustomOpAttributes(const torch::jit::Node *node,
                           const py::function &attribute_accessor) {
   logging::LogContext ctx("convertCustomOpAttributes: processing " +
@@ -1311,7 +1325,8 @@ convertCustomOpAttributes(const torch::jit::Node *node,
 
   auto dict = dict_obj.cast<py::dict>();
 
-  auto attributes = std::make_shared<std::vector<PopartAttribute>>();
+  auto attributes =
+      std::make_shared<std::vector<popart_compiler::PopartAttribute>>();
   for (const auto &attribute : dict) {
     std::string name = attribute.first.cast<std::string>();
 
@@ -1339,15 +1354,16 @@ convertCustomOpAttributes(const torch::jit::Node *node,
 
 LowerToPopartImpl::LowerToPopartImpl(
     torch::jit::Graph *g, InplaceGraphInfo &&inplace_info, bool training,
-    std::vector<Optimizer> &&opt, const SessionOptions &options,
+    std::vector<popart_compiler::Optimizer> &&opt,
+    const popart_compiler::SessionOptions &options,
     const py::function &attribute_accessor, CPUCallbackMap &&callback,
     const AnchorList &&anchors)
     : _graph(*g), _lowered(false), _built_in_params(true),
       _inplace_info(std::move(inplace_info)), _optimizers(opt),
-      _anchors(anchors), _compiler({training, options}), _callbacks(callback) {
+      _anchors(anchors), _compiler(training, options), _callbacks(callback) {
   // Init the function implementation map. This map will be populated by
   // elements which look something like:
-  /* {"popart::Foo", [&](const std::vector<poptorch::TensorId> &inputs,
+  /* {"popart::Foo", [&](const std::vector<popart_compiler::TensorId> &inputs,
      torch::jit::Node *node) { return _compiler.foo(inputs,
           node->i("attr::SomeIntegerAttr"),
     node->i("attr::SomeOtherIntegerAttr"), node->is("attr::AnIntArrayAttr"),
@@ -1387,20 +1403,22 @@ LowerToPopartImpl::LowerToPopartImpl(
 
 // Create a function decl with the given call and arguments.
 #define OP_DECL(ns, symbolName, function, unused, Args, unused2)               \
-  {symbols::ns::symbolName, [&](const std::vector<poptorch::TensorId> &inputs, \
-                                torch::jit::Node *node) {                      \
+  {symbols::ns::symbolName,                                                    \
+   [&](const std::vector<popart_compiler::TensorId> &inputs,                   \
+       torch::jit::Node *node) {                                               \
      (void)(node);                                                             \
      return _compiler.function(inputs Args);                                   \
    }},
 
 #define OP_DECL_NO_RETURN(ns, symbolName, function, unused, Args, unused2)     \
-  {symbols::ns::symbolName, [&](const std::vector<poptorch::TensorId> &inputs, \
-                                torch::jit::Node *node) {                      \
+  {symbols::ns::symbolName,                                                    \
+   [&](const std::vector<popart_compiler::TensorId> &inputs,                   \
+       torch::jit::Node *node) {                                               \
      _compiler.function(inputs Args);                                          \
      ERROR_ON_MSG(node->outputs().size() != 0,                                 \
                   "Void return function called on torch::jit::Node which has " \
                   "outputs");                                                  \
-     return poptorch::TensorId{};                                              \
+     return popart_compiler::TensorId{};                                       \
    }},
 
 #include "popart_compiler/SupportedOperations.inc.hpp"
@@ -1430,8 +1448,8 @@ LowerToPopart::LowerToPopart(torch::jit::Graph *graph,
                              const std::vector<at::Tensor> &parameters,
                              const std::vector<std::string> &parameter_names,
                              InplaceGraphInfo &&inplace_info, bool training,
-                             std::vector<Optimizer> &&opt,
-                             const SessionOptions &options,
+                             std::vector<popart_compiler::Optimizer> &&opt,
+                             const popart_compiler::SessionOptions &options,
                              const py::function &attribute_accessor,
                              CPUCallbackMap callbacks, AnchorList &&anchors) {
   _impl = std::make_unique<detail::LowerToPopartImpl>(
@@ -1443,8 +1461,8 @@ LowerToPopart::LowerToPopart(torch::jit::Graph *graph,
 
 LowerToPopart::LowerToPopart(torch::jit::Graph *graph,
                              InplaceGraphInfo &&inplace_info, bool training,
-                             std::vector<Optimizer> &&opt,
-                             const SessionOptions &options,
+                             std::vector<popart_compiler::Optimizer> &&opt,
+                             const popart_compiler::SessionOptions &options,
                              const py::function &attribute_accessor,
                              CPUCallbackMap callbacks, AnchorList &&anchors) {
   _impl = std::make_unique<detail::LowerToPopartImpl>(
@@ -1456,7 +1474,7 @@ void LowerToPopart::lower(std::vector<at::Tensor> *in_tensors) {
   _impl->lower(in_tensors);
 }
 
-std::shared_ptr<poptorch::PoplarExecutable> LowerToPopart::compile() {
+std::shared_ptr<PoplarExecutable> LowerToPopart::compile() {
   auto executable = _impl->compile();
   if (logging::outputPopartIR()) {
     logging::debug("Popart IR: {}", executable->getPopartIR());
@@ -1464,7 +1482,7 @@ std::shared_ptr<poptorch::PoplarExecutable> LowerToPopart::compile() {
   return executable;
 }
 
-std::shared_ptr<poptorch::PoplarExecutable>
+std::shared_ptr<PoplarExecutable>
 LowerToPopart::loadExecutableFromFile(const std::string &input_filename) {
   return _impl->loadExecutableFromFile(input_filename);
 }

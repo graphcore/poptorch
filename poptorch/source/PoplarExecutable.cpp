@@ -17,7 +17,7 @@
 namespace poptorch {
 
 void PoplarExecutable::updateOptimizers(
-    const std::vector<Optimizer> &optimizers) {
+    const std::vector<popart_compiler::Optimizer> &optimizers) {
   _compiler.updateOptimizers(optimizers);
 }
 
@@ -28,7 +28,7 @@ PoplarExecutable::run(std::vector<at::Tensor> &inTensors) {
   // Set up the input tensors in the poplar graph to point to the incoming
   // pytorch tensors.
   for (std::size_t i = 0; i < _popart_inputs.size(); ++i) {
-    poptorch::TensorId popart_id = _popart_inputs[i];
+    popart_compiler::TensorId popart_id = _popart_inputs[i];
     at::Tensor &pytorch_tensor = inTensors.at(i);
 
     ERROR_ON(!pytorch_tensor.is_contiguous());
@@ -110,9 +110,10 @@ PoplarExecutable::run(std::vector<at::Tensor> &inTensors) {
 
   // Set up the outputs.
   for (size_t i = 0; i < _popart_outputs.size(); i++) {
-    poptorch::TensorId &popart_id(_popart_outputs[i]);
+    popart_compiler::TensorId &popart_id(_popart_outputs[i]);
     auto dims = _compiler.getSize(popart_id);
-    ERROR_ON_MSG(dims == Compiler::invalid_size, "Shape inference failed");
+    ERROR_ON_MSG(dims == popart_compiler::Compiler::invalid_size,
+                 "Shape inference failed");
 
     std::uint64_t b_dim = _compiler.popartBatchDimForAnchor(popart_id);
     if (b_dim > 1) {
@@ -204,7 +205,8 @@ void PoplarExecutable::copyWeightsToDevice(
   _compiler.copyWeightsToDevice(pointers);
 }
 
-const std::vector<OutputTypeShape> &PoplarExecutable::outputTypes() const {
+const std::vector<popart_compiler::OutputTypeShape> &
+PoplarExecutable::outputTypes() const {
   return _compiler.outputTypes();
 }
 

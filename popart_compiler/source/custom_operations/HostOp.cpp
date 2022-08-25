@@ -24,10 +24,10 @@
 #include <popart/names.hpp>
 #include <popart/operators.hpp>
 
-#include <CustomOps.hpp>
-
 #include "popart_compiler/CompilerImpl.hpp"
+#include "popart_compiler/CustomOps.hpp"
 
+namespace poptorch {
 namespace poptorch_custom_ops {
 
 const char host_op_metadata_attr[] = "func_info";
@@ -38,7 +38,7 @@ const char host_op_metadata_attr[] = "func_info";
  * A popart custom operation to handle Host operations. Takes a callback and
  * sets up the IPU->CPU communication for the needed tensors.
  */
-namespace poptorch {
+namespace popart_compiler {
 
 namespace {
 
@@ -47,7 +47,7 @@ popart::TensorInfo shapeInferOutput(detail::CallbackInternalMetadata *func_info,
                                     std::uint32_t i) {
   // Get type and shape from metadata.
   const popart::DataType type =
-      poptorch::popartTypeFromPoptorch(func_info->output_types[i]);
+      popartTypeFromPoptorch(func_info->output_types[i]);
   const std::vector<std::size_t> &shape = func_info->output_shapes[i];
 
   // Convert from the poptorch/poplar type (std::size_t) to the popart one
@@ -76,7 +76,7 @@ getMetadataFromAttributeMap(const popart::Attributes &attrs) {
 
   // Cast to the correct type.
   // NOLINTNEXTLINE performance-no-int-to-ptr
-  return reinterpret_cast<poptorch::detail::CallbackInternalMetadata *>(as_ptr);
+  return reinterpret_cast<detail::CallbackInternalMetadata *>(as_ptr);
 }
 
 } // namespace
@@ -87,7 +87,7 @@ getMetadataFromAttributeMap(const popart::Attributes &attrs) {
 class HostOp : public popart::Op {
 public:
   HostOp(const popart::OperatorIdentifier &_opid,
-         poptorch::detail::CallbackInternalMetadata *info,
+         detail::CallbackInternalMetadata *info,
          const popart::Op::Settings &settings_)
       : popart::Op(_opid, settings_), func_info(info) {}
 
@@ -105,7 +105,7 @@ public:
 
   float getSubgraphValue() const final { return getLowSubgraphValue(); }
 
-  poptorch::detail::CallbackInternalMetadata *func_info;
+  detail::CallbackInternalMetadata *func_info;
 };
 
 class HostOpx : public popart::popx::Opx {
@@ -145,7 +145,7 @@ public:
     output_args.reserve(num_outputs);
     for (std::uint32_t output = 0; output < num_outputs; ++output) {
       const poplar::Type type =
-          poptorch::poplarTypeFromPoptorch(func_info->output_types[output]);
+          poplarTypeFromPoptorch(func_info->output_types[output]);
 
       const std::vector<std::size_t> &shape = func_info->output_shapes[output];
 
@@ -167,34 +167,38 @@ public:
     sequence.add(poplar::program::Call(hf, inputs, outputs));
   }
 
-  poptorch::detail::CallbackInternalMetadata *func_info;
+  detail::CallbackInternalMetadata *func_info;
 };
 
+} // namespace popart_compiler
 } // namespace poptorch
 
-static popart::OpCreator<poptorch::HostOp> host_op_creator(
-    {{poptorch_custom_ops::host_op, {}}},
+static popart::OpCreator<poptorch::popart_compiler::HostOp> host_op_creator(
+    {{poptorch::poptorch_custom_ops::host_op, {}}},
     [](const popart::OpCreatorInfo &info) {
       // Get the stream info from the attribute map we passed to
       // create the op.
-      auto *func_info = poptorch::getMetadataFromAttributeMap(info.attributes);
+      auto *func_info = poptorch::popart_compiler::getMetadataFromAttributeMap(
+          info.attributes);
 
-      return std::unique_ptr<popart::Op>(
-          new poptorch::HostOp(info.opid, func_info, info.settings));
+      return std::unique_ptr<popart::Op>(new poptorch::popart_compiler::HostOp(
+          info.opid, func_info, info.settings));
     },
     true);
 
-static popart::popx::OpxCreator<poptorch::HostOpx>
-    host_opx_creator(poptorch_custom_ops::host_op);
+static popart::popx::OpxCreator<poptorch::popart_compiler::HostOpx>
+    host_opx_creator(poptorch::poptorch_custom_ops::host_op);
 
 static popart::RegisterShapeInferenceFunction host_op_shape_inference(
-    poptorch_custom_ops::host_op, [](popart::ShapeInferenceContext &ctx) {
+    poptorch::poptorch_custom_ops::host_op,
+    [](popart::ShapeInferenceContext &ctx) {
       // Get the stream info from the attribute map we passed to create the op.
-      auto *func_info =
-          poptorch::getMetadataFromAttributeMap(ctx.getAttributes());
+      auto *func_info = poptorch::popart_compiler::getMetadataFromAttributeMap(
+          ctx.getAttributes());
 
       // Tell popart what the output should look like.
       for (std::uint32_t i = 0; i < func_info->output_types.size(); ++i) {
-        ctx.outInfo(i) = poptorch::shapeInferOutput(func_info, i);
+        ctx.outInfo(i) =
+            poptorch::popart_compiler::shapeInferOutput(func_info, i);
       }
     });

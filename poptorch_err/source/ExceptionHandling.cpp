@@ -142,7 +142,8 @@ void rethrowPoptorchException(const std::exception_ptr &eptr,
   line = catch_line;
 
   try {
-    rethrowPopartOrPoplarException(eptr, catch_file.c_str(), catch_line);
+    popart_compiler::rethrowPopartOrPoplarException(eptr, catch_file.c_str(),
+                                                    catch_line);
     std::rethrow_exception(eptr);
   } catch (const ExceptionInfo &ei) {
     filename = ei.filename();

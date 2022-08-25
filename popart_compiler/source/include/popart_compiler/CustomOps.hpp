@@ -11,6 +11,7 @@
 
 extern "C" {
 
+namespace poptorch {
 namespace poptorch_custom_ops {
 
 constexpr std::uint32_t domain = 1;
@@ -52,4 +53,5 @@ const popart::OperatorIdentifier fast_gather_last_dim_grad = {
     "poptorch.custom_ops", "FastGatherLastDimGrad", 1};
 
 } // namespace poptorch_custom_ops
+} // namespace poptorch
 }

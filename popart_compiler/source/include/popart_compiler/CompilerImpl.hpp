@@ -28,6 +28,7 @@
 #include "popart_compiler/MultiConvBuilder.hpp"
 
 namespace poptorch {
+namespace popart_compiler {
 
 class Compiler;
 
@@ -55,9 +56,9 @@ struct CallbackInternalMetadata {
   std::string handle;
 
   // Type and shape info for the input and outputs.
-  std::vector<poptorch::PopartType> input_types;
+  std::vector<PopartType> input_types;
   std::vector<std::vector<std::size_t>> input_shapes;
-  std::vector<poptorch::PopartType> output_types;
+  std::vector<PopartType> output_types;
   std::vector<std::vector<std::size_t>> output_shapes;
 
   // The callbacks are called in random order so we need to track how many have
@@ -253,7 +254,7 @@ public:
   // General helpers.
 
   // Inserts memory into the list of tensors being output by the model.
-  void addMemoryToOutput(poptorch::TensorId id, void *ptr,
+  void addMemoryToOutput(TensorId id, void *ptr,
                          std::unique_ptr<popart::IArray> &&memory);
 
   // Domain helpers
@@ -276,9 +277,8 @@ public:
   popart::TensorId tensorConstant(const std::vector<popart::TensorId> &tensors,
                                   const PopartConstant &constant);
 
-  poptorch::TensorId
-  hostSideTensorConstant(const std::vector<popart::TensorId> &tensors,
-                         HostSideConstant constant);
+  TensorId hostSideTensorConstant(const std::vector<popart::TensorId> &tensors,
+                                  HostSideConstant constant);
 
   popart::TensorId addNotInPlace(const std::vector<popart::TensorId> &in);
 
@@ -315,11 +315,10 @@ public:
 
   std::vector<popart::TensorId> endMultiConv();
 
-  void optimizerGroup(const std::vector<poptorch::TensorId> &tensors,
-                      int64_t group) {
+  void optimizerGroup(const std::vector<TensorId> &tensors, int64_t group) {
     std::vector<popart::TensorId> ins;
     std::transform(tensors.begin(), tensors.end(), std::back_inserter(ins),
-                   [&](poptorch::TensorId index) { return ids[index]; });
+                   [&](TensorId index) { return ids[index]; });
 
     grad_update_groups.insert({group, ins});
   }
@@ -350,9 +349,9 @@ public:
   void
   setExecutionStrategyAttributes(const std::set<popart::TensorId> &tensors);
 
-  const HostSideConstant &getHostSideConstant(poptorch::TensorId id) const;
+  const HostSideConstant &getHostSideConstant(TensorId id) const;
 
-  bool isHostSideConstant(poptorch::TensorId id) const;
+  bool isHostSideConstant(TensorId id) const;
 
   /* must_attach is a special case for on_demand devices */
   std::shared_ptr<popart::DeviceInfo> createDevice(bool must_attach = false);
@@ -369,7 +368,7 @@ public:
   std::set<popart::TensorId> getTensorNames() const;
 
   // Returns the PopART type for specified id
-  PopartType getPopartType(poptorch::TensorId id) const;
+  PopartType getPopartType(TensorId id) const;
 
   // Caches all PopART types
   void cachePopartTypes();
@@ -377,9 +376,7 @@ public:
   // Returns cached PopART type for the specified id
   // Caution: no bounds checking as this is called for each input, each run.
   // cachePopartType must be called once first.
-  PopartType getCachedPopartType(poptorch::TensorId id) const {
-    return ids_types[id];
-  }
+  PopartType getCachedPopartType(TensorId id) const { return ids_types[id]; }
 
   void setAttribute(const std::string &attribute, const std::string &key,
                     const std::string &value);
@@ -393,7 +390,7 @@ private:
 
   // Constants which are simply returned (possibly as part of a tuple/list) and
   // do not need to be input into Popart
-  std::unordered_map<poptorch::TensorId, HostSideConstant> _host_side_constants;
+  std::unordered_map<TensorId, HostSideConstant> _host_side_constants;
   std::shared_ptr<popart::DeviceInfo> _device;
 
   std::unordered_map<std::string, std::map<std::string, std::string>>
@@ -406,4 +403,5 @@ popart::DataType popartTypeFromPoptorch(PopartType);
 
 poplar::Type poplarTypeFromPoptorch(PopartType);
 
+} // namespace popart_compiler
 } // namespace poptorch

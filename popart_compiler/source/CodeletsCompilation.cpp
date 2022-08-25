@@ -13,6 +13,7 @@
 #include "poptorch_logging/Logging.hpp"
 
 namespace poptorch {
+namespace popart_compiler {
 
 namespace {
 
@@ -265,4 +266,5 @@ std::unique_ptr<char[]> compileCustomCodeletIfNeeded(const char *src_file_name,
   return stringToUniquePtr(out_file_path);
 }
 
+} // namespace popart_compiler
 } // namespace poptorch

@@ -1,6 +1,6 @@
 // Copyright (c) 2021 Graphcore Ltd. All rights reserved.
 #include "TorchSoftplus.hpp"
-#include "CustomOps.hpp"
+#include "popart_compiler/CustomOps.hpp"
 #include <popart/opmanager.hpp>
 #include <popart/opserialiser.hpp>
 #include <popart/popx/devicex.hpp>
@@ -10,6 +10,7 @@
 #include <popops/ElementWise.hpp>
 #include <snap/Graph.hpp>
 
+namespace poptorch {
 namespace poptorch_custom_ops {
 TorchSoftplusOp::TorchSoftplusOp(const popart::OperatorIdentifier &opid_,
                                  float beta, float threshold,
@@ -242,3 +243,4 @@ popart::popx::OpxCreator<TorchSoftplusGradOpx>
 } // namespace
 
 } // namespace poptorch_custom_ops
+} // namespace poptorch

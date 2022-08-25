@@ -6,6 +6,7 @@
 #include <string>
 
 namespace poptorch {
+namespace popart_compiler {
 
 bool ipuModelEnvironmentVariableIsEnabled();
 
@@ -33,6 +34,14 @@ std::int64_t ipuHardwareVersion(std::uint64_t num_ipus = 1);
 // is to return a "string" without using the non ABI-compatible std::string
 std::unique_ptr<char[]> stringToUniquePtr(const std::string &str);
 
+// Returns the dtype int corresponding to the onnx type string
+int64_t dtypeIntFromOnnxStr(const char *onnx_type);
+
+// Returns the Onnx datatype as string corresponding the dtype int used in Onnx
+// and Popart ops which take an int64_t dtype argument, a.g. "randomnormal"
+const char *onnxStrFromDtypeInt(int64_t dtype);
+
+} // namespace popart_compiler
 } // namespace poptorch
 
 #endif // POPART_COMPILER_UTILS_HPP

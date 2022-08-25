@@ -540,10 +540,15 @@ class ClangTidy(ILinter):
             while path.pop() != "include":
                 continue
 
+            # Types is a sub module in popart_compiler, so we want to go up one more level.
+            if path[-1] == "types":
+                path.pop()
+
             # TODO(T49191) lower_to_poplar, dialect and pytorch_bridge don't
             # have their sources in a "source" subfolder at the moment.
-            if not any(comp in path for comp in
-                       ["lower_to_poplar", "pytorch_bridge", "dialect"]):
+            exceptions = ["lower_to_poplar", "pytorch_bridge", "dialect"]
+            if not "source" in path and not any(comp in path
+                                                for comp in exceptions):
                 # Point at "source" instead
                 path.append("source")
         # else it's a private header: nothing to do, it's already in the same

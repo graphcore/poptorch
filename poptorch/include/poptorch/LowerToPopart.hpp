@@ -20,7 +20,9 @@ class function;
 namespace py = pybind11; // NOLINT
 
 namespace poptorch {
+namespace popart_compiler {
 class SessionOptions;
+}
 
 namespace detail {
 class LowerToPopartImpl;
@@ -28,7 +30,8 @@ class LowerToPopartImpl;
 
 // CallbackMetadata is used to pass information from python to the poplar custom
 // op for CPU ops. The string is the ID given by the user to each op.
-using CPUCallbackMap = std::unordered_map<std::string, CallbackMetadata>;
+using CPUCallbackMap =
+    std::unordered_map<std::string, popart_compiler::CallbackMetadata>;
 
 struct Anchor {
   Anchor(std::string n, std::uint8_t m, size_t p)
@@ -54,14 +57,15 @@ public:
                 const std::vector<at::Tensor> &parameters,
                 const std::vector<std::string> &parameter_names,
                 InplaceGraphInfo &&inplace_info, bool training,
-                std::vector<Optimizer> &&opt, const SessionOptions &options,
+                std::vector<popart_compiler::Optimizer> &&opt,
+                const popart_compiler::SessionOptions &options,
                 const py::function &attribute_accessor, CPUCallbackMap callback,
                 AnchorList &&anchors);
 
   // Dispatcher entry point: the parameters are embedded in the jit::Graph.
   LowerToPopart(torch::jit::Graph *graph, InplaceGraphInfo &&inplace_info,
-                bool training, std::vector<Optimizer> &&opt,
-                const SessionOptions &options,
+                bool training, std::vector<popart_compiler::Optimizer> &&opt,
+                const popart_compiler::SessionOptions &options,
                 const py::function &attribute_accessor, CPUCallbackMap callback,
                 AnchorList &&anchors);
   LowerToPopart(LowerToPopart &&lower);

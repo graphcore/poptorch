@@ -13,6 +13,7 @@
 #include <popart/popx/devicex.hpp>
 #include <popart/popx/opx.hpp>
 
+namespace poptorch {
 namespace poptorch_custom_ops {
 
 class FastGatherLastDimOp : public popart::Op {
@@ -117,5 +118,6 @@ private:
 };
 
 } // namespace poptorch_custom_ops
+} // namespace poptorch
 
 #endif

@@ -8,7 +8,8 @@
 #include <utility>
 #include <vector>
 
-#include "popart_compiler/PopartEnums.hpp"
+#include "popart_compiler/CompilerTypes.hpp"
+
 #include "poptorch_logging/Error.hpp"
 #include "poptorch_logging/Logging.hpp"
 
@@ -19,58 +20,13 @@ class ConstVoidData;
 } // namespace popart
 
 namespace poptorch {
-
-// PopTorch abstraction of popart::MutableVoidData to be used across the ABI
-// boundary
-struct TensorMetadata {
-  const char *id;
-  std::vector<int64_t> shape;
-  const char *dtype;
-  void *data = nullptr;
-  int64_t num_bytes = -1;
-};
-
-/*
-  We use this callback structure to capture data from the poptorch python
-  frontend. We get the function to call as well as pointers to the output/input
-  storage waiting on CPU. From this we derive more data, see
-  CallbackInternalMetadata in CompilerImpl.hpp.
-*/
-struct CallbackMetadata {
-  // The thing we are calling back.
-  std::function<void()> the_callback;
-
-  // Due to tracing complexities we have to register the buffers as a seperate
-  // step after the model has been traced.
-  std::function<void()> buffer_registration_callback;
-
-  // Pointers to the buffers we created on host.
-  std::vector<void *> input_pointers;
-  std::vector<void *> output_pointers;
-};
-
-using TensorId = std::size_t;
-
-static constexpr TensorId NoneTensor = 0; // NOLINT
+namespace popart_compiler {
 
 namespace detail {
 struct CompilerImpl;
 struct SessionOptionsImpl;
 } // namespace detail
 
-enum class OutputElemType { Tensor, Tuple, List };
-
-// For testing only: throw an exception of the selected type.
-enum class TestErrorType {
-  Poptorch,
-  Popart,
-  PopartInternal,
-  Poplibs,
-  PoplarUnrecoverable,
-  PoplarUnknown,
-  PoplarRecoverableFullReset,
-  PoplarLinkError
-};
 void throwTestError(TestErrorType type);
 
 // Examines the supplied exception. If it is a popart or poplar exception,
@@ -79,54 +35,11 @@ void throwTestError(TestErrorType type);
 void rethrowPopartOrPoplarException(const std::exception_ptr &eptr,
                                     const char *filename, uint64_t line);
 
-struct OutputTypeShape {
-  OutputElemType type;
-  int64_t num_elements{0};
-};
-
 void setPopartLogLevel(logging::Level level);
 
-struct Optimizer {
-  struct Parameter {
-    char name[32];
-    float value;
-    bool is_const;
-  };
-  using ParamType = std::pair<float, bool>;
-
-  explicit Optimizer(OptimizerType t, bool useTfVariant)
-      : type(t), accum_types_provided(false), use_tf_variant(useTfVariant) {}
-  explicit Optimizer(OptimizerType t, bool useTfVariant, float maxGradNorm)
-      : type(t), accum_types_provided(false), use_tf_variant(useTfVariant),
-        max_grad_norm(maxGradNorm) {}
-  Optimizer(OptimizerType t, bool accumType, bool firstOrderType,
-            bool secondOrderType, bool useTfVariant, float maxGradNorm)
-      : type(t), accum_types_provided(true), accum_type_is_half(accumType),
-        first_order_momentum_accum_type_is_half(firstOrderType),
-        second_order_momentum_accum_type_is_half(secondOrderType),
-        use_tf_variant(useTfVariant), max_grad_norm(maxGradNorm) {}
-
-  // Copies the value and constness of one parameter to another
-  void copyParam(const Optimizer &source_optim, const char *source,
-                 const char *dest);
-
-  void copyParam(const char *source, const char *dest) {
-    copyParam(*this, source, dest);
-  }
-
-  OptimizerType type;
-  // True if the main, first and second order accum types have been set.
-  bool accum_types_provided;
-  // Special parameters for adam/lamb. If true accumulations will be half
-  // otherwise will be float.
-  bool accum_type_is_half;
-  bool first_order_momentum_accum_type_is_half;
-  bool second_order_momentum_accum_type_is_half;
-  bool use_tf_variant;
-  float max_grad_norm;
-
-  std::vector<Parameter> parameters;
-};
+// Copies the value and constness of one parameter to another
+void copyParam(Optimizer &dest_optim, const Optimizer &source_optim,
+               const char *source, const char *dest);
 
 class Compiler;
 class SessionOptions {
@@ -239,11 +152,11 @@ public:
   ~Compiler();
   Compiler(Compiler &&compiler);
 
-  poptorch::TensorId addInputTensor(const char *type,
-                                    const std::vector<std::int64_t> &dims,
-                                    const char *overlap = "no_overlap");
+  TensorId addInputTensor(const char *type,
+                          const std::vector<std::int64_t> &dims,
+                          const char *overlap = "no_overlap");
 
-  poptorch::TensorId createTensorId(const char *name);
+  TensorId createTensorId(const char *name);
 
   void setCurrentPythonCodeLocation(const char *torch_node,
                                     const char *filename, std::uint64_t line,
@@ -266,13 +179,12 @@ public:
 
 // Create a function decl with the given call and arguments.
 #define OP_DECL(Namespace, FuncName, function, OnnxImpl, Args, BodyArgs)       \
-  poptorch::TensorId function(                                                 \
-      const std::vector<poptorch::TensorId> &inputs Args);
+  TensorId function(const std::vector<TensorId> &inputs Args);
 
 // Create a function decl with the given call and arguments which returns void.
 #define OP_DECL_NO_RETURN(Namespace, FuncName, function, OnnxImpl, Args,       \
                           BodyArgs)                                            \
-  void function(const std::vector<poptorch::TensorId> &inputs Args);
+  void function(const std::vector<TensorId> &inputs Args);
 
 #include "SupportedOperations.inc.hpp"
 
@@ -292,20 +204,20 @@ public:
 #undef FLOAT_VEC
 #undef INT_VEC
 
-  poptorch::TensorId
-  addInitializedInputTensor(const char *name, const char *type,
-                            const std::vector<std::int64_t> &dims, void *data);
+  TensorId addInitializedInputTensor(const char *name, const char *type,
+                                     const std::vector<std::int64_t> &dims,
+                                     void *data);
 
-  bool tensorIdIsValid(poptorch::TensorId id) const;
-  const char *tensorName(poptorch::TensorId id) const;
+  bool tensorIdIsValid(TensorId id) const;
+  const char *tensorName(TensorId id) const;
 
   static const std::vector<std::int64_t> invalid_size;
 
-  std::vector<std::int64_t> getSize(poptorch::TensorId id) const;
+  std::vector<std::int64_t> getSize(TensorId id) const;
 
-  std::unique_ptr<char[]> getTensorDTypeString(poptorch::TensorId id) const;
+  std::unique_ptr<char[]> getTensorDTypeString(TensorId id) const;
 
-  bool isHostSideConstant(poptorch::TensorId id) const;
+  bool isHostSideConstant(TensorId id) const;
 
   void addOutputType(OutputTypeShape type);
 
@@ -317,61 +229,61 @@ public:
   // "EVERYN": Will return every N batch
   // "FINAL": Will return the last batch only
   // clang-format on
-  void addOutputTensor(poptorch::TensorId output,
+  void addOutputTensor(TensorId output,
                        PopartOutputMode output_mode = PopartOutputMode::N,
                        size_t output_return_period = 1,
                        const char *overlap = "no_overlap");
 
-  void setUpInputOp(poptorch::TensorId id, float *ptr,
+  void setUpInputOp(TensorId id, float *ptr,
                     const std::vector<std::int64_t> &dims);
 
-  void setUpInputOp(poptorch::TensorId id, std::int32_t *ptr,
+  void setUpInputOp(TensorId id, std::int32_t *ptr,
                     const std::vector<std::int64_t> &dims);
 
-  void setUpInputOp(poptorch::TensorId id, bool *ptr,
+  void setUpInputOp(TensorId id, bool *ptr,
                     const std::vector<std::int64_t> &dims);
 
-  void setUpInputOp(poptorch::TensorId id, std::int16_t *ptr,
+  void setUpInputOp(TensorId id, std::int16_t *ptr,
                     const std::vector<std::int64_t> &dims,
                     bool float16 = false);
 
   // at::ScalarType::Byte
-  void setUpInputOp(poptorch::TensorId id, std::uint8_t *ptr,
+  void setUpInputOp(TensorId id, std::uint8_t *ptr,
                     const std::vector<std::int64_t> &dims);
 
   // at::ScalarType::Char
-  void setUpInputOp(poptorch::TensorId id, std::int8_t *ptr,
+  void setUpInputOp(TensorId id, std::int8_t *ptr,
                     const std::vector<std::int64_t> &dims);
 
   // at::ScalarType::Byte
-  void setUpOutputOp(poptorch::TensorId id, std::uint8_t *ptr,
+  void setUpOutputOp(TensorId id, std::uint8_t *ptr,
                      const std::vector<std::int64_t> &dims);
 
   // at::ScalarType::Char
-  void setUpOutputOp(poptorch::TensorId id, std::int8_t *ptr,
+  void setUpOutputOp(TensorId id, std::int8_t *ptr,
                      const std::vector<std::int64_t> &dims);
 
-  void setUpOutputOp(poptorch::TensorId id, float *ptr,
+  void setUpOutputOp(TensorId id, float *ptr,
                      const std::vector<std::int64_t> &dims);
 
-  void setUpOutputOp(poptorch::TensorId id, std::int32_t *ptr,
+  void setUpOutputOp(TensorId id, std::int32_t *ptr,
                      const std::vector<std::int64_t> &dims);
 
-  void setUpOutputOp(poptorch::TensorId id, bool *ptr,
+  void setUpOutputOp(TensorId id, bool *ptr,
                      const std::vector<std::int64_t> &dims);
 
-  void setUpOutputOp(poptorch::TensorId id, std::int16_t *ptr,
+  void setUpOutputOp(TensorId id, std::int16_t *ptr,
                      const std::vector<std::int64_t> &dims);
 
   // Each std::set of tensors represents all the outputs of a node to set
   // the available memory proportion on. This function loops over the outer
   // vector, so the total number of nodes it will set the proportion on
   // will be inputs.size().
-  void setAvailableMemoryProportion(
-      const std::vector<std::set<poptorch::TensorId>> &inputs,
-      float availableMemoryProportion);
+  void
+  setAvailableMemoryProportion(const std::vector<std::set<TensorId>> &inputs,
+                               float availableMemoryProportion);
 
-  void setMatMulSerialization(poptorch::TensorId matmul, const char *mode,
+  void setMatMulSerialization(TensorId matmul, const char *mode,
                               std::uint64_t factor,
                               std::uint64_t keep_precision);
   void clearActiveIpu();
@@ -398,25 +310,23 @@ public:
   static std::vector<char>
   importPoptorchMetadataFromFile(const char *import_filename);
 
-  poptorch::TensorId
-  addCPUCallback(const std::vector<poptorch::TensorId> &inputs,
-                 const CallbackMetadata &callback,
-                 std::vector<poptorch::PopartType> input_types,
-                 std::vector<std::vector<std::size_t>> input_shapes,
-                 std::vector<poptorch::PopartType> output_types,
-                 std::vector<std::vector<std::size_t>> output_shapes);
+  TensorId addCPUCallback(const std::vector<TensorId> &inputs,
+                          const CallbackMetadata &callback,
+                          std::vector<PopartType> input_types,
+                          std::vector<std::vector<std::size_t>> input_shapes,
+                          std::vector<PopartType> output_types,
+                          std::vector<std::vector<std::size_t>> output_shapes);
 
   void startSubgraph();
 
-  poptorch::TensorId endForLoop(std::int32_t trip_count,
-                                std::int64_t num_outputs,
-                                const std::vector<poptorch::TensorId> &inputs);
+  TensorId endForLoop(std::int32_t trip_count, std::int64_t num_outputs,
+                      const std::vector<TensorId> &inputs);
 
   void pushNameScope(const char *name);
 
   void popNameScope();
 
-  poptorch::TensorId addUntypedInputTensor();
+  TensorId addUntypedInputTensor();
   // Write the weights into IPU memory from the pytorch tensor buffers in the
   // model.
   void copyWeightsToDevice(const std::vector<void *> &host_buffers);
@@ -425,7 +335,7 @@ public:
   void copyWeightsToHost(const std::vector<void *> &host_buffers);
 
   // Return the type of the given tensor.
-  PopartType getPopartType(poptorch::TensorId id) const;
+  PopartType getPopartType(TensorId id) const;
 
   // Execute the compiled popart graph using poplar.
   void run();
@@ -442,7 +352,7 @@ public:
   // Take the above and work out how much of it is being returned. ID must be
   // an anchor. The batch dim will be mutated depending on what the anchor is
   // returning.
-  std::uint64_t popartBatchDimForAnchor(poptorch::TensorId id) const;
+  std::uint64_t popartBatchDimForAnchor(TensorId id) const;
 
   // Return a flat representation of the output types
   // For example: ( T0, T2, (T3, T4)) is represented as:
@@ -457,8 +367,7 @@ public:
   // protecting the ABI boundry.
   std::set<std::unique_ptr<char[]>> getTensorNames() const;
 
-  void optimizerGroup(const std::vector<poptorch::TensorId> &inputs,
-                      int64_t group);
+  void optimizerGroup(const std::vector<TensorId> &inputs, int64_t group);
 
   std::vector<TensorMetadata> optimizerTensorMetadataList() const;
 
@@ -470,7 +379,7 @@ public:
 
   std::unique_ptr<char[]> getExecutionInfo() const;
 
-  void addMultiConvPart(const std::vector<poptorch::TensorId> &inputs,
+  void addMultiConvPart(const std::vector<TensorId> &inputs,
                         const std::vector<int64_t> &dilations,
                         const std::vector<int64_t> &kernel_shape,
                         const std::vector<int64_t> &pads,
@@ -488,7 +397,7 @@ public:
 
   void setMultiConvCycleBackOff(double c);
 
-  std::vector<poptorch::TensorId> endMultiConv();
+  std::vector<TensorId> endMultiConv();
 
   void setAttribute(const char *attribute, const char *key, const char *value);
   void clearAttribute(const char *attribute, const char *key);
@@ -497,10 +406,7 @@ public:
   void attachToDevice();
   bool isAttachedToDevice() const;
 
-  const std::vector<double> &getInputTimestamps(size_t index) const;
-  const std::vector<double> &getInputCompleteTimestamps(size_t index) const;
-  const std::vector<double> &getOutputTimestamps(size_t index) const;
-  const std::vector<double> &getOutputCompleteTimestamps(size_t index) const;
+  Timestamps getTimestamps() const;
 
   // Returns the number of cycles (on replica 0) run by the IPU for the last
   // model run.
@@ -510,7 +416,7 @@ public:
   size_t getNumOutputs() const;
 
 private:
-  void assertTensorIs(PopartType dataType, poptorch::TensorId id) const;
+  void assertTensorIs(PopartType dataType, TensorId id) const;
 
   // Make sure no overlap is specified for pipelined mode and that the output
   // mode is supported by PopART.
@@ -525,4 +431,5 @@ private:
   static constexpr const char *poptorch_opaque_name = "poptorch";
 };
 
+} // namespace popart_compiler
 } // namespace poptorch

@@ -6,6 +6,7 @@
 #include "poptorch_logging/Error.hpp"
 
 namespace poptorch {
+namespace popart_compiler {
 
 /*
  * We maintain an ABI boundary inbetween PopART and Torch JIT. This avoids the
@@ -71,13 +72,6 @@ inline std::string toPopartTypeStr(const PopartType &type) {
 }
 #undef DEFINE_CASE
 
-// Returns the dtype int corresponding to the onnx type string
-int64_t dtypeIntFromOnnxStr(const char *onnx_type);
-
-// Returns the Onnx datatype as string corresponding the dtype int used in Onnx
-// and Popart ops which take an int64_t dtype argument, a.g. "randomnormal"
-const char *onnxStrFromDtypeInt(int64_t dtype);
-
 // See AnchorReturnTypeId in popart/dataflow.hpp for a full description of each.
 // Must be kept in sync with OutputMode in python/enums.py
 enum class PopartOutputMode : std::uint8_t { Final = 0, EveryN, All, Sum, N };
@@ -122,6 +116,7 @@ static const char *outputModeToString(PopartOutputMode type) {
   }
 }
 
+} // namespace popart_compiler
 } // namespace poptorch
 
 #endif // POPART_COMPILER_POPART_ENUMS_HPP

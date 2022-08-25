@@ -32,6 +32,7 @@
 #include "popart_compiler/Utils.hpp"
 
 namespace poptorch {
+namespace popart_compiler {
 namespace {
 
 std::string toString(const std::vector<std::string> &vec) {
@@ -438,7 +439,7 @@ std::uint64_t CompilerImpl::numPipelineStages() {
   return forward_stages;
 }
 
-void CompilerImpl::addMemoryToOutput(poptorch::TensorId id, void *ptr,
+void CompilerImpl::addMemoryToOutput(TensorId id, void *ptr,
                                      std::unique_ptr<popart::IArray> &&memory) {
   if (isHostSideConstant(id)) {
     getHostSideConstant(id).copyDataTo(ptr);
@@ -526,7 +527,7 @@ CompilerImpl::tensorConstant(const std::vector<popart::TensorId> &tensors,
                           getDebugContext("Constant"));
 }
 
-poptorch::TensorId CompilerImpl::hostSideTensorConstant(
+TensorId CompilerImpl::hostSideTensorConstant(
     const std::vector<popart::TensorId> &tensors, HostSideConstant constant) {
   UNUSED(tensors);
   _host_side_constants.emplace(std::make_pair(ids.size(), std::move(constant)));
@@ -743,7 +744,8 @@ CompilerImpl::getPopartOptimizer(std::vector<Optimizer> optimizers) {
   auto &default_value_optimizer(optimizers[0]);
 
   if (default_value_optimizer.type == OptimizerType::SGD2) {
-    default_value_optimizer.copyParam("lossScaling", "velocityScaling");
+    copyParam(default_value_optimizer, default_value_optimizer, "lossScaling",
+              "velocityScaling");
   }
 
   // The first optimizer contains the default values.
@@ -776,8 +778,8 @@ CompilerImpl::getPopartOptimizer(std::vector<Optimizer> optimizers) {
 
     // Copy loss scaling to velocity scaling for all groups
     for (std::size_t idx = 1; idx < optimizers.size(); ++idx) {
-      optimizers[idx].copyParam(default_value_optimizer, "lossScaling",
-                                "velocityScaling");
+      copyParam(optimizers[idx], default_value_optimizer, "lossScaling",
+                "velocityScaling");
     }
 
     auto optimizer = std::unique_ptr<popart::SGD>(new popart::SGD(
@@ -1052,12 +1054,11 @@ popart::TensorId CompilerImpl::prelu(std::vector<popart::TensorId> &tensors) {
                                                getDebugContext("Prelu"));
 }
 
-const HostSideConstant &
-CompilerImpl::getHostSideConstant(poptorch::TensorId id) const {
+const HostSideConstant &CompilerImpl::getHostSideConstant(TensorId id) const {
   return _host_side_constants.at(id);
 }
 
-bool CompilerImpl::isHostSideConstant(poptorch::TensorId id) const {
+bool CompilerImpl::isHostSideConstant(TensorId id) const {
   return _host_side_constants.count(id) != 0u;
 }
 
@@ -1166,7 +1167,7 @@ std::set<popart::TensorId> CompilerImpl::getTensorNames() const {
   return session->getAllTensorIds();
 }
 
-PopartType CompilerImpl::getPopartType(poptorch::TensorId id) const {
+PopartType CompilerImpl::getPopartType(TensorId id) const {
   if (isHostSideConstant(id)) {
     return getHostSideConstant(id).popartType();
   }
@@ -1209,4 +1210,5 @@ void CompilerImpl::errorOnCycleLogging() const {
 }
 
 } // namespace detail
+} // namespace popart_compiler
 } // namespace poptorch

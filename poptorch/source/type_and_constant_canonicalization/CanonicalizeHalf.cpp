@@ -3,6 +3,7 @@
 #include <torch/csrc/jit/ir/ir.h>
 
 #include "popart_compiler/PopartEnums.hpp"
+#include "popart_compiler/Utils.hpp"
 
 #include "poptorch_logging/Error.hpp"
 #include "poptorch_logging/Logging.hpp"
@@ -121,7 +122,8 @@ void ConvertHalfImpl::resolveNodeDtype(torch::jit::Node *node,
                                        const at::ScalarType scalar_type) {
   if (node->kindOf(c10::attr::dtype) == torch::jit::AttributeKind::i) {
     node->i_(c10::attr::dtype,
-             dtypeIntFromOnnxStr(scalarTypeToOnnxString(scalar_type).c_str()));
+             popart_compiler::dtypeIntFromOnnxStr(
+                 scalarTypeToOnnxString(scalar_type).c_str()));
   } else {
     node->s_(c10::attr::dtype, scalarTypeToOnnxString(scalar_type));
   }

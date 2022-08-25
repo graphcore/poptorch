@@ -5,7 +5,7 @@
 #include <tuple>
 #include <vector>
 
-#include <CustomOps.hpp>
+#include "popart_compiler/CustomOps.hpp"
 #include <popart/op.hpp>
 #include <popart/op/gather.hpp>
 #include <popart/opmanager.hpp>
@@ -20,6 +20,7 @@
 #include <popops/DynamicSlice.hpp>
 #include <popops/Zero.hpp>
 
+namespace poptorch {
 namespace poptorch_custom_ops {
 
 class EmbeddingGradOp;
@@ -364,3 +365,4 @@ popart::popx::OpxCreator<EmbeddingGradOpx>
 } // namespace
 
 } // namespace poptorch_custom_ops
+} // namespace poptorch

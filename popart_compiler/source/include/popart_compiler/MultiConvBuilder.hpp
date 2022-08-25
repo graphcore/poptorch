@@ -12,6 +12,7 @@
 #include "poptorch_logging/Error.hpp"
 
 namespace poptorch {
+namespace popart_compiler {
 namespace detail {
 
 class MultiConvBuilder {
@@ -87,4 +88,5 @@ private:
 };
 
 } // namespace detail
+} // namespace popart_compiler
 } // namespace poptorch

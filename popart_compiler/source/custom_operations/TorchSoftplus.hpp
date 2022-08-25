@@ -10,6 +10,7 @@
 #include <popart/op/elementwise.hpp>
 #include <popart/popx/op/elementwisex.hpp>
 
+namespace poptorch {
 namespace poptorch_custom_ops {
 
 class TorchSoftplusOp : public popart::ElementWiseUnaryOp {
@@ -105,5 +106,6 @@ private:
 };
 
 } // namespace poptorch_custom_ops
+} // namespace poptorch
 
 #endif

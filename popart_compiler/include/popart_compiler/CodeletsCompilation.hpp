@@ -5,6 +5,7 @@
 #include <memory>
 
 namespace poptorch {
+namespace popart_compiler {
 
 // Called from python on each 'import poptorch'. Cache path is expected to be
 // a true filesystem path of the installed python package where codelet sources
@@ -17,6 +18,7 @@ void setCustomCodeletsPath(const char *cache_path);
 std::unique_ptr<char[]> compileCustomCodeletIfNeeded(const char *src_file_name,
                                                      bool hw_only_codelet);
 
+} // namespace popart_compiler
 } // namespace poptorch
 
 #endif // POPART_COMPILER_CODELETS_COMPILATION_HPP

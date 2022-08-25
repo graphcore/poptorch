@@ -14,9 +14,9 @@
 #include <poputil/Util.hpp>
 #include <poputil/VertexTemplates.hpp>
 
-#include "CustomOps.hpp"
 #include "popart_compiler/CodeletsCompilation.hpp"
 #include "popart_compiler/CompilerImpl.hpp"
+#include "popart_compiler/CustomOps.hpp"
 
 namespace {
 
@@ -688,7 +688,7 @@ popart::OpDefinition upsample_op_def(
                                        {"align_corners", {"*"}}})});
 
 popart::OpCreator<UpsampleOp> upsample_op_creator(
-    popart::OpDefinitions({{poptorch_custom_ops::upsample_bilinear2d,
+    popart::OpDefinitions({{poptorch::poptorch_custom_ops::upsample_bilinear2d,
                             upsample_op_def}}),
     [](const popart::OpCreatorInfo &info) {
       // default scalingFactor is 2.0
@@ -708,10 +708,11 @@ public:
   UpsampleOpx(popart::Op *op, popart::popx::Devicex *devicex)
       : popart::popx::Opx(op, devicex) {
     // not strictly necessary, we check that op is castable to a UpsampleOp *.
-    verifyOp<UpsampleOp>(op, poptorch_custom_ops::upsample_bilinear2d);
+    verifyOp<UpsampleOp>(op,
+                         poptorch::poptorch_custom_ops::upsample_bilinear2d);
 
     // Get around the ABI issues.
-    auto managed_ptr = poptorch::compileCustomCodeletIfNeeded(
+    auto managed_ptr = poptorch::popart_compiler::compileCustomCodeletIfNeeded(
         "UpsampleBilinear2dCodelets.inc.cpp", /*hw_only_codelet=*/false);
     const char *compiled_codelet_path =
         static_cast<const char *>(managed_ptr.get());
@@ -736,7 +737,8 @@ class UpsampleGradOpx : public popart::popx::Opx {
 public:
   UpsampleGradOpx(popart::Op *op, popart::popx::Devicex *devicex)
       : popart::popx::Opx(op, devicex) {
-    verifyOp<UpsampleGradOp>(op, poptorch_custom_ops::upsample_bilinear2d_grad);
+    verifyOp<UpsampleGradOp>(
+        op, poptorch::poptorch_custom_ops::upsample_bilinear2d_grad);
   }
 
   // Create the gradient poplar::Tensor, which is
@@ -755,7 +757,8 @@ public:
 };
 
 UpsampleGradOp::UpsampleGradOp(const UpsampleOp &fwdOp)
-    : popart::Op(poptorch_custom_ops::upsample_bilinear2d_grad, fwdOp.settings),
+    : popart::Op(poptorch::poptorch_custom_ops::upsample_bilinear2d_grad,
+                 fwdOp.settings),
       _scalingFactor{fwdOp.getScalingFactor()}, _alignCorners{
                                                     fwdOp.getAlignCorners()} {}
 
@@ -773,8 +776,8 @@ void UpsampleGradOp::appendOutlineAttributes(
 }
 
 popart::popx::OpxCreator<UpsampleOpx>
-    upsample_opx_creator(poptorch_custom_ops::upsample_bilinear2d);
-popart::popx::OpxCreator<UpsampleGradOpx>
-    upsample_grad_opx_creator(poptorch_custom_ops::upsample_bilinear2d_grad);
+    upsample_opx_creator(poptorch::poptorch_custom_ops::upsample_bilinear2d);
+popart::popx::OpxCreator<UpsampleGradOpx> upsample_grad_opx_creator(
+    poptorch::poptorch_custom_ops::upsample_bilinear2d_grad);
 
 } // namespace

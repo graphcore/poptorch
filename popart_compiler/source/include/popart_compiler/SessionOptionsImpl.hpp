@@ -11,6 +11,7 @@
 #include "popart_compiler/CompilerOptions.hpp"
 
 namespace poptorch {
+namespace popart_compiler {
 namespace detail {
 
 struct SessionOptionsImpl {
@@ -47,4 +48,5 @@ struct SessionOptionsImpl {
 };
 
 } // namespace detail
+} // namespace popart_compiler
 } // namespace poptorch

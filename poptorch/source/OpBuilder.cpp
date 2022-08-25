@@ -1,6 +1,7 @@
 // Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 
 #include "popart_compiler/PopartEnums.hpp"
+#include "popart_compiler/Utils.hpp"
 
 #include "poptorch_logging/Logging.hpp"
 
@@ -214,8 +215,8 @@ void setNodeOutputsTypes(torch::jit::Node *node,
     if (node->hasAttribute(c10::attr::dtype)) {
       if (node->kindOf(c10::attr::dtype) == torch::jit::AttributeKind::i) {
         const auto onnx_dtype = node->i(c10::attr::dtype);
-        resolved_output_type =
-            onnxStrToScalarType(onnxStrFromDtypeInt(onnx_dtype));
+        resolved_output_type = onnxStrToScalarType(
+            popart_compiler::onnxStrFromDtypeInt(onnx_dtype));
       } else {
         const auto &onnx_dtype = node->s(c10::attr::dtype);
         resolved_output_type = onnxStrToScalarType(onnx_dtype.c_str());

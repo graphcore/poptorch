@@ -12,6 +12,7 @@
 #include "popart_compiler/PopartEnums.hpp"
 
 namespace poptorch {
+namespace popart_compiler {
 namespace detail {
 
 enum class ExecutionMode { Pipelined, Sharded, Phased, N };
@@ -151,4 +152,5 @@ struct CompilerOptions {
 };
 
 } // namespace detail
+} // namespace popart_compiler
 } // namespace poptorch

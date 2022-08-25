@@ -18,9 +18,9 @@ namespace poptorch {
 class PoplarExecutable {
 public:
   PoplarExecutable() = delete;
-  PoplarExecutable(poptorch::Compiler &&c,
-                   std::vector<poptorch::TensorId> &&inputs,
-                   std::vector<poptorch::TensorId> &&outputs,
+  PoplarExecutable(popart_compiler::Compiler &&c,
+                   std::vector<popart_compiler::TensorId> &&inputs,
+                   std::vector<popart_compiler::TensorId> &&outputs,
                    std::vector<at::ScalarType> &&outputTypes,
                    std::vector<std::string> parameter_names,
                    InplaceGraphInfo &&inplace_info)
@@ -40,7 +40,8 @@ public:
    */
   std::vector<at::IValue> run(std::vector<at::Tensor> &inTensors);
 
-  void updateOptimizers(const std::vector<Optimizer> &optimizer);
+  void
+  updateOptimizers(const std::vector<popart_compiler::Optimizer> &optimizer);
 
   // Tell popart to copy weights off the IPU and write into host memory.
   void copyWeightsToHost(const std::map<std::string, void *> &buffers);
@@ -48,7 +49,7 @@ public:
   // Tell popart to copy weights from host into IPU memory.
   void copyWeightsToDevice(const std::map<std::string, void *> &buffers);
 
-  const std::vector<OutputTypeShape> &outputTypes() const;
+  const std::vector<popart_compiler::OutputTypeShape> &outputTypes() const;
 
   // Get the IR from popart.
   std::string getPopartIR() const;
@@ -60,18 +61,18 @@ public:
   void attachToDevice();
   bool isAttachedToDevice() const;
 
-  const Compiler &getCompiler() const { return _compiler; }
-  Compiler &getCompiler() { return _compiler; }
+  const popart_compiler::Compiler &getCompiler() const { return _compiler; }
+  popart_compiler::Compiler &getCompiler() { return _compiler; }
 
 private:
-  poptorch::Compiler _compiler;
+  popart_compiler::Compiler _compiler;
 
-  std::vector<poptorch::TensorId> _popart_inputs;
+  std::vector<popart_compiler::TensorId> _popart_inputs;
 
   // Used for types which need conversion to maintain the ref count
   std::vector<at::Tensor> _converted_inputs;
 
-  std::vector<poptorch::TensorId> _popart_outputs;
+  std::vector<popart_compiler::TensorId> _popart_outputs;
   std::vector<at::ScalarType> _popart_output_types;
   const std::vector<std::string> _parameter_names;
 

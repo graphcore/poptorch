@@ -6,11 +6,12 @@
 #include <poputil/VertexTemplates.hpp>
 #include <poputil/exceptions.hpp>
 
-#include "CustomOps.hpp"
 #include "FastGatherLastDim.hpp"
 #include "popart_compiler/CodeletsCompilation.hpp"
+#include "popart_compiler/CustomOps.hpp"
 #include "popart_compiler/Utils.hpp"
 
+namespace poptorch {
 namespace poptorch_custom_ops {
 
 FastGatherLastDimOp::FastGatherLastDimOp(
@@ -33,8 +34,8 @@ std::unique_ptr<popart::Op> FastGatherLastDimOp::clone() const {
 }
 
 void FastGatherLastDimOp::setup() {
-  if (poptorch::ipuModelEnvironmentVariableIsEnabled() ||
-      poptorch::ipuSmallModelEnvironmentVariableIsEnabled()) {
+  if (popart_compiler::ipuModelEnvironmentVariableIsEnabled() ||
+      popart_compiler::ipuSmallModelEnvironmentVariableIsEnabled()) {
     throw popart::error(
         "FastGatherLastDimOp requires hardware but IPU model is enabled");
   }
@@ -112,7 +113,7 @@ FastGatherLastDimOpx::FastGatherLastDimOpx(popart::Op *op,
   verifyOp<FastGatherLastDimOp>(op, poptorch_custom_ops::fast_gather_last_dim);
 
   // Get around the ABI issues.
-  auto managed_ptr = poptorch::compileCustomCodeletIfNeeded(
+  auto managed_ptr = popart_compiler::compileCustomCodeletIfNeeded(
       "FastGatherLastDimFwdCodelets.inc.cpp", /*hw_only_codelet=*/true);
   const char *compiled_codelet_path =
       static_cast<const char *>(managed_ptr.get());
@@ -234,7 +235,7 @@ FastGatherLastDimGradOpx::FastGatherLastDimGradOpx(
       op, poptorch_custom_ops::fast_gather_last_dim_grad);
 
   // Get around the ABI issues.
-  auto managed_ptr = poptorch::compileCustomCodeletIfNeeded(
+  auto managed_ptr = popart_compiler::compileCustomCodeletIfNeeded(
       "FastGatherLastDimBwdCodelets.inc.cpp", /*hw_only_codelet=*/true);
   const char *compiled_codelet_path =
       static_cast<const char *>(managed_ptr.get());
@@ -360,3 +361,4 @@ popart::popx::OpxCreator<FastGatherLastDimGradOpx>
 } // namespace
 
 } // namespace poptorch_custom_ops
+} // namespace poptorch

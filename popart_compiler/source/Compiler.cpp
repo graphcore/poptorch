@@ -18,9 +18,10 @@
 
 #include "popart_compiler/Compiler.hpp"
 #include "popart_compiler/CompilerImpl.hpp"
+#include "popart_compiler/CustomOps.hpp"
 #include "popart_compiler/MultiConvBuilder.hpp"
 #include "popart_compiler/PopartEnums.hpp"
-#include "popart_compiler/SessionOptions.hpp"
+#include "popart_compiler/SessionOptionsImpl.hpp"
 #include "popart_compiler/Utils.hpp"
 
 #include "poptorch_err/ExceptionInfo.hpp"
@@ -28,9 +29,8 @@
 #include "poptorch_logging/Error.hpp"
 #include "poptorch_logging/Logging.hpp"
 
-#include "CustomOps.hpp"
-
 namespace poptorch {
+namespace popart_compiler {
 namespace {
 
 void saveModelProtoIfNeeded(popart::Builder *builder,
@@ -93,7 +93,7 @@ exchangeStrToPopartEnum(const char *overlap) {
 // one output can be used by user IR (but can still be used by the backed via
 // transformations).
 template <typename T> struct HandleOutput {
-  poptorch::TensorId operator()(T &in, bool loss, detail::CompilerImpl *_impl) {
+  TensorId operator()(T &in, bool loss, detail::CompilerImpl *_impl) {
     ERROR_ON_MSG(loss, "Unreachable internal error: no operation with multiple "
                        "returns is expected to be a loss.");
 
@@ -113,8 +113,8 @@ template <typename T> struct HandleOutput {
 
 // Single tensor output case
 template <> struct HandleOutput<popart::TensorId> {
-  poptorch::TensorId operator()(const popart::TensorId &in, bool loss,
-                                detail::CompilerImpl *_impl) {
+  TensorId operator()(const popart::TensorId &in, bool loss,
+                      detail::CompilerImpl *_impl) {
     // See if any available memory has been set for this IPU.
     auto itr =
         _impl->options.available_memory_proportion.find(_impl->active_ipu);
@@ -141,9 +141,8 @@ template <> struct HandleOutput<popart::TensorId> {
 };
 
 // Host side constant case
-template <> struct HandleOutput<poptorch::TensorId> {
-  poptorch::TensorId operator()(poptorch::TensorId in, bool loss,
-                                detail::CompilerImpl *_impl) {
+template <> struct HandleOutput<TensorId> {
+  TensorId operator()(TensorId in, bool loss, detail::CompilerImpl *_impl) {
     UNUSED(loss);
     ERROR_ON(!_impl->isHostSideConstant(in));
     return in;
@@ -158,8 +157,8 @@ bool IsLoss(const std::string &operation) {
 
 } // namespace
 
-void Optimizer::copyParam(const Optimizer &source_optim, const char *source,
-                          const char *dest) {
+void copyParam(Optimizer &dest_optim, const Optimizer &source_optim,
+               const char *source, const char *dest) {
   const float *source_float = nullptr;
   const bool *source_is_const = nullptr;
   float *dest_float = nullptr;
@@ -173,7 +172,7 @@ void Optimizer::copyParam(const Optimizer &source_optim, const char *source,
     }
   }
 
-  for (auto &param : parameters) {
+  for (auto &param : dest_optim.parameters) {
     const char *param_name = static_cast<const char *>(param.name);
     if (strcmp(param_name, dest) == 0) {
       dest_float = &param.value;
@@ -250,10 +249,9 @@ void HostSideConstant::copyDataTo(void *ptr) const {
   std::memcpy(ptr, &_data[0], _data.size());
 }
 
-poptorch::TensorId
-Compiler::addInputTensor(const char *type,
-                         const std::vector<std::int64_t> &dims,
-                         const char *overlap) {
+TensorId Compiler::addInputTensor(const char *type,
+                                  const std::vector<std::int64_t> &dims,
+                                  const char *overlap) {
   // Create the tensor info for our new tensor.
   popart::TensorInfo info{type, dims};
   popart::InputSettings settings;
@@ -272,7 +270,7 @@ Compiler::addInputTensor(const char *type,
   return _impl->ids.size() - 1;
 }
 
-poptorch::TensorId Compiler::createTensorId(const char *name) {
+TensorId Compiler::createTensorId(const char *name) {
   popart::TensorId tensor(name);
   _impl->ids.push_back(tensor);
   return _impl->ids.size() - 1;
@@ -296,29 +294,25 @@ poptorch::TensorId Compiler::createTensorId(const char *name) {
 
 // Create a function decl with the given call and arguments.
 #define OP_DECL(ns, funcName, function, onnxImpl, Args, BodyArgs)              \
-  poptorch::TensorId Compiler::function(                                       \
-      const std::vector<poptorch::TensorId> &inputs Args) {                    \
+  TensorId Compiler::function(const std::vector<TensorId> &inputs Args) {      \
     auto AiOnnxOpset10 = _impl->active_builder->aiOnnxOpset10();               \
     auto AiGraphcoreOpset1 = _impl->active_builder->aiGraphcoreOpset1();       \
     const bool isLoss = IsLoss(#ns "::" #funcName);                            \
     std::vector<popart::TensorId> ins;                                         \
-    std::transform(                                                            \
-        inputs.begin(), inputs.end(), std::back_inserter(ins),                 \
-        [&](poptorch::TensorId index) { return _impl->ids[index]; });          \
+    std::transform(inputs.begin(), inputs.end(), std::back_inserter(ins),      \
+                   [&](TensorId index) { return _impl->ids[index]; });         \
     auto output = onnxImpl(ins BodyArgs);                                      \
     return HandleOutput<decltype(output)>{}(output, isLoss, _impl.get());      \
   }
 
 // Create a function decl with the given call and arguments.
 #define OP_DECL_NO_RETURN(ns, funcName, function, onnxImpl, Args, BodyArgs)    \
-  void Compiler::function(                                                     \
-      const std::vector<poptorch::TensorId> &inputs Args) {                    \
+  void Compiler::function(const std::vector<TensorId> &inputs Args) {          \
     auto AiOnnxOpset10 = _impl->active_builder->aiOnnxOpset10();               \
     auto AiGraphcoreOpset1 = _impl->active_builder->aiGraphcoreOpset1();       \
     std::vector<popart::TensorId> ins;                                         \
-    std::transform(                                                            \
-        inputs.begin(), inputs.end(), std::back_inserter(ins),                 \
-        [&](poptorch::TensorId index) { return _impl->ids[index]; });          \
+    std::transform(inputs.begin(), inputs.end(), std::back_inserter(ins),      \
+                   [&](TensorId index) { return _impl->ids[index]; });         \
     onnxImpl(ins BodyArgs);                                                    \
   }
 
@@ -341,7 +335,7 @@ poptorch::TensorId Compiler::createTensorId(const char *name) {
 #undef INT_VEC
 #undef DEBUG_CONTEXT
 
-poptorch::TensorId
+TensorId
 Compiler::addInitializedInputTensor(const char *name, const char *type,
                                     const std::vector<std::int64_t> &dims,
                                     void *data) {
@@ -363,8 +357,7 @@ Compiler::addInitializedInputTensor(const char *name, const char *type,
   return _impl->ids.size() - 1;
 }
 
-void Compiler::addOutputTensor(poptorch::TensorId output,
-                               PopartOutputMode output_mode,
+void Compiler::addOutputTensor(TensorId output, PopartOutputMode output_mode,
                                size_t output_return_period,
                                const char *overlap) {
   _impl->outputs.push_back(_impl->ids[output]);
@@ -412,7 +405,7 @@ void Compiler::addOutputTensor(poptorch::TensorId output,
 }
 
 template <typename T>
-static void setUpInputImpl(poptorch::TensorId id, T *ptr,
+static void setUpInputImpl(TensorId id, T *ptr,
                            const std::vector<std::int64_t> &dims,
                            detail::CompilerImpl *impl) {
   // Popart wrapper around the tensor pointer.
@@ -422,37 +415,37 @@ static void setUpInputImpl(poptorch::TensorId id, T *ptr,
       {impl->ids[id], *impl->memory_manager.back().get()});
 }
 
-void Compiler::setUpInputOp(poptorch::TensorId id, float *ptr,
+void Compiler::setUpInputOp(TensorId id, float *ptr,
                             const std::vector<std::int64_t> &dims) {
   assertTensorIs(PopartType::FLOAT, id);
   setUpInputImpl(id, ptr, dims, _impl.get());
 }
 
-void Compiler::setUpInputOp(poptorch::TensorId id, std::int32_t *ptr,
+void Compiler::setUpInputOp(TensorId id, std::int32_t *ptr,
                             const std::vector<std::int64_t> &dims) {
   assertTensorIs(PopartType::INT32, id);
   setUpInputImpl(id, ptr, dims, _impl.get());
 }
 
-void Compiler::setUpInputOp(poptorch::TensorId id, bool *ptr,
+void Compiler::setUpInputOp(TensorId id, bool *ptr,
                             const std::vector<std::int64_t> &dims) {
   assertTensorIs(PopartType::BOOL, id);
   setUpInputImpl(id, ptr, dims, _impl.get());
 }
 
-void Compiler::setUpInputOp(poptorch::TensorId id, std::int8_t *ptr,
+void Compiler::setUpInputOp(TensorId id, std::int8_t *ptr,
                             const std::vector<std::int64_t> &dims) {
   assertTensorIs(PopartType::INT8, id);
   setUpInputImpl(id, ptr, dims, _impl.get());
 }
 
-void Compiler::setUpInputOp(poptorch::TensorId id, std::uint8_t *ptr,
+void Compiler::setUpInputOp(TensorId id, std::uint8_t *ptr,
                             const std::vector<std::int64_t> &dims) {
   assertTensorIs(PopartType::UINT8, id);
   setUpInputImpl(id, ptr, dims, _impl.get());
 }
 
-void Compiler::setUpInputOp(poptorch::TensorId id, std::int16_t *ptr,
+void Compiler::setUpInputOp(TensorId id, std::int16_t *ptr,
                             const std::vector<std::int64_t> &dims,
                             bool float16) {
   if (float16) {
@@ -472,7 +465,7 @@ void Compiler::setUpInputOp(poptorch::TensorId id, std::int16_t *ptr,
 }
 
 template <typename T>
-static void addOutput(poptorch::TensorId id, T *ptr,
+static void addOutput(TensorId id, T *ptr,
                       const std::vector<std::int64_t> &dims,
                       detail::CompilerImpl *impl) {
   // Popart wrapper around the tensor pointer.
@@ -482,32 +475,32 @@ static void addOutput(poptorch::TensorId id, T *ptr,
   impl->addMemoryToOutput(id, ptr, std::move(memory));
 }
 
-void Compiler::setUpOutputOp(poptorch::TensorId id, std::uint8_t *ptr,
+void Compiler::setUpOutputOp(TensorId id, std::uint8_t *ptr,
                              const std::vector<std::int64_t> &dims) {
   addOutput(id, ptr, dims, _impl.get());
 }
 
-void Compiler::setUpOutputOp(poptorch::TensorId id, std::int8_t *ptr,
+void Compiler::setUpOutputOp(TensorId id, std::int8_t *ptr,
                              const std::vector<std::int64_t> &dims) {
   addOutput(id, ptr, dims, _impl.get());
 }
 
-void Compiler::setUpOutputOp(poptorch::TensorId id, float *ptr,
+void Compiler::setUpOutputOp(TensorId id, float *ptr,
                              const std::vector<std::int64_t> &dims) {
   addOutput(id, ptr, dims, _impl.get());
 }
 
-void Compiler::setUpOutputOp(poptorch::TensorId id, std::int32_t *ptr,
+void Compiler::setUpOutputOp(TensorId id, std::int32_t *ptr,
                              const std::vector<std::int64_t> &dims) {
   addOutput(id, ptr, dims, _impl.get());
 }
 
-void Compiler::setUpOutputOp(poptorch::TensorId id, bool *ptr,
+void Compiler::setUpOutputOp(TensorId id, bool *ptr,
                              const std::vector<std::int64_t> &dims) {
   addOutput(id, ptr, dims, _impl.get());
 }
 
-void Compiler::setUpOutputOp(poptorch::TensorId id, std::int16_t *ptr,
+void Compiler::setUpOutputOp(TensorId id, std::int16_t *ptr,
                              const std::vector<std::int64_t> &dims) {
   addOutput(id, ptr, dims, _impl.get());
 }
@@ -861,7 +854,8 @@ void Compiler::loadEngineAndConnectStreams() {
     // For each input we create a special callback which tracks how many inputs
     // have been added and once they're all in it calls back into python.
     auto to_size_bytes = [&](const auto &shape, const auto &type) {
-      const poplar::Type ptype = poptorch::poplarTypeFromPoptorch(type);
+      const poplar::Type ptype =
+          poptorch::popart_compiler::poplarTypeFromPoptorch(type);
 
       auto it = host_sizes.find(ptype);
       ERROR_ON_MSG(it == host_sizes.end(), "Unsupported host op type");
@@ -1144,20 +1138,20 @@ void Compiler::run() {
   }
 }
 
-poptorch::PopartType Compiler::getPopartType(poptorch::TensorId id) const {
+PopartType Compiler::getPopartType(TensorId id) const {
   return _impl->getPopartType(id);
 }
 
-const char *Compiler::tensorName(poptorch::TensorId id) const {
+const char *Compiler::tensorName(TensorId id) const {
   return _impl->ids.at(id).c_str();
 }
 
-bool Compiler::tensorIdIsValid(poptorch::TensorId id) const {
+bool Compiler::tensorIdIsValid(TensorId id) const {
   return id < _impl->ids.size();
 }
 
 const std::vector<std::int64_t> Compiler::invalid_size{-1};
-std::vector<std::int64_t> Compiler::getSize(poptorch::TensorId id) const {
+std::vector<std::int64_t> Compiler::getSize(TensorId id) const {
   if (isHostSideConstant(id)) {
     return _impl->getHostSideConstant(id).shape();
   }
@@ -1174,8 +1168,7 @@ std::vector<std::int64_t> Compiler::getSize(poptorch::TensorId id) const {
   return _impl->active_builder->getTensorShape(popart_id);
 }
 
-std::unique_ptr<char[]>
-Compiler::getTensorDTypeString(poptorch::TensorId id) const {
+std::unique_ptr<char[]> Compiler::getTensorDTypeString(TensorId id) const {
   std::string type_str;
 
   if (_impl->session) {
@@ -1249,7 +1242,7 @@ void Compiler::setActiveIpu(std::uint64_t stage_id, std::int64_t phase_id,
   _impl->last_ipu_used = ipu_id;
 }
 
-bool Compiler::isHostSideConstant(poptorch::TensorId id) const {
+bool Compiler::isHostSideConstant(TensorId id) const {
   return _impl->isHostSideConstant(id);
 }
 
@@ -1260,7 +1253,7 @@ std::uint64_t Compiler::popartBatchDim() const {
          _impl->popart_options.accumulationFactor;
 }
 
-std::uint64_t Compiler::popartBatchDimForAnchor(poptorch::TensorId id) const {
+std::uint64_t Compiler::popartBatchDimForAnchor(TensorId id) const {
   if (isHostSideConstant(id)) {
     return 1; // Cannot be batched as it is a constant
   }
@@ -1290,27 +1283,26 @@ std::uint64_t Compiler::popartBatchDimForAnchor(poptorch::TensorId id) const {
 }
 
 void Compiler::setAvailableMemoryProportion(
-    const std::vector<std::set<poptorch::TensorId>> &inputs,
+    const std::vector<std::set<TensorId>> &inputs,
     float availableMemoryProportion) {
   for (const auto &ids : inputs) {
     std::set<popart::TensorId> popart_ids;
-    std::transform(
-        std::begin(ids), std::end(ids),
-        std::inserter(popart_ids, std::begin(popart_ids)),
-        [this](const poptorch::TensorId &id) { return _impl->ids[id]; });
+    std::transform(std::begin(ids), std::end(ids),
+                   std::inserter(popart_ids, std::begin(popart_ids)),
+                   [this](const TensorId &id) { return _impl->ids[id]; });
     _impl->active_builder->setAvailableMemoryProportion(
         popart_ids, availableMemoryProportion);
   }
 }
 
-void Compiler::setMatMulSerialization(poptorch::TensorId matmul,
-                                      const char *mode, std::uint64_t factor,
+void Compiler::setMatMulSerialization(TensorId matmul, const char *mode,
+                                      std::uint64_t factor,
                                       std::uint64_t keep_precision) {
   _impl->active_builder->setSerializeMatMul({_impl->ids[matmul]}, mode, factor,
                                             keep_precision != 0u);
 }
 
-void Compiler::optimizerGroup(const std::vector<poptorch::TensorId> &inputs,
+void Compiler::optimizerGroup(const std::vector<TensorId> &inputs,
                               int64_t group) {
   _impl->optimizerGroup(inputs, group);
 }
@@ -1426,9 +1418,8 @@ void Compiler::clearAttribute(const char *attribute, const char *key) {
   _impl->clearAttribute(std::string(attribute), std::string(key));
 }
 
-poptorch::TensorId
-Compiler::endForLoop(std::int32_t trip_count, std::int64_t num_outputs,
-                     const std::vector<poptorch::TensorId> &inputs) {
+TensorId Compiler::endForLoop(std::int32_t trip_count, std::int64_t num_outputs,
+                              const std::vector<TensorId> &inputs) {
   ERROR_ON_MSG(_impl->is_training,
                "poptorch.for_loop() is only supported in inference.");
 
@@ -1453,7 +1444,7 @@ Compiler::endForLoop(std::int32_t trip_count, std::int64_t num_outputs,
   std::vector<popart::TensorId> transformed_ins = {trip_count_as_tensor,
                                                    condition};
 
-  for (poptorch::TensorId id : inputs) {
+  for (TensorId id : inputs) {
     transformed_ins.push_back(_impl->ids[id]);
   }
 
@@ -1470,14 +1461,13 @@ void Compiler::pushNameScope(const char *name) {
 
 void Compiler::popNameScope() { _impl->active_builder->popNameScope(); }
 
-poptorch::TensorId Compiler::addUntypedInputTensor() {
+TensorId Compiler::addUntypedInputTensor() {
   popart::TensorId out = _impl->active_builder->addUntypedInputTensor();
   _impl->ids.push_back(out);
   return _impl->ids.size() - 1;
 }
 
-void Compiler::assertTensorIs(PopartType dataType,
-                              poptorch::TensorId id) const {
+void Compiler::assertTensorIs(PopartType dataType, TensorId id) const {
   PopartType actual_type = _impl->ids_types.at(id);
 
   if (__builtin_expect(
@@ -1493,14 +1483,14 @@ void Compiler::assertTensorIs(PopartType dataType,
                "running with different input data types.");
 }
 
-void Compiler::addMultiConvPart(const std::vector<poptorch::TensorId> &inputs,
+void Compiler::addMultiConvPart(const std::vector<TensorId> &inputs,
                                 const std::vector<int64_t> &dilations,
                                 const std::vector<int64_t> &kernel_shape,
                                 const std::vector<int64_t> &pads,
                                 const std::vector<int64_t> &strides) {
   std::vector<popart::TensorId> args;
   std::transform(inputs.begin(), inputs.end(), std::back_inserter(args),
-                 [&](poptorch::TensorId index) { return _impl->ids[index]; });
+                 [&](TensorId index) { return _impl->ids[index]; });
   _impl->addMultiConvPart(args, dilations, kernel_shape, pads, strides);
 }
 
@@ -1545,21 +1535,21 @@ void Compiler::setMultiConvCycleBackOff(double c) {
   _impl->multi_conv_builder->setCycleBackOff(static_cast<float>(c));
 }
 
-std::vector<poptorch::TensorId> Compiler::endMultiConv() {
+std::vector<TensorId> Compiler::endMultiConv() {
   auto outputs = _impl->endMultiConv();
-  poptorch::TensorId first =
+  TensorId first =
       HandleOutput<decltype(outputs)>{}(outputs, false, _impl.get());
-  std::vector<poptorch::TensorId> out_ids(outputs.size());
+  std::vector<TensorId> out_ids(outputs.size());
   std::iota(out_ids.begin(), out_ids.end(), first);
   return out_ids;
 }
 
-poptorch::TensorId
-Compiler::addCPUCallback(const std::vector<poptorch::TensorId> &inputs,
+TensorId
+Compiler::addCPUCallback(const std::vector<TensorId> &inputs,
                          const CallbackMetadata &callback,
-                         std::vector<poptorch::PopartType> input_types,
+                         std::vector<PopartType> input_types,
                          std::vector<std::vector<std::size_t>> input_shapes,
-                         std::vector<poptorch::PopartType> output_types,
+                         std::vector<PopartType> output_types,
                          std::vector<std::vector<std::size_t>> output_shapes) {
   logging::LogContext ctx{"Compiler::addCPUCallback"};
   logging::trace("Starting CPU callback adding");
@@ -1568,7 +1558,7 @@ Compiler::addCPUCallback(const std::vector<poptorch::TensorId> &inputs,
   std::vector<popart::TensorId> ins;
   ins.reserve(inputs.size());
   std::transform(inputs.begin(), inputs.end(), std::back_inserter(ins),
-                 [&](poptorch::TensorId index) { return _impl->ids[index]; });
+                 [&](TensorId index) { return _impl->ids[index]; });
 
   // Populate the metadata structure which will be used to communicate between
   // all the components involved in running the host op.
@@ -1631,26 +1621,28 @@ bool Compiler::isAttachedToDevice() const {
   return _impl->isAttachedToDevice();
 }
 
-const std::vector<double> &Compiler::getInputTimestamps(size_t index) const {
-  auto id = _impl->inputs[index];
-  return _impl->stepio.getInputTimestamps(id);
-}
+Timestamps Compiler::getTimestamps() const {
+  auto num_inputs = getNumInputs();
+  auto num_outputs = getNumOutputs();
 
-const std::vector<double> &
-Compiler::getInputCompleteTimestamps(size_t index) const {
-  auto id = _impl->inputs[index];
-  return _impl->stepio.getInputCompleteTimestamps(id);
-}
+  Timestamps ts;
+  ts.input.reserve(num_inputs);
+  ts.input_complete.reserve(num_inputs);
+  ts.output.reserve(num_outputs);
+  ts.output_complete.reserve(num_outputs);
 
-const std::vector<double> &Compiler::getOutputTimestamps(size_t index) const {
-  auto id = _impl->outputs[index];
-  return _impl->stepio.getOutputTimestamps(id);
-}
+  for (size_t i = 0; i < num_inputs; i++) {
+    auto id = _impl->inputs[i];
+    ts.input.push_back(_impl->stepio.getInputTimestamps(id));
+    ts.input_complete.push_back(_impl->stepio.getInputCompleteTimestamps(id));
+  }
+  for (size_t i = 0; i < num_outputs; i++) {
+    auto id = _impl->outputs[i];
+    ts.output.push_back(_impl->stepio.getOutputTimestamps(id));
+    ts.output_complete.push_back(_impl->stepio.getOutputCompleteTimestamps(id));
+  }
 
-const std::vector<double> &
-Compiler::getOutputCompleteTimestamps(size_t index) const {
-  auto id = _impl->outputs[index];
-  return _impl->stepio.getOutputCompleteTimestamps(id);
+  return ts;
 }
 
 uint64_t Compiler::getCycleCount() const {
@@ -1847,4 +1839,5 @@ void rethrowPopartOrPoplarException(const std::exception_ptr &eptr,
   throw pei;
 }
 
+} // namespace popart_compiler
 } // namespace poptorch

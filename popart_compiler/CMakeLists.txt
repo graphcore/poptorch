@@ -3,11 +3,13 @@ project(popart_compiler)
 
 find_package(popef REQUIRED)
 
+add_library(popart_compiler_types INTERFACE)
+target_include_directories(popart_compiler_types INTERFACE types/include)
+
 add_library(popart_compiler SHARED
   "source/CodeletsCompilation.cpp"
   "source/Compiler.cpp"
   "source/CompilerImpl.cpp"
-  "source/PopartEnums.cpp"
   "source/Utils.cpp"
   "source/SessionOptions.cpp"
   "source/custom_operations/Embedding.cpp"
@@ -19,7 +21,9 @@ add_library(popart_compiler SHARED
 
 set_property(TARGET popart_compiler PROPERTY CXX_STANDARD 14)
 
-target_link_libraries(popart_compiler PRIVATE
+target_link_libraries(popart_compiler PUBLIC
+                                      popart_compiler_types
+                                      PRIVATE
                                       popef
                                       popart-only
                                       poptorch_logging

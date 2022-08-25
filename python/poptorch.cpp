@@ -73,7 +73,7 @@ void registerBuffersWithCallback(
 
   ERROR_ON_MSG(itr == callbacks.end(), "Callback has not been registered.");
 
-  CallbackMetadata &metadata = itr->second;
+  popart_compiler::CallbackMetadata &metadata = itr->second;
 
   // Track the input tensors. Our python creates a persistent storage location
   // for the inputs and outputs.
@@ -102,7 +102,7 @@ void registerCPUCallBack(const py::object &obj, const std::string &ID) {
 
   // Structure to store the information given by python to be forwarded to the
   // backend.
-  CallbackMetadata &metadata = it->second;
+  popart_compiler::CallbackMetadata &metadata = it->second;
 
   // Wrap that in a lambda so we don't have to expose the naked pytorch function
   // pointer thing.
@@ -135,7 +135,7 @@ void getOptimizerValue(T &value, const py::dict &d, const std::string &key) {
   value = getOptimizerValue<T>(d, key);
 }
 
-void copyParametersDict(Optimizer *out, const py::dict &in) {
+void copyParametersDict(popart_compiler::Optimizer *out, const py::dict &in) {
   logging::LogContext ctx_func("copyParametersDict");
   out->parameters.resize(in.size());
   std::uint64_t param_idx = 0;
@@ -159,25 +159,25 @@ void copyParametersDict(Optimizer *out, const py::dict &in) {
 
 // Process the user provided dictionary and extract the relevant optimizer
 // information.
-std::vector<Optimizer> parseOptimizers(const py::dict &opt) {
+std::vector<popart_compiler::Optimizer> parseOptimizers(const py::dict &opt) {
   if (opt.empty()) {
     return {};
   }
 
-  OptimizerType type = OptimizerType::NONE;
+  popart_compiler::OptimizerType type = popart_compiler::OptimizerType::NONE;
   std::uint64_t num_groups;
-  type = static_cast<OptimizerType>(
+  type = static_cast<popart_compiler::OptimizerType>(
       getOptimizerValue<std::uint64_t>(opt, "optimizer_type"));
   auto defaults = getOptimizerValue<py::dict>(opt, "defaults");
   auto groups = getOptimizerValue<py::list>(opt, "groups");
   num_groups = groups.size();
-  std::vector<Optimizer> optimizers;
+  std::vector<popart_compiler::Optimizer> optimizers;
   // Note: all the group variables and optimizer variables are
   // automatically forwarded to the Compiler backend however
   // the optimizer attributes are extracted here.
   bool use_tf_variant = false;
-  if (type == OptimizerType::RMSPROP ||
-      type == OptimizerType::RMSPROP_CENTERED) {
+  if (type == popart_compiler::OptimizerType::RMSPROP ||
+      type == popart_compiler::OptimizerType::RMSPROP_CENTERED) {
     getOptimizerValue(use_tf_variant, opt, "useTfVariant");
   }
 
@@ -194,7 +194,8 @@ std::vector<Optimizer> parseOptimizers(const py::dict &opt) {
     // Indicate whether the optimizer should use float16 types
     getOptimizerValue(accum_type, opt, "accumType");
 
-    if (type == OptimizerType::SGD1 || type == OptimizerType::SGD2) {
+    if (type == popart_compiler::OptimizerType::SGD1 ||
+        type == popart_compiler::OptimizerType::SGD2) {
       getOptimizerValue(first_order_momentum_accum_type, opt,
                         "velocityAccumType");
     } else {
@@ -335,10 +336,10 @@ AnchorList parseAnchors(const py::list &list) {
   return map;
 }
 
-SessionOptions parseSessionOptions(const py::dict &opts) {
+popart_compiler::SessionOptions parseSessionOptions(const py::dict &opts) {
   logging::LogContext ctx_func("parseSessionOptions");
   // steps, replicationFactor, profile
-  SessionOptions options;
+  popart_compiler::SessionOptions options;
 
   for (const auto &element : opts) {
     const auto name = element.first.cast<std::string>();
@@ -626,8 +627,9 @@ poptorch::LowerToPopart lowerToPopartFromTrace(
   traced_parameter_tensors = remapTensors(
       python_traced_params, model_parameters, traced_parameter_tensors);
 
-  std::vector<Optimizer> optimizers = parseOptimizers(optimizer_dict);
-  SessionOptions parsed_options = parseSessionOptions(options);
+  std::vector<popart_compiler::Optimizer> optimizers =
+      parseOptimizers(optimizer_dict);
+  popart_compiler::SessionOptions parsed_options = parseSessionOptions(options);
 
   logGraph("Lowered graph:", *graph, has_converted_any_half, input_tensors);
 
@@ -772,10 +774,11 @@ poptorch::LowerToPopart lowerToPopartFromDispatch(
     callbacks.clear();
   });
 
-  SessionOptions parsed_options = parseSessionOptions(options);
+  popart_compiler::SessionOptions parsed_options = parseSessionOptions(options);
 
   AnchorList anchors_list = parseAnchors(anchors);
-  std::vector<Optimizer> optimizers = parseOptimizers(opt_dict);
+  std::vector<popart_compiler::Optimizer> optimizers =
+      parseOptimizers(opt_dict);
 
   InplaceGraphInfo inplace_info = getInplaceGraphInfo(
       anchors_list.size(), parsed_options.replicationFactor() > 1 &&
@@ -932,7 +935,7 @@ void setLogLevel(std::uint64_t level) {
 void setPopartLogLevelUInt(std::uint64_t level) {
   ERROR_ON(level > static_cast<std::uint64_t>(logging::Level::Off) ||
            level == 5);
-  poptorch::setPopartLogLevel(static_cast<logging::Level>(level));
+  popart_compiler::setPopartLogLevel(static_cast<logging::Level>(level));
 }
 
 void loadEngineAndConnectStreams(
@@ -948,7 +951,8 @@ void updateOptimizers(
   poptorch::logging::Tracepoint tp{__FUNCTION__};
   ERROR_ON_MSG(!executable, "No built executable");
   // Create an empty optimizer for inference, this will not be applied.
-  std::vector<Optimizer> optimizers = parseOptimizers(optimizer_dict);
+  std::vector<popart_compiler::Optimizer> optimizers =
+      parseOptimizers(optimizer_dict);
 
   executable->updateOptimizers(optimizers);
 }
@@ -984,14 +988,14 @@ execute(const std::shared_ptr<poptorch::PoplarExecutable> &executable,
   process_output = [&]() -> pybind11::object { // NOLINT
     ERROR_ON_MSG(type_it == output_types.end(), "Invalid OutputTypes object");
     switch (type_it->type) {
-    case OutputElemType::Tensor: {
+    case popart_compiler::OutputElemType::Tensor: {
       ERROR_ON_MSG(tensor_it == output_tensors.end(),
                    "Not enough tensors to unpack");
       auto object = torch::jit::toPyObject(*tensor_it);
       tensor_it++;
       return object;
     }
-    case OutputElemType::Tuple: {
+    case popart_compiler::OutputElemType::Tuple: {
       std::int64_t num_elements = type_it->num_elements;
       pybind11::tuple pytuple(num_elements);
       for (std::int64_t i = 0; i < num_elements; ++i) {
@@ -1000,7 +1004,7 @@ execute(const std::shared_ptr<poptorch::PoplarExecutable> &executable,
       }
       return std::move(pytuple);
     }
-    case OutputElemType::List: {
+    case popart_compiler::OutputElemType::List: {
       std::int64_t num_elements = type_it->num_elements;
       pybind11::list pylist(num_elements);
       for (std::int64_t i = 0; i < num_elements; ++i) {
@@ -1057,11 +1061,11 @@ py::dict readOptimizerState(
   py::dict param_tensors;
   ERROR_ON_MSG(!executable, "No built executable");
   auto &compiler = executable->getCompiler();
-  std::vector<TensorMetadata> metadata_list =
+  std::vector<popart_compiler::TensorMetadata> metadata_list =
       compiler.optimizerTensorMetadataList();
 
   std::vector<void *> host_buffers;
-  for (const TensorMetadata &meta : metadata_list) {
+  for (const popart_compiler::TensorMetadata &meta : metadata_list) {
     at::Tensor tensor =
         at::empty({meta.shape}, onnxStrToScalarType(meta.dtype)).contiguous();
 
@@ -1088,14 +1092,14 @@ void writeOptimizerState(
   poptorch::logging::Tracepoint tp{__FUNCTION__};
   ERROR_ON_MSG(!executable, "No built executable");
   auto &compiler = executable->getCompiler();
-  std::vector<TensorMetadata> metadata_list =
+  std::vector<popart_compiler::TensorMetadata> metadata_list =
       compiler.optimizerTensorMetadataList();
 
   std::vector<void *> host_buffers;
   auto state = optim_state["ipu_state"];
   auto params = optim_state["ipu_param"];
 
-  for (const TensorMetadata &meta : metadata_list) {
+  for (const popart_compiler::TensorMetadata &meta : metadata_list) {
     if (meta.num_bytes == -1) {
       // num_bytes == -1 indicates it's an optimiser state tensor (variable)
       if (!state.contains(py::cast(meta.id))) {
@@ -1126,22 +1130,24 @@ getTimestamps(const std::shared_ptr<poptorch::PoplarExecutable> &executable) {
   poptorch::logging::Tracepoint tp{__FUNCTION__};
   ERROR_ON_MSG(!executable, "No built executable");
   const auto &compiler = executable->getCompiler();
-  auto num_inputs = compiler.getNumInputs();
-  auto num_outputs = compiler.getNumOutputs();
+  popart_compiler::Timestamps ts = compiler.getTimestamps();
 
   py::list input;
   py::list input_complete;
   py::list output;
   py::list output_complete;
 
-  for (size_t i = 0; i < num_inputs; ++i) {
-    input.append(py::cast(compiler.getInputTimestamps(i)));
-    input_complete.append(py::cast(compiler.getInputCompleteTimestamps(i)));
+  for (const auto &t : ts.input) {
+    input.append(py::cast(t));
   }
-
-  for (size_t i = 0; i < num_outputs; ++i) {
-    output.append(py::cast(compiler.getOutputTimestamps(i)));
-    output_complete.append(py::cast(compiler.getOutputCompleteTimestamps(i)));
+  for (const auto &t : ts.input_complete) {
+    input_complete.append(py::cast(t));
+  }
+  for (const auto &t : ts.output) {
+    output.append(py::cast(t));
+  }
+  for (const auto &t : ts.output_complete) {
+    output_complete.append(py::cast(t));
   }
 
   return {input, input_complete, output, output_complete};
@@ -1204,9 +1210,9 @@ void saveExecutableToFile(
 void appendPoptorchMetadataToFile(const std::string &serialized_poptorch_data,
                                   const std::string &export_filename) {
   poptorch::logging::Tracepoint tp{__FUNCTION__};
-  Compiler::appendPoptorchMetadataToFile(serialized_poptorch_data.c_str(),
-                                         serialized_poptorch_data.size(),
-                                         export_filename.c_str());
+  popart_compiler::Compiler::appendPoptorchMetadataToFile(
+      serialized_poptorch_data.c_str(), serialized_poptorch_data.size(),
+      export_filename.c_str());
 }
 
 uint64_t
@@ -1233,7 +1239,8 @@ std::shared_ptr<poptorch::PoplarExecutable> processTraceAndImportExecutable(
 py::bytes importPoptorchMetadataFromFile(const std::string &import_filename) {
   poptorch::logging::Tracepoint tp{__FUNCTION__};
   std::vector<char> metadata_buffer =
-      Compiler::importPoptorchMetadataFromFile(import_filename.c_str());
+      popart_compiler::Compiler::importPoptorchMetadataFromFile(
+          import_filename.c_str());
   return py::bytes(metadata_buffer.data(), metadata_buffer.size());
 }
 
@@ -1344,9 +1351,11 @@ PYBIND11_MODULE(poptorch_core, m) { // NOLINT
         PTC(poptorch::loadEngineAndConnectStreams));
   m.def("copyWeightsToDevice_impl", PTC(poptorch::copyWeightsToDeviceImpl));
   m.def("copyWeightsToHost_impl", PTC(poptorch::copyWeightsToHostImpl));
-  m.def("ipuHardwareVersion", PTC(poptorch::ipuHardwareVersion),
+  m.def("ipuHardwareVersion",
+        PTC(poptorch::popart_compiler::ipuHardwareVersion),
         py::arg("numIpus") = 1);
-  m.def("setCustomCodeletsPath", PTC(poptorch::setCustomCodeletsPath));
+  m.def("setCustomCodeletsPath",
+        PTC(poptorch::popart_compiler::setCustomCodeletsPath));
   m.def("setLogLevel", PTC(poptorch::setLogLevel), py::arg("level") = 2);
   m.def("setPopartLogLevel", PTC(poptorch::setPopartLogLevelUInt));
   m.def("_getPopartIR", PTC(poptorch::getPopartIR));
@@ -1397,22 +1406,26 @@ PYBIND11_MODULE(poptorch_core, m) { // NOLINT
   m.def("compileWithManualTracing", PTC(poptorch::compileWithManualTracing));
   m.def("processDispatchAndImportExecutable",
         PTC(poptorch::processDispatchAndImportExecutable));
-  m.def("_throwTestError", PTC(poptorch::throwTestError));
+  m.def("_throwTestError", PTC(poptorch::popart_compiler::throwTestError));
   m.def("getIpuTensorId", PTC(poptorch::getIpuTensorId));
 
   poptorch::initialiseExceptionHandling(m);
 
-  py::enum_<poptorch::TestErrorType>(m, "TestErrorType")
-      .value("Poptorch", poptorch::TestErrorType::Poptorch)
-      .value("Popart", poptorch::TestErrorType::Popart)
-      .value("PopartInternal", poptorch::TestErrorType::PopartInternal)
-      .value("Poplibs", poptorch::TestErrorType::Poplibs)
+  py::enum_<poptorch::popart_compiler::TestErrorType>(m, "TestErrorType")
+      .value("Poptorch", poptorch::popart_compiler::TestErrorType::Poptorch)
+      .value("Popart", poptorch::popart_compiler::TestErrorType::Popart)
+      .value("PopartInternal",
+             poptorch::popart_compiler::TestErrorType::PopartInternal)
+      .value("Poplibs", poptorch::popart_compiler::TestErrorType::Poplibs)
       .value("PoplarUnrecoverable",
-             poptorch::TestErrorType::PoplarUnrecoverable)
-      .value("PoplarUnknown", poptorch::TestErrorType::PoplarUnknown)
-      .value("PoplarRecoverableFullReset",
-             poptorch::TestErrorType::PoplarRecoverableFullReset)
-      .value("PoplarLinkError", poptorch::TestErrorType::PoplarLinkError);
+             poptorch::popart_compiler::TestErrorType::PoplarUnrecoverable)
+      .value("PoplarUnknown",
+             poptorch::popart_compiler::TestErrorType::PoplarUnknown)
+      .value(
+          "PoplarRecoverableFullReset",
+          poptorch::popart_compiler::TestErrorType::PoplarRecoverableFullReset)
+      .value("PoplarLinkError",
+             poptorch::popart_compiler::TestErrorType::PoplarLinkError);
 
   py::register_exception_translator(
       [](std::exception_ptr p) { // NOLINT: Don't change 'p' to a const&

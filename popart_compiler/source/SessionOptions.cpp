@@ -34,7 +34,7 @@
 #include "popart_compiler/Compiler.hpp"
 #include "popart_compiler/CompilerOptions.hpp"
 #include "popart_compiler/PopartEnums.hpp"
-#include "popart_compiler/SessionOptions.hpp"
+#include "popart_compiler/SessionOptionsImpl.hpp"
 #include "popart_compiler/Utils.hpp"
 #include "poptorch_logging/Error.hpp"
 #include "poptorch_logging/Logging.hpp"
@@ -89,6 +89,7 @@ void registerSetter(std::map<std::string, std::function<void(Value)>> &options,
 } // namespace
 
 namespace poptorch {
+namespace popart_compiler {
 namespace detail {
 
 SessionOptionsImpl::SessionOptionsImpl() {
@@ -520,4 +521,5 @@ void SessionOptions::setCompilationProgressLogger(
 
 SessionOptions::~SessionOptions() = default;
 
+} // namespace popart_compiler
 } // namespace poptorch

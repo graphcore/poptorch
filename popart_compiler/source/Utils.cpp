@@ -2,13 +2,30 @@
 #include <chrono>
 #include <thread>
 
+#include <popart/popx/devicex.hpp>
 #include <popart/popx/devicexmanager.hpp>
+#include <popart/tensorinfo.hpp>
 
+#include "popart_compiler/CompilerImpl.hpp"
+#include "popart_compiler/PopartEnums.hpp"
 #include "popart_compiler/Utils.hpp"
 #include "poptorch_logging/Error.hpp"
 #include "poptorch_logging/Logging.hpp"
 
+// These symbols exist in popart but are not declared publicly
+namespace ONNX_NAMESPACE {
+enum class TensorProto_DataType;
+} // namespace ONNX_NAMESPACE
+
+namespace popart {
+namespace onnxutil {
+DataType getDataType(int);
+ONNX_NAMESPACE::TensorProto_DataType getTPDataType(DataType data_type);
+} // namespace onnxutil
+} // namespace popart
+
 namespace poptorch {
+namespace popart_compiler {
 
 bool ipuModelEnvironmentVariableIsEnabled() {
   if (const char *env_use_model = std::getenv("POPTORCH_IPU_MODEL")) {
@@ -122,4 +139,65 @@ std::unique_ptr<char[]> stringToUniquePtr(const std::string &str) {
   return ptr;
 }
 
+int64_t dtypeIntFromOnnxStr(const char *onnx_type) {
+  auto popart_type = popart::dataTypeFromString(onnx_type);
+  return static_cast<int64_t>(popart::onnxutil::getTPDataType(popart_type));
+}
+
+const char *onnxStrFromDtypeInt(int64_t dtype) {
+  auto popart_type = popart::onnxutil::getDataType(dtype);
+  const auto &data_type_map(popart::getDataTypeInfoMap());
+
+  // data_type_map is static so the c_str() remains valid
+  return data_type_map.at(popart_type).name().c_str();
+}
+
+poplar::Type poplarTypeFromPoptorch(PopartType type) {
+  const popart::DataType popart_type = popartTypeFromPoptorch(type);
+  return popart::popx::popType(popart_type);
+}
+
+popart::DataType popartTypeFromPoptorch(PopartType type) {
+  switch (type) {
+  case PopartType::UINT8:
+    return popart::DataType::UINT8;
+  case PopartType::INT8:
+    return popart::DataType::INT8;
+  case PopartType::UINT16:
+    return popart::DataType::UINT16;
+  case PopartType::INT16:
+    return popart::DataType::INT16;
+  case PopartType::INT32:
+    return popart::DataType::INT32;
+  case PopartType::INT64:
+    return popart::DataType::INT64;
+  case PopartType::UINT32:
+    return popart::DataType::UINT32;
+  case PopartType::UINT64:
+    return popart::DataType::UINT64;
+  case PopartType::BOOL:
+    return popart::DataType::BOOL;
+  case PopartType::FLOAT:
+    return popart::DataType::FLOAT;
+  case PopartType::FLOAT16:
+    return popart::DataType::FLOAT16;
+  case PopartType::BFLOAT16:
+    return popart::DataType::BFLOAT16;
+  case PopartType::DOUBLE:
+    return popart::DataType::DOUBLE;
+  case PopartType::COMPLEX64:
+    return popart::DataType::COMPLEX64;
+  case PopartType::COMPLEX128:
+    return popart::DataType::COMPLEX128;
+  case PopartType::STRING:
+    return popart::DataType::STRING;
+  case PopartType::UNDEFINED:
+    return popart::DataType::UNDEFINED;
+  default:
+    ERROR("Unsupported type in popartTypeFromPoptorchType");
+  }
+
+  return popart::DataType::UNDEFINED;
+}
+} // namespace popart_compiler
 } // namespace poptorch
