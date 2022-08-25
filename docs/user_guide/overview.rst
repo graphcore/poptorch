@@ -279,6 +279,16 @@ on IPU ``m``.
     :emphasize-lines: 37-38, 41-42, 45-46
     :caption: Annotating existing layers
 
+.. note:: The :py:class:`~poptorch.BeginBlock` annotations internally use PyTorch hooks.
+    If the module passed to :py:func:`~poptorch.BeginBlock` uses hooks, for example with
+    `register_forward_pre_hook <https://pytorch.org/docs/stable/generated/torch.nn.Module.html#torch.nn.Module.register_forward_pre_hook>`__,
+    then the assignment of operations to blocks may depend on the order those hooks are added.
+    A concrete example may help to clarify this: consider a layer, and an operation that is defined in a hook function.
+    If ``register_forward_pre_hook()`` is called on the layer, followed by a call to :py:func:`~poptorch.BeginBlock` passing the same layer as argument,
+    then the operation defined in the hook will be assigned to the preceding block (so not the same block as the layer).
+    If instead the call to :py:func:`~poptorch.BeginBlock` happens before ``register_forward_pre_hook()``, then the operation
+    will be assigned in the same block as the layer.
+
 You can use :py:class:`~poptorch.Block` to annotate a model from within its
 definition. This context manager class defines a scope in the context of
 the model. Everything within that scope is placed on the IPU specified (unless
