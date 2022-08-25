@@ -17,7 +17,7 @@ _____________
 
 The example in :numref:`mnist-example-code` shows how a MNIST model can be run on the IPU. The highlighted lines show the PopTorch-specific code required to run the example on multiple IPUs.
 
-You can download the full source code from GitHub: `mnist.py <https://github.com/graphcore/poptorch/blob/sdk-release-2.4/examples/mnist.py>`_.
+You can download the full source code from GitHub: :github-poptorch:`mnist.py <examples/mnist.py>`.
 
 To run this example you will need to install the Poplar SDK (see the `Getting Started Guide <https://docs.graphcore.ai/en/latest/getting-started.html>`_ for your IPU system) and the appropriate version of ``torchvision``:
 

@@ -44,7 +44,10 @@ SDK_RELEASE = get_current_release()
 extlinks = {
     'tutorials-repo':
     (f'https://github.com/graphcore/tutorials/tree/sdk-release-{SDK_RELEASE}/%s',
-     None)
+     None),
+    'github-poptorch':
+    (f'https://github.com/graphcore/poptorch/tree/sdk-release-{SDK_RELEASE}/%s',
+     None),
 }
 
 # Add any paths that contain templates here, relative to this directory.
