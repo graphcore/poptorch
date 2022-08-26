@@ -105,15 +105,7 @@ void replaceWithConstantTensor(torch::jit::Graph *graph, torch::jit::Node *n,
   torch::jit::WithInsertPoint insert_point(n);
   WithNodeMetadata meta(n);
 
-  poptorch::UseOfNode use_of_node;
-  if (is_dispatcher_active) {
-    // At the time of the intercept we don't have a full view of how a constant
-    // will be used so mark it as popart only and resolve at the
-    // end of dispatch.
-    use_of_node = poptorch::UseOfNode::PopARTOnly;
-  } else {
-    use_of_node = getUseOfNode(n);
-  }
+  poptorch::UseOfNode use_of_node = getUseOfNode(n);
   auto *new_node = tensorToConstant(graph, t, use_of_node);
 
   if (!is_dispatcher_active) {

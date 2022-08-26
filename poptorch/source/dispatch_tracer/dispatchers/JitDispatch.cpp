@@ -252,10 +252,24 @@ void JITDispatch::registerEmptyTensor(const at::Tensor &tensor) {
   ERROR_ON_MSG(
       coerced_scalar_type != tensor.scalar_type(),
       "[Internal error] The empty tensor should have a valid compiler type");
-  torch::jit::Node *n =
-      graph->createUninitialized(c10::TensorType::create(tensor));
+  // aten::empty.memory_format(int[] size, *, ScalarType? dtype=None,
+  //                           Layout? layout=None, Device? device=None,
+  //                           bool? pin_memory=None,
+  //                           MemoryFormat? memory_format=None) -> Tensor
+  auto *g = graph.get();
+  auto *pin_memory = g->createNone();
+  auto *memory_format = g->createNone();
+  insertNodeInGraph(g, pin_memory);
+  insertNodeInGraph(g, memory_format);
+  torch::jit::Node *n = createAndInsertNode(
+      g, c10::aten::empty,
+      {insertConstant(g, tensor.sizes()),
+       insertConstant(g, tensor.scalar_type()),
+       insertConstant(g, tensor.layout()), insertConstant(g, tensor.device()),
+       pin_memory->output(), memory_format->output()});
+  n->output()->inferTypeFrom(tensor);
   setSourceRangeToCurrentLocation(n);
-  _mapper.addTensor(tensor, n->output(0));
+  _mapper.addTensor(tensor, n->output());
 }
 
 // aten::detach(Tensor(a) self) -> (Tensor(a))

@@ -113,9 +113,9 @@ def test_input_error_messages(trace_model):
     options.Jit.traceModel(trace_model)
     poptorch_model = poptorch.inferenceModel(model, options)
 
-    input_label = "x" if trace_model else "1"
+    label = r"x" if trace_model else r"[0-9]+"
     err_msg = (r"poptorch.set_overlap_for_input must be the only op applied "
-               r"to an input. This is not the case for input " + input_label +
+               r"to an input. This is not the case for input " + label +
                r" to the model.")
     with pytest.raises(poptorch.poptorch_core.Error, match=err_msg):
         poptorch_model(torch.tensor([1.0]))

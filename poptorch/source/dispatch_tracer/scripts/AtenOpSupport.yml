@@ -1070,15 +1070,10 @@
   PopTorchDirect: cast
   IgnoreArgs: non_blocking, copy, memory_format
 
-# arange.start_step(Scalar start, Scalar end, Scalar step, *, ScalarType? dtype=None, Layout? layout=None, Device? device=None, bool? pin_memory=None) -> Tensor
-- func: arange.start_step
+# arange.start_out(Scalar start, Scalar end, Scalar step=1, *, Tensor(a!) out) -> Tensor(a!)
+- func: arange.start_out
   PopTorchDirect: arange
-  IgnoreArgs: layout, device, pin_memory
-
-# ones(int[] size, *, ScalarType? dtype=None, Layout? layout=None, Device? device=None, bool? pin_memory=None) -> Tensor
-- func: ones
-  PopTorchDirect: ones
-  IgnoreArgs: layout, device, pin_memory
+  UnusedOutputArguments: {out}
 
 - func: topk.values
   PopTorchDirect: topk
@@ -1198,6 +1193,12 @@
 # triu(Tensor self, int diagonal=0) -> Tensor
 - func: triu
   PopTorchDirect: triu
+
+# triu.out(Tensor self, int diagonal=0, *, Tensor(a!) out) -> Tensor(a!)
+- func: triu.out
+  PopTorchDirect: triu
+  UnusedOutputArguments: {out}
+
 
 #########
 # Norms

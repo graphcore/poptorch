@@ -36,20 +36,6 @@ TORCH_LIBRARY_IMPL(aten, XLA, m) {
   m.impl("feature_dropout_", PTC_BOXED(poptorch::fallback));
   m.impl("embedding", PTC_BOXED(poptorch::fallback));
 
-  // We don't want arange.start_out to reach fallback because
-  // it acts on empty tensors which are not constants, and thus
-  // wouldn't be recognised as a constexpr. Instead, catch it and
-  // dispatch to arange.start_step, which returns a new tensor and
-  // qualifies as a constexpr operation. arange.start_out is the
-  // default dispatched-to operation for arange. For some usages,
-  // it doesn't go through any other path so we have to catch it.
-  m.impl("arange.start_out", PTC(poptorch::arangeOut));
-  m.impl("arange.start_step", PTC_BOXED(poptorch::fallback));
-
-  // If we don't intercept this op, it will be decomposed into fill_.Scalar
-  // which acts on empty tensors and thus wouldn't be recognised as a constexpr
-  m.impl("ones", PTC_BOXED(poptorch::fallback));
-
   // Intercept alias to circumvent issues accessing tensor storage directly
   m.impl("alias", PTC_BOXED(poptorch::fallback));
 

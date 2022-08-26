@@ -39,7 +39,8 @@ bool isNondeterministic(const torch::jit::Node &node) {
   static const auto non_deterministic_nodes = {
       c10::aten::normal,   c10::aten::normal_,   c10::aten::feature_dropout,
       c10::aten::randint,  c10::aten::bernoulli, c10::aten::bernoulli_,
-      c10::aten::uniform_,
+      c10::aten::uniform_, c10::aten::randperm,  c10::aten::exponential_,
+      c10::aten::random_,
   };
 
   return std::find(non_deterministic_nodes.begin(),

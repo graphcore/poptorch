@@ -801,18 +801,21 @@ def test_fill(capfd, input_shapes, t, trace_model):
 
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_triu_in_constexpr(trace_model):
-    def op(x):
-        # triu is unsupported but the RHS should be reduced
-        # to a constant before the op reaches PopART
-        # canonicalisation
+    # triu is unsupported but the RHS should be reduced
+    # to a constant before the op reaches PopART
+    # canonicalisation
+    def triu_inplace(x):
+        # dispatches to aten::triu
         return x + torch.ones(3, 3).triu_()
 
+    def triu_out(x):
+        # dispatches to aten::triu.out
+        return x + torch.triu(torch.ones(3, 3))
+
     x = torch.ones(3, 3)
-    op_harness(op,
-               x,
-               test_training=False,
-               native_out=op(x),
-               trace_model=trace_model)
+    op_harness(triu_inplace, x, test_training=False, trace_model=trace_model)
+
+    op_harness(triu_out, x, test_training=False, trace_model=trace_model)
 
 
 @pytest.mark.parametrize("input_shapes", input_shapes)
