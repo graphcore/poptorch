@@ -282,6 +282,7 @@ TensorId Compiler::createTensorId(const char *name) {
 #define INT std::int64_t
 #define BOOL bool
 #define DEBUG_CONTEXT(Name) _impl->getDebugContext(Name)
+#define CHAR char
 #define STRING const char *
 #define STRING_VEC std::vector<const char *>
 #define NONE
@@ -327,6 +328,7 @@ TensorId Compiler::createTensorId(const char *name) {
 #undef ARG
 #undef NONE
 #undef STRING_VEC
+#undef CHAR
 #undef STRING
 #undef BOOL
 #undef INT

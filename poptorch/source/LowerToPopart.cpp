@@ -1380,6 +1380,7 @@ LowerToPopartImpl::LowerToPopartImpl(
 #define FLOAT_VEC fs
 #define FLOAT f
 #define INT i
+#define CHAR i
 #define BOOL i
 #define STRING s
 #define STRING_VEC ss
@@ -1434,6 +1435,7 @@ LowerToPopartImpl::LowerToPopartImpl(
 #undef ARG
 #undef NONE
 #undef BOOL
+#undef CHAR
 #undef STRING
 #undef STRING_VEC
 #undef INT

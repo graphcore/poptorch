@@ -33,7 +33,7 @@ target_link_libraries(dispatch_tracer
     torch
     pybind11::pybind11
   PRIVATE
-  poptorch_core_headers
+  poptorch_internal_headers
   poptorch_logging
   poptorch_compiler
   popart_compiler

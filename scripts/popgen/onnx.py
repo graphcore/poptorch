@@ -200,6 +200,7 @@ def parse_signatures():
     classes.reverse()
 
     type_map = {
+        'char': ['cstr'],
         'bool': ['cint'],
         'float': ['cfloat'],
         'int64_t': ['clong', 'dimension'],

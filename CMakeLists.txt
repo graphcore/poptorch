@@ -224,6 +224,7 @@ endif()
 
 add_subdirectory(poptorch/source/dispatch_tracer)
 add_subdirectory(popart_compiler)
+add_subdirectory(poptorch)
 add_subdirectory(python)
 
 # Examples and tests

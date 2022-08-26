@@ -475,6 +475,7 @@ CXXTypeToTypeClass = {
     "Attributes::Ints": "INT_VEC",
 
     # String
+    "char": "CHAR",
     "std::string": "STRING",
     "std::vector<std::string>": "STRING_VEC",
 
@@ -515,7 +516,7 @@ CXX_TYPE_CONV_TABLE = {
 }
 
 CXX_NON_CONV_TYPES = [
-    "bool", "float", "int", "int64_t", "unsigned int", "std::string",
+    "char", "bool", "float", "int", "int64_t", "unsigned int", "std::string",
     "std::vector<int64_t>", "std::vector<std::string>", "popart::DebugContext"
 ]
 
@@ -557,6 +558,7 @@ def convertCxxConvert(cxxType_orig):
 
 def attrTypeGetter(ty):
     typemap = {
+        "CHAR": "i",
         "INT": "i",
         "INT_VEC": "is",
         "FLOAT": "f",
@@ -753,8 +755,8 @@ with open(
     print(macroFile, file=f)
 
 with open(
-        os.path.join(_utils.sources_dir(), 'poptorch', 'include', 'poptorch',
-                     'CompilerOps.inc.hpp'), 'w') as f:
+        os.path.join(_utils.sources_dir(), 'poptorch', 'source', 'include',
+                     'poptorch', 'CompilerOps.inc.hpp'), 'w') as f:
     print(autoComment, file=f)
     print(headerStubs, file=f)
 

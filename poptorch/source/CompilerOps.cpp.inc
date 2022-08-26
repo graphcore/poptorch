@@ -25,10 +25,18 @@ torch::jit::Node* createSubsample(torch::jit::Graph *graph,  const std::vector<t
 new_node->is_(c10::Symbol::attr("strides"),strides);
 return new_node;
 }
-torch::jit::Node* createPrinttensor(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,int64_t print_gradient,const std::string & title) {
+torch::jit::Node* createPrinttensor(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,int64_t print_gradient,const std::string & title,const int summariseThreshold,const int edgeItems,const int maxLineWidth,const int digits,const int floatFormat,const char separator,const char openBracket,const char closeBracket) {
  torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::printtensor, args, ImplicitCast::None, OutputType::AsFirstInput);
 new_node->i_(c10::Symbol::attr("print_gradient"),print_gradient);
 new_node->s_(c10::Symbol::attr("title"),title);
+new_node->i_(c10::Symbol::attr("summariseThreshold"),summariseThreshold);
+new_node->i_(c10::Symbol::attr("edgeItems"),edgeItems);
+new_node->i_(c10::Symbol::attr("maxLineWidth"),maxLineWidth);
+new_node->i_(c10::Symbol::attr("digits"),digits);
+new_node->i_(c10::Symbol::attr("floatFormat"),floatFormat);
+new_node->i_(c10::Symbol::attr("separator"),separator);
+new_node->i_(c10::Symbol::attr("openBracket"),openBracket);
+new_node->i_(c10::Symbol::attr("closeBracket"),closeBracket);
 return new_node;
 }
 torch::jit::Node* createNop(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args) {

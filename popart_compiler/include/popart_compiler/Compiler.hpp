@@ -167,6 +167,7 @@ public:
 #define FLOAT float
 #define INT std::int64_t
 #define BOOL bool
+#define CHAR char
 #define STRING const char *
 #define STRING_VEC std::vector<const char *>
 #define NONE
@@ -198,6 +199,7 @@ public:
 #undef NONE
 #undef STRING_VEC
 #undef STRING
+#undef CHAR
 #undef BOOL
 #undef INT
 #undef FLOAT
