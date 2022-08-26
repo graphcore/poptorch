@@ -320,7 +320,12 @@ void replaceOutputUse(torch::jit::Value *old_val, torch::jit::Value *new_val) {
   auto old_type = old_val->type()->cast<c10::TensorType>();
   auto new_type = new_val->type()->cast<c10::TensorType>();
 
-  if (static_cast<bool>(old_type) && static_cast<bool>(new_type)) {
+  // With the dispatcher always use the old type and shape (as it comes from
+  // the MLIR shape inference) otherwise, if both types are defined, check if
+  // the new_val types needs adjusting (to work around some tracing
+  // limitations).
+  if (!isCompilingWithDispatcher() && static_cast<bool>(old_type) &&
+      static_cast<bool>(new_type)) {
     ERROR_ON(!(old_type->scalarType()));
     ERROR_ON_MSG(!(new_type->scalarType()), "New output has no scalar type.");
 
@@ -342,12 +347,12 @@ void replaceOutputUse(torch::jit::Value *old_val, torch::jit::Value *new_val) {
         return;
       }
 
-      new_val->setType(new_type);
       old_val->replaceAllUsesWith(new_val);
       return;
     }
   }
 
+  // Make sure the new value matches the type of the original value.
   new_val->setType(old_val->type());
 
   // Replace the old value with the new one.
