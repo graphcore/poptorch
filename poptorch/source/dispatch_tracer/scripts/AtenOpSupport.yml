@@ -557,14 +557,24 @@
 - func: clamp.Tensor
   PopTorchDirect: clampTensor
 
-# clamp_min.out(Tensor self, Tensor min, Tensor(a!) out) -> Tensor(a!)
+# clamp_min.out(Tensor self, Scalar min, *, Tensor(a!) out) -> Tensor(a!)
 - func: clamp_min.out
   PopTorchDirect: clamp_min
   UnusedOutputArguments: {out}
 
-# func: clamp_max.out(Tensor self, Scalar max, *, Tensor(a!) out) -> Tensor(a!)
+# clamp_max.out(Tensor self, Scalar max, *, Tensor(a!) out) -> Tensor(a!)
 - func: clamp_max.out
   PopTorchDirect: clamp_max
+  UnusedOutputArguments: {out}
+
+# clamp_min.Tensor_out(Tensor self, Tensor min, *, Tensor(a!) out) -> Tensor(a!)
+- func: clamp_min.Tensor_out
+  PopTorchDirect: clamp_min_tensor
+  UnusedOutputArguments: {out}
+
+# clamp_max.Tensor_out(Tensor self, Tensor max, *, Tensor(a!) out) -> Tensor(a!)
+- func: clamp_max.Tensor_out
+  PopTorchDirect: clamp_max_tensor
   UnusedOutputArguments: {out}
 
 # func: ceil.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)

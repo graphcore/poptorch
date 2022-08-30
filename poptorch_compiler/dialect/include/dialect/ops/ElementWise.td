@@ -525,23 +525,40 @@ def Poptorch_clampTensor: Poptorch_Op<"clampTensor", [AttrSizedOperandSegments]>
 }
 
 class Poptorch_clamp_common<string name>: Poptorch_NotImplementedOp<name, []> {
-  // defining input arguments
   let arguments = (ins Poptorch_tensor:$self,
-                       Poptorch_tensor:$other);
-  // defining output arguments
+                       F64Attr:$value);
   let results = (outs Poptorch_tensor:$result);
 
-  // builders allow us to tell MIR the types
   let builders = [
-    OpBuilder<(ins "mlir::Value":$self, "mlir::Value":$other), [{
-      $_state.addOperands({self, other});
+    OpBuilder<(ins "mlir::Value":$self, "double":$value), [{
+      $_state.addOperands({self});
+
+      $_state.addAttribute("value", $_builder.getF64FloatAttr(value));
+
       $_state.addTypes(self.getType());
     }]>
   ];
 }
 
-def Poptorch_clamp_min: Poptorch_clamp_common<"clamp_min"> {}
-def Poptorch_clamp_max: Poptorch_clamp_common<"clamp_max"> {}
+def Poptorch_clamp_min: Poptorch_clamp_common<"clamp_min">;
+def Poptorch_clamp_max: Poptorch_clamp_common<"clamp_max">;
+
+class Poptorch_clamp_tensor_common<string name>: Poptorch_NotImplementedOp<name, []> {
+  let arguments = (ins Poptorch_tensor:$self,
+                       Poptorch_tensor:$value);
+  let results = (outs Poptorch_tensor:$result);
+
+  let builders = [
+    OpBuilder<(ins "mlir::Value":$self, "mlir::Value":$value), [{
+      $_state.addOperands({self, value});
+
+      $_state.addTypes(self.getType());
+    }]>
+  ];
+}
+
+def Poptorch_clamp_min_tensor: Poptorch_clamp_tensor_common<"clamp_min_tensor">;
+def Poptorch_clamp_max_tensor: Poptorch_clamp_tensor_common<"clamp_max_tensor">;
 
 def Poptorch_threshold_out: Poptorch_Op<"threshold_out", []> {
   let arguments = (ins Poptorch_non_boolean_tensor:$self,

@@ -228,10 +228,30 @@ def test_clamp_(args, trace_model):
 def test_clamp_min_max(op, trace_model):
     torch.manual_seed(42)
 
-    input = torch.randn([1, 2, 10, 10])
+    magnitude = 50
+    input = torch.randn(1, 2, 10, 10) * magnitude
 
     def op_clamp(x):
-        return op(x, 0.5)
+        return op(x, magnitude / 2)
+
+    def assert_(native_out, poptorch_out):
+        helpers.assert_allclose(actual=poptorch_out, expected=native_out)
+
+    op_harness(trace_model, op_clamp, [input], assert_, test_training=True)
+
+
+@pytest.mark.parametrize(
+    "op",
+    [torch.clamp_min, torch.clamp_min_, torch.clamp_max, torch.clamp_max_])
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_clamp_min_max_tensor(op, trace_model):
+    torch.manual_seed(42)
+
+    magnitude = 50
+    input = torch.randn(1, 2, 10, 10) * magnitude
+
+    def op_clamp(x):
+        return op(x, torch.tensor(magnitude / 2))
 
     def assert_(native_out, poptorch_out):
         helpers.assert_allclose(actual=poptorch_out, expected=native_out)
@@ -264,7 +284,7 @@ clamp_int_inputs = [
 
 
 @pytest.mark.parametrize("args", clamp_int_inputs)
-def test_clamp_min_max_int(args):
+def test_clamp_int(args):
     torch.manual_seed(42)
 
     t = torch.randint(-100, 100, (100, ))
