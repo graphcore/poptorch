@@ -1064,26 +1064,64 @@ def test_requires_grad_true(capfd, trace_model):
         "inputs is not supported.")
 
 
+@pytest.mark.parametrize("args", [(5, ), (1, ), (5, 10),
+                                  (5, 10, 2), (10, 1, -1), (10, 1, -2),
+                                  (1, 5, 10), (2.5, ), (2, 10.), (2, 10, 3.4)])
 @pytest.mark.parametrize("trace_model", [True, False])
-def test_arange(trace_model):
-    class ArangeModel(torch.nn.Module):
-        def forward(self, a, b):
-            def f(x, y):
-                return torch.arange(20) + x, y
+def test_arange(args, trace_model):
+    torch.manual_seed(42)
 
-            return poptorch.for_loop(5, f, [a, b])
-
-    model = ArangeModel()
-    a = torch.randn(20)
-    b = torch.randn(20)
+    class Model(torch.nn.Module):
+        def forward(self, a):
+            return torch.arange(*args) + a
 
     options = poptorch.Options()
     options.Jit.traceModel(trace_model)
-    poptorch_model = poptorch.inferenceModel(model, options)
-    poptorch_out = poptorch_model(a, b)
 
-    helpers.assert_allclose(actual=poptorch_out,
-                            expected=[torch.arange(20) * 5 + a, b])
+    cpu_model = Model()
+    ipu_model = poptorch.inferenceModel(cpu_model, options)
+
+    a = torch.randn(())
+
+    cpu_res = cpu_model(a)
+    ipu_res = ipu_model(a)
+
+    helpers.assert_allclose(actual=ipu_res, expected=cpu_res)
+
+
+@pytest.mark.parametrize("args", [(5, ), (5, 10), (5, 10, 2), (2.5, ),
+                                  (2, 10.), (2, 10, 3.4)])
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_arange_types(args, trace_model):
+    torch.manual_seed(42)
+
+    should_be_float = any(isinstance(a, float) for a in args)
+
+    class Model(torch.nn.Module):
+        def forward(self, a):
+            res = torch.arange(*args)
+            assert res.is_floating_point() == should_be_float
+            return torch.index_select(res, 0, a)  # So the graph's not empty
+
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+
+    cpu_model = Model()
+    ipu_model = poptorch.inferenceModel(cpu_model, options)
+
+    a = torch.tensor([0])
+
+    cpu_res = cpu_model(a)
+    ipu_res = ipu_model(a)
+
+    exp_dtype = cpu_res.dtype
+    if exp_dtype == torch.int64:
+        exp_dtype = torch.int32
+    elif exp_dtype == torch.float64:
+        exp_dtype = torch.float32
+
+    # NOTE: this may depend on torch.get_default_dtype()
+    assert ipu_res.dtype == exp_dtype
 
 
 @pytest.mark.parametrize("input_shape,dim,size,step",
