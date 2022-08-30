@@ -34,6 +34,7 @@ PoplarExecutorWrapper::PoplarExecutorWrapper(
 
 void PoplarExecutorWrapper::execute(const std::vector<void *> &ptrs) {
   // Connect up the inputs.
+  ERROR_ON(ptrs.size() != _impl->input_callbacks.size());
   for (std::size_t i = 0; i < _impl->input_callbacks.size(); ++i) {
     // Did the user provide a new pointer for this input?
     if (ptrs[i] != nullptr) {

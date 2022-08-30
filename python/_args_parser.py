@@ -1,6 +1,7 @@
 # Copyright (c) 2021 Graphcore Ltd. All rights reserved.
 import copy
 import inspect
+from typing import Any, Dict
 import torch
 
 # Do not import any poptorch.* here: it will break the poptorch module
@@ -201,12 +202,16 @@ class ArgsParser:
                 _utils.flattenTensorStructure(self._args) +
                 _utils.flattenTensorStructure(self._kwargs))
 
-    def __init__(self, model, tracing=True):
+    def __init__(self, model: Any, tracing: bool = True):
         # Combine args and kwargs:
         if isinstance(model, _impl.OptimizerWrapper):
             sig = inspect.signature(model.model.forward)
-        else:
+        elif isinstance(model, torch.nn.Module):
             sig = inspect.signature(model.forward)
+        elif callable(model):
+            sig = inspect.signature(model)
+        else:
+            raise TypeError("Expected a torch.nn.Module or a callable")
 
         self._var_kinds = [p.kind for p in sig.parameters.values()]
         self._has_variadic_arguments = any([
@@ -224,7 +229,10 @@ class ArgsParser:
         self._warned_not_contiguous_input = False
         self._tracing = tracing
 
-    def __call__(self, args, kwargs, fast_path=False):
+    def __call__(self,
+                 args: Any,
+                 kwargs: Dict[str, Any],
+                 fast_path: bool = False) -> Args:
         """Checks the inputs are of a supported type. Inputs must be
            tensors or tuples/lists of tensors. Will convert list to tuples
            as we can't natively support lists in the JIT.

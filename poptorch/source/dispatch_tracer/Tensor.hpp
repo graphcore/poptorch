@@ -32,8 +32,10 @@ struct IpuTensorDetails {
   ValueMapper *mapper = nullptr;
   std::vector<int64_t> sizes;
   std::vector<int64_t> strides;
+  std::string name;
   bool is_parameter = false;
   Buffer host_buffer;
+  std::optional<std::uint64_t> alias_of;
 
   int64_t dim();
   c10::IntArrayRef sizesArrayref();
@@ -41,10 +43,7 @@ struct IpuTensorDetails {
   int64_t numel();
 };
 
-// Create an IPU at::Tensor.
-at::Tensor createIpuTensor(at::ScalarType dtype, const at::Device &device,
-                           uint64_t ipu_tensor_id, c10::IntArrayRef sizes,
-                           c10::IntArrayRef strides);
+uint64_t tensorImplDataSize(const at::TensorImpl &impl);
 
 // Mark an IPU tensor as being a parameter or not.
 void setIsParameter(at::Tensor &tensor, bool is_parameter);
@@ -74,14 +73,57 @@ std::string str(const at::Tensor &tensor);
 // IPU tensor.
 void copyDataFromCpuSource(at::Tensor &ipu_tensor, const at::Tensor &cpu_src);
 
-// Return a reference to the cpu data of the given IPU tensor.
-Buffer getCpuData(const at::Tensor &ipu_tensor);
+// Returns a reference to the CPU buffer of the given IPU tensor.
+Buffer &getHostBuffer(const at::Tensor &ipu_tensor);
 
-// Return a reference to the cpu data of the given IPU tensor implementation.
-Buffer getCpuData(const at::TensorImpl &ipu_tensor);
+// Returns a reference to the CPU buffer of the given IPU tensor implementation.
+Buffer &getHostBuffer(const at::TensorImpl &ipu_tensor);
 
 std::shared_ptr<IpuTensorDetails>
-getTensorDetails(const at::TensorImpl &ipu_tensor);
+getTensorDetails(const at::TensorImpl &ipu_tensor_impl);
+
+inline std::shared_ptr<IpuTensorDetails>
+getTensorDetails(const at::Tensor &ipu_tensor) {
+  return getTensorDetails(*ipu_tensor.unsafeGetTensorImpl());
+}
+
+void errorOnZeroSizedTensor(const at::Tensor &tensor);
+
+void initHostBuffer(at::Tensor &ipu_tensor);
+
+/** Host-side storage for `ipu` tensors.
+ *
+ *  This allows the user to convert tensors and modules to `ipu` using
+ *  `t.to("ipu")` even when the dispatcher is off, and even outside eager mode.
+ *
+ *  We simply copy the tensor in to our ownership, then when we go to load and
+ *  execute an executable, we can upload these tensors to the device. We'll
+ *  also retrieve them from the device when the user copies a tensor back to the
+ *  CPU (`t.to("cpu")`).
+ */
+class TensorStore {
+public:
+  TensorStore() = default;
+  TensorStore(const TensorStore &) = delete;
+  TensorStore(TensorStore &&) = delete;
+
+  // Create a new IPU tensor.
+  at::Tensor
+  allocateTensor(c10::IntArrayRef sizes,
+                 c10::optional<at::ScalarType> dtype = c10::nullopt,
+                 c10::optional<at::Device> device = c10::nullopt,
+                 c10::optional<at::Layout> layout = c10::nullopt,
+                 c10::optional<bool> pin_memory = c10::nullopt,
+                 c10::optional<at::MemoryFormat> memory_format = c10::nullopt);
+
+  // Create a new IPU tensor by copying the data from the given CPU tensor in to
+  // the new IPU tensor's host_buffer. Input tensor is a CPU tensor, returns an
+  // IPU tensor.
+  at::Tensor copyCpuTensorAsIpuTensor(const at::Tensor &cpu_tensor);
+
+private:
+  poptorch_ir::TensorId _next_tensor_id{1};
+};
 
 } // namespace poptorch
 

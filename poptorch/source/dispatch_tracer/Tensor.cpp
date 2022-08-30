@@ -10,10 +10,12 @@
 #include <string>
 #include <vector>
 
+#include "CommonHelperFunctions.hpp"
 #include "ValueMapper.hpp"
 
 #include "poptorch/DispatchTracer.hpp"
 
+#include "poptorch/Utils.hpp"
 #include "poptorch_logging/Error.hpp"
 #include "poptorch_logging/Logging.hpp"
 
@@ -26,6 +28,8 @@ namespace {
 c10::DispatchKeySet dispatch_key_set{c10::DispatchKey::XLA,
                                      c10::DispatchKey::AutogradXLA};
 
+} // namespace
+
 // Return the data size in bytes of a tensor (i.e num_elems * elem_size)
 uint64_t tensorImplDataSize(const at::TensorImpl &impl) {
   auto shape = impl.sizes();
@@ -34,8 +38,6 @@ uint64_t tensorImplDataSize(const at::TensorImpl &impl) {
   auto elem_size = impl.itemsize();
   return nelems * elem_size;
 }
-
-} // namespace
 
 // This is our own TensorImpl: this is stored in every at::Tensor of type IPU.
 //
@@ -87,8 +89,11 @@ struct IpuTensorImpl : public at::TensorImpl {
         /*version_counter=*/version_counter,
         /*allow_tensor_metadata_change=*/allow_tensor_metadata_change);
     impl->refresh_numel();
-    ERROR_ON_MSG(details->mapper == nullptr, "Copying tensor with no mapper");
-    details->mapper->addCopiedTensor(impl.get(), this);
+
+    details->alias_of = this->tensor_id;
+    if (details->mapper != nullptr) {
+      details->mapper->addCopiedTensor(impl.get(), this);
+    }
     return impl;
   }
 
@@ -102,8 +107,11 @@ struct IpuTensorImpl : public at::TensorImpl {
         /*version_counter=*/version_counter,
         /*allow_tensor_metadata_change=*/allow_tensor_metadata_change);
     impl->refresh_numel();
-    ERROR_ON_MSG(details->mapper == nullptr, "Copying tensor with no mapper");
-    details->mapper->addCopiedTensor(impl.get(), this);
+
+    details->alias_of = this->tensor_id;
+    if (details->mapper != nullptr) {
+      details->mapper->addCopiedTensor(impl.get(), this);
+    }
     return impl;
   }
 
@@ -115,9 +123,10 @@ struct IpuTensorImpl : public at::TensorImpl {
   void copyDataFromCpuSource(const at::Tensor &cpu_src) {
     auto data_size = tensorImplDataSize(*this);
     ERROR_ON_MSG(tensorDataSize(cpu_src) != data_size,
-                 "Data size mismatch between source tensor("
-                     << str(cpu_src) << "= " << tensorDataSize(cpu_src)
-                     << ") and destination tensor " << data_size);
+                 "Data size mismatch between source tensor ("
+                     << str(cpu_src) << "), of size " << tensorDataSize(cpu_src)
+                     << "; and destination tensor, of size " << data_size
+                     << '.');
     ERROR_ON_MSG(!cpu_src.is_contiguous(),
                  "Data source must be contiguous: " << str(cpu_src));
     if (!details->host_buffer) {
@@ -255,24 +264,6 @@ int64_t IpuTensorDetails::numel() {
   return c10::multiply_integers(std::begin(sizes), std::end(sizes));
 }
 
-at::Tensor createIpuTensor(at::ScalarType dtype, const at::Device &device,
-                           uint64_t ipu_tensor_id, c10::IntArrayRef sizes,
-                           c10::IntArrayRef strides) {
-  at::Tensor out = at::detail::make_tensor<IpuTensorImpl>(
-      c10::scalarTypeToTypeMeta(dtype), device, ipu_tensor_id, sizes, strides,
-      std::make_shared<IpuTensorDetails>());
-  for (size_t dim = 0; dim < sizes.size(); ++dim) {
-    ERROR_ON_MSG(sizes.at(dim) < 0, "Invalid tensor shape: dimension "
-                                        << dim << " is negative ("
-                                        << sizes.at(dim) << ")");
-  }
-  logging::trace("createIpuTensor {} impl_ {} sizes {} strides {} dtype {}",
-                 out.unsafeGetTensorImpl()->device_type(),
-                 reinterpret_cast<void *>(out.unsafeGetTensorImpl()), sizes,
-                 strides, dtype);
-  return out;
-}
-
 uint64_t ipuTensorId(const at::Tensor &tensor) {
   return toIpuTensorImpl(tensor)->tensor_id;
 }
@@ -326,11 +317,11 @@ void copyDataFromCpuSource(at::Tensor &ipu_tensor, const at::Tensor &cpu_src) {
   toIpuTensorImpl(ipu_tensor)->copyDataFromCpuSource(cpu_src);
 }
 
-Buffer getCpuData(const at::Tensor &ipu_tensor) {
+Buffer &getHostBuffer(const at::Tensor &ipu_tensor) {
   return toIpuTensorImpl(ipu_tensor)->details->host_buffer;
 }
 
-Buffer getCpuData(const at::TensorImpl &ipu_tensor) {
+Buffer &getHostBuffer(const at::TensorImpl &ipu_tensor) {
   auto details = toIpuTensorImpl(ipu_tensor)->details;
   return details->host_buffer;
 }
@@ -339,4 +330,80 @@ std::shared_ptr<IpuTensorDetails>
 getTensorDetails(const at::TensorImpl &ipu_tensor) {
   return toIpuTensorImpl(ipu_tensor)->details;
 }
+
+void errorOnZeroSizedTensor(const at::Tensor &tensor) {
+  auto sizes = tensor.sizes();
+  if (std::any_of(sizes.begin(), sizes.end(),
+                  [](auto dim) { return dim == 0; })) {
+    std::stringstream err;
+    err << "Zero-sized tensors are unsupported (Got shape [";
+    for (std::size_t i = 0; i < sizes.size() - 1; i++) {
+      err << sizes[i] << ", ";
+    }
+    err << sizes[sizes.size() - 1] << "]).";
+    ERROR(err.str());
+  }
+}
+
+void initHostBuffer(at::Tensor &ipu_tensor) {
+  auto *impl = toIpuTensorImpl(ipu_tensor);
+  auto data_size = tensorImplDataSize(*impl);
+  impl->details->host_buffer = std::make_shared<std::vector<char>>(data_size);
+}
+
+at::Tensor TensorStore::allocateTensor(
+    c10::IntArrayRef size, c10::optional<at::ScalarType> dtype,
+    c10::optional<at::Device> device, c10::optional<at::Layout> /*layout*/,
+    c10::optional<bool> /*pin_memory*/,
+    c10::optional<at::MemoryFormat> /*memory_format*/) {
+  at::ScalarType scalar_type = scalarTypeOrDefault(dtype);
+  auto coerced_scalar_type = coerceToSupportedType(scalar_type);
+  auto strides = at::detail::defaultStrides(size);
+
+  at::Tensor output = at::detail::make_tensor<IpuTensorImpl>(
+      c10::scalarTypeToTypeMeta(coerced_scalar_type),
+      deviceOrDefaultIpu(device), _next_tensor_id++, size, strides,
+      std::make_shared<IpuTensorDetails>());
+
+  for (size_t dim = 0; dim < size.size(); ++dim) {
+    ERROR_ON_MSG(size.at(dim) < 0, "Invalid tensor shape: dimension "
+                                       << dim << " is negative ("
+                                       << size.at(dim) << ")");
+  }
+
+  // TODO(T59880): replace XLA -> IPU
+  ERROR_ON(output.device().type() != c10::DeviceType::XLA);
+
+  logging::trace(
+      "Created IPU tensor: id {} impl_ {} size {} strides {} dtype {}",
+      ipuTensorId(output),
+      reinterpret_cast<void *>(output.unsafeGetTensorImpl()), size, strides,
+      coerced_scalar_type);
+
+  if (scalar_type != coerced_scalar_type) {
+    logging::warn("[DISPATCHER] Type coerced from {} to {} for tensor id {}",
+                  scalar_type, coerced_scalar_type, ipuTensorId(output));
+  }
+
+  return output;
+}
+
+at::Tensor TensorStore::copyCpuTensorAsIpuTensor(const at::Tensor &cpu_tensor) {
+  ERROR_ON(!cpu_tensor.unsafeGetTensorImpl()->is_cpu());
+
+  at::Tensor tensor = allocateTensor(
+      cpu_tensor.sizes(), c10::typeMetaToScalarType(cpu_tensor.dtype()));
+
+  tensor = copyAndCoerceType(tensor);
+
+  logging::trace("[DISPATCHER] Copying CPU tensor {} with data_ptr {}",
+                 static_cast<void *>(cpu_tensor.unsafeGetTensorImpl()),
+                 cpu_tensor.data_ptr());
+  copyDataFromCpuSource(tensor, cpu_tensor);
+
+  tensor.set_requires_grad(cpu_tensor.requires_grad());
+
+  return tensor;
+}
+
 } // namespace poptorch

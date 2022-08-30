@@ -46,6 +46,8 @@ private:
   };
 
 public:
+  ~ValueMapper();
+
   // Each tensor we are tracking has a short record containing a pointer to the
   // tensor and its corresponding values in the two IRs.
   struct TrackedTensor {
@@ -104,6 +106,26 @@ public:
   void setParameterName(const at::Tensor &t, const std::string &name);
 
   void replaceValue(torch::jit::Value *v_old, torch::jit::Value *v_new);
+
+  IpuTensorDetails *getTensorDetailsForId(uint64_t id) const;
+
+  // Create an alias from the `src_details` tensor details to the tensor
+  // described by `dest_details` and `dest_tensor_id`. The source tensor must
+  // already be added to this mapper. The MLIR or JIT value will now map to the
+  // same tensor details and PopTorch tensor id as the destination tensor.
+  void aliasTensor(const std::shared_ptr<IpuTensorDetails> &dest_details,
+                   uint64_t dest_tensor_id,
+                   const std::shared_ptr<IpuTensorDetails> &src_details);
+
+  // Creating an alias from src to dest as above, but locating the original
+  // tensor's shared pointer and id in this ValueMapper given just the raw
+  // pointer to both tensor details.
+  void aliasTensor(IpuTensorDetails *dest_details,
+                   IpuTensorDetails *src_details);
+
+protected:
+  // For resolving aliases, it's useful to find a TrackedTensor from its id.
+  std::unordered_map<uint64_t, IpuTensorDetails *> _ids_tensors_map;
 };
 
 } // namespace poptorch

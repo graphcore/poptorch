@@ -31,19 +31,38 @@ public:
   ~WithMetadata() { setCurrentMetadata(""); }
 };
 
-JITDispatch::JITDispatch(const CompilerOptions &options)
-    : graph(std::make_shared<torch::jit::Graph>()), _mlir_dispatch(options) {}
+std::string truncateGraphString(torch::jit::Graph &graph) {
+  static const int num_lines_max = [=]() {
+    if (const char *graph_len = std::getenv("POPTORCH_MAX_GRAPH_LEN")) {
+      const int n = std::stoi(graph_len);
+      logging::trace("POPTORCH_MAX_GRAPH_LEN={}", n);
+      return n;
+    }
+    const int n = 10;
+    logging::trace("POPTORCH_MAX_GRAPH_LEN not set, defaulting to {}", n);
+    return n;
+  }();
 
-at::Tensor JITDispatch::allocateTensor(
-    c10::IntArrayRef sizes, c10::optional<at::ScalarType> dtype,
-    c10::optional<at::Device> device, c10::optional<at::Layout> layout,
-    c10::optional<bool> pin_memory,
-    c10::optional<at::MemoryFormat> memory_format) {
-  // We delegate tensor creation to the MLIR dispatcher so we don't end up with
-  // clashing IPU tensor IDs.
-  return _mlir_dispatch.allocateTensor(sizes, dtype, device, layout, pin_memory,
-                                       memory_format);
+  std::string s = graph.toString();
+  if (num_lines_max <= 0 || s.empty()) {
+    return s;
+  }
+  size_t start = s.size();
+  for (int i = 0; i < num_lines_max; i++) {
+    start = s.rfind('\n', start - 1);
+    if (start == std::string::npos) {
+      // Didn't find another new line: print everything.
+      return s;
+    }
+  }
+  // Start after the last line return.
+  return "[...truncated...]" + s.substr(start);
 }
+
+JITDispatch::JITDispatch(const CompilerOptions &options,
+                         TensorStore *tensor_store)
+    : IDispatch(tensor_store), graph(std::make_shared<torch::jit::Graph>()),
+      _mlir_dispatch(options, tensor_store) {}
 
 at::Tensor JITDispatch::addConstant(const at::Tensor &cpu_tensor) {
   ERROR_ON(!cpu_tensor.unsafeGetTensorImpl()->is_cpu());
@@ -51,7 +70,8 @@ at::Tensor JITDispatch::addConstant(const at::Tensor &cpu_tensor) {
 
   auto src = copyAndCoerceType(cpu_tensor);
 
-  at::Tensor tensor = allocateTensor(src.sizes(), src.scalar_type());
+  at::Tensor tensor =
+      _tensor_store->allocateTensor(src.sizes(), src.scalar_type());
 
   auto *value = insertConstant(graph.get(), src);
 
@@ -63,30 +83,10 @@ at::Tensor JITDispatch::addConstant(const at::Tensor &cpu_tensor) {
   return tensor;
 }
 
-void errorOnZeroSizedTensor(const at::Tensor &tensor) {
-  auto sizes = tensor.sizes();
-  if (std::any_of(sizes.begin(), sizes.end(),
-                  [](auto dim) { return dim == 0; })) {
-    std::stringstream err;
-    err << "Zero-sized tensors are unsupported (Got shape [";
-    for (std::size_t i = 0; i < sizes.size() - 1; i++) {
-      err << sizes[i] << ", ";
-    }
-    err << sizes[sizes.size() - 1] << "]).";
-    ERROR(err.str());
-  }
-}
-
 at::Tensor JITDispatch::addTensor(const at::Tensor &cpu_tensor,
                                   bool is_parameter) {
-  ERROR_ON(!cpu_tensor.unsafeGetTensorImpl()->is_cpu());
   errorOnZeroSizedTensor(cpu_tensor);
-
-  at::Tensor tensor = allocateTensor(
-      cpu_tensor.sizes(), c10::typeMetaToScalarType(cpu_tensor.dtype()));
-
-  tensor = copyAndCoerceType(tensor);
-
+  auto tensor = _tensor_store->copyCpuTensorAsIpuTensor(cpu_tensor);
   torch::jit::Value *value = graph->addInput(cpu_tensor.name());
   setSourceRangeToCurrentLocation(value->node());
   value->setType(c10::TensorType::create(tensor)->withRequiresGrad(
@@ -95,7 +95,6 @@ at::Tensor JITDispatch::addTensor(const at::Tensor &cpu_tensor,
   logging::trace("[DISPATCHER] Adding {}: Value {} with cpu ptr {}",
                  is_parameter ? "parameter" : "input",
                  static_cast<void *>(value), cpu_tensor.data_ptr());
-  copyDataFromCpuSource(tensor, cpu_tensor);
   _inplace_tracker.addTensor(value);
   _mapper.addTensor(tensor, value);
   setIsParameter(tensor, is_parameter);

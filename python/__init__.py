@@ -36,7 +36,7 @@ except ImportError as e:
                       "`source /path/to/poplar-sdk/enable`") from e
 
 # pylint: disable=wrong-import-position
-from poptorch.poptorch_core import importPoptorchMetadataFromFile, Error, RecoverableError, UnrecoverableError, enableEagerMode
+from poptorch.poptorch_core import CompilerOptions, Error, RecoverableError, UnrecoverableError, enableEagerMode, importPoptorchMetadataFromFile
 from . import _dataloader
 from . import _impl
 from . import _poptorch_data

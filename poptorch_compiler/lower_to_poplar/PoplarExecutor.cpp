@@ -75,10 +75,12 @@ void PoplarExecutor::connectStream(const std::string &string, void *ptr) {
 void PoplarExecutor::execute() { _impl->engine->run(Programs::MainGraph); }
 
 void PoplarExecutor::weightsToDevice() {
+  poptorch::logging::trace("Copying weights to device");
   _impl->engine->run(Programs::WeightsToDevice);
 }
 
 void PoplarExecutor::weightsToHost() {
+  poptorch::logging::trace("Copying weights to host");
   _impl->engine->run(Programs::WeightsToHost);
 }
 

@@ -20,18 +20,11 @@ struct CompilerOptions;
 
 class JITDispatch final : public IDispatch {
 public:
-  explicit JITDispatch(const CompilerOptions &options);
+  JITDispatch(const CompilerOptions &options, TensorStore *tensor_store);
 
   // The JIT graph we are building up.
   std::shared_ptr<torch::jit::Graph> graph;
 
-  at::Tensor allocateTensor(
-      c10::IntArrayRef sizes,
-      c10::optional<at::ScalarType> dtype = c10::nullopt,
-      c10::optional<at::Device> device = c10::nullopt,
-      c10::optional<at::Layout> layout = c10::nullopt,
-      c10::optional<bool> pin_memory = c10::nullopt,
-      c10::optional<at::MemoryFormat> memory_format = c10::nullopt) override;
   at::Tensor addConstant(const at::Tensor &cpu_tensor) final;
   at::Tensor addInput(const at::Tensor &cpu_tensor) final;
   at::Tensor addParameter(const at::Tensor &cpu_tensor) final;

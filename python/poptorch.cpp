@@ -310,7 +310,7 @@ std::vector<popart_compiler::Optimizer> parseOptimizers(const py::dict &opt) {
     }
   }
 
-  copyParametersDict(&optimizers[0], defaults);
+  copyParametersDict(optimizers.data(), defaults);
   // For each group copy all the attributes
   // Start at 1: index 0 is 'defaults'
   std::uint64_t group = 1;
@@ -1079,10 +1079,16 @@ PYBIND11_MODULE(poptorch_core, m) { // NOLINT
 #if POPTORCH_BUILD_MLIR_COMPILER
   py::class_<poptorch::MLIRExecutor, std::shared_ptr<poptorch::MLIRExecutor>>(
       m, "MLIRExecutor")
-      .def("execute", &poptorch::MLIRExecutor::execute)
+      .def("execute",
+           [&](const std::shared_ptr<poptorch::MLIRExecutor> mlir_executor,
+               const std::vector<at::Tensor> &inputs) {
+             poptorch::swapLastMLIRExecutor(mlir_executor);
+             return mlir_executor->execute(inputs);
+           })
       .def("weightsToDevice", &poptorch::MLIRExecutor::weightsToDevice)
-      .def("weightsToHost", &poptorch::MLIRExecutor::weightsToHost);
-  m.def("compileWithMLIR", PTC(poptorch::compileMLIR));
+      .def("copyWeightsToHostIfNeeded",
+           &poptorch::MLIRExecutor::copyWeightsToHostIfNeeded);
+  m.def("compileMLIR", PTC(poptorch::compileMLIR));
 #endif
 
   py::enum_<poptorch::TracingMode>(m, "TracingMode")
@@ -1115,6 +1121,8 @@ PYBIND11_MODULE(poptorch_core, m) { // NOLINT
         PTC(poptorch::bindings::processDispatchAndImportExecutable));
   m.def("_throwTestError", PTC(poptorch::popart_compiler::throwTestError));
   m.def("getIpuTensorId", PTC(poptorch::getIpuTensorId));
+  m.def("promoteArgsAsInputs", PTC(poptorch::promoteArgsAsInputs));
+  m.def("promoteOutputs", PTC(poptorch::promoteOutputs));
 
   poptorch::initialiseExceptionHandling(m);
 

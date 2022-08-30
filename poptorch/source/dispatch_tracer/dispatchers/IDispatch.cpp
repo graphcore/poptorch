@@ -13,30 +13,9 @@
 
 namespace poptorch {
 
-at::Tensor IDispatch::allocateTensor(
-    c10::IntArrayRef size, c10::optional<at::ScalarType> dtype,
-    c10::optional<at::Device> device, c10::optional<at::Layout> layout,
-    c10::optional<bool> pin_memory,
-    c10::optional<at::MemoryFormat> memory_format) {
-  UNUSED(layout);
-  UNUSED(memory_format);
-  UNUSED(pin_memory);
-  at::ScalarType scalar_type = scalarTypeOrDefault(dtype);
-  auto coerced_scalar_type = coerceToSupportedType(scalar_type);
-
-  at::Tensor output = createIpuTensor(
-      coerced_scalar_type, deviceOrDefaultIpu(device), _next_tensor_id++, size,
-      at::detail::defaultStrides(size));
-  if (scalar_type != coerced_scalar_type) {
-    logging::warn(
-        "[DISPATCHER] Allocated tensor: {} {} (type coerced from {} to {})",
-        ipuTensorId(output), toString(output), scalar_type,
-        coerced_scalar_type);
-  } else {
-    logging::trace("[DISPATCHER] Allocated tensor: {} {}", ipuTensorId(output),
-                   toString(output));
-  }
-  return output;
+IDispatch::IDispatch(TensorStore *tensor_store) {
+  ERROR_ON(tensor_store == nullptr);
+  _tensor_store = tensor_store;
 }
 
 void IDispatch::setPythonStack(

@@ -2,10 +2,11 @@
 import collections
 import functools
 import warnings
-from typing import List, Optional
+from typing import Callable, List, Optional
 
 import torch
-from . import enums, poptorch_core, _impl, accessAttributes
+from . import enums, poptorch_core, _impl, accessAttributes, CompilerOptions
+from ._args_parser import ArgsParser
 from ._utils import flattenTensorStructure, reconstructTensorStructure, isOnIpu
 from .options import Options
 from .optim import Optimizer
@@ -63,7 +64,7 @@ class IPUScope:
         self._upload_weights = True
         self._skip_compilation = skip_compilation
 
-        mlir_compiler_options = poptorch_core.CompilerOptions()
+        mlir_compiler_options = CompilerOptions()
         mlir_compiler_options.source_location_excludes = self._options._source_location_excludes  # pylint: disable=line-too-long
 
         # Create the graph. Future captured calls will be written into this
@@ -258,7 +259,7 @@ class IPUScope:
                 list(self._options.anchored_tensors.values()))
         else:
             # Compile the captured graph using MLIR.
-            self._executable = poptorch_core.compileWithMLIR()
+            self._executable = poptorch_core.compileMLIR()
         return True
 
     def loadExecutable(self, filename):
@@ -290,6 +291,7 @@ class IPUScope:
         elif self._compile_using == enums.Compiler.MLIR:
             # Run via the MLIR compiled binary.
             self._executable.execute(args)
+            self._executable.copyWeightsToHostIfNeeded()
             output = self._outputs
 
         if self._outputs_structure is not None:
@@ -450,3 +452,123 @@ def IPUContext(func=None,
     # default arguments
     return _IPUContext(func, compiler, options, training, optimizer,
                        dict_optimizer, model)
+
+
+class _IPUSession:
+    """
+    Internal use only.
+
+    Context manager for creating a session in which to build an IPU graph.
+    """
+
+    def __init__(self, compiler_options: CompilerOptions):
+        self._compiler_options = compiler_options
+
+        # Create the graph. Future captured calls will be written into this
+        # graph behind the scenes.
+        poptorch_core.createGraph(
+            poptorch_core.TracingMode(enums.Compiler.MLIR), [],
+            self._compiler_options)
+
+    def run(self, func: Callable, args: ArgsParser.Args):
+        poptorch_core.startDispatch()
+        _impl.setDispatchTracing(True)
+        _impl.setIpuContext(True)
+        poptorch_core.promoteArgsAsInputs(args.asPackedFlatTuple())
+
+        excepted = False
+        out = None
+        try:
+            out = func(*args.args, **args.kwargs)
+        except Exception as exc:
+            excepted = True
+            raise exc
+        finally:
+            if not excepted and out is not None:
+                flattened = flattenTensorStructure(out)
+                poptorch_core.promoteOutputs(flattened)
+
+            _impl.setIpuContext(False)
+            _impl.setDispatchTracing(False)
+            poptorch_core.endDispatch(excepted)
+
+        return out
+
+    def compile(self):
+        """
+        Compile the graph built in this IPUSession, and return an executable,
+        on which you can call `executable.execute()`.
+        """
+        return poptorch_core.compileMLIR()
+
+
+def ipu_wrapper(_func: Optional[Callable] = None,
+                *,
+                compiler_options: CompilerOptions = CompilerOptions()):
+    """Function decorator which compiles the IPU graph contained within.
+
+    The previously compiled executable are kept in a cache and compilation is
+    avoided if the shapes do not change from a previous run.
+
+    Usage:
+    ```
+    @ipu_wrapper
+    def my_ipu_func(a, b):
+        return a @ b
+
+    a = ...
+    b = ...
+    res = my_ipu_func(a.to("ipu"), b.to("ipu"))
+
+    print("Result of a @ b:", res.to("cpu"))
+    ```
+
+    Arguments:
+    options -- poptorch.CompilerOptions structure to configure runtime
+               parameters.
+    """
+
+    def decorator(func: Callable):
+        cache = None
+        args_parser: ArgsParser = ArgsParser(func, tracing=False)
+        compiled_args: Optional[ArgsParser.Args] = None
+        out = None
+
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            nonlocal cache, args_parser, compiled_args, out, compiler_options
+
+            current_args = args_parser(args, kwargs)
+            flat_args = current_args.asPackedFlatTuple()
+            if len(flat_args) == 0:
+                raise _impl.createPoptorchError(
+                    "No tensor inputs passed to `ipu_wrapper`-wrapped "
+                    "function. At least one input to an this function must be "
+                    "a `torch.Tensor`.")
+
+            if compiled_args:
+                try:
+                    compiled_args.validateInputs(current_args)
+                    cache.execute(flat_args)
+                    return out
+                except poptorch_core.Error:
+                    pass
+
+            sess = _IPUSession(compiler_options)
+            out = sess.run(func, current_args)
+
+            executable = sess.compile()
+            executable.execute(flat_args)
+
+            # Save this executable as compiled with these args.
+            cache = executable
+            compiled_args = current_args
+
+            return out
+
+        return wrapper
+
+    if _func is None:
+        return decorator
+
+    return decorator(_func)

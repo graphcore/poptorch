@@ -18,15 +18,9 @@ namespace poptorch {
 
 class IDispatch {
 public:
-  virtual ~IDispatch();
+  explicit IDispatch(TensorStore *tensor_store);
 
-  virtual at::Tensor
-  allocateTensor(c10::IntArrayRef sizes,
-                 c10::optional<at::ScalarType> dtype = c10::nullopt,
-                 c10::optional<at::Device> device = c10::nullopt,
-                 c10::optional<at::Layout> layout = c10::nullopt,
-                 c10::optional<bool> pin_memory = c10::nullopt,
-                 c10::optional<at::MemoryFormat> memory_format = c10::nullopt);
+  virtual ~IDispatch();
 
   // Input tensor is a CPU tensor, returns an IPU tensor.
   virtual at::Tensor addInput(const at::Tensor &cpu_tensor) = 0;
@@ -73,6 +67,10 @@ protected:
   // types.
   ValueMapper _mapper;
 
+  // Used to create and manage tensors. This is a raw pointer to ensure this is
+  // trivially copyable, but must never be nullptr.
+  TensorStore *_tensor_store;
+
   virtual const std::vector<std::vector<char>> &
   getSourceLocationExcludes() const = 0;
   virtual void
@@ -81,8 +79,6 @@ protected:
 private:
   torch::jit::SourceRange getPythonInterpreterSourceRange(
       const std::vector<torch::jit::StackEntry> &cs) const;
-
-  uint64_t _next_tensor_id{1};
 };
 
 } // namespace poptorch

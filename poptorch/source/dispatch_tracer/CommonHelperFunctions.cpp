@@ -61,6 +61,12 @@ torch::jit::Value *insertValueIntoGraphAndTrackIt(c10::IValue &value,
 
     torch::jit::Value *val = mapper.getValueForTensor(tensor);
     if (val == nullptr) {
+      // TODO(T59880): rename XLA -> IPU
+      ERROR_ON_MSG(tensor.device().type() == c10::DeviceType::XLA,
+                   "Attempted to promote a Tensor converted (using "
+                   ".to(\"ipu\") or .ipu()) outside an IPUScope or IPUContext "
+                   "with the PopART compiler.");
+
       // This is probably an external tensor that we didn't catch. Assume
       // it's a constant.
       val = insertConstant(graph, copyAndCoerceType(tensor));
@@ -184,7 +190,7 @@ at::Tensor copyAndCoerceType(const at::Tensor &tensor) {
 
 std::vector<at::Tensor> getInplaceArguments(const c10::Stack &stack,
                                             const c10::FunctionSchema &schema) {
-  logging::trace("[TRACING-2][JIT] Looking for inplace arguments in schema {}",
+  logging::trace("[DISPATCHER][JIT] Looking for inplace arguments in schema {}",
                  schema);
 
   std::vector<at::Tensor> results;
@@ -202,10 +208,10 @@ std::vector<at::Tensor> getInplaceArguments(const c10::Stack &stack,
       }
 
       if (argument.alias_info() && argument.alias_info()->isWrite()) {
-        logging::trace(
-            "[TRACING-2][JIT] Found inplace argument, tensor ptr {}, tensor {}",
-            reinterpret_cast<void *>(tensor.unsafeGetTensorImpl()),
-            toString(tensor));
+        logging::trace("[DISPATCHER][JIT] Found inplace argument, tensor ptr "
+                       "{}, tensor {}",
+                       reinterpret_cast<void *>(tensor.unsafeGetTensorImpl()),
+                       toString(tensor));
         results.push_back(tensor);
       }
     }

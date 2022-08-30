@@ -2,12 +2,14 @@
 #include <ATen/core/List.h>
 #include <ATen/core/function_schema.h>
 #include <ATen/native/CPUFallback.h>
+#include <c10/core/ScalarType.h>
 #include <torch/csrc/autograd/autograd_not_implemented_fallback.h>
 #include <torch/csrc/jit/frontend/tracer.h>
 #include <torch/csrc/jit/ir/ir.h>
 #include <torch/csrc/jit/runtime/interpreter.h>
 #include <torch/types.h>
 
+#include <memory>
 #include <set>
 #include <string>
 #include <unordered_map>
@@ -121,6 +123,15 @@ struct GlobalTracerContext {
   // exist.
   std::set<void *> graph_inputs;
 
+#if POPTORCH_BUILD_MLIR_COMPILER
+  // Store a weak pointer to the MLIRExecutor which was last run. This allows us
+  // to move associated tensors off the device when we load a new executor.
+  std::weak_ptr<MLIRExecutor> last_mlir_executor;
+#endif
+
+  // Create and store Tensors...
+  TensorStore tensor_store;
+
 private:
   // The active dispatcher. Created once upon dispatch start.
   std::unique_ptr<IDispatch> _active_dispatch;
@@ -141,15 +152,106 @@ at::Tensor downCastIfNeeded(const at::Tensor &t) {
   return t;
 }
 
+#if POPTORCH_BUILD_MLIR_COMPILER
+
+// NOLINTNEXTLINE
+void hostSideCast(void *dest, c10::ScalarType dest_scalar_type, void *src,
+                  const void *src_end, c10::ScalarType src_scalar_type) {
+  // NOLINTNEXTLINE
+  AT_DISPATCH_ALL_TYPES_AND(
+      at::ScalarType::Half, dest_scalar_type, "copy_", [&] {
+        using dest_t = scalar_t;
+
+        // NOLINTNEXTLINE
+        AT_DISPATCH_ALL_TYPES_AND(
+            at::ScalarType::Half, src_scalar_type, "copy_", [&] {
+              scalar_t *src_ = reinterpret_cast<scalar_t *>(src);
+              dest_t *dest_ = reinterpret_cast<dest_t *>(dest);
+
+              // TODO(T69558): use vectorised casts
+              // at::vec::convert(src, dest, numel);
+
+              while (reinterpret_cast<void *>(src_) != src_end) {
+                *(dest_++) =
+                    c10::static_cast_with_inter_type<dest_t, scalar_t>::apply(
+                        *(src_++));
+              }
+            });
+      });
+}
+
+#endif
+
 // copy_(Tensor(a!) self, Tensor src, bool non_blocking=False) -> Tensor(a!)
 at::Tensor &copyInplace(at::Tensor &self, const at::Tensor &src,
-                        bool non_blocking) {
+                        bool /*non_blocking*/) {
+  logging::trace("[DISPATCHER] Intercepting aten::copy_");
+  logging::trace("[Input copy_] self {}", str(self));
+  logging::trace("[Input copy_] src {}", str(src));
+
+#if POPTORCH_BUILD_MLIR_COMPILER
+  if (!context.hasActiveDispatch()) {
+    if (self.is_xla() && src.is_cpu()) {
+      logging::trace("copy_ CPU -> IPU, outside dispatch");
+      auto scalar_type = src.scalar_type();
+      auto coerced_type = coerceToSupportedType(scalar_type);
+      ERROR_ON_MSG(scalar_type != coerced_type,
+                   "Unsupported scalar type `"
+                       << scalar_type << "'. Please cast to `" << coerced_type
+                       << "' before moving this tensor to the IPU.");
+      self = context.tensor_store.copyCpuTensorAsIpuTensor(src);
+    } else if (self.is_cpu() && src.is_xla()) {
+      logging::trace("copy_ IPU -> CPU, outside dispatch");
+      if (std::shared_ptr<MLIRExecutor> executor =
+              context.last_mlir_executor.lock()) {
+        executor->copyWeightsToHostIfNeeded();
+      }
+
+      auto *impl = src.unsafeGetTensorImpl();
+      ERROR_ON(!getHostBuffer(*impl));
+
+      std::memcpy(self.data_ptr(), getHostBuffer(*impl)->data(),
+                  tensorImplDataSize(*impl));
+    } else if (self.is_xla() && src.is_xla()) {
+      if (std::shared_ptr<MLIRExecutor> executor =
+              context.last_mlir_executor.lock()) {
+        executor->copyWeightsToHostIfNeeded();
+      }
+
+      auto &self_buffer = getHostBuffer(self);
+      auto &src_buffer = getHostBuffer(src);
+
+      if (!self_buffer) {
+        initHostBuffer(self);
+      }
+
+      ERROR_ON(!src_buffer);
+
+      if (self.dtype() != src.dtype()) {
+        logging::trace("copy_ cast from {} to {} on CPU, outside dispatch",
+                       src.dtype(), self.dtype());
+        hostSideCast(
+            self_buffer->data(), self.scalar_type(), src_buffer->data(),
+            src_buffer->data() + src_buffer->size(), src.scalar_type());
+      } else {
+        ERROR_ON_MSG(self_buffer->size() != src_buffer->size(),
+                     "Failed to copy_ outside dispatch: src and self host-side "
+                     "buffer sizes are not equal.");
+        std::memcpy(self_buffer->data(), src_buffer->data(),
+                    tensorImplDataSize(*src.unsafeGetTensorImpl()));
+      }
+    } else {
+      ERROR("Intercepted unexpected copy_ outside dispatch: only copies "
+            "between CPU, IPU tensors as well as between IPU tensors "
+            "themselves are supported.");
+    }
+
+    return self;
+  }
+#endif
+
   context.activeDispatch()->setPythonStack(
       torch::jit::tracer::pythonCallstack());
-  UNUSED(non_blocking);
-  logging::debug("[DISPATCHER] Intercepting aten::copy_");
-  logging::trace("[Input] self {}", str(self));
-  logging::trace("[Input] src {}", str(src));
 
   // TODO(T59880) rename is_xla() -> is_ipu()
   if (self.is_xla()) {
@@ -188,9 +290,9 @@ at::Tensor &copyInplace(at::Tensor &self, const at::Tensor &src,
     ERROR_ON(!self.is_cpu());
     // TODO(T59880) rename is_xla() -> is_ipu()
     if (src.is_xla()) {
-      if (!context.moving_outputs && !eagerModeEnabled()) {
-        ERROR("Moved a tensor from IPU to CPU outside output");
-      }
+      ERROR_ON_MSG(!context.moving_outputs && !eagerModeEnabled(),
+                   "Illegal move to CPU (via `.to(\"cpu\")`) when using the "
+                   "dispatcher. Instead, return this output as an IPU tensor.");
       logging::debug("copy_ output IPU -> CPU");
       context.activeDispatch()->addOutput(src, self);
     } else {
@@ -220,9 +322,11 @@ void startDispatch() { context.dispatch_on = true; }
 bool eagerModeEnabled() {
   bool result = false;
 #if POPTORCH_BUILD_MLIR_COMPILER
-  auto *mlir = dynamic_cast<MLIRDispatch *>(context.activeDispatch());
-  if (mlir != nullptr) {
-    result = mlir->isEagerMode();
+  if (context.hasActiveDispatch()) {
+    auto *mlir = dynamic_cast<MLIRDispatch *>(context.activeDispatch());
+    if (mlir != nullptr) {
+      result = mlir->isEagerMode();
+    }
   }
 #endif
   return result;
@@ -230,8 +334,8 @@ bool eagerModeEnabled() {
 
 CompilerOptions &enableEagerMode() {
 #if POPTORCH_BUILD_MLIR_COMPILER
-  auto dispatcher =
-      std::make_unique<MLIRDispatch>(CompilerOptions::eagerOptions());
+  auto dispatcher = std::make_unique<MLIRDispatch>(
+      CompilerOptions::eagerOptions(), &context.tensor_store);
 
   auto &options = dispatcher->getMutableCompilerOptions();
 
@@ -296,6 +400,16 @@ bool isDispatcherOn() {
 #endif
 }
 
+#if POPTORCH_BUILD_MLIR_COMPILER
+void swapLastMLIRExecutor(const std::shared_ptr<MLIRExecutor> &mlir_executor) {
+  if (std::shared_ptr<MLIRExecutor> replaced_mlir_executor =
+          context.last_mlir_executor.lock()) {
+    replaced_mlir_executor->copyWeightsToHostIfNeeded();
+  }
+  context.last_mlir_executor = mlir_executor;
+}
+#endif
+
 CompilerOptions
 createMLIROptions(const std::vector<std::string> &source_location_excludes) {
   CompilerOptions options;
@@ -315,7 +429,8 @@ void createGraph(TracingMode mode, const std::vector<at::Tensor> &inputs,
   if (mode == TracingMode::POPART) {
 // TODO(T49566) We don't build this on Centos
 #if POPTORCH_BUILD_MLIR_COMPILER
-    context.resetActiveDispatch(std::make_unique<JITDispatch>(options));
+    context.resetActiveDispatch(
+        std::make_unique<JITDispatch>(options, &context.tensor_store));
 #else
     UNUSED(options);
     ERROR("PopTorch must be compiled with POPTORCH_BUILD_MLIR_COMPILER=ON to "
@@ -324,7 +439,8 @@ void createGraph(TracingMode mode, const std::vector<at::Tensor> &inputs,
   } else if (mode == TracingMode::MLIR) {
 // TODO(T49566) We don't build this on Centos
 #if POPTORCH_BUILD_MLIR_COMPILER
-    context.resetActiveDispatch(std::make_unique<MLIRDispatch>(options));
+    context.resetActiveDispatch(
+        std::make_unique<MLIRDispatch>(options, &context.tensor_store));
 #else
     UNUSED(options);
     ERROR("PopTorch must be compiled with POPTORCH_BUILD_MLIR_COMPILER=ON to "
@@ -373,9 +489,9 @@ void fallback(const c10::OperatorHandle &op, c10::Stack *stack) {
 std::shared_ptr<MLIRExecutor> compileMLIR() {
   auto *mlir = dynamic_cast<MLIRDispatch *>(context.activeDispatch());
   ERROR_ON(mlir == nullptr);
-  auto executable = mlir->compile();
+  auto executor = mlir->compile();
   destroyDispatcher();
-  return executable;
+  return executor;
 }
 
 #endif
@@ -421,7 +537,7 @@ std::shared_ptr<torch::jit::Graph> getTracedGraph() {
 void finalizeGraph() { context.activeDispatch()->finalizeGraph(); }
 
 void *getDataSource(const at::Tensor &tensor) {
-  return getCpuData(tensor)->data();
+  return getHostBuffer(tensor)->data();
 }
 
 void *getDataSourceForValue(torch::jit::Value *value) {
@@ -463,17 +579,24 @@ emptyBase(at::IntArrayRef size,
           c10::optional<at::MemoryFormat> memory_format = c10::nullopt) {
   ERROR_ON(!device); // Internal error: shouldn't happen
   if (isIpuDevice(*device)) {
-    context.activeDispatch()->setPythonStack(
-        torch::jit::tracer::pythonCallstack());
-
     // We use the device ID to determine if a tensor is a parameter
     // (device 1) or not (device 0) but in reality all the tensors
     // currently live on the same IPU so always use the default IPU.
-    at::Tensor output = context.activeDispatch()->allocateTensor(
+    at::Tensor output = context.tensor_store.allocateTensor(
         size, dtype, deviceOrDefaultIpu({}), layout, pin_memory, memory_format);
     // TODO(T61576) Find a better way to identify parameters and buffers.
     setIsParameter(output, context.moving_parameters);
-    context.activeDispatch()->registerEmptyTensor(output);
+
+    if (context.hasActiveDispatch()) {
+      context.activeDispatch()->setPythonStack(
+          torch::jit::tracer::pythonCallstack());
+      context.activeDispatch()->registerEmptyTensor(output);
+    }
+
+#if POPTORCH_BUILD_MLIR_COMPILER
+    initHostBuffer(output);
+#endif
+
     return output;
   }
   // Native calls are a dispatch endpoint so will not be redispatched.
@@ -518,11 +641,27 @@ at::Tensor emptyStrided(at::IntArrayRef size, at::IntArrayRef stride,
 void detach(const c10::OperatorHandle &op, c10::Stack *stack) {
   logging::debug("[DISPATCHER] Intercepting aten::detach");
 
-  context.activeDispatch()->setPythonStack(
-      torch::jit::tracer::pythonCallstack());
+  if (context.hasActiveDispatch()) {
+    context.activeDispatch()->setPythonStack(
+        torch::jit::tracer::pythonCallstack());
 
-  // Perform the shallow copy and detach.
-  context.activeDispatch()->detach(op, stack, context.moving_parameters);
+    // Perform the shallow copy and detach.
+    context.activeDispatch()->detach(op, stack, context.moving_parameters);
+  } else {
+    const c10::FunctionSchema &schema = op.schema();
+    const auto num_arguments = schema.arguments().size();
+    const auto arguments = torch::jit::last(stack, num_arguments);
+
+    ERROR_ON(arguments.size() != 1);
+    at::Tensor in = arguments.front().toTensor();
+
+    at::Tensor out(in.unsafeGetTensorImpl()->shallow_copy_and_detach(
+        /*version_counter=*/in.unsafeGetTensorImpl()->version_counter(),
+        /*allow_tensor_metadata_change=*/true));
+
+    torch::jit::drop(stack, num_arguments);
+    torch::jit::push(stack, out);
+  }
 }
 
 void replaceValueDispatcher(torch::jit::Value *v_old,
@@ -538,6 +677,41 @@ std::uint64_t getIpuTensorId(const at::Tensor &tensor) {
                "You may only call getIpuTensorId on an IPU tensor");
   return ipuTensorId(tensor);
 }
+
+void promoteArgsAsInputs(std::vector<at::Tensor> &args) {
+#if POPTORCH_BUILD_MLIR_COMPILER
+  auto *mlir = dynamic_cast<MLIRDispatch *>(context.activeDispatch());
+  ERROR_ON(mlir == nullptr);
+
+  for (at::Tensor &arg : args) {
+    mlir->promoteAsInput(arg, true);
+  }
+#else
+  UNUSED(args);
+  ERROR("Attempted to use the MLIR compiler on an unsupported platform.");
+#endif
+}
+
+void promoteOutputs(std::vector<at::Tensor> &outputs) {
+#if POPTORCH_BUILD_MLIR_COMPILER
+  auto *mlir = dynamic_cast<MLIRDispatch *>(context.activeDispatch());
+  ERROR_ON(mlir == nullptr);
+
+  for (at::Tensor &out : outputs) {
+    if (!getHostBuffer(out)) {
+      initHostBuffer(out);
+    }
+
+    mlir->promoteAsOutput(out, getHostBuffer(out)->data());
+  }
+#else
+  UNUSED(outputs);
+  ERROR("Attempted to use the MLIR compiler on an unsupported platform.");
+#endif
+}
+
+bool movingParameters() { return context.moving_parameters; }
+
 } // namespace poptorch
 
 /*

@@ -1,19 +1,26 @@
 // Copyright (c) 2021 Graphcore Ltd. All rights reserved.
 #include "ValueMapper.hpp"
 
+#include <memory>
 #include <utility>
 
 #include "Tensor.hpp"
+#include "poptorch/DispatchTracer.hpp"
 #include "poptorch/Utils.hpp"
 #include "poptorch_logging/Error.hpp"
 #include "poptorch_logging/Logging.hpp"
 
 namespace poptorch {
 
+ValueMapper::~ValueMapper() {
+  for (const auto &entry : tensors) {
+    entry.first->mapper = nullptr;
+  }
+}
+
 ValueMapper::TrackedTensor::TrackedTensor(const at::Tensor &tensor)
-    : tensor_details(getTensorDetails(*tensor.unsafeGetTensorImpl())),
-      jit(nullptr), mlir(poptorch_ir::tensor_error_id),
-      ipu_tensor_id(ipuTensorId(tensor)) {}
+    : tensor_details(getTensorDetails(tensor)), jit(nullptr),
+      mlir(poptorch_ir::tensor_error_id), ipu_tensor_id(ipuTensorId(tensor)) {}
 
 void ValueMapper::setParameterName(const at::Tensor &t,
                                    const std::string &name) {
@@ -63,6 +70,8 @@ void ValueMapper::addTensor(const at::Tensor &t, poptorch_ir::TensorId id) {
   auto itr = tensors.insert({new_details.get(), TrackedTensor{t}}).first;
   itr->second.mlir = id;
   ERROR_ON(itr->second.tensor_details != new_details);
+
+  _ids_tensors_map.insert({getIpuTensorId(t), new_details.get()});
 }
 
 void ValueMapper::addTensor(const at::Tensor &t, torch::jit::Value *val) {
@@ -82,6 +91,8 @@ void ValueMapper::addTensor(const at::Tensor &t, torch::jit::Value *val) {
 
   // Ensure we maintain a lookup of torch::jit to pytorch tensor.
   values_map.insert({val, &itr.first->second});
+
+  _ids_tensors_map.insert({getIpuTensorId(t), new_details.get()});
 }
 
 void ValueMapper::addCopiedTensor(const at::TensorImpl *dest,
@@ -89,12 +100,31 @@ void ValueMapper::addCopiedTensor(const at::TensorImpl *dest,
   auto src_details = getTensorDetails(*src);
   auto dest_details = getTensorDetails(*dest);
   dest_details->mapper = this;
+
+  aliasTensor(dest_details, ipuTensorId(*dest), src_details);
+}
+
+void ValueMapper::aliasTensor(
+    const std::shared_ptr<IpuTensorDetails> &dest_details,
+    uint64_t dest_tensor_id,
+    const std::shared_ptr<IpuTensorDetails> &src_details) {
   auto itr = tensors.find(src_details.get());
   ERROR_ON_MSG(itr == tensors.end(), "Could not find source tensor");
-  auto itr_new =
-      tensors.insert(std::make_pair(dest_details.get(), itr->second));
+  auto itr_new = tensors.insert_or_assign(dest_details.get(), itr->second);
   itr_new.first->second.tensor_details = dest_details;
-  itr_new.first->second.ipu_tensor_id = ipuTensorId(*dest);
+  itr_new.first->second.ipu_tensor_id = dest_tensor_id;
+}
+
+void ValueMapper::aliasTensor(IpuTensorDetails *dest_details,
+                              IpuTensorDetails *src_details) {
+  auto dest_it = tensors.find(dest_details);
+  auto src_it = tensors.find(src_details);
+
+  ERROR_ON(dest_it == tensors.end());
+  ERROR_ON(src_it == tensors.end());
+
+  aliasTensor(dest_it->second.tensor_details, dest_it->second.ipu_tensor_id,
+              src_it->second.tensor_details);
 }
 
 ValueMapper::TrackedTensor *ValueMapper::rawTensorRecord(const at::Tensor &t) {
@@ -166,6 +196,15 @@ void ValueMapper::replaceValue(torch::jit::Value *v_old,
       rec.second.jit = v_new;
     }
   }
+}
+
+IpuTensorDetails *ValueMapper::getTensorDetailsForId(uint64_t id) const {
+  auto it = _ids_tensors_map.find(id);
+  if (it == _ids_tensors_map.end()) {
+    return nullptr;
+  }
+
+  return it->second;
 }
 
 } // namespace poptorch

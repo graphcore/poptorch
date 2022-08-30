@@ -55,10 +55,14 @@ public:
   ~MLIRExecutor();
   void execute(const std::vector<at::Tensor> &inputs);
   void weightsToDevice();
-  void weightsToHost();
+
+  // Call before the MLIRExecutor is switched out.
+  void copyWeightsToHostIfNeeded();
 
 private:
-  std::unique_ptr<poptorch_ir::PoplarExecutorWrapper> _impl;
+  std::unique_ptr<poptorch_ir::PoplarExecutorWrapper> _executor;
+
+  bool _host_buffers_are_dirty{false};
 };
 
 // Create a new graph.
@@ -80,6 +84,10 @@ std::shared_ptr<torch::jit::Graph> getTracedGraph();
 // Compile MLIR. Is a full roundtrip compile and spits out a runable poplar
 // binary at the end, wrapped by `MLIRExecutor`.
 std::shared_ptr<MLIRExecutor> compileMLIR();
+
+#if POPTORCH_BUILD_MLIR_COMPILER
+void swapLastMLIRExecutor(const std::shared_ptr<MLIRExecutor> &mlir_executor);
+#endif
 
 // Get a pointer to the data source for an IPU input / parameter tensor.
 // If the value is not a parameter or an input, return nullptr.
@@ -139,6 +147,15 @@ void destroyDispatcher();
 void replaceValueDispatcher(torch::jit::Value *v_old, torch::jit::Value *v_new);
 
 std::uint64_t getIpuTensorId(const at::Tensor &tensor);
+
+// Promote these tensors as args passed in to the model. This is used in
+// IPUSession to determine which inputs are likely to change.
+void promoteArgsAsInputs(std::vector<at::Tensor> &args);
+
+void promoteOutputs(std::vector<at::Tensor> &outputs);
+
+bool movingParameters();
+
 } // namespace poptorch
 
 #endif // INCLUDE_POPTORCH_DISPATCH_TRACER_HPP_

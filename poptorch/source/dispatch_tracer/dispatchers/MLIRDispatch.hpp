@@ -23,7 +23,7 @@ struct CompilerOptions;
 
 class MLIRDispatch : public IDispatch {
 public:
-  explicit MLIRDispatch(CompilerOptions const &options);
+  MLIRDispatch(CompilerOptions const &options, TensorStore *tensor_store);
 
   at::Tensor addConstant(const at::Tensor &cpu_tensor) final;
   at::Tensor addInput(const at::Tensor &cpu_tensor) final;
@@ -37,6 +37,12 @@ public:
 
   void detach(const c10::OperatorHandle &op, c10::Stack *stack,
               bool moving_parameters) final;
+
+  void promoteAsParameter(at::Tensor &tensor);
+
+  void promoteAsInput(at::Tensor &tensor, bool is_wrapped = false);
+
+  void promoteAsOutput(const at::Tensor &tensor, void *storage);
 
   void registerEmptyTensor(const at::Tensor &tensor) final;
 
@@ -101,6 +107,10 @@ protected:
   static poptorch_ir::TensorId getSingleOptionalTensorId(
       const std::vector<poptorch_ir::OptionalTensorId> &tensor_vec);
 
+  // Find any tensors which were created before this Dispatch was created, and
+  // promote them by marking them as inputs to the graph.
+  void findAndPromoteExternalTensors(c10::Stack *stack);
+
 private:
   void
   setCurrentCodeLocation(const torch::jit::SourceRange &source_location) final;
@@ -126,6 +136,9 @@ private:
   // operation.
   using StackFunctionType = std::function<void(c10::Stack &)>;
   std::unordered_map<std::string, StackFunctionType> _direct_dispatch_lookup;
+
+  std::vector<IpuTensorDetails *> _aliases_to_restore;
+  void restoreAliases();
 };
 
 } // namespace poptorch
