@@ -24,6 +24,11 @@ if args.add_to_sys_path:
         print(f"Adding {path}")
         sys.path.insert(0, path)
 
+# This script doesn't actually need poptorch, but pytest later on will import
+# it while compiling the list of tests and if it fails then we usually don't
+# get the reason (Because the collection happens in a subprocess).
+import poptorch  # pylint: disable=unused-import,wrong-import-position
+
 # Collect the list of tests:
 list_tests = io.StringIO()
 pytest_args = ["-x", args.test_dir, "--collect-only", "-q"]
