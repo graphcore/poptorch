@@ -62,8 +62,6 @@ bool alreadyRegistered(const std::string &ID) {
   return callbacks.find(ID) != callbacks.end();
 }
 
-bool mlirIsSupportedOnPlatform() { return POPTORCH_BUILD_MLIR_COMPILER == 1; }
-
 void registerBuffersWithCallback(
     const std::string &ID,
     std::vector<at::Tensor> &input_tensors, // NOLINT
@@ -122,6 +120,111 @@ void initCallbackBuffers() {
   }
 }
 
+class PybindValue : public IPyValue {
+public:
+  template <typename T,
+            std::enable_if_t<std::is_base_of<py::object, T>::value, int> = 0>
+  explicit PybindValue(T obj) {
+    _maybe_obj = obj;
+    _value = _maybe_obj;
+  }
+
+  template <typename T,
+            std::enable_if_t<!std::is_base_of<py::object, T>::value, int> = 0>
+  explicit PybindValue(T handle) : _value(handle) {}
+
+  std::function<void(int, int)> toFunction() const override {
+    py::function py_func = _value.cast<py::function>();
+    return [py_func](int x, int y) {
+      py::gil_scoped_acquire acquire;
+      py_func(x, y);
+    };
+  }
+
+  bool isBoolean() const override { return py::isinstance<py::bool_>(_value); }
+
+  bool toBoolean() const override { return _value.cast<bool>(); }
+
+  bool isDouble() const override {
+    // Python's float type is actually double
+    // precision.
+    return py::isinstance<py::float_>(_value);
+  }
+
+  double toDouble() const override { return _value.cast<double>(); }
+
+  bool isInt() const override { return py::isinstance<py::int_>(_value); }
+
+  std::uint64_t toUInt64() const override {
+    return _value.cast<std::uint64_t>();
+  }
+
+  std::int64_t toInt64() const override { return _value.cast<std::int64_t>(); }
+
+  bool isString() const override { return py::isinstance<py::str>(_value); }
+
+  std::string toString() const override {
+    if (isString()) {
+      return _value.cast<std::string>();
+    }
+    if (isInt()) {
+      std::stringstream ss;
+      ss << _value.cast<std::uint64_t>();
+      return ss.str();
+    }
+    ERROR("Don't know how to convert type " << _value.get_type()
+                                            << " to string");
+  }
+
+  bool isSetListOrTuple() const override {
+    return py::isinstance<py::set>(_value) ||
+           py::isinstance<py::list>(_value) ||
+           py::isinstance<py::tuple>(_value);
+  }
+
+  void forEachInList(std::function<void(const IPyValue &)> fn) const override {
+    for (auto option : _value.cast<py::list>()) {
+      fn(PybindValue(option));
+    }
+  }
+
+  bool isDict() const override { return py::isinstance<py::dict>(_value); }
+
+  void forEachInDict(std::function<void(const IPyValue &, const IPyValue &)> fn)
+      const override {
+    for (auto option : _value.cast<py::dict>()) {
+      fn(PybindValue(option.first), PybindValue(option.second));
+    }
+  }
+
+  std::unique_ptr<IPyValue> getFromDict(const std::string &key) const override {
+    auto dict = _value.cast<py::dict>();
+    if (!dict.contains(key)) {
+      return nullptr;
+    }
+    return std::make_unique<PybindValue>(dict[key.c_str()]);
+  }
+  std::uint64_t getListSize() const override {
+    return _value.cast<py::list>().size();
+  }
+  std::unique_ptr<IPyValue>
+  getFromList(const std::uint64_t index) const override {
+    auto list = _value.cast<py::list>();
+    if (index >= list.size()) {
+      return nullptr;
+    }
+    return std::make_unique<PybindValue>(list[index]);
+  }
+
+  std::string type() const override { return py::str(_value.get_type()); }
+
+private:
+  // pybind11 handles do not keep a reference to the python object so it might
+  // disappear if the parent doesn't hold a reference to it, so just to be safe
+  // keep a reference if possible.
+  py::object _maybe_obj;
+  py::handle _value;
+};
 template <typename T>
 T getOptimizerValue(const py::dict &d, const std::string &key) {
   ERROR_ON_MSG(!d.contains(key), "Missing optimizer value for '"
@@ -757,7 +860,11 @@ poptorch::LowerToPopart lowerToPopartFromTrace(
   poptorch::LowerToPopart lower(
       graph.get(), traced_parameter_tensors, parameters,
       std::move(inplace_info), training, std::move(optimizers), parsed_options,
-      attribute_accessor, callbacks, std::move(anchors_list));
+      [&attribute_accessor](const std::string &attributes_id_str) {
+        return std::make_unique<PybindValue>(
+            attribute_accessor(attributes_id_str));
+      },
+      callbacks, std::move(anchors_list));
   lower.lower(&input_tensors);
 
   poptorch::setAvailableMemoryOnGraphFinalized();
@@ -836,7 +943,12 @@ poptorch::LowerToPopart lowerToPopartFromDispatch(
   logging::debug("Graph right before popart:\n{}", *graph);
   poptorch::LowerToPopart lower(
       graph.get(), std::move(inplace_info), is_training, std::move(optimizers),
-      parsed_options, attribute_accessor, callbacks, std::move(anchors_list));
+      parsed_options,
+      [&attribute_accessor](const std::string &attributes_id_str) {
+        return std::make_unique<PybindValue>(
+            attribute_accessor(attributes_id_str));
+      },
+      callbacks, std::move(anchors_list));
 
   lower.lower(nullptr);
 

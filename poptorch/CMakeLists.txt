@@ -28,6 +28,7 @@ add_library(poptorch SHARED
   "source/PoptorchSymbols.cpp"
   "source/RemoveSurplusIdentityLosses.cpp"
   "source/ScatterAddOptimization.cpp"
+  "source/SessionOptionsParser.cpp"
   "source/Utils.cpp"
   "source/popart_canonicalization/ActivationOps.cpp"
   "source/popart_canonicalization/ArithmeticOps.cpp"

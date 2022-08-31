@@ -288,7 +288,7 @@ public:
                     bool training,
                     std::vector<popart_compiler::Optimizer> &&opt,
                     const popart_compiler::SessionOptions &options,
-                    const py::function &attribute_accessor,
+                    const AttributeAccessor &attribute_accessor,
                     CPUCallbackMap &&callback, const AnchorList &&anchors);
   void setParameters(const std::vector<at::Tensor> &params,
                      const std::vector<std::string> &parameter_names);
@@ -1251,10 +1251,9 @@ popart_compiler::HostSideConstant
 convertHostSideTensorConstantNode(const torch::jit::Node *node) {
   logging::LogContext ctx("convertHostSideTensorConstantNode: processing " +
                           nodeToString(node));
-  ERROR_ON_MSG(
-      node->kind() != symbols::poptorch::host_side_tensor_constant,
-      "Only a popart_compiler::host_side_tensor_constant can be converted "
-      "into a host side constant constant");
+  ERROR_ON_MSG(node->kind() != symbols::poptorch::host_side_tensor_constant,
+               "Only a poptorch::host_side_tensor_constant can be converted "
+               "into a host side constant constant");
 
   auto tensor = getNodeTensorAttrValue(node);
   ERROR_ON(!tensor.is_contiguous());
@@ -1263,50 +1262,39 @@ convertHostSideTensorConstantNode(const torch::jit::Node *node) {
           tensor.nbytes(), getTensorDimensions(tensor)};
 }
 
-float pyFloatToFloatWithRangeCheck(const pybind11::handle &pyFloat) {
-  // A python "float" is a double
-  double value = pyFloat.cast<double>();
-  ERROR_ON_MSG(value > std::numeric_limits<float>::max(),
-               value << " is too high for a Popart float attribute.");
-  ERROR_ON_MSG(value < std::numeric_limits<float>::lowest(),
-               value << " is too low for a Popart float attribute.");
-  return static_cast<float>(value);
-}
-
 void processListAttribute(
     const char *name,
     const std::shared_ptr<std::vector<popart_compiler::PopartAttribute>>
         &attributes,
-    const py::list &elements) {
-  ERROR_ON(elements.empty());
-  const auto &first_element = static_cast<py::object>(elements[0]);
+    const IPyValue &elements) {
+  const auto first_element = elements.getFromList(0);
 
-  if (py::isinstance<py::int_>(first_element)) {
+  if (first_element->isInt()) {
     std::vector<int64_t> ints;
-    ints.reserve(elements.size());
-    for (const auto &int_obj : elements) {
-      ints.push_back(int_obj.cast<int64_t>());
-    }
+    ints.reserve(elements.getListSize());
+    elements.forEachInList([&ints](const IPyValue &int_obj) {
+      ints.push_back(int_obj.toInt64());
+    });
     attributes->emplace_back(name, ints);
     return;
   }
 
-  if (py::isinstance<py::float_>(first_element)) {
+  if (first_element->isDouble()) {
     std::vector<float> floats;
-    floats.reserve(elements.size());
-    for (const auto &float_obj : elements) {
-      floats.push_back(pyFloatToFloatWithRangeCheck(float_obj));
-    }
+    floats.reserve(elements.getListSize());
+    elements.forEachInList([&floats](const IPyValue &float_obj) {
+      floats.push_back(float_obj.toFloatWithRangeCheck());
+    });
     attributes->emplace_back(name, floats);
     return;
   }
 
-  if (py::isinstance<py::str>(first_element)) {
+  if (first_element->isString()) {
     std::vector<std::unique_ptr<char[]>> strs;
-    strs.reserve(elements.size());
-    for (const auto &str : elements) {
-      strs.emplace_back(stringToUniquePtr(str.cast<std::string>()));
-    }
+    strs.reserve(elements.getListSize());
+    elements.forEachInList([&strs](const IPyValue &str) {
+      strs.emplace_back(stringToUniquePtr(str.toString()));
+    });
     attributes->emplace_back(name, strs);
     return;
   }
@@ -1316,37 +1304,31 @@ void processListAttribute(
 
 std::shared_ptr<std::vector<popart_compiler::PopartAttribute>>
 convertCustomOpAttributes(const torch::jit::Node *node,
-                          const py::function &attribute_accessor) {
+                          const AttributeAccessor &attribute_accessor) {
   logging::LogContext ctx("convertCustomOpAttributes: processing " +
                           nodeToString(node));
   std::string attributes_id_str(node->s(c10::Symbol::attr("attributes_id")));
 
   auto dict_obj = attribute_accessor(attributes_id_str);
-
-  auto dict = dict_obj.cast<py::dict>();
-
   auto attributes =
       std::make_shared<std::vector<popart_compiler::PopartAttribute>>();
-  for (const auto &attribute : dict) {
-    std::string name = attribute.first.cast<std::string>();
+  dict_obj->forEachInDict([&attributes](const IPyValue &key,
+                                        const IPyValue &attribute) {
+    auto name = key.toString();
 
-    if (py::isinstance<py::int_>(attribute.second)) {
-      attributes->emplace_back(name.c_str(), attribute.second.cast<int64_t>());
-    } else if (py::isinstance<py::float_>(attribute.second)) {
+    if (attribute.isInt()) {
+      attributes->emplace_back(name.c_str(), attribute.toInt64());
+    } else if (attribute.isDouble()) {
+      attributes->emplace_back(name.c_str(), attribute.toFloatWithRangeCheck());
+    } else if (attribute.isString()) {
       attributes->emplace_back(name.c_str(),
-                               pyFloatToFloatWithRangeCheck(attribute.second));
-    } else if (py::isinstance<py::str>(attribute.second)) {
-      attributes->emplace_back(
-          name.c_str(),
-          stringToUniquePtr(attribute.second.cast<std::string>()));
-    } else if (py::isinstance<py::list>(attribute.second) ||
-               py::isinstance<py::tuple>(attribute.second)) {
-      processListAttribute(name.c_str(), attributes,
-                           attribute.second.cast<py::tuple>());
+                               stringToUniquePtr(attribute.toString()));
+    } else if (attribute.isSetListOrTuple()) {
+      processListAttribute(name.c_str(), attributes, attribute);
     } else {
       ERROR("Invalid attribute type");
     }
-  }
+  });
 
   return attributes;
 }
@@ -1356,7 +1338,7 @@ LowerToPopartImpl::LowerToPopartImpl(
     torch::jit::Graph *g, InplaceGraphInfo &&inplace_info, bool training,
     std::vector<popart_compiler::Optimizer> &&opt,
     const popart_compiler::SessionOptions &options,
-    const py::function &attribute_accessor, CPUCallbackMap &&callback,
+    const AttributeAccessor &attribute_accessor, CPUCallbackMap &&callback,
     const AnchorList &&anchors)
     : _graph(*g), _lowered(false), _built_in_params(true),
       _inplace_info(std::move(inplace_info)), _optimizers(opt),
@@ -1452,7 +1434,7 @@ LowerToPopart::LowerToPopart(torch::jit::Graph *graph,
                              InplaceGraphInfo &&inplace_info, bool training,
                              std::vector<popart_compiler::Optimizer> &&opt,
                              const popart_compiler::SessionOptions &options,
-                             const py::function &attribute_accessor,
+                             const AttributeAccessor &attribute_accessor,
                              CPUCallbackMap callbacks, AnchorList &&anchors) {
   _impl = std::make_unique<detail::LowerToPopartImpl>(
       graph, std::move(inplace_info), training, std::move(opt),
@@ -1465,7 +1447,7 @@ LowerToPopart::LowerToPopart(torch::jit::Graph *graph,
                              InplaceGraphInfo &&inplace_info, bool training,
                              std::vector<popart_compiler::Optimizer> &&opt,
                              const popart_compiler::SessionOptions &options,
-                             const py::function &attribute_accessor,
+                             const AttributeAccessor &attribute_accessor,
                              CPUCallbackMap callbacks, AnchorList &&anchors) {
   _impl = std::make_unique<detail::LowerToPopartImpl>(
       graph, std::move(inplace_info), training, std::move(opt),

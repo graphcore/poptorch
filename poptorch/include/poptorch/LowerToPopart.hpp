@@ -13,11 +13,7 @@
 #include "popart_compiler/Compiler.hpp"
 #include "popart_compiler/PopartEnums.hpp"
 #include "poptorch/PoplarExecutable.hpp"
-
-namespace pybind11 {
-class function;
-}
-namespace py = pybind11; // NOLINT
+#include "poptorch/SessionOptionsParser.hpp"
 
 namespace poptorch {
 namespace popart_compiler {
@@ -59,15 +55,15 @@ public:
                 InplaceGraphInfo &&inplace_info, bool training,
                 std::vector<popart_compiler::Optimizer> &&opt,
                 const popart_compiler::SessionOptions &options,
-                const py::function &attribute_accessor, CPUCallbackMap callback,
-                AnchorList &&anchors);
+                const AttributeAccessor &attribute_accessor,
+                CPUCallbackMap callback, AnchorList &&anchors);
 
   // Dispatcher entry point: the parameters are embedded in the jit::Graph.
   LowerToPopart(torch::jit::Graph *graph, InplaceGraphInfo &&inplace_info,
                 bool training, std::vector<popart_compiler::Optimizer> &&opt,
                 const popart_compiler::SessionOptions &options,
-                const py::function &attribute_accessor, CPUCallbackMap callback,
-                AnchorList &&anchors);
+                const AttributeAccessor &attribute_accessor,
+                CPUCallbackMap callback, AnchorList &&anchors);
   LowerToPopart(LowerToPopart &&lower);
   ~LowerToPopart();
 
