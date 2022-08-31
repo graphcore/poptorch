@@ -61,15 +61,11 @@ private:
   std::unique_ptr<popart_compiler::SessionOptions> _opts;
 };
 
-// TODO(T60710) Used in follow up patch
-// void processPrecisionOptions(const IPyValue &values_dict, bool dispatcher);
+void processPrecisionOptions(const IPyValue &values_dict, bool dispatcher);
 
 typedef std::function<std::unique_ptr<IPyValue>(const std::string &)>
     AttributeAccessor;
 
-void appendPoptorchMetadataToFile(const std::string &serialized_poptorch_data,
-                                  const std::string &export_filename);
-void setPopartLogLevelUInt(std::uint64_t level);
 bool mlirIsSupportedOnPlatform();
 } // namespace poptorch
 

@@ -34,9 +34,6 @@ target_link_libraries(poptorch_core PRIVATE
   ${TORCH_PYTHON_LIBRARY}
   poptorch_err
   poptorch_logging
-  dispatch_tracer
-  poptorch_internal_headers
-  stdc++fs
 )
 
 target_include_directories(poptorch_core PRIVATE ${PROJECT_SOURCE_DIR}/poptorch_compiler/pytorch_bridge/include)

@@ -20,6 +20,7 @@ add_library(poptorch SHARED
   "source/ImplicitCasting.cpp"
   "source/InplaceOps.cpp"
   "source/LowerToPopart.cpp"
+  "source/LowerToPopartFactories.cpp"
   "source/OpBuilder.cpp"
   "source/OverlappedIO.cpp"
   "source/PopartCanonicalization.cpp"
@@ -67,7 +68,11 @@ add_library(poptorch SHARED
   "source/type_and_constant_canonicalization/MakeConstantIntParams.cpp"
 )
 
-set_property(TARGET poptorch PROPERTY CXX_STANDARD 17)
+file(GLOB_RECURSE poptorch_public_headers "${CMAKE_CURRENT_SOURCE_DIR}/include/*.hpp*")
+
+set_target_properties(poptorch PROPERTIES
+  CXX_STANDARD 17
+  PUBLIC_HEADER "${poptorch_public_headers}")
 
 target_link_libraries(poptorch PUBLIC
                                popart_compiler_types
@@ -76,14 +81,20 @@ target_link_libraries(poptorch PUBLIC
                                popart_compiler
                                poptorch_logging
                                torch
+                               stdc++fs
                                )
 
 target_include_directories(poptorch
                            PUBLIC
-                           include
+                           $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+                           $<INSTALL_INTERFACE:include>
                            PRIVATE
                            source/include)
 
 
 install(TARGETS poptorch
-  DESTINATION ${INSTALL_PYDIR})
+  LIBRARY
+    DESTINATION ${INSTALL_PYDIR}
+  PUBLIC_HEADER
+    DESTINATION ${INSTALL_PYDIR}/include/poptorch
+  )

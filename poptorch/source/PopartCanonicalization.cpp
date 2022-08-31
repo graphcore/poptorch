@@ -255,5 +255,4 @@ void canonicalize(torch::jit::Graph *graph) {
   CanonicalizeImpl converter;
   converter.run(graph);
 }
-
 } // namespace poptorch

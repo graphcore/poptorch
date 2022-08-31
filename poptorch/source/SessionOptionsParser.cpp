@@ -103,8 +103,6 @@ SessionOptionsParser::SessionOptionsParser(const IPyValue &py_opts)
   });
 }
 
-/*
-//TODO(T60710) Used in follow up patch
 void processPrecisionOptions(const IPyValue &values_dict, bool dispatcher) {
   poptorch::setAutocastEnabled(
       values_dict.getFromDict("autocast_enabled")->toBoolean());
@@ -139,21 +137,6 @@ void processPrecisionOptions(const IPyValue &values_dict, bool dispatcher) {
                "in the dispatcher. Simply cast the running statistics tensors "
                "to float at the pytorch level.");
   poptorch::setRunningStatisticsAlwaysFloat(running_statistics_always_float);
-}
-*/
-
-void setPopartLogLevelUInt(std::uint64_t level) {
-  ERROR_ON(level > static_cast<std::uint64_t>(logging::Level::Off) ||
-           level == 5);
-  popart_compiler::setPopartLogLevel(static_cast<logging::Level>(level));
-}
-
-void appendPoptorchMetadataToFile(const std::string &serialized_poptorch_data,
-                                  const std::string &export_filename) {
-  poptorch::logging::Tracepoint tp{__FUNCTION__};
-  popart_compiler::Compiler::appendPoptorchMetadataToFile(
-      serialized_poptorch_data.c_str(), serialized_poptorch_data.size(),
-      export_filename.c_str());
 }
 
 bool mlirIsSupportedOnPlatform() { return POPTORCH_BUILD_MLIR_COMPILER == 1; }
