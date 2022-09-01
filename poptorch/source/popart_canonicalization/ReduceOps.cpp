@@ -165,11 +165,15 @@ torch::jit::Node *argMinMaxHandler(torch::jit::Graph *graph,
     dim_to_use = *dim;
   }
 
+  torch::jit::Node *indices;
   // Create the actual argmax/argmin.
   if (kind == c10::aten::argmax) {
-    return createArgmax(graph, {input}, dim_to_use, keep_dim);
+    indices = createArgmax(graph, {input}, dim_to_use, keep_dim);
+  } else {
+    indices = createArgmin(graph, {input}, dim_to_use, keep_dim);
   }
-  return createArgmin(graph, {input}, dim_to_use, keep_dim);
+  // Note: these ops return int64, so we need to cast them to int
+  return createCast(graph, indices->output(), c10::ScalarType::Int);
 }
 
 torch::jit::Node *argsortHandler(torch::jit::Graph *graph,

@@ -25,6 +25,17 @@ checkAndGetLayerNormDimsOperandsAndSegs(
                  "weight must be the same size as normalized_shape.");
     ERROR_ON_MSG(getShape(bias).size() != normalized_shape.size(),
                  "bias must be the same size as normalized_shape.");
+    ERROR_ON_MSG(getElementType(weight) != getElementType(input),
+                 "Type mismatch: input ("
+                     << elementTypeToString(getElementType(input))
+                     << ") != weight ("
+                     << elementTypeToString(getElementType(weight)) << ")");
+
+    ERROR_ON_MSG(getElementType(bias) != getElementType(input),
+                 "Type mismatch: input ("
+                     << elementTypeToString(getElementType(input))
+                     << ") != bias ("
+                     << elementTypeToString(getElementType(bias)) << ")");
 
     segments[operands.size()] = 1;
     operands.push_back(weight);
