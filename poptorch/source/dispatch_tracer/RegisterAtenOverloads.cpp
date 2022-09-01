@@ -677,6 +677,7 @@ void castOp(const c10::OperatorHandle &op, c10::Stack *stack) {
 //  }
 void customOperation(const c10::OperatorHandle &op, c10::Stack *stack) {
   if (poptorch::isDispatcherOn()) {
+    // NB treated as inplace due to use of example_outputs
     poptorch::fallback(op, stack);
     return;
   }

@@ -27,6 +27,8 @@ constexpr TensorId tensor_error_id = std::numeric_limits<TensorId>::max();
 // The tensor is none (e.g. optional parameter/return) and this is not an error
 constexpr TensorId none_id = std::numeric_limits<TensorId>::max() - 1;
 
+// How to calculate which floating-point outputs require gradients (others
+// types will always have this set to false.)
 enum class RequiresGradType {
   OR_INPUTS, // OR together all the input tensor requires_grad values
   FALSE      // always false

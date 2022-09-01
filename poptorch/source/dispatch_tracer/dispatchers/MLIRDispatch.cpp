@@ -29,6 +29,16 @@
 namespace poptorch {
 
 namespace {
+
+// Sets requires_grad=true on a tensor iff it is a floating-point type.
+// Other types (except complex unsupported on IPU) cannot have requires_grad
+// set to true.
+void setRequiresGradIfFloat(const at::Tensor &tensor) {
+  if (c10::isFloatingType(tensor.scalar_type())) {
+    tensor.set_requires_grad(true);
+  }
+}
+
 poptorch_ir::Type toCompilerType(const at::ScalarType &elem_type) {
   switch (elem_type) {
   case at::ScalarType::Bool:
@@ -494,7 +504,11 @@ MLIRDispatch::outputIsInplaceOf(poptorch_ir::OptionalTensorId output_id,
   _compiler.copy_(actual_output, output_id);
   const std::vector<std::int64_t> shape = _compiler.getSize(output_id);
   original_input.unsafeGetTensorImpl()->set_sizes_contiguous(shape);
-  original_input.unsafeGetTensorImpl()->set_requires_grad(requires_grad);
+
+  if (requires_grad) {
+    setRequiresGradIfFloat(original_input);
+  }
+
   return original_input;
 }
 
@@ -513,7 +527,10 @@ at::Tensor MLIRDispatch::outputInplaceReshape(poptorch_ir::TensorId output_id,
                                               bool requires_grad) {
   const std::vector<std::int64_t> shape = _compiler.getSize(output_id);
   original_input.unsafeGetTensorImpl()->set_sizes_contiguous(shape);
+
+  // (Assume the original input was floating-point if requires_grad)
   original_input.unsafeGetTensorImpl()->set_requires_grad(requires_grad);
+
   _mapper.addTensor(original_input, output_id);
   return original_input;
 }
@@ -548,7 +565,10 @@ at::Tensor MLIRDispatch::makeEmptyOutputTensor(poptorch_ir::TensorId output_id,
   auto dtype = compilerTypeToScalarType(compiler_type);
   // Create new tensor
   at::Tensor new_output = allocateTensor(shape, dtype);
-  new_output.set_requires_grad(requires_grad);
+
+  if (requires_grad) {
+    setRequiresGradIfFloat(new_output);
+  }
   _mapper.addTensor(new_output, output_id);
 
   return new_output;
