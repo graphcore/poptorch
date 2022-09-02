@@ -699,22 +699,31 @@ def test_broadcast_to(trace_model):
     op_harness(op, x, trace_model=trace_model)
 
 
+@pytest.mark.parametrize(
+    "shape",
+    [
+        (2, 4, 4),  # standard
+        (2, 2, 2, 4, 4),  # more dimensions
+        (2, 4, -1),  # negative dimension
+        (2, 2, -1, 2, 4),  # negative & extra dimensions
+    ])
 @pytest.mark.parametrize("trace_model", [True, False])
-def test_expand(trace_model):
+def test_expand(shape, trace_model):
     torch.manual_seed(42)
-    x = torch.randn(3, 1)
-    op = lambda x: x.expand(3, 4)
+    x = torch.randn(2, 1, 4)
+    op = lambda x: x.expand(shape)
 
     op_harness(op, x, trace_model=trace_model)
 
 
+@pytest.mark.parametrize("shape", [(5), (1, 2, 3)])
 @pytest.mark.parametrize("trace_model", [True, False])
-def test_expand_preserve_dim(trace_model):
+def test_expand_scalar(shape, trace_model):
     torch.manual_seed(42)
-    x = torch.randn(1, 1, 100)
-    op = lambda x: x.expand(2, -1, -1)
+    x = torch.randn(())
+    op = lambda x: x.expand(shape)
 
-    op_harness(op, x, trace_model=trace_model)
+    op_harness(op, x, trace_model=trace_model, test_training=False)
 
 
 @pytest.mark.parametrize("trace_model", [True, False])

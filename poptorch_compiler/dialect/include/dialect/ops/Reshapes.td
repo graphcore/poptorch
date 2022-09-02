@@ -183,9 +183,9 @@ def Poptorch_expand: Poptorch_Op<"expand", [ViewOp]> {
 
         ERROR_ON_MSG(desired_shape.size() < input_shape.size(),
                      "The desired shape passed to expand should have at least "
-                     "as many dimensions as the input tensor (wanted at least "
-                     << input_shape.size() << ", got " << desired_shape.size()
-                     << ")");
+                     "as many dimensions as the input tensor (required at "
+                     "least " << input_shape.size() << ", got "
+                     << desired_shape.size() << ")");
 
         for (size_t i = 0; i < input_shape.size(); i++) {
           // If you give more dimensions in the desired shape than there are in

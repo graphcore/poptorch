@@ -20,7 +20,8 @@ Bug Fixes
 ---------
 
 - Fixed BatchNorm running statistics, now using the unbiased estimator to update ``running_var`` at training time.
-- Fixed scalar tensor inputs to the graph not working
+- Fixed scalar tensor inputs to the graph not working.
+- Fixed ``expand``, when the desired shape contains both added dimensions and ``-1``.
 
 v2.6 (Poplar SDK 2.6)
 =====================

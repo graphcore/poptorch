@@ -41,10 +41,27 @@ torch::jit::Node *expandHandler(torch::jit::Graph *graph,
   std::vector<std::int64_t> new_shape =
       constantToLongVec(node->input(1)->node());
 
-  // a new shape element of -1 means that dimension should not change
-  for (unsigned i = 0; i < new_shape.size(); ++i) {
-    if (new_shape[i] == -1) {
-      new_shape[i] = old_shape[i];
+  ERROR_ON_MSG(new_shape.size() < old_shape.size(),
+               "The desired shape passed to expand should have at least as "
+               "many dimensions as the input tensor (required at least "
+                   << old_shape.size() << ", got " << new_shape.size() << ")");
+
+  // A new shape element of -1 means that dimension should not change
+  for (size_t i = 0; i < old_shape.size(); i++) {
+    // If you give more dimensions in the desired shape than there are in the
+    // input tensor, they'll get *pre*pended -- so to turn the -1s into lengths
+    // from the input, work backwards.
+    const auto input_idx = old_shape.size() - (i + 1);
+    const auto input_len = old_shape[input_idx];
+    const auto desired_idx = new_shape.size() - (i + 1);
+    const auto desired_len = new_shape[desired_idx];
+
+    if (desired_len == -1) {
+      new_shape[desired_idx] = input_len;
+    } else if (desired_len != input_len && input_len != 1) {
+      ERROR("Can only expand dimensions of size 1; however, trying "
+            "to expand dimension "
+            << input_idx << " of size " << input_len << " to " << desired_len);
     }
   }
 
