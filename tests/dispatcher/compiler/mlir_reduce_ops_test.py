@@ -24,10 +24,14 @@ def reduce_harness(fn, *args, **kwargs):
     check_dtype = isinstance(
         cpu_res, torch.Tensor
     ) and cpu_res.dtype != torch.int64 and cpu_res.dtype != torch.int32
-    return helpers.assert_allclose(expected=cpu_res,
-                                   actual=ipu_res,
-                                   check_dtype=check_dtype,
-                                   equal_nan=True)
+    if not isinstance(cpu_res, tuple):
+        cpu_res = (cpu_res, )
+        ipu_res = (ipu_res, )
+    for cpu_elem, ipu_elem in zip(cpu_res, ipu_res):
+        return helpers.assert_allclose(expected=cpu_elem,
+                                       actual=ipu_elem,
+                                       check_dtype=check_dtype,
+                                       equal_nan=True)
 
 
 # This seed has a failure when computing standard deviation due to numerical stability issues
@@ -136,6 +140,21 @@ def test_any_all(func, input):
 @pytest.mark.parametrize("dim", [0, -1])
 @pytest.mark.parametrize("keepdim", [True, False])
 def test_any_all_dim(func, input, dim, keepdim):
+    reduce_harness(func, input, dim, keepdim)
+
+
+@pytest.mark.mlirSupportRequired
+@pytest.mark.parametrize("func", [torch.max, torch.min, torch.median])
+@pytest.mark.parametrize("input", all_test_cases)
+@pytest.mark.parametrize("dim", [0, -1])
+@pytest.mark.parametrize("keepdim", [True, False])
+def test_max_min_median_dim(func, input, dim, keepdim):
+    if input.numel() == 0:
+        pytest.skip(
+            "median(), max() and min() can't handle zero-element tensors")
+    if input.dtype in [torch.uint8, torch.bool]:
+        pytest.skip(
+            f"median(), max() and min() can't handle type '{input.dtype}'")
     reduce_harness(func, input, dim, keepdim)
 
 

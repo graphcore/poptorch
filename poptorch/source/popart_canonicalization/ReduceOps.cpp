@@ -201,32 +201,39 @@ torch::jit::Node *minMaxWithIndicesHandler(torch::jit::Graph *graph,
                                            torch::jit::Node *node) {
   auto *x = node->input(0);
   auto t0 = x->type()->expect<c10::TensorType>();
-  auto dim = handleDimensionParam(node->input(1), t0);
-  auto keepdim = constantToBool(node->input(2)->node());
-  bool negate = node->kind() == c10::aten::min;
+  std::vector<std::int64_t> shape = shapeFromTensor(x);
+  torch::jit::Value *values;
+  torch::jit::Value *indices;
+  if (shape.empty()) {
+    values = createIdentity(graph, {x})->output();
+    indices = createConstantInt(graph, {0}, {})->output();
+  } else {
+    auto dim = handleDimensionParam(node->input(1), t0);
+    auto keepdim = constantToBool(node->input(2)->node());
+    bool negate = node->kind() == c10::aten::min;
 
-  if (negate) {
-    x = createNeg(graph, {x})->output();
+    if (negate) {
+      x = createNeg(graph, {x})->output();
+    }
+
+    auto *one = tensorToConstant(graph, at::tensor(1L))->output();
+    auto *result = createTopk(graph, {x, one}, dim);
+    values = result->output(0);
+    indices = result->output(1);
+    // TopK returns UINT32 indices, but torch doesn't have unsigned
+    // 32 bit integer tensor types so we need to cast back to INT32
+    indices = createCast(graph, indices, c10::ScalarType::Int)->output();
+
+    if (negate) {
+      values = createNeg(graph, {values})->output();
+    }
+
+    if (!keepdim) {
+      // Squeeze out the singleton-dim left by topk
+      values = createSqueeze(graph, {values}, {dim})->output();
+      indices = createSqueeze(graph, {indices}, {dim})->output();
+    }
   }
-
-  auto *one = tensorToConstant(graph, at::tensor(1L))->output();
-  auto *result = createTopk(graph, {x, one}, dim);
-  auto *values = result->output(0);
-  auto *indices = result->output(1);
-  // TopK returns UINT32 indices, but torch doesn't have unsigned
-  // 32 bit integer tensor types so we need to cast back to INT32
-  indices = createCast(graph, indices, c10::ScalarType::Int)->output();
-
-  if (negate) {
-    values = createNeg(graph, {values})->output();
-  }
-
-  if (!keepdim) {
-    // Squeeze out the singleton-dim left by topk
-    values = createSqueeze(graph, {values}, {dim})->output();
-    indices = createSqueeze(graph, {indices}, {dim})->output();
-  }
-
   replaceOutputUse(node->output(0), values);
   replaceOutputUse(node->output(1), indices);
 

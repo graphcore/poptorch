@@ -353,7 +353,7 @@ def Poptorch_select : Poptorch_Op<"select", [ViewOp]> {
     ];
 }
 
-def Poptorch_slice_Tensor : Poptorch_NotImplementedOp<"slice_Tensor", []> {
+def Poptorch_slice_Tensor : Poptorch_Op<"slice_Tensor", []> {
     let arguments = (ins Poptorch_tensor:$self,
                          I64Attr:$dim,
                          OptionalAttr<I64Attr>:$start,

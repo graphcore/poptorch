@@ -2,6 +2,7 @@ add_library(poptorch_mlir_passes STATIC
         source/CanonicalizeInplaceCopies.cpp
         source/RemoveUnusedOperations.cpp
         source/Elementwise.cpp
+        source/Reductions.cpp
         )
 
 target_link_libraries(poptorch_mlir_passes PRIVATE

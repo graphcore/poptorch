@@ -118,8 +118,8 @@ class VariadicValueType(ValueType):
 
 def vals_from_json(json_in, op_key, sub_key, allow_attributes=True):
     assert any([
-        x in json_in[op_key]["!superclasses"]
-        for x in ['Poptorch_Op', 'Poptorch_NotImplementedOp']
+        x in json_in[op_key]["!superclasses"] for x in
+        ['Poptorch_Op', 'Poptorch_NotImplementedOp', 'Poptorch_AbstractOp']
     ])
 
     arg_types = []
@@ -223,8 +223,10 @@ def returns_from_json(json_in, op_key):
 
 for key in json_in.keys():
     if key.startswith("Poptorch_"):
-        if all(x not in json_in[key]["!superclasses"]
-               for x in ["Poptorch_Op", "Poptorch_NotImplementedOp"]):
+        if all(x not in json_in[key]["!superclasses"] for x in [
+                "Poptorch_Op", "Poptorch_NotImplementedOp",
+                "Poptorch_AbstractOp"
+        ]):
             continue
 
         # Skip the stream copies. They have their own API.

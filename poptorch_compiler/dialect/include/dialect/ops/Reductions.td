@@ -447,7 +447,7 @@ class Poptorch_prefix_sum<string name> : Poptorch_Op<name, []> {
 
 def Poptorch_cumsum_out : Poptorch_prefix_sum<"cumsum_out"> {}
 
-class Poptorch_single_dim_reduction<string name> : Poptorch_NotImplementedOp<name, []> {
+class Poptorch_single_dim_reduction<string name> : Poptorch_AbstractOp<name, []> {
     let arguments = (ins Poptorch_tensor:$self, I64Attr:$dim, BoolAttr:$keepdim);
     let results = (outs Poptorch_tensor:$values, Poptorch_tensor_no_grad:$indices);
     let builders = [
@@ -463,10 +463,12 @@ class Poptorch_single_dim_reduction<string name> : Poptorch_NotImplementedOp<nam
 
             dim = convertToPositiveDim(dim, out_shape.size());
 
-            if (keepdim) {
-                out_shape[dim] = 1;
-            } else {
-                out_shape.erase(out_shape.begin() + dim);
+            if (!out_shape.empty()) {
+                if (keepdim) {
+                    out_shape[dim] = 1;
+                } else {
+                    out_shape.erase(out_shape.begin() + dim);
+                }
             }
 
             const auto out_type = mlir::RankedTensorType::get(
@@ -477,6 +479,7 @@ class Poptorch_single_dim_reduction<string name> : Poptorch_NotImplementedOp<nam
             $_state.addTypes({out_type, out_indices_type});
         }]>
     ];
+    let hasCanonicalizeMethod = 1;
 }
 
 def Poptorch_max_dim : Poptorch_single_dim_reduction<"max_dim"> {}

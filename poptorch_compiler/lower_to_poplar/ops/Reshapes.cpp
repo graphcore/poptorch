@@ -185,4 +185,22 @@ void select::lowerToPoplar(CompilerContext &context) {
   context.addTensor(this->result(), res);
 }
 
+void slice_Tensor::lowerToPoplar(CompilerContext &context) {
+  const poplar::Tensor self = context.fromSsa(this->self());
+  int64_t dim = this->dim();
+  auto start_optional = this->start();
+  auto end_optional = this->end();
+  int64_t step = this->step();
+
+  int64_t start = start_optional.hasValue() ? start_optional.getValue() : 0;
+  int64_t end =
+      end_optional.hasValue() ? end_optional.getValue() : self.shape()[dim];
+  auto sliced = self.slice(start, end, dim);
+  if (step == 1) {
+    context.addTensor(this->result(), sliced);
+    return;
+  }
+  context.addTensor(this->result(), sliced.subSample(step, dim));
+}
+
 } // namespace poptorch_ir

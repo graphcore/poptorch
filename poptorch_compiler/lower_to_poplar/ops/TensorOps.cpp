@@ -129,10 +129,8 @@ void topk::lowerToPoplar(CompilerContext &context) {
   poplar::Tensor values = pair.first;
   poplar::Tensor indices = pair.second;
 
-  values = values.dimShufflePartial({dim}, {last_dim});
-  indices = indices.dimShufflePartial({dim}, {last_dim});
-
-  std::vector<std::uint64_t> unflattened;
+  values = values.dimShufflePartial({last_dim}, {dim});
+  indices = indices.dimShufflePartial({last_dim}, {dim});
 
   // Cast to signed int.
   indices = indices.reinterpret(poplar::INT);
