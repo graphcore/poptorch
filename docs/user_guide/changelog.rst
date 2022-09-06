@@ -9,6 +9,7 @@ New features
 ------------
 
 - Support for tensor.new_full
+- Improved performance of ``index_put`` when the indices are a one dimensional vector.
 
 API changes
 -----------

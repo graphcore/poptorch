@@ -254,3 +254,43 @@ def test_index_select(dim, trace_model):
 
     # Training test - check weights changed
     poptorch_model.assert_weights_changed()
+
+
+@helpers.printCapfdOnExit
+@helpers.overridePoptorchLogLevel("TRACE")
+@pytest.mark.parametrize("trace_model", [True, False])
+@pytest.mark.parametrize("dim", [0, 1])
+def test_vectorized_scatter(capfd, trace_model, dim):
+    def op(out, index, src):
+        if dim == 0:
+            out[index, :] = src
+        else:
+            out[:, index] = src
+
+        return out
+
+    torch.manual_seed(0)
+    N = 20
+    out = torch.randn(N, 30)
+    sz = out.shape[dim] - N // 10
+    indices = torch.randint(sz, (sz, ))
+    src_sz = (sz, out.shape[1]) if dim == 0 else (out.shape[0], sz)
+    src = torch.randn(src_sz)
+
+    model = helpers.ModelWithWeights(op, out.shape)
+    # Clone the tensor so that the original is unchanged by the in-place op
+    native_out, _ = model((out.clone(), indices, src))
+
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    poptorch_model = poptorch.trainingModel(model, options=options)
+    poptorch_out, _ = poptorch_model((out.clone(), indices, src))
+
+    # Inference test - check outputs
+    helpers.assert_allclose(actual=poptorch_out, expected=native_out)
+
+    # Training test - check weights changed
+    poptorch_model.assert_weights_changed()
+
+    it = helpers.LogChecker(capfd).createIterator()
+    it.findNext("Using vectorized ScatterReduce with none reduction")

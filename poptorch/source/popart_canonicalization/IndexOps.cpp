@@ -9,6 +9,8 @@
 #include "poptorch/DispatchTracer.hpp"
 #include "poptorch/OpBuilder.hpp"
 #include "poptorch/Utils.hpp"
+#include "poptorch_logging/Error.hpp"
+#include "poptorch_logging/Logging.hpp"
 
 namespace poptorch {
 namespace {
@@ -169,6 +171,60 @@ bool isMaskedAssign(torch::jit::Graph *graph, torch::jit::Value *x,
   return true;
 }
 
+std::optional<std::int32_t>
+canVectorizeInDim(std::vector<torch::jit::Value *> &indices) {
+  std::optional<std::int32_t> dim;
+  std::int32_t num_indices = static_cast<std::int32_t>(indices.size());
+
+  for (std::int32_t i = 0; i < num_indices; i++) {
+    if (isNone(indices[i])) {
+      continue;
+    }
+
+    if (dim) {
+      // Already found a valid dim but additional indices are specified so
+      // cannot vectorise this case.
+      return std::nullopt;
+    }
+
+    auto idx = indices[i]->type()->expect<c10::TensorType>();
+    ERROR_ON(!idx->scalarType().has_value());
+    auto dtype = idx->scalarType().value();
+
+    if (!isIntegralType(dtype, false)) {
+      return std::nullopt;
+    }
+
+    if (idx->dim() != 1 || idx->numel() == 1) {
+      return std::nullopt;
+    }
+
+    dim = i;
+  }
+
+  return dim;
+}
+
+void applyInplaceSlice(torch::jit::Node *node, torch::jit::Node *out) {
+  // If we're performing an index_put on a slice - this should operate
+  // "in-place"
+  //
+  // Slices are tensor views in torch, and index_put_ should modify the tensor
+  // being sliced. To simulate in-place modification to slices, we replace all
+  // uses of the tensor being sliced with the output of this operation
+  torch::jit::Value *x = node->input(0);
+
+  if (x->node()->kind() == symbols::popart::slice) {
+    auto *slice_input = x->node()->input(0);
+    // Recursively follow the chain of slices until we find the original tensor
+    // actually being sliced
+    while (slice_input->node()->kind() == symbols::popart::slice) {
+      slice_input = slice_input->node()->input(0);
+    }
+    slice_input->replaceAllUsesAfterNodeWith(node, out->output());
+  }
+}
+
 torch::jit::Node *indexPutHandler(torch::jit::Graph *graph,
                                   torch::jit::Node *node) {
   // aten::index_put(Tensor self, Tensor?[] indices, Tensor value, bool
@@ -188,8 +244,19 @@ torch::jit::Node *indexPutHandler(torch::jit::Graph *graph,
     return none;
   };
   auto shape = shapeFromTensor(x);
-  // Scatter cannot assign entire dimensions, only individual elements, so we
-  // must pad the end of indices with NoneTypes so that the entire input is
+  auto vectorized_dim = canVectorizeInDim(indices);
+  if (vectorized_dim) {
+    logging::trace(
+        "Using vectorized ScatterReduce with none reduction in dim {}",
+        *vectorized_dim);
+    auto *out = createScatterreduce(graph, {v, indices[*vectorized_dim], x},
+                                    shape[0], *vectorized_dim, 3);
+    applyInplaceSlice(node, out);
+    return out;
+  }
+
+  // ONNX Scatter cannot assign entire dimensions, only individual elements, so
+  // we must pad the end of indices with NoneTypes so that the entire input is
   // flattened during indexing
   std::generate_n(std::back_inserter(indices), shape.size() - indices.size(),
                   fn_gen_none);
@@ -222,23 +289,7 @@ torch::jit::Node *indexPutHandler(torch::jit::Graph *graph,
       graph, {info.x_partial_flat, info.indices_partial_flat, v}, 0);
   // Restore original input shape
   auto *out = createReshape(graph, scatter->output(), shape);
-
-  // If we're performing an index_put on a slice - this should operate
-  // "in-place"
-  //
-  // Slices are tensor views in torch, and index_put_ should modify the tensor
-  // being sliced. To simulate in-place modification to slices, we replace all
-  // uses of the tensor being sliced with the output of this operation
-  if (x->node()->kind() == symbols::popart::slice) {
-    auto *slice_input = x->node()->input(0);
-    // Recursively follow the chain of slices until we find the original tensor
-    // actually being sliced
-    while (slice_input->node()->kind() == symbols::popart::slice) {
-      slice_input = slice_input->node()->input(0);
-    }
-    slice_input->replaceAllUsesAfterNodeWith(node, out->output());
-  }
-
+  applyInplaceSlice(node, out);
   return out;
 }
 
