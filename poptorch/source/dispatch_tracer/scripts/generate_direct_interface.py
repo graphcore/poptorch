@@ -49,9 +49,9 @@ def canonicalise_tensor(tensor):
     if not tensor.startswith("Tensor"):
         raise ValueError(f"Type {tensor} not implemented.")
 
-    is_list = tensor.endswith("[]")
+    is_list = "[]" in tensor
     if is_list:
-        tensor = tensor[:-2]
+        tensor = tensor.replace("[]", "")
 
     # We have a normal non-aliasing tensor.
     if '(' not in tensor:

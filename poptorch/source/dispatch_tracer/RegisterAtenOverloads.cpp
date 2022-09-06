@@ -2,6 +2,7 @@
 #include <ATen/core/List.h>
 #include <ATen/core/function_schema.h>
 #include <ATen/native/CPUFallback.h>
+#include <torch/csrc/autograd/autograd_not_implemented_fallback.h>
 #include <torch/csrc/jit/frontend/tracer.h>
 #include <torch/csrc/jit/ir/ir.h>
 #include <torch/csrc/jit/runtime/interpreter.h>
@@ -824,7 +825,7 @@ static auto registry =
         .op(torch::RegisterOperators::options()
                 .schema("poptorch::custom_operation(Tensor[] inputs, str name, "
                         "str domain, int domain_version, int num_outputs, "
-                        "Tensor(a!)[] outputs, str attributes) -> Tensor(a!)[]")
+                        "Tensor[] outputs, str attributes) -> Tensor[]")
                 .catchAllKernel<PTC(customOperation)>())
         .op(torch::RegisterOperators::options()
                 .schema("poptorch::ctc_beam_search_decoder(Tensor probs, "
@@ -840,8 +841,10 @@ static auto registry =
                 .catchAllKernel<PTC(opWithNoReturn)>())
         .op(torch::RegisterOperators::options()
                 .schema("poptorch::end_for_loop(Tensor[] outputs, Tensor[] "
-                        "inputs, int trip_count, Tensor(a!)[] example_outputs) "
-                        "-> Tensor(a!)[]")
+                        "inputs, int trip_count, Tensor[](a!) example_outputs) "
+                        "-> Tensor[](a!)")
+                // PyTorch has trouble with Tensor[](a!)
+                .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA)
                 .catchAllKernel<PTC(endForLoop)>())
         .op(torch::RegisterOperators::options()
                 .schema("poptorch::optimizer_group(int group, Tensor[] inputs) "
@@ -907,3 +910,53 @@ static auto registry =
                 .schema(
                     "poptorch::clear_attribute(str attribute, str key) -> ()")
                 .catchAllKernel<PTC(opWithNoReturn)>());
+
+// By default, if we don't register anything for autograd, the the outputs of
+// `poptorch::` ops will have no `grad_fn` (making them leaves). For PopART it's
+// not inherently an issue since PopART does its own thing in the backward pass.
+// However, PyTorch will error if you put the output of one of these ops through
+// an inplace op: `a leaf Variable that requires grad is being used in an
+// in-place operation.`
+//
+// The JIT trace will have the `grad_fn`s filled with whatever the previous
+// `grad_fn` of the input was, so this isn't an issue.
+//
+// Note: Presumably, for non-PopART backends these will need to have
+// implementations (`torch::autograd::Function` subclasses).
+TORCH_LIBRARY_IMPL(poptorch, AutogradXLA, m) {
+  m.impl("begin_ipu_block", torch::autograd::autogradNotImplementedFallback());
+  m.impl("end_ipu_block", torch::autograd::autogradNotImplementedFallback());
+  m.impl("ipu_print_tensor", torch::autograd::autogradNotImplementedFallback());
+  m.impl("internal_cast", torch::autograd::autogradNotImplementedFallback());
+  m.impl("nop", torch::autograd::autogradNotImplementedFallback());
+  m.impl("dynamic_slice", torch::autograd::autogradNotImplementedFallback());
+  m.impl("custom_operation", torch::autograd::autogradNotImplementedFallback());
+  m.impl("ctc_beam_search_decoder",
+         torch::autograd::autogradNotImplementedFallback());
+  m.impl("identity_loss", torch::autograd::autogradNotImplementedFallback());
+  m.impl("start_for_loop", torch::autograd::autogradNotImplementedFallback());
+  m.impl("end_for_loop", torch::autograd::autogradNotImplementedFallback());
+  m.impl("optimizer_group", torch::autograd::autogradNotImplementedFallback());
+  m.impl("set_matmul_serialization",
+         torch::autograd::autogradNotImplementedFallback());
+  m.impl("set_overlap_for_input",
+         torch::autograd::autogradNotImplementedFallback());
+  m.impl("set_overlap_for_output",
+         torch::autograd::autogradNotImplementedFallback());
+  m.impl("recomputation_checkpoint",
+         torch::autograd::autogradNotImplementedFallback());
+  m.impl("set_available_memory",
+         torch::autograd::autogradNotImplementedFallback());
+  m.impl("begin_multi_conv", torch::autograd::autogradNotImplementedFallback());
+  m.impl("end_multi_conv", torch::autograd::autogradNotImplementedFallback());
+  m.impl("push_name_scope", torch::autograd::autogradNotImplementedFallback());
+  m.impl("pop_name_scope", torch::autograd::autogradNotImplementedFallback());
+  m.impl("begin_autocast", torch::autograd::autogradNotImplementedFallback());
+  m.impl("suppress_autocast",
+         torch::autograd::autogradNotImplementedFallback());
+  m.impl("restore_autocast", torch::autograd::autogradNotImplementedFallback());
+  m.impl("end_cpu_op", torch::autograd::autogradNotImplementedFallback());
+  m.impl("call_cpu_op", torch::autograd::autogradNotImplementedFallback());
+  m.impl("set_attribute", torch::autograd::autogradNotImplementedFallback());
+  m.impl("clear_attribute", torch::autograd::autogradNotImplementedFallback());
+}

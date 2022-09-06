@@ -24,7 +24,7 @@
    PopTorchDirect: internal_cast
 
  - func: custom_operation
-   native_func: custom_operation(Tensor[] inputs, str name, str domain, int domain_version, int num_outputs, Tensor(a!)[] outputs, str attributes) -> Tensor(a!)[]
+   native_func: custom_operation(Tensor[] inputs, str name, str domain, int domain_version, int num_outputs, Tensor[] outputs, str attributes) -> Tensor[]
    PopTorchDirect: custom_operation
 
  - func: ctc_beam_search_decoder
@@ -40,7 +40,7 @@
    PopTorchDirect: start_for_loop
 
  - func: end_for_loop
-   native_func: end_for_loop(Tensor(a!)[] outputs, Tensor[] inputs, int trip_count, Tensor(a!)[] example_outputs) -> Tensor(a!)[]
+   native_func: end_for_loop(Tensor[] outputs, Tensor[] inputs, int trip_count, Tensor[](a!) example_outputs) -> Tensor[](a!)
    PopTorchDirect: end_for_loop
 
  - func: optimizer_group

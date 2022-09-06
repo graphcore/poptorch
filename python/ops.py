@@ -155,13 +155,19 @@ def for_loop(count: int,
     # Break the alias of the outputs.
     example_outputs = []
     for output in outputs:
-        grad = output.requires_grad
+        # Don't want to set requires_grad: example_outputs is full of leaf
+        # tensors, about to go into an inplace op. This is forbidden by PyTorch
+        # for tensors that require grad. The dispatcher backend will set
+        # requires_grad properly, and in either case PopART doesn't support for
+        # loops in training mode.
         example_outputs.append(
-            torch.zeros_like(output, requires_grad=grad, device=device))
+            torch.zeros_like(output, requires_grad=False, device=device))
 
     # End the for loop.
-    return torch.ops.poptorch.end_for_loop(outputs, cloned_inputs, count,
-                                           example_outputs)
+    res = torch.ops.poptorch.end_for_loop(outputs, cloned_inputs, count,
+                                          example_outputs)
+
+    return res
 
 
 def nop(tensor: "torch.Tensor") -> "torch.Tensor":
@@ -805,7 +811,11 @@ class CPU:
         torch.ops.poptorch.call_cpu_op([*input], self._ID)
 
         if poptorch_core.isCompilingWithDispatcher():
-            cpu_input = [torch.zeros_like(i, device="cpu") for i in input]
+            cpu_input = [
+                torch.zeros_like(i,
+                                 device="cpu",
+                                 requires_grad=i.requires_grad) for i in input
+            ]
         else:
             cpu_input = input
 
@@ -827,7 +837,12 @@ class CPU:
         self.out_shapes = [o.shape for o in cpu_outputs]
 
         if poptorch_core.isCompilingWithDispatcher():
-            outputs = [torch.zeros_like(o, device="xla") for o in cpu_outputs]
+            outputs = [
+                torch.zeros_like(o,
+                                 device="xla",
+                                 requires_grad=o.requires_grad)
+                for o in cpu_outputs
+            ]
         else:
             outputs = cpu_outputs
 
