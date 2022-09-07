@@ -770,22 +770,6 @@ void identityLoss(const c10::OperatorHandle &op, c10::Stack *stack) {
   }
 }
 
-// c10::List<at::Tensor>
-// endForLoop(c10::List<at::Tensor> outputs,
-//            c10::List<at::Tensor> inputs, int64_t count,
-//            c10::List<at::Tensor> example_outputs) {
-//   return example_outputs;
-// }
-void endForLoop(const c10::OperatorHandle &op, c10::Stack *stack) {
-  if (poptorch::isDispatcherOn()) {
-    poptorch::fallback(op, stack);
-    return;
-  }
-
-  auto out = getNthArgument(op, stack, 3);
-  updateStack(op, stack, {out});
-}
-
 // TODO(T64770) This method is the old way of registering custom functions. The
 // new way would look like this:
 //
@@ -841,11 +825,8 @@ static auto registry =
                 .catchAllKernel<PTC(opWithNoReturn)>())
         .op(torch::RegisterOperators::options()
                 .schema("poptorch::end_for_loop(Tensor[] outputs, Tensor[] "
-                        "inputs, int trip_count, Tensor[](a!) example_outputs) "
-                        "-> Tensor[](a!)")
-                // PyTorch has trouble with Tensor[](a!)
-                .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA)
-                .catchAllKernel<PTC(endForLoop)>())
+                        "inputs, int trip_count) -> Tensor[]")
+                .catchAllKernel<PTC(opReturningFirstArgument)>())
         .op(torch::RegisterOperators::options()
                 .schema("poptorch::optimizer_group(int group, Tensor[] inputs) "
                         "-> ()")

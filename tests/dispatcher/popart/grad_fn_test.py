@@ -46,12 +46,11 @@ def cpu_op(self, x):
 
 
 def custom_op(self, x):
-    x, y = poptorch.custom_op([x, x],
+    return poptorch.custom_op([x, x],
                               "Cube",
                               "com.acme",
                               1,
                               example_outputs=[x, x])
-    return [x, y]
 
 
 def dynamic_slice(self, x):

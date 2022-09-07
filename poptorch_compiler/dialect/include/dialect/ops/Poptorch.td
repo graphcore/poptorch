@@ -195,18 +195,15 @@ def Poptorch_start_for_loop : Poptorch_NotImplementedOp<"start_for_loop", []> {
   let arguments = (ins Poptorch_tensorlist:$inputs);
 }
 
-// end_for_loop(Tensor(a!)[] outputs, Tensor[] inputs, int trip_count, Tensor(a!)[] example_outputs) -> Tensor(a!)[]
+// end_for_loop(Tensor[] outputs, Tensor[] inputs, int trip_count) -> Tensor[]
 def Poptorch_end_for_loop : Poptorch_NotImplementedOp<"end_for_loop", [AttrSizedOperandSegments]> {
   let arguments = (ins Poptorch_tensorlist:$outputs,
                        Poptorch_tensorlist:$inputs,
-                       I64Attr:$trip_count,
-                       Poptorch_tensorlist:$example_outputs);
+                       I64Attr:$trip_count);
   let results = (outs Poptorch_tensorlist:$result);
   let builders = [OpBuilder<(ins "mlir::ValueRange":$outputs,
                                  "mlir::ValueRange":$inputs,
-                                 "int64_t":$trip_count,
-                                 "mlir::ValueRange":$example_outputs), [{
-          UNUSED(example_outputs);
+                                 "int64_t":$trip_count), [{
           std::vector<mlir::Value> operands(std::begin(inputs), std::end(inputs));
           operands.insert(std::end(operands), std::begin(outputs), std::end(outputs));
           $_state.addOperands(operands);

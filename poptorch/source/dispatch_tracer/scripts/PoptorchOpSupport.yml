@@ -40,7 +40,7 @@
    PopTorchDirect: start_for_loop
 
  - func: end_for_loop
-   native_func: end_for_loop(Tensor[] outputs, Tensor[] inputs, int trip_count, Tensor[](a!) example_outputs) -> Tensor[](a!)
+   native_func: end_for_loop(Tensor[] outputs, Tensor[] inputs, int trip_count) -> Tensor[]
    PopTorchDirect: end_for_loop
 
  - func: optimizer_group

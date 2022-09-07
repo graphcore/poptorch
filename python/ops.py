@@ -147,25 +147,8 @@ def for_loop(count: int,
     if not isinstance(outputs, list) and not isinstance(outputs, tuple):
         outputs = [outputs]
 
-    device = None
-    if _impl.isDispatchTracing():
-        #TODO(T59880) "xla" -> "ipu"
-        device = "xla"
-
-    # Break the alias of the outputs.
-    example_outputs = []
-    for output in outputs:
-        # Don't want to set requires_grad: example_outputs is full of leaf
-        # tensors, about to go into an inplace op. This is forbidden by PyTorch
-        # for tensors that require grad. The dispatcher backend will set
-        # requires_grad properly, and in either case PopART doesn't support for
-        # loops in training mode.
-        example_outputs.append(
-            torch.zeros_like(output, requires_grad=False, device=device))
-
     # End the for loop.
-    res = torch.ops.poptorch.end_for_loop(outputs, cloned_inputs, count,
-                                          example_outputs)
+    res = torch.ops.poptorch.end_for_loop(outputs, cloned_inputs, count)
 
     return res
 
