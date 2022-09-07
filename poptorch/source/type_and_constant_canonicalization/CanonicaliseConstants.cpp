@@ -371,6 +371,8 @@ private:
     case State::IN_LIST:
       construct_node = _graph->create(c10::prim::ListConstruct);
       break;
+    default:
+      ERROR("Unreachable");
     }
 
     for (auto *element : _info_stack.top().container_nodes) {

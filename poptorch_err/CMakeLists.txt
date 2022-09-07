@@ -16,8 +16,13 @@ add_library(poptorch_err STATIC
   "source/ExceptionHandling.cpp")
 
 target_include_directories(poptorch_err SYSTEM PUBLIC
-                                        include
+                           $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+                           $<INSTALL_INTERFACE:include>
                                         )
+file(GLOB_RECURSE poptorch_err_public_headers "${CMAKE_CURRENT_SOURCE_DIR}/include/*.hpp*" "exception_info/*.hpp*")
+
+set_target_properties(poptorch_err PROPERTIES
+  PUBLIC_HEADER "${poptorch_err_public_headers}")
 target_link_libraries(poptorch_err
                       PUBLIC
                       torch
@@ -26,3 +31,10 @@ target_link_libraries(poptorch_err
                       pybind11::module
                       popart_compiler
                       poptorch_logging)
+
+install(TARGETS poptorch_err
+  LIBRARY
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}
+  PUBLIC_HEADER
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/poptorch_err
+  )

@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.14 FATAL_ERROR)
 project(poptorch)
+include(GNUInstallDirs)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
@@ -92,8 +93,10 @@ endif()
 # Tell the source files if we have built MLIR or not so it can be exposed via python.
 if (POPTORCH_BUILD_MLIR_COMPILER)
   add_compile_definitions(POPTORCH_BUILD_MLIR_COMPILER=1)
+  set(GENERATE_PYTHON_PACKAGE_FLAGS "")
 else()
   add_compile_definitions(POPTORCH_BUILD_MLIR_COMPILER=0)
+  set(GENERATE_PYTHON_PACKAGE_FLAGS "--build-without-mlir")
 endif()
 
 if(EXISTS ${SDK_DIR})
@@ -193,7 +196,7 @@ endif()
 
 set(CMAKE_CXX_STANDARD 17)
 
-set(INSTALL_PYDIR poptorch)
+set(INSTALL_PYDIR ${CMAKE_INSTALL_PREFIX}/poptorch)
 
 if(${CMAKE_SYSTEM_NAME} STREQUAL Darwin)
   set(CMAKE_INSTALL_RPATH "@loader_path")
@@ -234,14 +237,25 @@ add_subdirectory(docs/user_guide)
 
 add_custom_target(poptorch_standalone_wheel
   WORKING_DIRECTORY ${CMAKE_INSTALL_PREFIX}
-  COMMAND  ${CMAKE_COMMAND} -E env WHEEL_LIB_DIRS="${popart_LIB_DIR}:${POPLAR_DIR}" python3 ${CMAKE_CURRENT_SOURCE_DIR}/setup.py sdist bdist_wheel
-  DEPENDS poptorch_core
+  COMMAND python3 ${PROJECT_SOURCE_DIR}/scripts/generate_python_package.py bdist_wheel ${GENERATE_PYTHON_PACKAGE_FLAGS} --include-dir ${CMAKE_INSTALL_PREFIX}/include --lib-dir ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR} --output-dir ${CMAKE_INSTALL_PREFIX}/dist --python-dir ${INSTALL_PYDIR} --standalone "${popart_LIB_DIR}:${POPLAR_DIR}"
+  DEPENDS poptorch
+)
+add_custom_target(poptorch_standalone_sdist
+  WORKING_DIRECTORY ${CMAKE_INSTALL_PREFIX}
+  COMMAND python3 ${PROJECT_SOURCE_DIR}/scripts/generate_python_package.py sdist ${GENERATE_PYTHON_PACKAGE_FLAGS} --include-dir ${CMAKE_INSTALL_PREFIX}/include --lib-dir ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR} --output-dir ${CMAKE_INSTALL_PREFIX}/dist --python-dir ${INSTALL_PYDIR} --standalone "${popart_LIB_DIR}:${POPLAR_DIR}"
+  DEPENDS poptorch
 )
 
 add_custom_target(poptorch_wheel
   WORKING_DIRECTORY ${CMAKE_INSTALL_PREFIX}
-  COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/setup.py sdist bdist_wheel
-  DEPENDS poptorch_core
+  COMMAND python3 ${PROJECT_SOURCE_DIR}/scripts/generate_python_package.py bdist_wheel ${GENERATE_PYTHON_PACKAGE_FLAGS} --include-dir ${CMAKE_INSTALL_PREFIX}/include --lib-dir ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR} --output-dir ${CMAKE_INSTALL_PREFIX}/dist --python-dir ${INSTALL_PYDIR}
+  DEPENDS poptorch
+)
+
+add_custom_target(poptorch_sdist
+  WORKING_DIRECTORY ${CMAKE_INSTALL_PREFIX}
+  COMMAND python3 ${PROJECT_SOURCE_DIR}/scripts/generate_python_package.py sdist ${GENERATE_PYTHON_PACKAGE_FLAGS} --include-dir ${CMAKE_INSTALL_PREFIX}/include --lib-dir ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR} --output-dir ${CMAKE_INSTALL_PREFIX}/dist --python-dir ${INSTALL_PYDIR}
+  DEPENDS poptorch
 )
 
 install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/README.md
@@ -259,6 +273,6 @@ if(${CMAKE_VERSION} VERSION_GREATER "3.15.0")
   # module cannot be used so always install after a build.
   add_custom_target(install_poptorch ALL
       COMMAND ${CMAKE_COMMAND} --install ${CMAKE_BINARY_DIR}
-      DEPENDS poptorch_core custom_cube_op custom_leaky_relu_op custom_add_scalar_op custom_add_scalar_vec_op custom_add_vec_scalar_mul_op custom_reduce_op custom_three_input_reduce_op custom_many_attribute_op
+      DEPENDS poptorch custom_cube_op custom_leaky_relu_op custom_add_scalar_op custom_add_scalar_vec_op custom_add_vec_scalar_mul_op custom_reduce_op custom_three_input_reduce_op custom_many_attribute_op
   )
 endif()

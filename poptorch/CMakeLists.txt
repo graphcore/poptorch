@@ -94,7 +94,7 @@ target_include_directories(poptorch
 
 install(TARGETS poptorch
   LIBRARY
-    DESTINATION ${INSTALL_PYDIR}
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}
   PUBLIC_HEADER
-    DESTINATION ${INSTALL_PYDIR}/include/poptorch
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/poptorch
   )

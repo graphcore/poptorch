@@ -19,7 +19,10 @@ add_library(popart_compiler SHARED
   "source/custom_operations/UpsampleBilinear2d.cpp"
 )
 
-set_property(TARGET popart_compiler PROPERTY CXX_STANDARD 14)
+file(GLOB_RECURSE popart_compiler_public_headers "${CMAKE_CURRENT_SOURCE_DIR}/include/*.hpp*" "${CMAKE_CURRENT_SOURCE_DIR}/types/include/*.hpp*")
+set_target_properties(popart_compiler PROPERTIES
+  CXX_STANDARD 14
+  PUBLIC_HEADER "${popart_compiler_public_headers}")
 
 target_link_libraries(popart_compiler PUBLIC
                                       popart_compiler_types
@@ -32,7 +35,8 @@ target_link_libraries(popart_compiler PUBLIC
 
 target_include_directories(popart_compiler
                            PUBLIC
-                           include
+                           $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+                           $<INSTALL_INTERFACE:include>
                            PRIVATE
                            source/include)
 
@@ -51,9 +55,13 @@ foreach(SRC ${CUSTOM_CODELETS})
 endforeach()
 
 install(TARGETS popart_compiler
-  DESTINATION ${INSTALL_PYDIR})
+  LIBRARY
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}
+  PUBLIC_HEADER
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/popart_compiler
+  )
 
 foreach(SRC ${CUSTOM_CODELETS})
   install(FILES ${CMAKE_CURRENT_BINARY_DIR}/${SRC}
-    DESTINATION ${INSTALL_PYDIR})
+  DESTINATION ${INSTALL_PYDIR})
 endforeach()

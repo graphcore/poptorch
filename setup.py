@@ -1,41 +1,36 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
+import pathlib
 import os
 import sys
-import distutils
-import distutils.util
 import logging
 from setuptools import setup
 from setuptools.dist import Distribution
-from wheel.pep425tags import get_abbr_impl, get_impl_ver, get_abi_tag
-import scripts.utils._utils as utils
+from pybind11.setup_helpers import Pybind11Extension
 
 logging.basicConfig(level=logging.INFO)
 
-REQUIRES = ['tqdm']
-VERSION = utils.PkgInfo.load_from_file(must_exist=False,
-                                       path="..").version_long
-TORCH_VERSION = utils.get_required_torch_version()
+REQUIRES = ['tqdm', '@TORCH_DEPENDENCY@']
+VERSION = "@VERSION@"
+UPDATE_LDSHARED = "@UPDATE_LDSHARED@" == "True"
+DEFINE_MACROS = "@DEFINE_MACROS@"
 
 LONG_DESCRIPTION = (
     "PopTorch is a set of extensions for PyTorch enabling "
     "models to be trained, evaluated and used on the Graphcore IPU.")
 
-# https://www.python.org/dev/peps/pep-0425/
-# The platform tag is simply distutils.util.get_platform() with all hyphens - and periods . replaced with underscore _.
-platform = distutils.util.get_platform().replace(".", "_").replace("-", "_")
+LIBS = ["*.so", "lib/*", "lib/poplar_rt/*", "lib/graphcore/lib/*.a"]
 
-if "macosx" in platform:
-    REQUIRES += [f'torch=={TORCH_VERSION}']
-    LIBS = ["*.dylib", "*.so"]
-else:
-    if "aarch64" in utils.get_arch_type():
-        # There is no +cpu variant of Torch on Arm
-        REQUIRES += [f'torch=={TORCH_VERSION}']
-    else:
-        REQUIRES += [
-            f'torch @ https://download.pytorch.org/whl/cpu/torch-{TORCH_VERSION}%2Bcpu-{get_abbr_impl()}{get_impl_ver()}-{get_abi_tag()}-{platform}.whl',
-        ]
-    LIBS = ["*.so"]
+# On CentOS 7 the Conda compiler sets flags that make Conda's libc++ supersed the system one:
+#  gcc -pthread -shared -B /poptorch_view/build/buildenv/compiler_compat -L/poptorch_view/build/buildenv/lib -Wl,-rpath=/poptorch_view/build/buildenv/lib -Wl,--no-as-needed -Wl,--sysroot=/
+# So we remove all the flags that contain "buildenv/lib"
+if UPDATE_LDSHARED:
+    import distutils.sysconfig
+    config = distutils.sysconfig.get_config_vars()
+    ldshared = config["LDSHARED"]
+    ldshared = [
+        opt for opt in ldshared.split(" ") if not "buildenv/lib" in opt
+    ]
+    config["LDSHARED"] = " ".join(ldshared)
 
 
 class BinaryDistribution(Distribution):
@@ -45,38 +40,74 @@ class BinaryDistribution(Distribution):
         return True
 
 
+def get_define_macros():
+    res = []
+    for m in DEFINE_MACROS.split(":"):
+        key_value = m.split("=")
+        assert len(key_value) == 2, f"Expected key=value, got {m}"
+        res.append(tuple(key_value))
+    return res
+
+
+def get_torch_paths():
+    # setup.py is executed several times, so it's ok if torch is not always
+    # available.
+    try:
+        import torch  # pylint: disable=import-outside-toplevel
+    except ModuleNotFoundError:
+        return [], []
+    torch_root = str(pathlib.Path(torch.__file__).parent)
+    return [
+        os.path.join(torch_root, "include"),
+        os.path.join(torch_root, "include", "torch", "csrc", "api", "include")
+    ], [os.path.join(torch_root, "lib")]
+
+
+torch_include_dirs, torch_lib_dirs = get_torch_paths()
 package_data = {'poptorch': LIBS}
-wheel_lib_dirs = os.environ.get("WHEEL_LIB_DIRS")
-lib = "poptorch/lib"
-utils.rmdir_if_exists(lib)
-if wheel_lib_dirs:
-    os.makedirs(lib)
-    for d in wheel_lib_dirs.split(":"):
-        distutils.dir_util.copy_tree(d, lib)
-    package_data["poptorch"].append("lib/*")
-    package_data["poptorch"].append("lib/poplar_rt/*")
-    package_data["poptorch"].append("lib/graphcore/lib/*.a")
-    # Only 1 "+" symbol allowed per version
-    separator = "+" if "+" not in VERSION else "_"
-    VERSION += separator + "standalone"
 
 # Copy custom codelets into the package so that we can pre-compile them later.
 package_data["poptorch"].append("*.inc.cpp")
 
+core_mod = Pybind11Extension(
+    "poptorch.poptorch_core", ["src/poptorch.cpp"],
+    define_macros=[("_GLIBCXX_USE_CXX11_ABI", 0)] + get_define_macros(),
+    include_dirs=["include"] + torch_include_dirs,
+    library_dirs=["poptorch/lib"] + torch_lib_dirs,
+    extra_link_args=["-Wl,--rpath=$ORIGIN/lib:$ORIGIN"],
+    libraries=[
+        "poptorch", "popart_compiler", "poptorch_err", "poptorch_logging",
+        "torch_python", "torch"
+    ],
+    language="c++",
+    cxx_std="17")
+
+# Same as pybind11_add_module but without stripping the symbols and setting the visibility to hidden.
+# Source: https://pybind11.readthedocs.io/en/stable/compiling.html#advanced-interface-library-targets
+#
+# If the symbols are stripped then error messages will only contain symbol
+# addresses instead of human readable names.
+core_mod.extra_compile_args = [
+    f for f in core_mod.extra_compile_args if not "visibility=hidden" in f
+]
+
 setup(
     name='poptorch',
     version=VERSION,
-    description=LONG_DESCRIPTION[0],
-    long_description=LONG_DESCRIPTION[3:],
+    description=LONG_DESCRIPTION,
+    long_description=LONG_DESCRIPTION,
     long_description_content_type="text/markdown",
     url='http://graphcore.ai',
     author='Graphcore',
     author_email='contact@graphcore.ai',
+    ext_modules=[core_mod],
+    has_ext_modules=lambda: True,
     license='Apache 2.0',
     packages=['poptorch'],
     package_data=package_data,
+    include_package_data=True,
     python_requires=f"=={sys.version_info.major}.{sys.version_info.minor}.*",
-    platforms=platform,
+    platforms="@PLATFORM@",
     install_requires=REQUIRES,
     zip_safe=False,
     distclass=BinaryDistribution,
@@ -94,6 +125,3 @@ setup(
         'Topic :: Software Development :: Libraries :: Python Modules',
     ],
 )
-# Don't keep the Poplar / Popart libs around
-# This might interfere with the enable.sh script
-utils.rmdir_if_exists(lib)

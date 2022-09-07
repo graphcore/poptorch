@@ -9,9 +9,7 @@
 #include <vector>
 
 #include "popart_compiler/CompilerTypes.hpp"
-
-#include "poptorch_logging/Error.hpp"
-#include "poptorch_logging/Logging.hpp"
+#include "poptorch_logging/LoggingLight.hpp"
 
 namespace popart {
 class any;

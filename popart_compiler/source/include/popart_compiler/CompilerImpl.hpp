@@ -26,6 +26,7 @@
 #include "popart_compiler/Compiler.hpp"
 #include "popart_compiler/CompilerOptions.hpp"
 #include "popart_compiler/MultiConvBuilder.hpp"
+#include "poptorch_logging/Logging.hpp"
 
 namespace poptorch {
 namespace popart_compiler {

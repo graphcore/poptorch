@@ -10,6 +10,7 @@
 #include <torch/script.h>
 
 #include "popart_compiler/Compiler.hpp"
+#include "poptorch_logging/Logging.hpp"
 #include "poptorch_logging/Tracepoint.hpp"
 
 #include "poptorch/AliasProcessing.hpp"

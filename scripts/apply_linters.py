@@ -696,7 +696,10 @@ class ClangTidy(ILinter):
         return compare_versions_from_conda("clang-tools", "13.0.1")
 
     def is_enabled(self, filename, autofix):
-        return "custom_cube_op.cpp" not in filename
+        # Don't run Clang Tidy on the pybind11 modules because we don't know
+        # where pybind headers are.
+        return "custom_cube_op.cpp" not in filename and \
+                "python/" not in filename
 
 
 class CppLint(ILinter):

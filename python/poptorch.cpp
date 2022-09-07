@@ -20,7 +20,7 @@
 #include "poptorch_err/ExceptionHandling.hpp"
 
 #include "poptorch_logging/Error.hpp"
-#include "poptorch_logging/Logging.hpp"
+#include "poptorch_logging/LoggingLight.hpp"
 #include "poptorch_logging/Tracepoint.hpp"
 
 #include "poptorch/DispatchTracer.hpp"
@@ -590,7 +590,8 @@ void copyWeightsToHostImpl(
   poptorch::logging::Tracepoint tp{"copyWeightsToHost"};
   // Copy the weights or warn if this is before first time compilation.
   if (!executable) {
-    logging::warn(
+    logging::log(
+        logging::Level::Warn,
         "Call to copyWeightsToHost ignored as model has not been compiled "
         "(PopTorch will compile models on first invocation).");
   } else {
@@ -606,7 +607,8 @@ void copyWeightsToDeviceImpl(
   poptorch::logging::Tracepoint tp{"copyWeightsToDevice"};
   // Copy the weights or warn if this is before first time compilation.
   if (!executable) {
-    logging::warn(
+    logging::log(
+        logging::Level::Warn,
         "Call to copyWeightsToDevice ignored as model has not been compiled "
         "(PopTorch will compile models on first invocation).");
   } else {
@@ -818,8 +820,11 @@ void writeOptimizerState(
     if (meta.num_bytes == -1) {
       // num_bytes == -1 indicates it's an optimiser state tensor (variable)
       if (!state.contains(py::cast(meta.id))) {
-        logging::warn("writeOptimizerState: ignoring missing state {}",
-                      meta.id);
+        logging::log(
+            logging::Level::Warn,
+            std::string("writeOptimizerState: ignoring missing state " +
+                        std::string(meta.id))
+                .c_str());
         host_buffers.push_back(nullptr);
         continue;
       }
@@ -827,8 +832,11 @@ void writeOptimizerState(
       host_buffers.push_back(tensor.data_ptr());
     } else {
       if (!params.contains(py::cast(meta.id))) {
-        logging::warn("writeOptimizerState: ignoring missing parameter {}",
-                      meta.id);
+        logging::log(
+            logging::Level::Warn,
+            std::string("writeOptimizerState: ignoring missing parameter " +
+                        std::string(meta.id))
+                .c_str());
         continue;
       }
       // Otherwise it's a stream/constant optimiser parameter that we can copy
@@ -959,7 +967,7 @@ std::shared_ptr<poptorch::PoplarExecutable> compileWithManualTracing(
     const pybind11::dict &options, const py::function &attribute_accessor,
     bool is_training, const py::dict &opt_dict, const py::list &anchors) {
   poptorch::logging::Tracepoint tp{__FUNCTION__};
-  logging::debug("Compile with manual tracing");
+  logging::log(logging::Level::Debug, "Compile with manual tracing");
   auto lower = lowerToPopartFromDispatch(options, attribute_accessor,
                                          is_training, opt_dict, anchors);
   py::gil_scoped_release release;

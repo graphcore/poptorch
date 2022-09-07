@@ -94,5 +94,3 @@ mlir_check_all_link_libraries(poptorch_compiler)
 mlir_check_all_link_libraries(lower_to_poplar)
 mlir_check_all_link_libraries(poptorch_dialect)
 
-install(TARGETS poptorch_compiler
-  DESTINATION ${INSTALL_PYDIR})

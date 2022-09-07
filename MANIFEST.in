@@ -1,0 +1,5 @@
+recursive-include include *.hpp
+include poptorch/lib/*
+include poptorch/lib/poplar_rt/*
+include poptorch/lib/graphcore/lib/*.a
+include *.py

@@ -7,6 +7,8 @@
 #include <string>
 #include <utility>
 
+#include "poptorch_logging/LoggingLight.hpp"
+
 /// This is a simple logging system for poptorch based on spdlog. The easiest
 /// way to use it is to simply call `logging::<level>()` where <level> is one
 /// of trace, debug, info, warn or err. For example:
@@ -27,35 +29,6 @@
 
 namespace poptorch {
 namespace logging {
-
-enum class Level {
-  Trace = 0,
-  Debug = 1,
-  Info = 2,
-  Warn = 3,
-  Err = 4,
-  // level 5 is "critical" in spdlog, which we don't use so isn't exposed here.
-  Off = 6,
-};
-
-// Set the current log level to one of the above levels. The default
-// log level is set by the POPTORCH_LOG_LEVEL environment variable
-// and is off by default.
-void setLogLevel(Level l);
-
-// Return true if the passed log level is currently enabled.
-bool shouldLog(Level l);
-
-// Return true if the Popart IR should be dumped.
-bool outputPopartIR();
-
-// Flush the log. By default it is only flushed when the underlying libc
-// decides to.
-void flush();
-
-// Log a message. You should probably use the MAKE_LOG_TEMPLATE macros
-// instead, e.g. logging::debug("A debug message").
-void log(Level l, const char *msg);
 
 // Log a formatted message. This uses the `fmt` C++ library for formatting.
 // See https://github.com/fmtlib/fmt for details. You should probably use
