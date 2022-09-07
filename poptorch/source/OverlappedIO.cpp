@@ -5,6 +5,7 @@
 #include <algorithm>
 
 #include "PoptorchSymbols.hpp"
+#include "poptorch/DispatchTracer.hpp"
 #include "poptorch/OverlappedIO.hpp"
 #include "poptorch/Utils.hpp"
 
@@ -22,6 +23,10 @@ void attributiseOverlappedInputs(
 
   int64_t input_num = -1;
   for (auto *input : graph->inputs()) {
+    if (isCompilingWithDispatcher() && isParameter(input)) {
+      continue;
+    }
+
     input_num++;
     auto input_uses = input->uses();
 
