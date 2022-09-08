@@ -359,6 +359,31 @@ void WeightsIO::updateData(const std::vector<void *> &host_buffers) {
   }
 }
 
+bool ConstVoidDataLessThan::operator()(const popart::ConstVoidData &lhs,
+                                       const popart::ConstVoidData &rhs) const {
+  // Optional data should not be set
+  ERROR_ON(lhs.storesData());
+  ERROR_ON(rhs.storesData());
+
+  // First compare on data type
+  if (lhs.info.dataType() != rhs.info.dataType()) {
+    return lhs.info.dataType() < rhs.info.dataType();
+  }
+
+  // Next compare on shape
+  const auto &lhs_shape = lhs.info.shape();
+  const auto &rhs_shape = rhs.info.shape();
+
+  if (lhs_shape != rhs_shape) {
+    // Shape is a vector so uses std::lexicographical_compare
+    return lhs_shape < rhs_shape;
+  }
+
+  // Otherwise, compare underlying data
+  ERROR_ON(lhs.info.nbytes() != rhs.info.nbytes());
+  return std::memcmp(lhs.data, rhs.data, lhs.info.nbytes()) < 0;
+}
+
 CompilerImpl::~CompilerImpl() {
   if (_device && isAttachedToDevice()) {
     detachFromDevice();
@@ -521,10 +546,31 @@ popart::TensorId
 CompilerImpl::tensorConstant(const std::vector<popart::TensorId> &tensors,
                              const PopartConstant &constant) {
   UNUSED(tensors);
-  auto ai_onnx = active_builder->aiOnnxOpset10();
 
-  return ai_onnx.constant(constant.getPopartData(),
-                          getDebugContext("Constant"));
+  // Use the cache for the active builder. This is effectively one cache per
+  // subgraph as constants only exist on one graph.
+  auto &current_cache(_constants_cache[active_builder]);
+
+  // Reuse a tensor if an identical one exists already
+  if (current_cache.count(constant.getPopartData()) != 0u) {
+    auto tensor = current_cache[constant.getPopartData()];
+    return tensor;
+  }
+
+  // To preserve memory, use a clone of the data
+  size_t buff_size = constant.getPopartData().info.nbytes();
+  _constant_cloned_data.emplace_back(new char[buff_size]);
+  auto *new_buff = reinterpret_cast<void *>(&_constant_cloned_data.back()[0]);
+  std::memcpy(new_buff, constant.getPopartData().data, buff_size);
+  popart::ConstVoidData new_constant(new_buff, constant.getPopartData().info);
+
+  auto ai_onnx = active_builder->aiOnnxOpset10();
+  popart::TensorId tensor =
+      ai_onnx.constant(new_constant, getDebugContext("Constant"));
+
+  current_cache[new_constant] = tensor;
+
+  return tensor;
 }
 
 TensorId CompilerImpl::hostSideTensorConstant(
