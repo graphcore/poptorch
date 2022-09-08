@@ -185,8 +185,18 @@ def test_unary_ops_bool(op, trace_model):
     op_harness(trace_model, op, [input], assert_)
 
 
-# Parameterize torch.clamp unittests for different supported overloads
-clamp_inputs = [{"min": 0.2, "max": 0.8}, {"min": 0.2}, {"max": 0.8}]
+# Parameterize torch.clamp unit tests for different supported overloads
+clamp_inputs = [{
+    "min": 0.2,
+    "max": 0.8
+}, {
+    "min": 0.2
+}, {
+    "max": 0.8
+}, {
+    "min": 0.8,
+    "max": 0.2
+}]
 
 
 @pytest.mark.parametrize("args", clamp_inputs)
@@ -228,11 +238,11 @@ def test_clamp_(args, trace_model):
 def test_clamp_min_max(op, trace_model):
     torch.manual_seed(42)
 
-    magnitude = 50
+    magnitude = 1
     input = torch.randn(1, 2, 10, 10) * magnitude
 
     def op_clamp(x):
-        return op(x, magnitude / 2)
+        return op(x, magnitude * 0.75)
 
     def assert_(native_out, poptorch_out):
         helpers.assert_allclose(actual=poptorch_out, expected=native_out)
@@ -247,11 +257,11 @@ def test_clamp_min_max(op, trace_model):
 def test_clamp_min_max_tensor(op, trace_model):
     torch.manual_seed(42)
 
-    magnitude = 50
+    magnitude = 1
     input = torch.randn(1, 2, 10, 10) * magnitude
 
     def op_clamp(x):
-        return op(x, torch.tensor(magnitude / 2))
+        return op(x, torch.tensor(magnitude * 0.75))
 
     def assert_(native_out, poptorch_out):
         helpers.assert_allclose(actual=poptorch_out, expected=native_out)
