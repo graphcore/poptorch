@@ -2,6 +2,20 @@
 Changelog
 =========
 
+v3.1 (Poplar SDK 3.1)
+=====================
+
+New features
+------------
+
+
+API changes
+-----------
+
+
+Bug Fixes
+---------
+
 v3.0 (Poplar SDK 3.0)
 =====================
 
