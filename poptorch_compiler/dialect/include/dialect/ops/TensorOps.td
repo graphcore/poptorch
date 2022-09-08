@@ -396,7 +396,6 @@ def Poptorch_masked_fill_Scalar : Poptorch_NotImplementedOp<"masked_fill_Scalar"
     $_state.addOperands({self, mask});
     $_state.addAttribute("scalar", $_builder.getF32FloatAttr(scalar));
 
-
     mlir::RankedTensorType tensor = self.getType().cast<mlir::RankedTensorType>();
     mlir::RankedTensorType mask_tensor = mask.getType().cast<mlir::RankedTensorType>();
 

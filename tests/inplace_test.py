@@ -504,12 +504,11 @@ def chained_slice(x, step):
 
 
 def modify_before_assign(x, step):
-    x = x * 2
+    x *= 2
     x[0:2:step.item()] = x[0:2:step.item()] * 0
     return x
 
 
-@helpers.printCapfdOnExit
 @pytest.mark.parametrize("step_size", [1, 2])
 @pytest.mark.parametrize("op", [
     direct_assign, direct_assign_inplace, direct_fill, chained_slice,

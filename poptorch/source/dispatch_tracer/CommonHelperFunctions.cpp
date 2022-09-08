@@ -227,10 +227,12 @@ c10::OperatorHandle getOutplaceOpHandle(const c10::OperatorHandle &op,
   return op;
 }
 
-std::optional<at::Tensor>
-getInplaceArgument(const c10::Stack &stack, const c10::FunctionSchema &schema) {
-  logging::trace("[TRACING-2][JIT] Looking for inplace argument in schema {}",
+std::vector<at::Tensor> getInplaceArguments(const c10::Stack &stack,
+                                            const c10::FunctionSchema &schema) {
+  logging::trace("[TRACING-2][JIT] Looking for inplace arguments in schema {}",
                  schema);
+
+  std::vector<at::Tensor> results;
 
   for (std::size_t arg = 0; arg < schema.arguments().size(); ++arg) {
     const c10::Argument &argument = schema.arguments()[arg];
@@ -245,19 +247,16 @@ getInplaceArgument(const c10::Stack &stack, const c10::FunctionSchema &schema) {
       }
 
       if (argument.alias_info() && argument.alias_info()->isWrite()) {
-        // We just return the first inplace argument but more than one can
-        // technically be inplace.
         logging::trace(
             "[TRACING-2][JIT] Found inplace argument, tensor ptr {}, tensor {}",
             reinterpret_cast<void *>(tensor.unsafeGetTensorImpl()),
             toString(tensor));
-        return tensor;
+        results.push_back(tensor);
       }
     }
   }
 
-  // Assigned null in constructor.
-  return std::nullopt;
+  return results;
 }
 
 torch::jit::Node *lowerFromSchema(const c10::FunctionSchema &schema,
@@ -270,23 +269,6 @@ torch::jit::Node *lowerFromSchema(const c10::FunctionSchema &schema,
     inputs.push_back(insertValueIntoGraphAndTrackIt(value, graph, mapper));
   }
   return createAtenTarget(graph, schema, inputs, stack, mapper);
-}
-
-void assertCanBeCanonicalised(const c10::FunctionSchema &schema) {
-  torch::jit::Symbol symbol = torch::jit::Symbol::fromQualString(schema.name());
-  if (schema.getNamespace().has_value() &&
-      *schema.getNamespace() == "poptorch") {
-    // OK: it's a PopTorch op (It will be handled by the late canonicalisation).
-    return;
-  }
-  // In the JIT path we are not allowed to fail as we only have the
-  // canonicaliser to rely on. In the MLIR path we have our own 1:1 handlers
-  // as well so we can use them too and we will only fail if BOTH JIT and MLIR
-  // can't process the node.
-  ERROR_ON_MSG(!getHandler(symbol),
-               "Could not find canonicalisation handler for JIT symbol, "
-                   << symbol.toQualString() << ", for schema, " << schema.name()
-                   << ".");
 }
 
 std::string toString(const at::Tensor &t) {

@@ -361,37 +361,30 @@ void JITDispatch::fixOutput(c10::Stack &stack, torch::jit::Node *node) {
   }
 }
 
-void JITDispatch::fallback(const c10::OperatorHandle &initial_op,
-                           c10::Stack *stack) {
-  c10::Dispatcher &dispatcher = c10::Dispatcher::singleton();
-
-  const c10::FunctionSchema &initial_schema = initial_op.schema();
+void JITDispatch::fallback(const c10::OperatorHandle &op, c10::Stack *stack) {
+  const c10::FunctionSchema &schema = op.schema();
   // Run through the schema to find out if one of the operators is supposed to
   // be inplace, this could be the 'out' argument of a non-inplace op.
-  std::optional<at::Tensor> inplace_tensor =
-      getInplaceArgument(*stack, initial_schema);
+  std::vector<at::Tensor> inplace_tensors = getInplaceArguments(*stack, schema);
   torch::jit::Value *aliased_input = nullptr;
-  if (inplace_tensor) {
+  if (!inplace_tensors.empty()) {
     aliased_input = _inplace_tracker.eraseCurrentAlias(
-        _mapper.getValueForTensor(*inplace_tensor));
+        _mapper.getValueForTensor(inplace_tensors[0]));
   }
-
-  c10::OperatorHandle op = getOutplaceOpHandle(initial_op, dispatcher, *stack);
-  const c10::FunctionSchema &schema = op.schema();
 
   // Tag all the nodes created by the handler with the initial schema string
   // representation so that they can be traced back to top level ops in the
   // profiler.
-  WithMetadata metadata(c10::toString(initial_schema));
+  WithMetadata metadata(c10::toString(schema));
 
   // Create a fake IR node for us to target using the schema.
   torch::jit::Node *node = lowerFromSchema(schema, stack, *graph, _mapper);
   logging::trace("[TRACING-2][JIT] Node from schema {}", *node);
 
-  if (inplace_tensor) {
+  if (!inplace_tensors.empty()) {
     // For inplace ops, cast all input tensors to the same type as the output
     // tensor.
-    auto output_type = inplace_tensor->scalar_type();
+    auto output_type = inplace_tensors[0].scalar_type();
     bool output_float = c10::isFloatingType(output_type);
     for (size_t i = 0; i < stack->size(); i++) {
       const c10::IValue &sv = (*stack)[i];
@@ -473,10 +466,6 @@ void JITDispatch::fallback(const c10::OperatorHandle &initial_op,
 
   logging::trace("[TRACING-2][JIT] Pre canonicalisation {}", *node);
 
-  // Make sure we will be able to handle this op when we will later
-  // lower to PopART.
-  assertCanBeCanonicalised(schema);
-
   std::size_t i = 0;
   for (c10::IValue value : *stack) {
     if (value.isTensor()) {
@@ -491,7 +480,7 @@ void JITDispatch::fallback(const c10::OperatorHandle &initial_op,
 
   // Switcheroo the output so the inplace tensor reference is now pointing to
   // the output.
-  if (inplace_tensor) {
+  if (!inplace_tensors.empty()) {
     at::Tensor output = stack->at(0).toTensor();
 
     // Get the jit value we are tracking for the output.
@@ -505,24 +494,24 @@ void JITDispatch::fallback(const c10::OperatorHandle &initial_op,
     // Overwrite the inplace tensor with that jit. Now a reference to the
     // inplace tensor correctly points to this outplace value.
     ValueMapper::TrackedTensor *record =
-        _mapper.rawTensorRecord(*inplace_tensor);
+        _mapper.rawTensorRecord(inplace_tensors[0]);
     ERROR_ON_MSG(
         !record,
         "[TRACING-2][JIT] Inplace op is not tracking inplace argument");
 
     // Ensure the value and torch tensor shapes match
     JitTensorInfo value_info(value);
-    inplace_tensor->unsafeGetTensorImpl()->set_sizes_contiguous(
+    inplace_tensors[0].unsafeGetTensorImpl()->set_sizes_contiguous(
         value_info.dims);
 
     // Validate to make sure the data type also matches.
-    validateTensorShapeAndType(value, *inplace_tensor);
+    validateTensorShapeAndType(value, inplace_tensors[0]);
     record->jit = value;
   }
 
   if (logging::shouldLog(logging::Level::Trace)) {
     logging::trace("[TRACING-2][JIT] Graph after interception of {}=\n{}\n",
-                   schema.name(), truncateGraphString(*graph));
+                   schema, truncateGraphString(*graph));
   }
 }
 

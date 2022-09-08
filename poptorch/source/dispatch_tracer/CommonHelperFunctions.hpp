@@ -36,8 +36,8 @@ c10::OperatorHandle getOutplaceOpHandle(const c10::OperatorHandle &initial_op,
 // is not truly inplace, e.g. it returns the 'out' argument in the schema
 // op(Tensor self, Tensor(a!) out) -> (Tensor(a!)) even when 'self' and 'out'
 // are not the same tensor.
-std::optional<at::Tensor> getInplaceArgument(const c10::Stack &stack,
-                                             const c10::FunctionSchema &schema);
+std::vector<at::Tensor> getInplaceArguments(const c10::Stack &stack,
+                                            const c10::FunctionSchema &schema);
 
 // Using the schema definition as a guide look up all the correct
 // torch::jit::Values in the stack and create a jit node with the correct
@@ -45,8 +45,6 @@ std::optional<at::Tensor> getInplaceArgument(const c10::Stack &stack,
 torch::jit::Node *lowerFromSchema(const c10::FunctionSchema &schema,
                                   c10::Stack *stack, torch::jit::Graph &graph,
                                   ValueMapper &mapper);
-
-void assertCanBeCanonicalised(const c10::FunctionSchema &schema);
 
 // Return a string containing the tensor sizes and type.
 std::string toString(const at::Tensor &t);

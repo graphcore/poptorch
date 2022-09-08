@@ -272,6 +272,11 @@
 - func: index_put
   PopTorchDirect: index_put
 
+# NOTE: this should split from index_put once given an implementation
+# index_put_(Tensor(a!) self, Tensor?[] indices, Tensor values, bool accumulate=False) -> Tensor(a!)
+- func: index_put_
+  PopTorchDirect: index_put
+
 # func: permute(Tensor(a) self, int[] dims) -> Tensor(a)
 - func: permute
   PopTorchDirect: permute
@@ -616,6 +621,10 @@
 
 # hardtanh(Tensor self, Scalar min_val=-1, Scalar max_val=1) -> Tensor
 - func: hardtanh
+  PopTorchDirect: clamp
+
+# hardtanh_(Tensor(a!) self, Scalar min_val=-1, Scalar max_val=1) -> Tensor(a!)
+- func: hardtanh_
   PopTorchDirect: clamp
 
 # func: isnan(Tensor self) -> Tensor
@@ -1179,6 +1188,11 @@
 - func: masked_fill.Scalar
   PopTorchDirect: masked_fill_Scalar
 
+# NOTE: this should split from masked_fill_Scalar once given an implementation
+# func: masked_fill_.Scalar(Tensor(a!) self, Tensor mask, Scalar value) -> Tensor(a!)
+- func: masked_fill_.Scalar
+  PopTorchDirect: masked_fill_Scalar
+
 # func: embedding(Tensor weight, Tensor indices, int padding_idx=-1, bool scale_grad_by_freq=False, bool sparse=False) -> Tensor
 - func: embedding
   PopTorchDirect: embedding
@@ -1208,6 +1222,11 @@
 - func: triu.out
   PopTorchDirect: triu
   UnusedOutputArguments: {out}
+
+# NOTE: this should split from triu once given an implementation
+# triu_(Tensor(a!) self, int diagonal=0) -> Tensor(a!)
+- func: triu_
+  PopTorchDirect: triu
 
 
 #########

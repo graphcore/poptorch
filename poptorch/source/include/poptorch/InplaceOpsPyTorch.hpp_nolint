@@ -103,21 +103,5 @@ bool isInplaceOp(const Node* node) {
   return kind_str[str_length-1] == '_';
 }
 
-// Code within function is copied but wrapped in a new function
-void addAdditionalInputsIfRequired(Graph *graph, const Node *node,
-                                   Node *newNode) {
-  int additionalInputCount = 0;
-  if (expectedInputCount.find(node->kind()) != expectedInputCount.end()) {
-    additionalInputCount = expectedInputCount.at(node->kind()) -
-        static_cast<int>(newNode->inputs().size());
-  }
-
-  for (int i = 0; i < additionalInputCount; ++i) {
-    auto noneNode = graph->createNone();
-    noneNode->insertBefore(newNode);
-    newNode->addInput(noneNode->output());
-  }
-}
-
 } // namespace jit
 } // namespace torch

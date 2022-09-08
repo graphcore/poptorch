@@ -173,38 +173,14 @@ void CanonicalizeImpl::run(torch::jit::Graph *graph) {
     torch::jit::Node *new_node = nullptr;
     torch::jit::Symbol kind = node->kind();
 
-    // There is a slight asymmetry regarding what ops will be inplace at this
-    // point, between the JIT trace and the dispatcher:
-    //
-    // * The JIT trace will have outplaced any op that has an outplace
-    //   equivalent, and that is not applied to a view. To handle slice
-    //   modifications, it's sufficient to check that those ops are still
-    //   inplace.
-    // * The dispatcher's fallback mechanism will have outplaced inplace ops,
-    //   including ones operating on views, and instead marked inplace ops on
-    //   views of graph inputs with the `was_inplace_on_view` attribute.
-    //
-    // We want to handle the potential slice modifications in both cases, but
-    // only want to do any more outplacing in the JIT trace case.
-
-    const bool is_inplace_op = torch::jit::isInplaceOp(node);
-
-    const bool was_inplace_op_on_view =
-        node->hasAttributeS("was_inplace_on_view");
-
-    // If the op is inplace at the canonicalisation stage (i.e. it
-    // wasn't outplaced by the InplaceOpHandler), that means it's
-    // operating on a view and is unsafe to replace. We can handle
-    // the slice modification here so it's safe to outplace remaining
-    // inplace ops
-    if (is_inplace_op) {
-      kind = outplaceKind(kind);
-    }
-
     if (SymbolHandler handler = getHandler(kind)) {
       new_node = handler(graph, node);
 
-      if (is_inplace_op || was_inplace_op_on_view) {
+      const bool was_inplace_op_on_view =
+          node->hasAttributeS("was_inplace_on_view") &&
+          node->i(c10::Symbol::attr("was_inplace_on_view")) == 1;
+
+      if (was_inplace_op_on_view || torch::jit::isInplaceOp(node)) {
         new_node = handleSliceModification(graph, node, new_node->output());
       }
     }

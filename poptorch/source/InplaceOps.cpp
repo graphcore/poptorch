@@ -59,13 +59,37 @@ size_t countNumTensorOutputs(torch::jit::Graph &graph) {
   return num_tensors;
 }
 
+// When replacing `node` with `new_node`, if `new_node` doesn't have enough
+// inputs pad them out with None-nodes.
+// NOTE: Body mostly taken from torch (see torch::jit::RemoveInplaceOps), with
+// the addition of metadata.
+void addAdditionalInputsIfRequired(torch::jit::Graph *graph,
+                                   const torch::jit::Node *node,
+                                   torch::jit::Node *new_node) {
+  int additional_input_count = 0;
+  if (torch::jit::expectedInputCount.find(node->kind()) !=
+      torch::jit::expectedInputCount.end()) {
+    additional_input_count = torch::jit::expectedInputCount.at(node->kind()) -
+                             static_cast<int>(new_node->inputs().size());
+  }
+
+  WithNodeMetadata meta(new_node);
+  for (int i = 0; i < additional_input_count; ++i) {
+    auto *none_node = graph->createNone();
+    // NOLINTNEXTLINE readability-suspicious-call-argument
+    insertNodeBeforeNode(none_node, new_node);
+    new_node->addInput(none_node->output());
+  }
+}
+
 torch::jit::Node *outplaceOp(torch::jit::Graph &graph, torch::jit::Node *node) {
   torch::jit::NodeKind new_kind = outplaceKind(node->kind());
 
   torch::jit::WithInsertPoint insert_point(node);
+  WithNodeMetadata meta(node);
   auto *new_node = createAndInsertNode(&graph, new_kind, node->inputs());
 
-  torch::jit::addAdditionalInputsIfRequired(&graph, node, new_node);
+  addAdditionalInputsIfRequired(&graph, node, new_node);
 
   new_node->output()->setType(node->output()->type());
   node->output()->replaceAllUsesWith(new_node->output());
@@ -84,14 +108,6 @@ void removeRemainingInplaceOps(torch::jit::Graph &graph) {
 
     // Keep it in place if there is only an inplace version
     if (onlyInplaceOps().count(node->kind()) != 0) {
-      continue;
-    }
-
-    // If the input is a view operation, it's unsafe to
-    // outplace at this stage because aliasing information
-    // is lost. This special case will be handled during
-    // PopART canonicalisation
-    if (viewOps().count(node->input(0)->node()->kind()) != 0) {
       continue;
     }
 
@@ -151,17 +167,13 @@ size_t processInput(torch::jit::Graph &graph, torch::jit::Value *graph_input,
                *output_tensor_type->scalarType());
     }
 
+    // This in-place op applies to the graph input via some view ops: tag it, to
+    // handle the slice modification later.
+    node->i_(c10::Symbol::attr("was_inplace_on_view"),
+             viewOps().count(node->input(0)->node()->kind()) != 0 ? 1 : 0);
+
     // Keep it in place if there is only an inplace version
     if (onlyInplaceOps().count(node->kind()) != 0) {
-      current_alias = node->output();
-      continue;
-    }
-
-    // If the input is a view operation, it's unsafe to
-    // outplace at this stage because aliasing information
-    // is lost. This special case will be handled during
-    // PopART canonicalisation
-    if (viewOps().count(node->input(0)->node()->kind()) != 0) {
       current_alias = node->output();
       continue;
     }
@@ -170,6 +182,9 @@ size_t processInput(torch::jit::Graph &graph, torch::jit::Value *graph_input,
     auto *new_node = outplaceOp(graph, node);
     to_delete.push_back(node);
     current_alias = new_node->output();
+
+    new_node->i_(c10::Symbol::attr("was_inplace_on_view"),
+                 node->i(c10::Symbol::attr("was_inplace_on_view")));
   }
 
   // Check if it is not modified in place at all
@@ -225,6 +240,7 @@ size_t processInput(torch::jit::Graph &graph, torch::jit::Value *graph_input,
   }
   return output_mapping;
 }
+
 } // namespace
 
 InplaceGraphInfo handleInplaceOpsInGraph(torch::jit::Graph &graph,
@@ -269,14 +285,15 @@ torch::jit::NodeKind outplaceKind(torch::jit::NodeKind kind) {
     return kind;
   }
 
-  torch::jit::NodeKind new_kind;
+  std::string kind_str = kind.toQualString();
+
+  torch::jit::NodeKind new_kind = kind;
   if (torch::jit::inPlaceToOutOfPlace.count(kind) != 0) {
     new_kind = torch::jit::inPlaceToOutOfPlace.at(kind);
-  } else {
+  } else if (kind_str.back() == '_') {
     // Remove trailing '_' from the kind string
-    std::string kind_str(kind.toQualString());
-    std::string modified_kind_str = kind_str.substr(0, kind_str.length() - 1);
-    new_kind = c10::Symbol::fromQualString(modified_kind_str);
+    kind_str.pop_back();
+    new_kind = c10::Symbol::fromQualString(kind_str);
   }
 
   return new_kind;
@@ -321,25 +338,23 @@ InplaceInputsTracker::finalizeGraph(torch::jit::Graph &graph,
                                     size_t num_anchors,
                                     bool replicas_needing_broadcast) {
   // For every alias (ie. target of an inplace op), look back and see if it's
-  // applied through a bunch of views back to an input. if it is, mark it to
-  // be handled later, at canonicalisation.
-  for (auto &kv : _aliases) {
-    auto *inplace_op = kv.first->node();
-    const auto *aliased_input = kv.second;
-
-    if (inplace_op->inputs().empty()) {
+  // applied through a bunch of views back to an input. if it is, mark it to be
+  // handled later, at canonicalisation.
+  for (const auto &[alias, aliased_input] : _aliases) {
+    if (alias == aliased_input) {
       continue;
     }
+
+    auto *inplace_op = alias->node();
 
     // Aliases are already traced back through views to graph inputs when
     // they're updated via `eraseCurrentAlias`, so can just check that the
     // ultimate input (`aliased_input`) is different to the inplace op's
     // immediate input.
-    if (aliased_input == inplace_op->input(0)) {
-      continue;
-    }
-
-    inplace_op->i_(c10::Symbol::attr("was_inplace_on_view"), 1);
+    const bool was_inplace_on_view =
+        !inplace_op->inputs().empty() && aliased_input != inplace_op->input(0);
+    inplace_op->i_(c10::Symbol::attr("was_inplace_on_view"),
+                   was_inplace_on_view ? 1 : 0);
   }
 
   // _aliases[alias] = graph_input -> we want the other way around.
@@ -404,12 +419,18 @@ InplaceInputsTracker::finalizeGraph(torch::jit::Graph &graph,
         }
       }
     }
+
     // The input/output mapping is only for 'true' inputs -- not parameters &
     // buffers (see its usage in PoplarExecutable::run).
     if (!isParameter(graph_input)) {
       out.input_output_mapping.push_back(output_mapping);
     }
   }
+
+  // Outplace all the ops we can; the _aliases map no longer needs to be kept
+  // up-to-date.
+  removeRemainingInplaceOps(graph);
+
   return out;
 }
 
