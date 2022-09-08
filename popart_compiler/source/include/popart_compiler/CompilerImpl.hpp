@@ -147,6 +147,12 @@ private:
   std::vector<popart::TensorId> _weights_order;
 };
 
+// Compare a ConstVoidData based on type, shape, and data
+struct ConstVoidDataLessThan {
+  bool operator()(const popart::ConstVoidData &lhs,
+                  const popart::ConstVoidData &rhs) const;
+};
+
 struct CompilerImpl {
 public:
   friend Compiler;
@@ -388,6 +394,14 @@ public:
 private:
   // Raise an error if cycle logging is enabled
   void errorOnCycleLogging() const;
+
+  // Keep all the PopART tensors in a cache to avoid adding duplicate constants,
+  // wasting tile memory. This must also be mapped by builder as constants
+  // exist only in one graph.
+  std::map<popart::Builder *, std::map<popart::ConstVoidData, popart::TensorId,
+                                       ConstVoidDataLessThan>>
+      _constants_cache;
+  std::vector<std::unique_ptr<char[]>> _constant_cloned_data;
 
   // Constants which are simply returned (possibly as part of a tuple/list) and
   // do not need to be input into Popart
