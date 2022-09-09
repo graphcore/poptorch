@@ -318,10 +318,21 @@ void ConstExprEvaluator::copyNodeToConstexprGraph(torch::jit::Node *node) {
   }
 
   WithNodeMetadata meta(new_node);
-  _nodes_map[node] = new_node;
 
   insertNodeInGraph(_constexpr_graph.get(), new_node);
 
+  // The CPU backend in some case (e.g aten::expand) will alter a tensor's
+  // strides, whereas the IPU will always keep all the tensors contiguous.
+  // This means all reshapes can be lowered to view ops on the IPU, but
+  // not necessarily on the CPU, so just to be safe we replace all view
+  // ops by reshape ops in the const expr graph.
+  if (new_node->kind() == c10::aten::view) {
+    auto *view = new_node;
+    new_node = view->replaceWithNewSymbol(c10::aten::reshape);
+    view->destroy();
+  }
+
+  _nodes_map[node] = new_node;
   // Map the old outputs to the new
   const auto *old_it = node->outputs().begin();
   const auto *new_it = new_node->outputs().begin();
