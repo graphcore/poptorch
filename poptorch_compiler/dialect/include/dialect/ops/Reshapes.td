@@ -400,7 +400,7 @@ def Poptorch_slice_Tensor : Poptorch_Op<"slice_Tensor", []> {
         $_state.addAttribute("end", $_builder.getI64IntegerAttr(actual_end));
         $_state.addAttribute("step", $_builder.getI64IntegerAttr(step));
 
-        out_shape[dim] = (actual_end - actual_start) / std::abs(step);
+        out_shape[dim] = (actual_end - actual_start + (std::abs(step) - 1)) / std::abs(step);
 
         $_state.addTypes(mlir::RankedTensorType::get(out_shape, input_tensor.getElementType()));
      }]>
