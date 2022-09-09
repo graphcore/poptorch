@@ -607,6 +607,34 @@ def test_reshape(trace_model):
     op_harness(op, x, trace_model=trace_model)
 
 
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_constExpr_reshape(trace_model):
+    a = 2
+    b = 3
+    c = 4
+
+    class Model(torch.nn.Module):
+        def forward(self, input):
+            # Use a constant in order for this code to be run in the
+            # ConstExpr pass
+            mask = torch.ones(b, a, device=input.device).to(torch.bool)
+            mask = mask.unsqueeze(1)
+            # The expand on CPU will be implemented by setting the
+            # stride to 0
+            mask = mask.expand([-1, c, -1])
+            mask = mask.reshape([b * c, a])
+            return mask * input[0]
+
+    input = torch.randn(1).to(torch.bool)
+    native = Model()
+    out_native = native(input)
+    opts = poptorch.Options()
+    opts.Jit.traceModel(trace_model)
+    m = poptorch.inferenceModel(Model(), opts)
+    out_ipu = m(input)
+    helpers.assert_allequal(actual=out_ipu, expected=out_native)
+
+
 @pytest.mark.parametrize("split_size_or_sections",
                          (1, 5, 6, 20, [10, 10], [19, 1]))
 @pytest.mark.parametrize("trace_model", [True, False])
