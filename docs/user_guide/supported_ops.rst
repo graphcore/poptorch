@@ -378,114 +378,44 @@ Support nearest and bicubic mode.
 
 .. _float_16_op_support:
 
-Float 16 operations
-===================
+16-bit float operations
+=======================
 
 .. warning::
-   Deprecated since version 3.0.
-   The use of `torch.jit.trace()` has been deprecated, therefore this section only applies if you explicitly use ``opts.Jit.traceModel(True)``.
+   Handling of ``float16`` operations has been greatly simplified since PopTorch version 3.0. Please read this section
+   carefully if you are used to the way this worked prior to version 3.0.
 
-Due to the limitation of PyTorch's float 16 support on the CPU (used for tracing the model), certain operations may result in the use of float 32 where float 16 would be expected, or float 16 where float 32 would be expected.
-This is because the model must always be traced with float 16 inputs converted to float 32.
+In PopTorch version 3.0 and newer, ``float16`` operations are handled straightforwardly by the dispatcher frontend (see
+:numref:`dispatcher-support`). Tensors and models can be freely cast to and from ``float16``, and normalization running
+statistics can also be retyped by simple casting.
 
-This limitation is much less noticeable when ``opts.Precision.halfFloatCasting(poptorch.HalfFloatCastingBehavior.HalfUpcastToFloat)`` has not been set because PopTorch's default casting functionality is to output a float 16 if any input of the op is float 16.
-In such situations, any dtype which incorrectly resolves to a float 16 would have been cast to a float 16 in any case.
+If you have PopTorch code created with a previous version of PopTorch, please see :ref:`float_16_migration`. If you wish
+to use the legacy tracing frontend, please see :numref:`tracing-float16`.
 
-Casting
--------
+.. _float_16_migration:
 
-.. warning::
-   Deprecated since version 3.0.
-   The use of `torch.jit.trace()` has been deprecated, therefore this section only applies if you explicitly use ``opts.Jit.traceModel(True)``.
+16-bit float migration
+======================
 
-The ``tensor.to(dtype)`` argument will be ignored if it is ``torch.float32`` because it may refer to one or more float 16 tensors which were converted to float 32 to allow tracing to happen, for example ``a.to(b.dtype)`` where ``b`` may be a float 16 tensor converted to a float 32 tensor.
-Once the output of the op or one of its descendants encounters a known float 16 or float 32 input, the type will be resolved to this type.
+Legacy PopTorch code using ``float16`` can be updated for the dispatcher frontend by considering the following points:
 
-The following examples show cases where the casting functionality is resolved based on context, correctly or incorrectly:
+* Casts were not well supported by the tracing frontend. They are fully supported by the dispatcher frontend.
 
-.. literalinclude:: half_float_casting.py
-    :language: python
-    :caption: Cases where casting resolves to the correct type
-    :linenos:
-    :start-after: correct_cast_start
-    :end-before: correct_cast_end
+* :py:meth:`~poptorch.options._PrecisionOptions.halfFloatCasting` was used to switch between ways of resolving ops with
+  both ``float32`` and ``float16`` inputs (mixed-precision inputs), either by upcasting the inputs to ``float32``, or by
+  downcasting them to ``float16``. This option is not supported under the dispatcher frontend: mixed precision ops are
+  now always upcast to ``float32``, in accordance with normal PyTorch behaviour. To recreate the effect of
+  ``opts.Precision.halfFloatCasting(poptorch.HalfFloatCastingBehavior.FloatDowncastToHalf)``,
+  which was the default behaviour with the tracing frontend, ``float32`` inputs to mixed-precision ops should be
+  explicitly cast to ``float16`` before being passed to the op.
 
-.. literalinclude:: half_float_casting.py
-    :language: python
-    :caption: Cases where casting resolves to an incorrect type
-    :linenos:
-    :start-after: incorrect_cast_start
-    :end-before: incorrect_cast_end
-
-
-Creation functions
-------------------
-
-.. warning::
-   Deprecated since version 3.0.
-   The use of `torch.jit.trace()` has been deprecated, therefore this section only applies if you explicitly use ``opts.Jit.traceModel(True)``.
-
-The following functions are affected:
-
-* torch.ones
-* torch.rand
-* torch.zeros
-* torch.distributions.uniform.Uniform
-
-The ``dtype`` arguments will be ignored because they may refer to  float 16 tensors which were converted to float 32 tensors to allow tracing to succeed.
-Once the output of the op, or its descendant, encounters a known float 16 or float 32 input, the ``dtype`` values are resolved to this type.
-
-The following examples show cases where the type output differs from PyTorch:
-
-.. literalinclude:: half_float_ops.py
-    :language: python
-    :caption: Type resolution when using torch.zeros
-    :linenos:
-    :start-after: zero_res_start
-    :end-before: zero_res_end
-
-
-.. literalinclude:: half_float_ops.py
-    :language: python
-    :caption: Type resolution when using torch.rand
-    :linenos:
-    :start-after: rand_res_start
-    :end-before: rand_res_end
-
-
-.. literalinclude:: half_float_ops.py
-    :language: python
-    :caption: Type resolution when using torch.distributions.uniform.Uniform
-    :linenos:
-    :start-after: uniform_res_start
-    :end-before: uniform_res_end
-
-Normalization
--------------
-
-.. warning::
-   Deprecated since version 3.0.
-   The use of `torch.jit.trace()` has been deprecated, therefore this section only applies if you explicitly use ``opts.Jit.traceModel(True)``.
-
-Some normalization layers require the computation of running statistics - mean and variance. These tensors will be computed as float32 even though the inputs to the operator can be float16. This behaviour has been chosen to strike a balance between performance and numerical accuracy.
-
-The following operators are affected:
-
-* ``torch.nn.BatchNorm1d``
-* ``torch.nn.BatchNorm2d``
-* ``torch.nn.BatchNorm3d``
-
-The type of running statistics computations may be controlled via ``opts.Precision.runningStatisticsAlwaysFloat(bool)``. For example, in the script below, mean and variance computations will be performed in half precision:
-
-.. literalinclude:: running_statistics_half.py
-    :language: python
-    :caption: Controlling type of running mean and variance computations
-    :linenos:
-    :start-after: half_stats_begin
-    :end-before: half_stats_end
+* :py:meth:`~poptorch.options._PrecisionOptions.runningStatisticsAlwaysFloat` was used to cause the running mean and variance of certain
+  normalization ops to be calculated in ``float32`` precision, even though the normalization module itself had been cast
+  to ``float16``. This option is not supported in the dispatcher frontend, as the same effect can be achieved by simply
+  casting the running statistic tensors back to ``float32`` before running the model.
 
 Gradient computation control
-----------------------------
+============================
 
-``torch.no_grad`` is supported as a context manager as well as a decorator to suppress locally the
-computation of the gradients.
+``torch.no_grad`` is supported as a context manager as well as a decorator to suppress the
+computation of gradients locally.

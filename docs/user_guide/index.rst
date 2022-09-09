@@ -15,6 +15,7 @@ PyTorch for the IPU: User Guide
     hostio_optimisation
     example
     experimental
+    tracing
     reference
     legal
     changelog

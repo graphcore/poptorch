@@ -344,7 +344,7 @@ New features
 - Support for bool inputs to models
 - Improved support for half type models and inputs.
 
-  * Using a mix of float 16 and float 32 inputs is now supported. Please see
+  * Using a mix of float16 and float32 inputs is now supported. Please see
     the documentation for cases in which a model might use different types
     compared to when run natively with PyTorch.
 

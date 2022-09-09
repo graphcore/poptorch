@@ -64,11 +64,11 @@ opts.Jit.traceModel(True)
 opts.Precision.halfFloatCasting(
     poptorch.HalfFloatCastingBehavior.HalfUpcastToFloat)
 
-# This incorrectly results in a float 16 tensor
+# This incorrectly results in a float16 tensor
 poptorch_model = poptorch.inferenceModel(native_model, opts)
 assert poptorch_model(float16_tensor, float16_tensor).dtype == torch.float16
 
-# This incorrectly results in a float 16 tensor
+# This incorrectly results in a float16 tensor
 poptorch_model = poptorch.inferenceModel(native_model, opts)
 assert poptorch_model(float32_tensor, float16_tensor).dtype == torch.float16
 

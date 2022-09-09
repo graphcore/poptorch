@@ -646,7 +646,7 @@ PopTorch supports the following optimizers:
 #. :py:class:`~poptorch.optim.RMSprop`
 #. :py:class:`~poptorch.optim.LAMB`
 
-In addition, PopTorch has features to support float16 models, such as loss scaling, velocity scaling, bias correction and accumulator types.
+In addition, PopTorch has features to support ``float16`` models, such as loss scaling, velocity scaling, bias correction and accumulator types.
 
 .. important:: All of these extra attributes (except ``velocity_scaling``) must have the same values for different ``param_groups`` and therefore you must set them at the optimizer level.
 
@@ -667,7 +667,7 @@ In addition, PopTorch has features to support float16 models, such as loss scali
 Loss scaling
 ------------
 
-When training models which use half/float16 values, you can use loss scaling  to prevent the gradients from becoming too small and underflowing.
+When training models which use ``half``/``float16`` values, you can use loss scaling  to prevent the gradients from becoming too small and underflowing.
 
 Before calculating the gradients, PopTorch will scale the loss by the value of the ``loss_scaling`` parameter.
 PopTorch will multiply the gradients by the inverse scale prior to updating the optimizer state.
@@ -692,7 +692,7 @@ The combined variant uses one tensor per parameter to store the
 velocity and the changes to the velocity from accumulated gradients.
 Unlike the separate variant, therefore, each gradient accumulation step involves
 adding or subtracting values of a different magnitude to the gradients (for
-which loss scaling is used). You can therefore use the ``velocity_scaling`` parameter to scale the combined velocity tensor to improve numerical precision when using half/float16 values.
+which loss scaling is used). You can therefore use the ``velocity_scaling`` parameter to scale the combined velocity tensor to improve numerical precision when using ``half``/``float16`` values.
 (Note that the gradients are, in effect, scaled by ``velocity_scaling/loss_scaling`` so the ``loss_scaling`` has no impact on the effective scaling of velocity parameters.)
 
 As with loss scaling, higher values can minimise underflow of the velocity values but may result in overflow.
@@ -867,22 +867,22 @@ The following PopTorch functions, not related to model creation, are available:
 - :py:func:`~poptorch.setLogLevel`
 
 
-Half / float16 support
-=======================
+16-bit float support
+====================
 
-PopTorch supports the half-precision floating point (float16) format.
-You can simply input float16 tensors into your model.
-(You can convert a tensor to float16 using ``tensor = tensor.half()``)
+PopTorch supports the half-precision floating point (``float16``) format.
+You can simply input ``float16`` tensors into your model.
+(You can convert a tensor to ``float16`` using ``tensor = tensor.half()``)
 
 You can use your models in one of the following ways:
 
-#. Convert all parameters (weights) to float16 by using using a ``Module``'s .``half()`` method. This is the most memory efficient, however small updates to weights may be lost, hindering training.
-#. Keep the parameters (weights) as float32, in which case the parameter updates will occur using float32. However, the parameters will be converted to float16 if you call an operation with a float16 input. This is more memory efficient than using float32 tensors (inputs) but less memory efficient than using float16 weights.
-#. Use a mix of float32 and float16 parameters by manually specifying parameters as float16 or float32.
+#. Convert all parameters (weights) to ``float16`` by using a ``Module``'s ``.half()`` method. This is the most memory efficient, however small updates to weights may be lost, hindering training.
+#. Keep the parameters (weights) as ``float32``, in which case the parameter updates will occur using ``float32``. However, the parameters will be converted to ``float16`` if you call an operation with a ``float16`` input. This is more memory efficient than using ``float32`` tensors (inputs) but less memory efficient than using ``float16`` weights.
+#. Use a mix of ``float32`` and ``float16`` parameters by manually specifying parameters as ``float16`` or ``float32``.
 
-.. note::  When PyTorch encounters a mix of float16 and float32 inputs for a given operation, it will usually cast all inputs to float32.
-    PopTorch differs and will cast all inputs to float16.
-    This makes it easier to build models with float32 weights which take float16 tensors. However, if you wish to follow PyTorch behaviour, you can use  ``opts.Precision.halfFloatCasting(poptorch.HalfFloatCastingBehavior.HalfUpcastToFloat)`` where ``opts`` is the ``poptorch.Options`` object passed to the model wrapping function.
+.. note::  When PyTorch encounters a mix of ``float16`` and ``float32`` inputs for a given operation, it will usually cast all inputs to ``float32``,
+    and PopTorch complies with this convention when using the default dispatcher frontend. If you are using the legacy tracing frontend, the
+    behaviour is different. Please see :numref:`tracing-float16` for details.
 
 .. literalinclude:: inferenceModel.py
     :language: python
@@ -892,98 +892,17 @@ You can use your models in one of the following ways:
     :end-before: inference_half_end
     :emphasize-lines: 1, 2
 
-Because PopTorch relies on the `torch.jit.trace() <https://pytorch.org/docs/1.10.0/generated/torch.jit.trace.html#torch.jit.trace>`__ function, it is limited to tracing operations which run on the CPU.
-Many of these operations do not support float16 inputs.
-To allow the full range of operations, PopTorch converts all float16 inputs to float32 before tracing and then restores the inputs to float16 as part of the canonicalization process.
-Some operations may result in the model running in float32 where float16 would
-be expected, or vice versa (see :numref:`float_16_op_support` for full details).
-
-Graphcore's tutorials repository contains a walkthrough on using half and mixed precision
-in PopTorch: :tutorials-repo:`Half and mixed precision tutorial <tutorials/pytorch/mixed_precision>`.
 
 Automatic mixed-precision casting
 =================================
 
-PopTorch supports converting your model automatically between float16 and float32.
-This functionality is not active by default - you must enable it explicitly by
-calling the ``autocast(enabled=True)`` method at model level.
+The PopTorch autocasting API is part of the legacy tracing frontend.
+Under the default dispatcher frontend (see :numref:`dispatcher-support`),
+PyTorch casting can be used to manipulate mixed-precision operations, just as
+in CPU-based PyTorch code.
 
-.. literalinclude:: autocast.py
-    :language: python
-    :caption: Enabling automatic casting at model level
-    :start-after: model_autocast_start
-    :end-before: model_autocast_end
-    :emphasize-lines: 2
-
-During compilation, selected layers and operators will have their types adjusted aiming
-to strike a good compromise between compute efficiency, memory requirements and numerical
-precision.
-
-You can also set automatic casting at the layer level. In this situation,
-its effect is hierarchical: changing the setting for a layer affects it and all layers contained
-within.
-
-In the following example, automatic casting is enabled for all layers of the model, except for the
-first activation and second convolution.
-
-.. literalinclude:: autocast.py
-    :language: python
-    :caption: Controlling automatic casting at layer level
-    :start-after: layer_autocast_start
-    :end-before: layer_autocast_end
-    :emphasize-lines: 6-8
-
-You can also set automatic casting with the function decorator ``@poptorch.autocast(enabled=True)``.
-Its effect is to apply automatic casting to the body of the function. Setting its parameter to ``False``
-has the opposite effect. A typical use-case is applying it to the ``forward`` function of custom modules.
-
-.. literalinclude:: autocast.py
-    :language: python
-    :caption: Controlling automatic casting via decorator
-    :start-after: decorator_autocast_start
-    :end-before: decorator_autocast_end
-    :emphasize-lines: 2
-
-In addition, you can apply ``poptorch.autocast(enabled=True)`` to a code-block, with similar effect.
-
-.. literalinclude:: autocast.py
-    :language: python
-    :caption: Applying automatic casting to a code-block
-    :start-after: block_autocast_start
-    :end-before: block_autocast_end
-    :emphasize-lines: 3
-
-You can completely turn off this feature for the whole application via the ``autocastEnabled(bool)``
-method of :py:class:`~poptorch.options._PrecisionOptions`.
-
-.. literalinclude:: autocast.py
-    :language: python
-    :caption: Disabling automatic casting
-    :start-after: disable_autocast_start
-    :end-before: disable_autocast_end
-    :emphasize-lines: 2
-
-Custom casting policies
------------------------
-
-PopTorch provides a mechanism to customize automatic casting behaviour in the form of casting
-policy classes. A casting policy is defined by four sets of Torch modules and/or torch operators:
-
-#. ``fp16`` - set of operations to be typed as float16
-#. ``fp32`` - set of operations to be typed as float32
-#. ``promote`` - set of operations to be promoted to float32 should they take mixed-precision inputs
-#. ``demote`` - set of operations to be demoted to float16 should they take mixed-precision inputs
-
-The following example describes a policy where convolution and ReLU operations are to be performed using float16,
-whilst batch matrix multiplication is to be performed using float32. Dot product computations will be
-promoted to float32 when operands have mixed precision.
-
-.. literalinclude:: autocast.py
-    :language: python
-    :caption: Custom casting policies
-    :start-after: policy_autocast_start
-    :end-before: policy_autocast_end
-    :emphasize-lines: 5, 8
+If you are using the legacy tracing frontend, the autocasting API is still
+available; see :numref:`tracing-autocast`.
 
 
 PyTorch buffers
@@ -1143,7 +1062,7 @@ to a custom op. PopTorch supports all attributes supported in PopART except for
    * - PopART attribute type
      - Python equivalent
    * - ``Float``
-     - Python float (converted to float32)
+     - Python float (converted to ``float32``)
    * - ``Floats``
      - List or tuple of Python float
    * - ``Int``
