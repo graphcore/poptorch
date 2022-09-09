@@ -99,28 +99,32 @@ hosts. Please refer to the `PopDist and PopRun User Guide
 including details about the installation of Horovod if you are using the MPI
 communication protocol.
 
+.. _constraints:
 
 Constraints
 ===========
 
-PopTorch uses PyTorch's `torch.jit.trace <https://pytorch.org/docs/1.10.0/generated/torch.jit.trace.html#torch.jit.trace>`_ API. That means it inherits the
-constraints of that API. These include:
+The following constraints apply when using PopTorch:
 
-   * Inputs must be PyTorch tensors or tuples containing PyTorch tensors.
-   * ``None`` can be used as a default value for a parameter but cannot be
-     explicitly passed as an input value.
-   * `torch.jit.trace <https://pytorch.org/docs/1.10.0/generated/torch.jit.trace.html#torch.jit.trace>`_ cannot handle control flow or shape variations within the
-     model. That is, the inputs passed at run-time cannot vary the control flow of the
-     model or the shapes/sizes of results. If you attempt this, the graph will be
-     frozen to whichever control flow path was traced as a result of the first inputs
-     given to the wrapped model.
+* All tensor data types and shapes must be constant for the entire dataset.
 
-.. note:: All tensor data types and shapes must be constant for the entire dataset.
+* As PopTorch compiles to a static graph, it cannot handle control flow
+  variations within the model. This means that the inputs passed at run-time
+  cannot vary the control flow of the model or the shapes or sizes of results.
+  If this is attempted, the graph will be frozen to whichever control flow path
+  was activated as a result of the first inputs given to the wrapped model.
 
-Not all PyTorch operations have been implemented by the PopTorch compiler yet.  See
-:numref:`supported_ops` for a list of operators that are supported on the IPU.
-Please also report any unsupported operators to support@graphcore.ai so that these
-ops may be incorporated into a future release.
+* Not all PyTorch operations are implemented within the PopTorch compiler.  See
+  :numref:`supported_ops` for a list of operators that are supported on the IPU.
+  Please also report any unsupported operators to support@graphcore.ai so that these
+  ops may be incorporated into a future release.
+
+* Whilst any argument type can be used in the forward method, only tensor
+  arguments may change between model invocations, as other types will be
+  statically compiled inside the executable.
+
+* Additional constraints apply when using the legacy tracing frontend. See
+  :numref:`tracing-constraints`.
 
 
 Other resources

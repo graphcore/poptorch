@@ -45,9 +45,7 @@ assert any(top_five_classes[1][0] == native_top_five_classes[1][0])
 # inference_half_start
 model = torch.nn.Linear(1, 10)
 
-# Convert the parameters (weights) to halfs. Without doing so,
-# the Linear parameters will automatically be cast to half, which allows
-# training with float32 parameters but half tensors.
+# Cast the parameters (weights) to half.
 model.half()
 
 t1 = torch.tensor([1.]).half()
