@@ -12,6 +12,8 @@ New features
 API changes
 -----------
 
+- In addition to tensors, :py:func:`poptorch.set_overlap_for_input` and :py:func:`poptorch.set_overlap_for_output` can now be applied to tuples, lists, and dicts of tensors.
+
 
 Bug Fixes
 ---------

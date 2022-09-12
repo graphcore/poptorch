@@ -9,7 +9,8 @@ import torch
 
 from . import poptorch_core  # type: ignore
 from ._logging import logger
-from .ops import ATTR_PREFIX
+
+ATTR_PREFIX = "attr:"
 
 
 # Decorator function to mark other functions as

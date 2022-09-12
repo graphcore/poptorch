@@ -6,6 +6,7 @@ import torch
 from . import enums
 from . import poptorch_core
 from . import _impl
+from ._utils import ATTR_PREFIX, flattenTensorStructure, reconstructTensorStructure
 
 _end_ipu_block = torch.ops.poptorch.end_ipu_block
 
@@ -320,9 +321,8 @@ def set_available_memory(tensor: "torch.Tensor",
         tensor, available_memory_proportion)
 
 
-def set_overlap_for_input(input_tensor: "torch.Tensor",
-                          mode: "poptorch.OverlapMode") -> "torch.Tensor":
-    """Sets host overlap setting for input_tensor.
+def set_overlap_for_input(input_tensors, mode: "poptorch.OverlapMode"):
+    """Sets host overlap setting for input_tensors.
 
     You can increase performance in some cases by overlapping the copying
     from the host to IPUs with computation. However, this requires a number
@@ -331,24 +331,31 @@ def set_overlap_for_input(input_tensor: "torch.Tensor",
     affect computation performance.
 
     You should use this function at the start of your model's `forward` method
-    for each applicable input and use the returned tensor in future ops.
+    for each applicable input and use the returned tensors in future ops.
 
-    :param input_tensor: The input tensor for which enable overlapping host IO.
+    :param input_tensors: The input tensors for which enable overlapping host
+      IO. This can be either a single tensor, or any combination of tuple,
+      list, or dict of tensors.
     :param mode: Control to what extent the host IO overlaps computation.
-    :returns: the input tensor, specified for overlap.
+    :returns: the input tensors, specified for overlap.
 
     .. seealso:: :py:class:`poptorch.OverlapMode`.
     """
-    if not isinstance(input_tensor, torch.Tensor):
-        raise _impl.createPoptorchError(
-            "You may only set overlap for torch.tensor inputs. "
-            f"{type(input_tensor)} is not supported.")
-    return torch.ops.poptorch.set_overlap_for_input(input_tensor, mode.value)
+
+    def set_overlap_for_input_tensor(tensor):
+        if not isinstance(tensor, torch.Tensor):
+            raise _impl.createPoptorchError(
+                "You may only set overlap for torch.tensor inputs. "
+                f"{type(tensor)} is not supported.")
+        return torch.ops.poptorch.set_overlap_for_input(tensor, mode.value)
+
+    flattened = flattenTensorStructure(input_tensors)
+    return reconstructTensorStructure(
+        input_tensors, map(set_overlap_for_input_tensor, flattened))
 
 
-def set_overlap_for_output(output_tensor: "torch.Tensor",
-                           mode: "poptorch.OverlapMode") -> "torch.Tensor":
-    """Sets host overlap setting for output_tensor.
+def set_overlap_for_output(output_tensors, mode: "poptorch.OverlapMode"):
+    """Sets host overlap setting for output_tensors.
 
     You can increase performance in some cases by overlapping the copying
     from the IPUs to host with computation. However, this requires a number
@@ -357,20 +364,27 @@ def set_overlap_for_output(output_tensor: "torch.Tensor",
     affect computation performance.
 
     You should use this function at the end of your model's `forward` method,
-    for each applicable output, just before returning the tensor.
+    for each applicable output, just before returning the tensors.
 
-    :param output_tensor: The output tensor to enable overlapping host
-      IO for.
+    :param output_tensors: The output tensors to enable overlapping host
+      IO for. This can be either a single tensor, or any combination of tuple,
+      list, or dict of tensors.
     :param mode: Control to what extent the host IO overlaps computation.
-    :returns: the output tensor, specified for overlap.
+    :returns: the output tensors, specified for overlap.
 
     .. seealso:: :py:class:`poptorch.OverlapMode`.
     """
-    if not isinstance(output_tensor, torch.Tensor):
-        raise _impl.createPoptorchError(
-            "You may only set overlap for torch.tensor outputs. "
-            f"{type(output_tensor)} is not supported.")
-    return torch.ops.poptorch.set_overlap_for_output(output_tensor, mode.value)
+
+    def set_overlap_for_output_tensor(tensor):
+        if not isinstance(tensor, torch.Tensor):
+            raise _impl.createPoptorchError(
+                "You may only set overlap for torch.tensor outputs. "
+                f"{type(tensor)} is not supported.")
+        return torch.ops.poptorch.set_overlap_for_output(tensor, mode.value)
+
+    flattened = flattenTensorStructure(output_tensors)
+    return reconstructTensorStructure(
+        output_tensors, map(set_overlap_for_output_tensor, flattened))
 
 
 def _assertIdIsValid(name, value, expected_type):
@@ -611,8 +625,6 @@ def BlockFunction(user_id: Optional[str] = None, ipu_id: Optional[int] = None):
 
 # Store all attributes to prevent garbage collection
 attributes_lists: List[Dict[str, Union[float, int, str, list, tuple]]] = []
-
-ATTR_PREFIX = "attr:"
 
 
 def custom_op(inputs: Tuple["torch.Tensor"],

@@ -166,24 +166,6 @@ def test_input_error_messages(trace_model):
     poptorch_model = poptorch.inferenceModel(model, options=opts)
     poptorch_model(torch.tensor([1.0]))
 
-    class TupleModel(torch.nn.Module):
-        def forward(self, x):
-            x2 = poptorch.set_overlap_for_input(
-                x, poptorch.OverlapMode.OverlapAccumulationLoop)
-            y = torch.add(*x2)
-            return y
-
-    model = TupleModel()
-
-    opts = opts.clone()
-    poptorch_model = poptorch.inferenceModel(model, options=opts)
-
-    input = (torch.tensor([1.0]), torch.tensor([0.0]))
-    err_msg = ("You may only set overlap for torch.tensor inputs. "
-               f"{type(input)} is not supported.")
-    with pytest.raises(poptorch.poptorch_core.Error, match=err_msg):
-        poptorch_model(input)
-
 
 @pytest.mark.ipuHardwareRequired
 @pytest.mark.parametrize("trace_model", [True, False])
@@ -337,3 +319,28 @@ def test_overlap_both_non_output_marked(trace_model):
                r"not a tensor output to the model.")
     with pytest.raises(poptorch.Error, match=err_msg):
         inference_model(torch.tensor([1.0]))
+
+
+@pytest.mark.mlirSupportRequired
+@pytest.mark.ipuHardwareRequired
+def test_overlap_tuple():
+    class Model(torch.nn.Module):
+        def forward(self, xs):
+            xs = poptorch.set_overlap_for_input(
+                xs, poptorch.OverlapMode.OverlapDeviceIterationLoop)
+            x = torch.cat(xs) + 1
+            xs = x.chunk(2)
+            return poptorch.set_overlap_for_output(
+                xs, poptorch.OverlapMode.OverlapAccumulationLoop)
+
+    opts = poptorch.Options()
+    opts.setExecutionStrategy(poptorch.ShardedExecution())
+    # This only works with the dispatcher, because tracing inserts
+    # ListConstruct/TupleConstruct which are not compatible with
+    # the overlapped IO pass
+    opts.Jit.traceModel(False)
+    opts.TensorLocations.numIOTiles(32)
+    model = poptorch.inferenceModel(Model(), opts)
+
+    xs = torch.arange(8).reshape(4, 2).chunk(2)
+    model(xs)
