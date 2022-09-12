@@ -770,6 +770,19 @@ void identityLoss(const c10::OperatorHandle &op, c10::Stack *stack) {
   }
 }
 
+void autocastOp(const c10::OperatorHandle &op, c10::Stack *stack) {
+  ERROR_ON_MSG(
+      poptorch::isDispatcherOn(),
+      "The autocast API is not supported in PopTorch while using the "
+      "dispatcher frontend (the default since version 3.0); normal PyTorch "
+      "casting should be used to replicate its behaviour. For more information "
+      "on porting autocast code, see "
+      "https://docs.graphcore.ai/projects/poptorch-user-guide/en/latest/"
+      "supported_ops.html#bit-float-migration");
+
+  opWithNoReturn(op, stack);
+}
+
 // TODO(T64770) This method is the old way of registering custom functions. The
 // new way would look like this:
 //
@@ -869,13 +882,13 @@ static auto registry =
                 .catchAllKernel<PTC(opWithNoReturn)>())
         .op(torch::RegisterOperators::options()
                 .schema("poptorch::begin_autocast() -> ()")
-                .catchAllKernel<PTC(opWithNoReturn)>())
+                .catchAllKernel<PTC(autocastOp)>())
         .op(torch::RegisterOperators::options()
                 .schema("poptorch::suppress_autocast() -> ()")
-                .catchAllKernel<PTC(opWithNoReturn)>())
+                .catchAllKernel<PTC(autocastOp)>())
         .op(torch::RegisterOperators::options()
                 .schema("poptorch::restore_autocast() -> ()")
-                .catchAllKernel<PTC(opWithNoReturn)>())
+                .catchAllKernel<PTC(autocastOp)>())
         .op(torch::RegisterOperators::options()
                 .schema("poptorch::end_cpu_op(Tensor[] output) -> Tensor[]")
                 .catchAllKernel<PTC(endCpuOp)>())
