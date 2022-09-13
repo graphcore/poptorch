@@ -147,20 +147,21 @@ at::Tensor &copyInplace(at::Tensor &self, const at::Tensor &src,
   context.activeDispatch()->setPythonStack(
       torch::jit::tracer::pythonCallstack());
   UNUSED(non_blocking);
-  logging::trace("[TRACING-2] Intercepting aten::copy_");
-  logging::trace("[Input copy_] self {}", str(self));
-  logging::trace("[Input copy_] src {}", str(src));
+  logging::debug("[DISPATCHER] Intercepting aten::copy_");
+  logging::trace("[Input] self {}", str(self));
+  logging::trace("[Input] src {}", str(src));
 
   // TODO(T59880) rename is_xla() -> is_ipu()
   if (self.is_xla()) {
     if (src.is_cpu()) {
-      logging::trace("copy_ CPU -> IPU");
+      std::stringstream ss;
+      ss << "copy_ CPU -> IPU ";
       // TODO(T61574) use already allocated self instead of allocating a new
       // tensor.
       if (isParameter(self)) {
         self = context.activeDispatch()->addParameter(downCastIfNeeded(src));
         // Make sure the parameter flag is preserved.
-        logging::trace("copy_ parameter CPU -> IPU, new self {}", str(self));
+        ss << "parameter";
       } else {
         ERROR_ON_MSG(
             src.requires_grad() && !eagerModeEnabled(),
@@ -172,13 +173,15 @@ at::Tensor &copyInplace(at::Tensor &self, const at::Tensor &src,
         } else {
           self = context.activeDispatch()->addConstant(downCastIfNeeded(src));
         }
-        logging::trace("copy_ input CPU -> IPU, new self {}", str(self));
+        ss << "input";
         // Make sure the parameter flag is preserved.
       }
+      ss << ", new self " << str(self);
+      logging::debug(ss.str().c_str());
     } else {
       // TODO(T59880) rename is_xla() -> is_ipu()
       ERROR_ON(!src.is_xla());
-      logging::trace("copy_ IPU {} -> IPU {}", src.dtype(), self.dtype());
+      logging::debug("copy_ IPU {} -> IPU {}", src.dtype(), self.dtype());
       context.activeDispatch()->copyInplace(self, src);
     }
   } else {
@@ -188,7 +191,7 @@ at::Tensor &copyInplace(at::Tensor &self, const at::Tensor &src,
       if (!context.moving_outputs && !eagerModeEnabled()) {
         ERROR("Moved a tensor from IPU to CPU outside output");
       }
-      logging::trace("copy_ output IPU -> CPU");
+      logging::debug("copy_ output IPU -> CPU");
       context.activeDispatch()->addOutput(src, self);
     } else {
       ERROR("Unexpected tensor of type "
@@ -351,7 +354,7 @@ void cpuFallback(const c10::OperatorHandle &op, torch::jit::Stack *stack) {
 
 void fallback(const c10::OperatorHandle &op, c10::Stack *stack) {
   const c10::FunctionSchema &schema = op.schema();
-  logging::trace("[TRACING-2] Intercepting {} ", schema);
+  logging::debug("[DISPATCHER] Intercepting {} ", schema);
 
   context.activeDispatch()->setPythonStack(
       torch::jit::tracer::pythonCallstack());
@@ -470,16 +473,12 @@ emptyBase(at::IntArrayRef size,
         size, dtype, deviceOrDefaultIpu({}), layout, pin_memory, memory_format);
     // TODO(T61576) Find a better way to identify parameters and buffers.
     setIsParameter(output, context.moving_parameters);
-
-    logging::trace("[TRACING-2] Intercepting IPU empty_base");
     context.activeDispatch()->registerEmptyTensor(output);
     return output;
   }
   // Native calls are a dispatch endpoint so will not be redispatched.
   at::Tensor output = at::native::empty_cpu(size, dtype, layout, device,
                                             pin_memory, memory_format);
-  logging::trace("[TRACING-2] Ignoring empty_base for CPU tensor: {}",
-                 str(output));
   return output;
 }
 
@@ -492,9 +491,12 @@ at::Tensor emptyMemoryFormat(
     c10::optional<bool> pin_memory = c10::nullopt,
     c10::optional<at::MemoryFormat> memory_format = c10::nullopt) {
 
-  logging::trace("[TRACING-2] Intercepting IPU memory_format");
-  return poptorch::emptyBase(size, dtype, layout, deviceOrDefaultIpu(device),
-                             pin_memory, memory_format);
+  auto device_or_default = deviceOrDefaultIpu(device);
+  logging::debug(
+      "[DISPATCHER] Intercepting aten::empty.memory_format, device {}",
+      device_or_default.str());
+  return poptorch::emptyBase(size, dtype, layout, device_or_default, pin_memory,
+                             memory_format);
 }
 
 // func: empty_strided(int[] size, int[] stride, *, ScalarType? dtype=None,
@@ -506,14 +508,15 @@ at::Tensor emptyStrided(at::IntArrayRef size, at::IntArrayRef stride,
                         c10::optional<bool> pin_memory = c10::nullopt) {
   ERROR_ON(!device); // Internal error: shouldn't happen
   ERROR_ON(!isIpuDevice(*device));
-  logging::trace("[TRACING-2] Intercepting empty_strided");
+  logging::trace("[DISPATCHER] Intercepting aten::empty_strided, device {}",
+                 device->str());
   ERROR_ON(at::detail::defaultStrides(size) != stride);
   return emptyBase(size, dtype, layout, device, pin_memory);
 }
 
 // aten::detach(Tensor(a) self) -> (Tensor(a))
 void detach(const c10::OperatorHandle &op, c10::Stack *stack) {
-  logging::trace("[TRACING-2] Intercepting aten::detach");
+  logging::debug("[DISPATCHER] Intercepting aten::detach");
 
   context.activeDispatch()->setPythonStack(
       torch::jit::tracer::pythonCallstack());

@@ -214,7 +214,7 @@ at::Tensor MLIRDispatch::addConstant(const at::Tensor &cpu_tensor) {
     val = _compiler.cast(val, toCompilerType(cpu_dtype)).at(0).tensor_ids.at(0);
   }
 
-  logging::trace("[TRACING-2] Adding constant: {} with cpu ptr {}",
+  logging::trace("[DISPATCHER] Adding constant: {} with cpu ptr {}",
                  static_cast<void *>(cpu_tensor.unsafeGetTensorImpl()),
                  cpu_tensor.data_ptr());
 
@@ -229,7 +229,7 @@ at::Tensor MLIRDispatch::addInput(const at::Tensor &cpu_tensor) {
       cpu_tensor.sizes(), c10::typeMetaToScalarType(cpu_tensor.dtype()));
 
   const std::string str = "Input/" + std::to_string(_next_input_idx++);
-  logging::trace("[TRACING-2] Adding input: {} with cpu ptr {}",
+  logging::trace("[DISPATCHER] Adding input: {} with cpu ptr {}",
                  static_cast<void *>(cpu_tensor.unsafeGetTensorImpl()),
                  cpu_tensor.data_ptr());
   copyDataFromCpuSource(tensor, cpu_tensor);
@@ -248,7 +248,7 @@ at::Tensor MLIRDispatch::addParameter(const at::Tensor &cpu_tensor) {
 
   const std::string str = "Parameter/" + std::to_string(_next_parameter_idx++);
 
-  logging::trace("[TRACING-2] Adding parameter: {} with cpu ptr {}",
+  logging::trace("[DISPATCHER] Adding parameter: {} with cpu ptr {}",
                  static_cast<void *>(cpu_tensor.unsafeGetTensorImpl()),
                  cpu_tensor.data_ptr());
 
@@ -267,7 +267,7 @@ void MLIRDispatch::addOutput(const at::Tensor &ipu_src,
 
   const std::string str = "Output/" + std::to_string(_next_output_idx++);
   poptorch_ir::TensorId id = _mapper.getMLIRForTensor(ipu_src);
-  logging::trace("[TRACING-2] Marking output: {} with cpu ptr {}",
+  logging::trace("[DISPATCHER] Marking output: {} with cpu ptr {}",
                  static_cast<void *>(cpu_dest.unsafeGetTensorImpl()),
                  cpu_dest.data_ptr());
 
@@ -371,7 +371,7 @@ std::string MLIRDispatch::handleOp(const c10::OperatorHandle &op,
     logging::err("{}", s);
     ERROR(s);
   }
-  logging::trace("[TRACING-2] Handling {} via MLIR", schema_key);
+  logging::trace("[DISPATCHER] Handling {} via MLIR", schema_key);
 
   /*
    * The core MLIR part.
@@ -448,7 +448,7 @@ poptorch_ir::TensorId MLIRDispatch::findTensor(const at::Tensor &tensor) {
         std::vector<float> tmp(tensor.numel());
         for (auto i = 0u; i < tensor.numel(); ++i) {
           double wrapped_value = tensor.data_ptr<double>()[i];
-          logging::trace("[TRACING-2] Found tensor is a wrapped value: {}",
+          logging::trace("[DISPATCHER] Found tensor is a wrapped value: {}",
                          wrapped_value);
           tmp[i] = wrapped_value;
         }
@@ -459,7 +459,7 @@ poptorch_ir::TensorId MLIRDispatch::findTensor(const at::Tensor &tensor) {
         std::vector<std::int32_t> tmp(tensor.numel());
         for (auto i = 0u; i < tensor.numel(); ++i) {
           std::int64_t wrapped_value = tensor.data_ptr<std::int64_t>()[i];
-          logging::trace("[TRACING-2] Found tensor is a wrapped value: {}",
+          logging::trace("[DISPATCHER] Found tensor is a wrapped value: {}",
                          wrapped_value);
           // Ensure the wrapped value fits in 32 bit
           ERROR_ON_MSG(
@@ -481,7 +481,7 @@ poptorch_ir::TensorId MLIRDispatch::findTensor(const at::Tensor &tensor) {
       // Don't track constants in the ValueMaper: they're CPU tensors.
 
       logging::trace(
-          "[TRACING-2] Added wrapped value tensor, addr: {} with storage {}",
+          "[DISPATCHER] Added wrapped value tensor, addr: {} with storage {}",
           static_cast<void *>(tensor.unsafeGetTensorImpl()),
           static_cast<void *>(tensor.storage().unsafeGetStorageImpl()));
 

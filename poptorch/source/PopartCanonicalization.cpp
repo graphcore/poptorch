@@ -144,8 +144,6 @@ void propagateHalfOnListOrTupleConstruct(torch::jit::Node *n, bool tuple) {
     for (auto *output : unpack->outputs()) {
       // The output will be float as tracing was carried out using floats.
       if (input_was_half[idx]) {
-        logging::trace("D");
-
         output->setType(
             output->type()->expect<c10::TensorType>()->withScalarType(
                 c10::ScalarType::Half));

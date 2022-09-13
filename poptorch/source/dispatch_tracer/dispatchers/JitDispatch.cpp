@@ -31,34 +31,6 @@ public:
   ~WithMetadata() { setCurrentMetadata(""); }
 };
 
-std::string truncateGraphString(torch::jit::Graph &graph) {
-  static const int num_lines_max = [=]() {
-    if (const char *graph_len = std::getenv("POPTORCH_MAX_GRAPH_LEN")) {
-      const int n = std::stoi(graph_len);
-      logging::trace("POPTORCH_MAX_GRAPH_LEN={}", n);
-      return n;
-    }
-    const int n = 10;
-    logging::trace("POPTORCH_MAX_GRAPH_LEN not set, defaulting to {}", n);
-    return n;
-  }();
-
-  std::string s = graph.toString();
-  if (num_lines_max <= 0 || s.empty()) {
-    return s;
-  }
-  size_t start = s.size();
-  for (int i = 0; i < num_lines_max; i++) {
-    start = s.rfind('\n', start - 1);
-    if (start == std::string::npos) {
-      // Didn't find another new line: print everything.
-      return s;
-    }
-  }
-  // Start after the last line return.
-  return "[...truncated...]" + s.substr(start);
-}
-
 JITDispatch::JITDispatch(const CompilerOptions &options)
     : graph(std::make_shared<torch::jit::Graph>()), _mlir_dispatch(options) {}
 
@@ -83,7 +55,7 @@ at::Tensor JITDispatch::addConstant(const at::Tensor &cpu_tensor) {
 
   auto *value = insertConstant(graph.get(), src);
 
-  logging::trace("[TRACING-2] Adding constant: Value {} with cpu ptr {}",
+  logging::trace("[DISPATCHER] Adding constant: Value {} with cpu ptr {}",
                  static_cast<void *>(value), cpu_tensor.data_ptr());
 
   _mapper.addTensor(tensor, value);
@@ -120,7 +92,7 @@ at::Tensor JITDispatch::addTensor(const at::Tensor &cpu_tensor,
   value->setType(c10::TensorType::create(tensor)->withRequiresGrad(
       cpu_tensor.requires_grad()));
 
-  logging::trace("[TRACING-2] Adding {}: Value {} with cpu ptr {}",
+  logging::trace("[DISPATCHER] Adding {}: Value {} with cpu ptr {}",
                  is_parameter ? "parameter" : "input",
                  static_cast<void *>(value), cpu_tensor.data_ptr());
   copyDataFromCpuSource(tensor, cpu_tensor);
@@ -175,7 +147,7 @@ void JITDispatch::addOutput(const at::Tensor &ipu_src,
     }
   }
 
-  logging::trace("[TRACING-2][JIT] Graph output: Tensor ptr {}, jit ir %{} "
+  logging::trace("[DISPATCHER][JIT] Graph output: Tensor ptr {}, jit ir %{} "
                  "(scalar type {})",
                  reinterpret_cast<void *>(ipu_src.unsafeGetTensorImpl()),
                  val->debugNameBase(),
@@ -186,7 +158,6 @@ void JITDispatch::addOutput(const at::Tensor &ipu_src,
 }
 
 void JITDispatch::finalizeGraph() {
-  logging::trace("[TRACING-2][JIT] Graph after marking outputs\n{}\n", *graph);
   // Clear the code location
   setCurrentPythonCodeLocation({});
 }
@@ -200,7 +171,7 @@ const at::Tensor &JITDispatch::copyInplace(const at::Tensor &self,
   ERROR_ON(src_tracked == nullptr);
 
   logging::trace(
-      "[TRACING-2][JIT] copyInplace: src tensor {} (jit ir %{}), self tensor "
+      "[DISPATCHER][JIT] copyInplace: src tensor {} (jit ir %{}), self tensor "
       "{} (jit ir %{})",
       static_cast<void *>(src.unsafeGetTensorImpl()),
       src_tracked->jit->debugName(),
@@ -235,7 +206,7 @@ const at::Tensor &JITDispatch::copyInplace(const at::Tensor &self,
   self_tracked->jit = copy;
 
   self.set_requires_grad(src.requires_grad());
-  logging::trace("[TRACING-2][JIT] copyInplace: self tensor new jit ir %{}",
+  logging::trace("[DISPATCHER][JIT] copyInplace: self tensor new jit ir %{}",
                  self_tracked->jit->debugName());
 
   return self;
@@ -331,13 +302,14 @@ void JITDispatch::fixOutput(c10::Stack &stack, torch::jit::Node *node) {
       _mapper.addTensor(tensor, val);
 
       logging::trace(
-          "[TRACING-2][JIT] Output: Tensor ptr {}, jit ir %{} (scalar type {})",
+          "[DISPATCHER][JIT] Output: Tensor ptr {}, jit ir %{} (scalar type "
+          "{})",
           reinterpret_cast<void *>(tensor.unsafeGetTensorImpl()),
           val->debugNameBase(),
           val->type()->expect<c10::TensorType>()->scalarType().value_or(
               at::ScalarType::Undefined));
     } else if (value.isTensorList()) {
-      logging::trace("[TRACING-2][JIT] Output tensor list: jit ir %{}",
+      logging::trace("[DISPATCHER][JIT] Output tensor list: jit ir %{}",
                      val->debugName());
       val->setType(value.type()->expect<c10::ListType>());
       auto tensor_list = value.toTensorVector();
@@ -350,7 +322,7 @@ void JITDispatch::fixOutput(c10::Stack &stack, torch::jit::Node *node) {
         val = unpack->output(i);
         val->inferTypeFrom(copyAndCoerceType(tensor));
         _mapper.addTensor(tensor, val);
-        logging::trace("[TRACING-2][JIT] Output tensor list element: Tensor "
+        logging::trace("[DISPATCHER][JIT] Output tensor list element: Tensor "
                        "ptr {}, jit ir %{} {}",
                        reinterpret_cast<void *>(tensor.unsafeGetTensorImpl()),
                        val->debugNameBase(), toString(tensor));
@@ -379,7 +351,7 @@ void JITDispatch::fallback(const c10::OperatorHandle &op, c10::Stack *stack) {
 
   // Create a fake IR node for us to target using the schema.
   torch::jit::Node *node = lowerFromSchema(schema, stack, *graph, _mapper);
-  logging::trace("[TRACING-2][JIT] Node from schema {}", *node);
+  logging::trace("[DISPATCHER][JIT] Node from schema {}", *node);
 
   if (!inplace_tensors.empty()) {
     // For inplace ops, cast all input tensors to the same type as the output
@@ -464,17 +436,17 @@ void JITDispatch::fallback(const c10::OperatorHandle &op, c10::Stack *stack) {
   // functions which check the output.
   fixOutput(*stack, node);
 
-  logging::trace("[TRACING-2][JIT] Pre canonicalisation {}", *node);
+  logging::trace("[DISPATCHER][JIT] Pre canonicalisation {}", *node);
 
   std::size_t i = 0;
   for (c10::IValue value : *stack) {
     if (value.isTensor()) {
       at::Tensor tensor = value.toTensor();
       logging::trace(
-          "[TRACING-2][JIT] Node tensor output at index {} size: ={}", i++,
+          "[DISPATCHER][JIT] Node tensor output at index {} size: ={}", i++,
           tensor.sizes());
     } else {
-      logging::trace("[TRACING-2][JIT] Node scalar output at index {}", i++);
+      logging::trace("[DISPATCHER][JIT] Node scalar output at index {}", i++);
     }
   }
 
@@ -497,7 +469,7 @@ void JITDispatch::fallback(const c10::OperatorHandle &op, c10::Stack *stack) {
         _mapper.rawTensorRecord(inplace_tensors[0]);
     ERROR_ON_MSG(
         !record,
-        "[TRACING-2][JIT] Inplace op is not tracking inplace argument");
+        "[DISPATCHER][JIT] Inplace op is not tracking inplace argument");
 
     // Ensure the value and torch tensor shapes match
     JitTensorInfo value_info(value);
@@ -507,11 +479,6 @@ void JITDispatch::fallback(const c10::OperatorHandle &op, c10::Stack *stack) {
     // Validate to make sure the data type also matches.
     validateTensorShapeAndType(value, inplace_tensors[0]);
     record->jit = value;
-  }
-
-  if (logging::shouldLog(logging::Level::Trace)) {
-    logging::trace("[TRACING-2][JIT] Graph after interception of {}=\n{}\n",
-                   schema, truncateGraphString(*graph));
   }
 }
 

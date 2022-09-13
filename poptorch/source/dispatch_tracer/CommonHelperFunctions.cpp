@@ -66,8 +66,8 @@ torch::jit::Value *insertValueIntoGraphAndTrackIt(c10::IValue &value,
     }
 
     logging::trace(
-        "[TRACING-2] Tensor input: tensor ptr {} ({}), jit ir %{} (scalar type "
-        "{})",
+        "[DISPATCHER] Tensor input: tensor ptr {} ({}), jit ir %{} (scalar "
+        "type {})",
         reinterpret_cast<void *>(tensor.unsafeGetTensorImpl()),
         toString(tensor), val->debugNameBase(),
         val->type()->expect<c10::TensorType>()->scalarType().value_or(
@@ -116,7 +116,7 @@ torch::jit::Value *insertValueIntoGraphAndTrackIt(c10::IValue &value,
   torch::jit::Value *val = insertConstant(&graph, value);
   ERROR_ON_MSG(val == nullptr, "Internal: graph could not insert a constant");
 
-  logging::trace("[TRACING-2] Constant input: jit ir %{}, ivalue tag kind: {}",
+  logging::trace("[DISPATCHER] Constant input: jit ir %{}, ivalue tag kind: {}",
                  val->debugNameBase(), value.tagKind());
 
   return val;
@@ -171,7 +171,7 @@ at::Tensor copyAndCoerceType(const at::Tensor &tensor) {
   auto scalar_type = tensor.scalar_type();
   auto coerced_scalar_type = coerceToSupportedType(scalar_type);
   if (scalar_type != coerced_scalar_type) {
-    logging::warn("[TRACING-2] Tensor (ptr {}) type coerced from {} to {}",
+    logging::warn("[DISPATCHER] Tensor (ptr {}) type coerced from {} to {}",
                   static_cast<void *>(tensor.unsafeGetTensorImpl()),
                   scalar_type, coerced_scalar_type);
     return tensor.to(coerced_scalar_type);

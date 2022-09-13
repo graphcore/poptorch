@@ -29,11 +29,11 @@ at::Tensor IDispatch::allocateTensor(
       at::detail::defaultStrides(size));
   if (scalar_type != coerced_scalar_type) {
     logging::warn(
-        "[TRACING-2] Allocated tensor: {} {} (type coerced from {} to {})",
+        "[DISPATCHER] Allocated tensor: {} {} (type coerced from {} to {})",
         ipuTensorId(output), toString(output), scalar_type,
         coerced_scalar_type);
   } else {
-    logging::trace("[TRACING-2] Allocated tensor: {} {}", ipuTensorId(output),
+    logging::trace("[DISPATCHER] Allocated tensor: {} {}", ipuTensorId(output),
                    toString(output));
   }
   return output;
