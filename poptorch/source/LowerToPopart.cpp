@@ -418,7 +418,7 @@ LowerToPopartImpl::loadExecutableFromFile(const std::string &input_filename) {
 }
 
 void LowerToPopartImpl::lower(std::vector<at::Tensor> *in_tensors) {
-  logging::debug("Graph lowered to Popart {");
+  logging::debug("Graph lowered to PopART {");
   // Lower the tensor parameters of the _graph to OpInputs.
   lowerParameters(in_tensors);
 

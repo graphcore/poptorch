@@ -338,7 +338,7 @@ def test_available_memory_scatter_add(capfd, trace_model):
 
     log = helpers.LogChecker(capfd)
     it = log.createIterator()
-    it.findNext("Graph right before popart:")
+    it.findNext("Graph before lowering to PopART:")
     # Assert that the set_available_memory node references the scatterreduce,
     # not the add.
     sa_line = it.findNext("popart::scatterreduce").strip()

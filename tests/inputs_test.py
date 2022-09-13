@@ -174,7 +174,7 @@ def test_nested_tuples_and_lists(capfd, use_half, thing_to_test, trace_model):
         testlog = helpers.LogChecker(capfd)
         testlog.assert_contains_after(
             "Double(1, strides=[1], requires_grad=0, device=cpu) = "
-            "prim::TupleUnpack", "Graph right before popart")
+            "prim::TupleUnpack", "Graph before lowering to PopART")
 
 
 @pytest.mark.parametrize("use_half", [True, False])

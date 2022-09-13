@@ -82,7 +82,7 @@ def test_available_memory_last_op(capfd, trace_model):
     # Check the trace log to make sure set_available_memory isn't pruned
     # before it's lowered to PopART
     ir_before_popart_regex = \
-    (r"Graph right before popart:\n"
+    (r"Graph before lowering to PopART:\n"
      r".*\n"
      r".* popart::matmul.*\n"
      r".* poptorch::set_available_memory.*")
@@ -118,7 +118,7 @@ def test_available_memory_linear(capfd, trace_model):
     it = log.createIterator()
     # Assert that the set_available_memory node references the matmul, not the
     # add.
-    it.findNext("Graph right before popart:")
+    it.findNext("Graph before lowering to PopART:")
     matmul_line = it.findNext("popart::matmul").strip()
     matmul_var = matmul_line.partition(" ")[0]
     sam_line = it.findNext("poptorch::set_available_memory").strip()

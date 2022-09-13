@@ -312,7 +312,7 @@ def test_outline_attribute(capfd, trace_model):
     testlog.assert_no_matches(get_regex("gn2"), per_line=False)
 
     it = testlog.createIterator()
-    it.findNext("lowered to Popart")
+    it.findNext("lowered to PopART")
     # Ensure none of the attributes key / values are actually lowered to PopART
     # (They should have been converted to attributes)
     it.assert_not_contains("Char")

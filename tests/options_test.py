@@ -619,7 +619,7 @@ def test_name_scope_hook_disabled(capfd, namescopes_enabled, trace_model):
 
     testlog = helpers.LogChecker(capfd)
     it = testlog.createIterator()
-    it.findNext("lowered to Popart")
+    it.findNext("lowered to PopART")
     # Ensure none of the scope names are actually lowered to PopART
     # They should have been handled by the compiler and not be part
     # of the graph anymore.

@@ -154,25 +154,21 @@ poptorch::LowerToPopart lowerToPopartFromTrace(
 
   poptorch::logging::Tracepoint::begin(poptorch_passes);
 
-  logGraph("Lowered graph:", *graph, has_converted_any_half, input_tensors);
-
-  torch::jit::EliminateDeadCode(graph);
-  torch::jit::PeepholeOptimize(graph);
-  torch::jit::EliminateDeadCode(graph);
-
-  torch::jit::LowerSimpleTuples(graph);
-  torch::jit::PeepholeOptimize(graph);
-
-  logGraph("Graph before attributising IO overlap specifiers", *graph,
-           has_converted_any_half, input_tensors);
-  poptorch::attributiseOverlappedIO(graph.get());
-
-  logGraph("Graph before handling aliases:", *graph, has_converted_any_half,
+  logGraph("Initial traced graph:", *graph, has_converted_any_half,
            input_tensors);
 
-  poptorch::resolveAliases(graph.get());
+  torch::jit::EliminateDeadCode(graph);
+  torch::jit::PeepholeOptimize(graph);
+  torch::jit::LowerSimpleTuples(graph);
+  torch::jit::PeepholeOptimize(graph);
+  logGraph("Optimised graph:", *graph, has_converted_any_half, input_tensors);
 
-  logGraph("Graph before handling inplace ops:", *graph, has_converted_any_half,
+  poptorch::attributiseOverlappedIO(graph.get());
+  logGraph("Graph after attributising IO overlap specifiers", *graph,
+           has_converted_any_half, input_tensors);
+
+  poptorch::resolveAliases(graph.get());
+  logGraph("Graph after resolving aliases:", *graph, has_converted_any_half,
            input_tensors);
 
   // Ensure that list elements have the ListTypeWithNumElements type which
@@ -183,38 +179,38 @@ poptorch::LowerToPopart lowerToPopartFromTrace(
       *graph, traced_parameter_tensors.size(), anchors_list.size(),
       parsed_options.replicationFactor() > 1 &&
           parsed_options.broadcastBuffers());
+  logGraph("Graph after handling inplace ops:", *graph, has_converted_any_half,
+           input_tensors);
 
   // Any types with ListTypeWithNumElements must be reverted (revert = true)
   // to allow constant evaluation to proceed
   poptorch::type_and_constant_canonicalization::addListNumElements(graph.get(),
                                                                    true);
 
-  logGraph("Graph right before evaluating constant expressions:", *graph,
-           has_converted_any_half, input_tensors);
-
   poptorch::type_and_constant_canonicalization::evaluateConstexprs(graph.get());
-
-  logGraph("Graph right before casting making integer params as constant "
-           "inputs:",
-           *graph, has_converted_any_half, input_tensors);
+  logGraph("Graph after evaluating constant expressions:", *graph,
+           has_converted_any_half, input_tensors);
 
   poptorch::type_and_constant_canonicalization::makeConstantIntParams(
       graph.get(), parameters, traced_parameter_tensors);
+  logGraph("Graph after casting making integer params as constant "
+           "inputs:",
+           *graph, has_converted_any_half, input_tensors);
 
-  logGraph("Graph right before casting unsupported inputs:", *graph,
-           has_converted_any_half, input_tensors);
   poptorch::type_and_constant_canonicalization::castUnsupportedInputs(
       graph.get());
-
-  logGraph("Graph right before output type changes:", *graph,
+  logGraph("Graph after casting unsupported inputs:", *graph,
            has_converted_any_half, input_tensors);
+
   poptorch::type_and_constant_canonicalization::checkAndChangeOutputTypes(
       graph.get());
+  logGraph("Graph after output type changes:", *graph, has_converted_any_half,
+           input_tensors);
 
-  logGraph("Graph right before constant canonicalisation:", *graph,
-           has_converted_any_half, input_tensors);
   poptorch::type_and_constant_canonicalization::canonicaliseConstants(
       graph.get());
+  logGraph("Graph after constant canonicalisation:", *graph,
+           has_converted_any_half, input_tensors);
 
   // After constant canonicalisation, it is safe to ensure that list have
   // ListTypeWithNumElements once again, plus the last step will have added
@@ -222,18 +218,16 @@ poptorch::LowerToPopart lowerToPopartFromTrace(
   poptorch::type_and_constant_canonicalization::addListNumElements(graph.get());
 
   // Convert the IR to half to match the inputs/actual usage.
-  logGraph("Graph before canonicalising half:", *graph, has_converted_any_half,
-           input_tensors);
   poptorch::canonicaliseHalfInputs(graph.get(), input_tensors,
                                    traced_parameter_tensors);
-
-  logging::trace("Graph right before canonicalizing lists:\n{}", *graph);
+  logGraph("Graph after canonicalising half:", *graph, has_converted_any_half,
+           input_tensors);
 
   poptorch::canonicalizeLists(graph.get());
-
-  logging::trace("Graph right before automatic casting:\n{}", *graph);
+  logging::trace("Graph after canonicalizing lists:\n{}", *graph);
 
   poptorch::automaticCasting(graph.get());
+  logging::trace("Graph after automatic casting:\n{}", *graph);
 
   poptorch::cpuOffloadingCleanup(graph.get());
 
@@ -241,7 +235,7 @@ poptorch::LowerToPopart lowerToPopartFromTrace(
 
   poptorch::simplifyGatherWithExpandedIndices(graph.get());
 
-  logging::trace("Graph right before canonicalization:\n{}", *graph);
+  logging::trace("Graph before PopART canonicalisation:\n{}", *graph);
   // Convert any unsupported ATEN nodes in the graph to a popart
   // representation.
   poptorch::canonicalize(graph.get());
@@ -254,24 +248,22 @@ poptorch::LowerToPopart lowerToPopartFromTrace(
 
   // Enforce any constraints that aren't enforced by popart.
   poptorch::canonicalizeLate(graph.get());
-
-  logging::trace("Graph right after canonicalization:\n{}", *graph);
+  logging::trace("Graph after PopART canonicalisation:\n{}", *graph);
 
   if (training) {
     poptorch::removeSurplusIdentityLosses(graph.get());
     poptorch::addDetachOperations(graph.get());
-    logging::trace("Graph right after add detach operations:\n{}", *graph);
+    logging::trace("Graph after adding detach operations:\n{}", *graph);
   }
 
   // Error the user if any operations couldn't be canonicalised.
   poptorch::errorOnUnsupportedAten(graph.get());
 
-  logging::trace("Graph right before popart:\n{}", *graph);
-
   // Get the callback buffers from python, we have to do this at the last
   // possible moment due to tracing.
   initCallbackBuffers();
 
+  logging::trace("Graph before lowering to PopART:\n{}", *graph);
   poptorch::logging::Tracepoint::end(poptorch_passes);
   poptorch::logging::Tracepoint::begin(lower_to_popart);
 
@@ -293,26 +285,36 @@ poptorch::LowerToPopart lowerToPopartFromDispatch(
     std::vector<popart_compiler::Optimizer> &&optimizers,
     const AttributeAccessor &attribute_accessor, CPUCallbackMap &callbacks) {
   auto &parsed_options = parser.options();
+  std::shared_ptr<torch::jit::Graph> graph = getTracedGraph();
+  logging::trace("Initial dispatched graph:\n{}", *graph);
+
+  torch::jit::EliminateDeadCode(graph);
+  torch::jit::PeepholeOptimize(graph);
+  logging::trace("Optimised graph:\n{}", *graph);
+
   InplaceGraphInfo inplace_info = getInplaceGraphInfo(
       anchors_list.size(), parsed_options.replicationFactor() > 1 &&
                                parsed_options.broadcastBuffers());
-  std::shared_ptr<torch::jit::Graph> graph = getTracedGraph();
-
-  logging::trace("Traced graph:\n{}", *graph);
+  logging::trace("Graph after handling inplace ops:\n{}", *graph);
 
   poptorch::attributiseOverlappedIO(graph.get());
+  logging::trace("Graph after attributising IO overlap specifiers:\n{}",
+                 *graph);
 
   fixForLoopInputs(*graph);
 
   poptorch::type_and_constant_canonicalization::evaluateConstexprs(graph.get());
+  logging::trace("Graph after evaluating constant expressions:\n{}", *graph);
 
   poptorch::type_and_constant_canonicalization::canonicaliseConstants(
       graph.get());
+  logging::trace("Graph after constant canonicalisation:\n{}", *graph);
 
   poptorch::removeScatterAddIndexExpansion(graph.get());
 
   poptorch::simplifyGatherWithExpandedIndices(graph.get());
 
+  logging::trace("Graph before PopART canonicalisation:\n{}", *graph);
   poptorch::canonicalize(graph.get());
 
   poptorch::annotateSubgraphs(graph.get(), graph->nodes().front());
@@ -332,10 +334,12 @@ poptorch::LowerToPopart lowerToPopartFromDispatch(
   removeDeadImplicitCasts(graph.get());
 
   canonicalizeLate(graph.get());
+  logging::trace("Graph after PopART canonicalisation:\n{}", *graph);
 
   if (training) {
     poptorch::addDetachOperations(graph.get());
     poptorch::removeSurplusIdentityLosses(graph.get());
+    logging::trace("Graph after adding detach operations:\n{}", *graph);
   }
 
   // Error the user if any operations couldn't be canonicalised.
@@ -346,7 +350,7 @@ poptorch::LowerToPopart lowerToPopartFromDispatch(
   // moment due to tracing.
   initCallbackBuffers();
 
-  logging::debug("Graph right before popart:\n{}", *graph);
+  logging::trace("Graph before lowering to PopART:\n{}", *graph);
   poptorch::LowerToPopart lower(
       graph.get(), std::move(inplace_info), training, std::move(optimizers),
       parsed_options, attribute_accessor, callbacks, std::move(anchors_list));
