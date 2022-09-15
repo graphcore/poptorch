@@ -37,8 +37,9 @@ def type_out_harness(trace_model, inputs, forward_op,
                          expect_same_type_float_downcast_to_half)
 
     opts = opts.clone()
-    opts.Precision.halfFloatCasting(
-        poptorch.HalfFloatCastingBehavior.HalfUpcastToFloat)
+    if trace_model:
+        opts.Precision.halfFloatCasting(
+            poptorch.HalfFloatCastingBehavior.HalfUpcastToFloat)
     assert_same_type(inputs, model, opts, expect_same_type_like_poptorch)
 
 
@@ -337,12 +338,16 @@ def test_constant_always_float32(trace_model):
 
 
 @pytest.mark.parametrize("trace_model", [True, False])
-def test_float16_activations_float32_weights(trace_model):
+@pytest.mark.parametrize("conv", [True, False])
+def test_float16_activations_float32_weights(trace_model, conv):
     torch.manual_seed(42)
 
-    input = torch.ones(10)
-
-    model = torch.nn.Linear(10, 20)
+    if conv:
+        input = torch.ones(1, 4, 4)
+        model = torch.nn.Conv1d(4, 5, 2)
+    else:
+        input = torch.ones(10)
+        model = torch.nn.Linear(10, 20)
 
     # Float 32 act, float 32 weights
     options = poptorch.Options()
@@ -361,7 +366,7 @@ def test_float16_activations_float32_weights(trace_model):
     model.half()
     pop_model = poptorch.inferenceModel(model, options)
     pop_out = pop_model(input)
-    if trace_model:
+    if trace_model and not conv:
         assert pop_out.dtype == torch.half
     else:
         assert pop_out.dtype == torch.float

@@ -571,7 +571,7 @@ new_node->i_(c10::Symbol::attr("axis"),axis);
 return new_node;
 }
 torch::jit::Node* createConv(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,const std::vector<int64_t> & dilations,int64_t group,const std::vector<int64_t> & kernel_shape,const std::vector<int64_t> & pads,const std::vector<int64_t> & strides) {
- torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::conv, args, ImplicitCast::All, OutputType::AsImplicitCastPromoted);
+ torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::conv, args, ImplicitCast::None, OutputType::AsFirstInput);
 new_node->is_(c10::Symbol::attr("dilations"),dilations);
 new_node->i_(c10::Symbol::attr("group"),group);
 new_node->is_(c10::Symbol::attr("kernel_shape"),kernel_shape);
