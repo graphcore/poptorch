@@ -9,6 +9,7 @@ import clang.cindex
 current_dir = os.path.dirname(os.path.realpath(__file__))
 logger = logging.getLogger('OnnxParser')
 
+poplar_include_dir = None
 popart_include_dir = None
 popart_files = ["builder.hpp", "builder.gen.hpp"]
 
@@ -44,6 +45,29 @@ def find_popart_includes():
         "Failed to find path to PopART in compile_commands.json")
 
 
+def find_poplar_includes():
+    assert "CONDA_PREFIX" in os.environ, ("You need to run this script from "
+                                          "inside an activated buildenv")
+    compile_commands = os.path.realpath(
+        os.path.join(os.environ["CONDA_PREFIX"], "..",
+                     "compile_commands.json"))
+    assert os.path.isfile(compile_commands), (
+        "You need to configure your build "
+        "by running cmake")
+    with open(compile_commands, "r") as f:
+        cmds = json.load(f)
+    regex = r'.*-isystem (.*poplar.*?(/install)?/include) ?.*'
+    for c in cmds:
+        if "popart_compiler" in c["file"]:
+            m = re.match(regex, c["command"])
+            if not m:
+                continue
+            return m.group(1)
+
+    raise RuntimeError(
+        "Failed to find path to Poplar in compile_commands.json")
+
+
 # init(popart_path=None, clang_path=None, debug=False):
 #
 # Initialize parser module and logging object
@@ -51,7 +75,8 @@ def find_popart_includes():
 #   popart_path - path to popART headers (default: autodetect)
 #   clang_path - path to clang shared object (default: autodetect)
 #   debug - True: enable debug logging
-def init(popart_path=None, clang_path=None, debug=False):
+def init(popart_path=None, poplar_path=None, clang_path=None, debug=False):
+    global poplar_include_dir
     global popart_include_dir
     logging_level = logging.DEBUG if debug else logging.INFO
     logging.basicConfig(level=logging_level)
@@ -65,6 +90,11 @@ def init(popart_path=None, clang_path=None, debug=False):
                               "in " + popart_path)
         popart_include_dir = popart_path
 
+    if poplar_path is None:
+        poplar_include_dir = find_poplar_includes()
+    else:
+        poplar_include_dir = poplar_path
+    logger.info('Will pick up poplar headers from: %s', poplar_include_dir)
     logger.info('Will pick up popART headers from: %s', popart_include_dir)
     for (i, fname) in enumerate(popart_files):
         popart_files[i] = os.path.realpath(
@@ -155,7 +185,7 @@ def parse():
     tu = index.parse(path,
                      args=[
                          "-std=c++14", "-I" + popart_include_dir,
-                         "-DONNX_NAMESPACE=onnx"
+                         "-I" + poplar_include_dir, "-DONNX_NAMESPACE=onnx"
                      ])
 
     for diag in tu.diagnostics:

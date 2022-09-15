@@ -27,6 +27,7 @@ parser.add_argument("-D",
 
 args = parser.parse_args()
 
+poplar_dir = onnx.find_poplar_includes()
 popart_dir = onnx.find_popart_includes()
 onnx.init(popart_dir, args.clang, args.debug)
 jsonOutput = onnx.parse()
@@ -199,6 +200,7 @@ tu = index.parse(session_file,
                  args=[
                      "-std=c++14",
                      "-I" + popart_dir,
+                     "-I" + poplar_dir,
                      "-DONNX_NAMESPACE=onnx",
                  ])
 
@@ -218,7 +220,6 @@ CastingOps = [
     "call",
     "clip",
     "concat",
-    "conv",
     "convtranspose",
     "div",
     "dynamicadd",
@@ -304,6 +305,7 @@ OutputTypeSameAsFirstInput = [
     "celu",
     "compress",
     "concat",
+    "conv",
     "cos",
     "cosh",
     "cumsum",

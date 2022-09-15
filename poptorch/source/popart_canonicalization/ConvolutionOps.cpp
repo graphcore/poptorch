@@ -20,10 +20,25 @@ torch::jit::Node *convolutionHandler(torch::jit::Graph *graph,
   torch::jit::Value *input = node->input(0);
   torch::jit::Value *kernel = node->input(1);
 
+  const c10::ScalarType input_type =
+      input->type()->expect<c10::TensorType>()->scalarType().value();
+  const c10::ScalarType kernel_type =
+      kernel->type()->expect<c10::TensorType>()->scalarType().value();
+
+  if (kernel_type != input_type) {
+    kernel = createCast(graph, kernel, input_type)->output();
+  }
+
   std::vector<torch::jit::Value *> inputs{input, kernel};
 
   if (!isNone(node->input(2)->node())) {
-    inputs.push_back(node->input(2));
+    torch::jit::Value *bias = node->input(2);
+    const c10::ScalarType bias_type =
+        bias->type()->expect<c10::TensorType>()->scalarType().value();
+    if (bias_type != input_type) {
+      bias = createCast(graph, bias, input_type)->output();
+    }
+    inputs.push_back(bias);
   }
 
   std::vector<std::int64_t> stride = constantToLongVec(node->input(3)->node());
@@ -73,14 +88,28 @@ torch::jit::Node *conv2dHandler(torch::jit::Graph *graph,
   // aten::mkldnn_convolution(Tensor self, Tensor weight, Tensor? bias, int[]
   // padding, int[] stride, int[] dilation, int groups) -> (Tensor)
 
-  auto *input = node->input(0);
-  auto *kernel = node->input(1);
+  torch::jit::Value *input = node->input(0);
+  torch::jit::Value *kernel = node->input(1);
+
+  const c10::ScalarType input_type =
+      input->type()->expect<c10::TensorType>()->scalarType().value();
+  const c10::ScalarType kernel_type =
+      kernel->type()->expect<c10::TensorType>()->scalarType().value();
+
+  if (kernel_type != input_type) {
+    kernel = createCast(graph, kernel, input_type)->output();
+  }
 
   std::vector<torch::jit::Value *> inputs{input, kernel};
 
-  // Add bias if present.
   if (!isNone(node->input(2)->node())) {
-    inputs.push_back(node->input(2));
+    torch::jit::Value *bias = node->input(2);
+    const c10::ScalarType bias_type =
+        bias->type()->expect<c10::TensorType>()->scalarType().value();
+    if (bias_type != input_type) {
+      bias = createCast(graph, bias, input_type)->output();
+    }
+    inputs.push_back(bias);
   }
 
   const bool is_mkldnn_conv = node->kind() == c10::aten::mkldnn_convolution;
@@ -179,6 +208,8 @@ torch::jit::Node *cumsumHandler(torch::jit::Graph *graph,
   // kernel of ones with [span-1,0] padding above and below.
   torch::jit::Value *x = createUnsqueeze(graph, {data}, {2, 3})->output();
   x = createTranspose(graph, {x}, {1, 2, 0, 3})->output();
+  x = createCast(graph, x, c10::ScalarType::Float)->output();
+
   torch::jit::Value *y =
       createConv(graph, {x, k}, {}, 1, {}, {span - 1, 0, 0, 0}, {})->output();
 
