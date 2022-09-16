@@ -69,6 +69,26 @@ def test_batchNorm(batch_norm, affine, running_stats, training, trace_model):
         poptorch_model.assert_weights_changed()
 
 
+def test_batchNorm_typing():
+    torch.manual_seed(42)
+
+    class Model(torch.nn.Module):
+        def __init__(self):
+            super(Model, self).__init__()
+            self.bn = nn.BatchNorm1d(100)
+
+        def forward(self, x, y):
+            return self.bn(x) + y
+
+    m = Model()
+    ipu_model = poptorch.inferenceModel(m)
+
+    x = torch.randn(20, 100, dtype=torch.half)
+    y = torch.randn(20, 100, dtype=torch.half)
+
+    ipu_model(x, y)
+
+
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_batchNorm_eval_during_training(trace_model):
     torch.manual_seed(42)
