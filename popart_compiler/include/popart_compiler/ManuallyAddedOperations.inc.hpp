@@ -64,10 +64,10 @@ OP_DECL(poptorch, prelu, prelu, _impl->prelu, NONE, NONE)
 #define OPTIONAL_FLOAT nonstd::optional<float>()
 #define OPTIONAL_INT nonstd::optional<int64_t>()
 
-OP_DECL(poptorch, gru, gru, AiOnnxOpset10.gru, NONE,
+OP_DECL(poptorch, gru, gru, AiOnnxOpset10.gru, ARG(INT, hidden_size),
         BODY_ARG(2) BODY_ARG(EMPTY_FLOAT_VEC) BODY_ARG(EMPTY_FLOAT_VEC)
         BODY_ARG(EMPTY_STRING_VEC) BODY_ARG(OPTIONAL_FLOAT)
-        BODY_ARG("forward") BODY_ARG(OPTIONAL_INT) BODY_ARG(1)
+        BODY_ARG("forward") BODY_ARG(hidden_size) BODY_ARG(1)
         BODY_ARG(DEBUG_CONTEXT("Gru")))
 
 OP_DECL(poptorch, rnn, rnn, AiOnnxOpset10.rnn, ARG(STRING_VEC, activations),

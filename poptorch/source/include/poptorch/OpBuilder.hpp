@@ -270,7 +270,8 @@ torch::jit::Node *createMultiConvPart(torch::jit::Graph *graph,
                                       torch::jit::Node *conv_node);
 
 torch::jit::Node *createGru(torch::jit::Graph *graph,
-                            const std::vector<torch::jit::Value *> &args);
+                            const std::vector<torch::jit::Value *> &args,
+                            int64_t hidden_size);
 
 torch::jit::Node *createRnn(torch::jit::Graph *graph,
                             const std::vector<torch::jit::Value *> &args,

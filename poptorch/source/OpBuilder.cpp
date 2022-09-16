@@ -696,10 +696,13 @@ torch::jit::Node *createMultiConvPart(torch::jit::Graph *graph,
 }
 
 torch::jit::Node *createGru(torch::jit::Graph *graph,
-                            const std::vector<torch::jit::Value *> &args) {
+                            const std::vector<torch::jit::Value *> &args,
+                            int64_t hidden_size) {
   torch::jit::Node *new_node = createAndInsertNode(
       graph, symbols::poptorch::gru, args, ImplicitCast::All,
       OutputType::AsImplicitCastPromoted, 2);
+  new_node->i_(c10::attr::hidden_size, hidden_size);
+
   return new_node;
 }
 

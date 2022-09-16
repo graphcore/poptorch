@@ -18,7 +18,7 @@ torch::jit::Value *prependDimension(torch::jit::Graph *graph,
 
 torch::jit::Value *reshapeWeights(torch::jit::Graph *graph,
                                   torch::jit::Value *tensor,
-                                  unsigned slice_size, bool transpose = false,
+                                  int64_t slice_size, bool transpose = false,
                                   bool swap = true) {
   std::vector<torch::jit::Value *> slices;
   unsigned num_slices = 3;
@@ -65,7 +65,7 @@ torch::jit::Node *gruHandler(torch::jit::Graph *graph, torch::jit::Node *node) {
   unsigned batch_size = input_shape[1];
 
   auto recur_shape = shapeFromTensor(recur_weights);
-  unsigned hidden_size = recur_shape[2];
+  int64_t hidden_size = recur_shape[2];
 
   gate_weights = reshapeWeights(graph, gate_weights, hidden_size);
   recur_weights = reshapeWeights(graph, recur_weights, hidden_size);
@@ -93,7 +93,8 @@ torch::jit::Node *gruHandler(torch::jit::Graph *graph, torch::jit::Node *node) {
   }
 
   auto *gru = createGru(
-      graph, {input, gate_weights, recur_weights, biases, seq_lens, hx});
+      graph, {input, gate_weights, recur_weights, biases, seq_lens, hx},
+      hidden_size);
 
   auto *output = createSqueeze(graph, {gru->output(0)}, {1})->output();
 
