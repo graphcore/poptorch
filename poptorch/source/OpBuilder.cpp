@@ -333,6 +333,14 @@ createConstantInt(torch::jit::Graph *graph,
 }
 
 torch::jit::Node *
+createConstantLong(torch::jit::Graph *graph,
+                   const std::vector<std::int64_t> &data,
+                   const std::vector<std::int64_t> &new_shape) {
+  return createConstant<std::int64_t>(graph, data, new_shape,
+                                      at::ScalarType::Long);
+}
+
+torch::jit::Node *
 createConstantFloat32(torch::jit::Graph *graph, const std::vector<double> &data,
                       const std::vector<std::int64_t> &new_shape) {
   return createConstant<float>(graph, data, new_shape, at::ScalarType::Float);

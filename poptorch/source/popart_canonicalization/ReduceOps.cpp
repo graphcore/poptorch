@@ -182,14 +182,18 @@ torch::jit::Node *argsortHandler(torch::jit::Graph *graph,
   auto t0 = x->type()->expect<c10::TensorType>();
   std::vector<std::int64_t> shape = shapeFromTensor(node->input(0));
   auto dim = handleDimensionParam(node->input(1), t0);
-  auto *size = createConstantInt(graph, {shape[dim]}, {1})->output();
-  size = createCast(graph, size, c10::ScalarType::Long)->output();
+
+  auto *size = createConstantLong(graph, {shape[dim]}, {1})->output();
+
   auto *topk = createTopk(graph, {x, size}, dim);
   auto *indices = topk->output(1);
-  auto descending = constantToBool(node->input(2)->node());
 
+  // Onnx will output the indices long, so use a cast to revert the type.
+  // PopART will remove it as an identity when topk resolves to output an int.
+  indices = createCast(graph, indices, c10::ScalarType::Int)->output();
+
+  auto descending = constantToBool(node->input(2)->node());
   if (descending) {
-    indices = createCast(graph, indices, c10::ScalarType::Int)->output();
     return indices->node();
   }
 

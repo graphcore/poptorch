@@ -104,6 +104,11 @@ tensorToConstant(torch::jit::Graph *graph, const at::Tensor &t,
 torch::jit::Node *createReshape(torch::jit::Graph *graph, torch::jit::Value *A,
                                 const std::vector<int64_t> &new_shape);
 
+torch::jit::Node *
+createConstantLong(torch::jit::Graph *graph,
+                   const std::vector<std::int64_t> &data,
+                   const std::vector<std::int64_t> &new_shape);
+
 torch::jit::Node *createConstantInt(torch::jit::Graph *graph,
                                     const std::vector<std::int64_t> &data,
                                     const std::vector<std::int64_t> &new_shape);
