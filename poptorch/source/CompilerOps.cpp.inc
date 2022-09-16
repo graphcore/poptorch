@@ -8,7 +8,7 @@ torch::jit::Node* createCopyvarupdate(torch::jit::Graph *graph,  const std::vect
 return new_node;
 }
 torch::jit::Node* createBatchnormalization(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,unsigned int num_outputs,float epsilon,float momentum, unsigned int num_node_outputs) {
- torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::batchnormalization, args, ImplicitCast::ExceptFourthFifth, OutputType::AsFirstInput, num_node_outputs);
+ torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::batchnormalization, args, ImplicitCast::None, OutputType::AsFirstInput, num_node_outputs);
 new_node->i_(c10::Symbol::attr("num_outputs"),num_outputs);
 new_node->f_(c10::Symbol::attr("epsilon"),epsilon);
 new_node->f_(c10::Symbol::attr("momentum"),momentum);

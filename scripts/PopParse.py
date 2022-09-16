@@ -262,7 +262,7 @@ CastingExceptSecondArgsOps = [
 ]
 # Also Pad but only after >= 11
 CastingExceptThirdArgsOps = ["roialign"]
-CastingExceptFourthFifthArgsOps = ["batchnormalization"]
+CastingExceptFourthFifthArgsOps = []
 
 # Implicit casting ops not in these catagories:
 # QLinearConv, QLinearMatMul
