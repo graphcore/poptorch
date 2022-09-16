@@ -272,7 +272,7 @@ def test_bernoulli_limits(p, trace_model):
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_bernoulli_(trace_model):
     def rng_op(x):
-        return x.bernoulli_(p=0.5)
+        return x.bernoulli_(p=0.3)
 
     input = torch.empty(3, 5, 100)
     stat_funs = [torch.min, torch.max, torch.mean]

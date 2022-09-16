@@ -1075,7 +1075,7 @@
 # randperm.generator_out(int n, *, Generator? generator, Tensor(a!) out) -> Tensor(a!)
 - func: randperm.generator_out
   PopTorchDirect: randperm
-  IgnoreArgs: {'generator'}
+  IgnoreArgs: {'generator': 'None'}
   UnusedOutputArguments: {out}
 
 
@@ -1094,6 +1094,7 @@
   PopTorchDirect: arange
   UnusedOutputArguments: {out}
 
+# func: topk.values(Tensor self, int k, int dim=-1, bool largest=True, bool sorted=True, *, Tensor(a!) values, Tensor(b!) indices) -> (Tensor(a!) values, Tensor(b!) indices)
 - func: topk.values
   PopTorchDirect: topk
   UnusedOutputArguments: {values, indices}

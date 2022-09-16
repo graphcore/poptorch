@@ -1,6 +1,7 @@
 # Copyright (c) 2021 Graphcore Ltd. All rights reserved.
 
 import sys
+import warnings
 
 # PyTorch Schema types to C++ convertor.
 schemaToCpp = {
@@ -238,7 +239,8 @@ def add_maybe_inplace_op(op_target, parameters, tensor_params,
 
 
 # Generate the c++ function which handles this operation.
-def generate_cpp(op_target, canonicalised_args, outputs, named_tensors):
+def generate_cpp(op_target, canonicalised_args, outputs, named_tensors,
+                 aten_name):
     # Some arguments we just completely ignore.
     args_to_ignore = {} if "IgnoreArgs" not in op_target else op_target[
         "IgnoreArgs"]
@@ -266,12 +268,48 @@ def generate_cpp(op_target, canonicalised_args, outputs, named_tensors):
     inplace_ins = []
 
     for arg in canonicalised_args:
-        # We just skip some arguments
+        stack_at_index = "stack.at(" + str(arg_index) + ")"
+
+        # If the argument is in args_to_ignore we skip it
         if arg[0] in args_to_ignore:
+            # args_to_ignore is either a set or a dictionary. In the former
+            # case we check the given value against the schema default value.
+            # In the latter case we check the given value against the value in
+            # the dictionary.
+            #
+            # Note: it appears that sets can sometimes be parsed as
+            # dictionaries with None values by the yaml parser (we wish to
+            # check against the schema in this case)
+            is_in_dict = isinstance(
+                args_to_ignore, dict) and args_to_ignore[arg[0]] is not None
+            arg_default = args_to_ignore[arg[0]] if is_in_dict else arg[2]
+
+            if arg_default == 'None':
+                # If we know the expected values for the ignored arguments
+                # emit checks for them
+                function_decl += (
+                    f'\tERROR_ON_MSG(!{stack_at_index}.isNone(), '
+                    f'"{aten_name}: Poptorch does not handle {arg[0]}. '
+                    'Expected it to be None");\n')
+            elif arg_default in ('True', 'False'):
+                val = arg_default.lower()
+                function_decl += (
+                    f'\tERROR_ON_MSG({stack_at_index}.toBool() != '
+                    f'{val.lower()}, "{aten_name}: Poptorch does not handle '
+                    f'{arg[0]}. Expected it to be {arg_default}");\n')
+            elif arg_default is None:
+                warnings.warn(
+                    f'No default value for {arg[0]} in {aten_name}. You can '
+                    'use IgnoreArgs as a dictionary to provide a default '
+                    'value.')
+            else:
+                warnings.warn(
+                    f'Not implemented: default value ({arg_default}) for '
+                    f'{arg[0]} in {aten_name} is not checked')
+
             arg_index += 1
             continue
 
-        stack_at_index = "stack.at(" + str(arg_index) + ")"
         arg_type = arg[1]
 
         # Handle tensor list e.g "_cat(Tensor[] tensors, int dim=0) -> Tensor"
@@ -346,13 +384,16 @@ def generate_cpp(op_target, canonicalised_args, outputs, named_tensors):
             function_decl += "\trequires_grad_or |= " + arg[
                 0] + "_pytorch.requires_grad();\n\n"
 
-            # All args should be [Name, type] but tensors with additional info will be [Name, Type, Id, inplace, view]
-            if len(arg) > 2 and arg[3]:
+            # All args should be [Name, Type, DefaultValue] but tensors with
+            # additional info will be [Name, Type, DefaultValue, Id, inplace,
+            # view]
+            if len(arg) > 3 and arg[4]:
                 inplace_ins.append(arg[0])
         else:
             if arg_type not in schemaToCpp:
-                print(f"There is no c++ schema for {arg_type} in {__file__}.")
-                print("You need to add one to schemaToCpp for compilation "
+                print(f"There is no c++ schema for {arg_type} in {aten_name} "
+                      f"from {__file__}.")
+                print("You need to add one to schemaToCpp for compilation " +
                       "to succeed.")
                 sys.exit(1)
 
@@ -442,8 +483,14 @@ class DirectMLIRGenerator:
             # Here we are processing the arguments from native functions.yml, i.e:
             # aten.contiguous(Tensor(a) self, *, MemoryFormat memory_format=contiguous_format) -> Tensor(a)
 
+            arg = argument.split('=')
+
+            arg_default = None
+            if '=' in argument:
+                arg_default = arg[-1]
+
             # Remove default arguments.
-            arg_name = argument.split('=')[0].split(' ')[-1]
+            arg_name = arg[0].split(' ')[-1]
 
             # E.g Tensor(a) self -> name: self, type : Tensor(a)
             arg_name = arg_name.split(' ')[-1]
@@ -456,15 +503,17 @@ class DirectMLIRGenerator:
             # Tensor(a!) -> `a` modified inplace
             # Tensor(a!)[] -> list
             if 'Tensor' in arg_type and '(' in arg_type:
-                # Turn the tensor into [Name, 'Tensor', id, is_inplace, is_view]
+                # Turn the tensor into [Name, 'Tensor', default_val, id, is_inplace, is_view]
                 ct = canonicalise_tensor(arg_type)
-                canonical = [arg_name, 'Tensor[]' if ct[3] else "Tensor"] + ct
+                canonical = [
+                    arg_name, 'Tensor[]' if ct[3] else "Tensor", arg_default
+                ] + ct + [arg_default]
 
-                named_tensors[canonical[2]] = arg_name
+                named_tensors[canonical[3]] = arg_name
                 canonicalised_args.append(canonical)
             else:
                 # Just add a normal list.
-                canonicalised_args.append([arg_name, arg_type])
+                canonicalised_args.append([arg_name, arg_type, arg_default])
 
         aten_name = function_name
         function_name = function_name.replace('.', '_')
@@ -474,7 +523,7 @@ class DirectMLIRGenerator:
         function_decl = "void MLIRDispatch::" + function_name
         function_decl += "(c10::Stack& stack) {\n"
         function_decl += generate_cpp(op_target, canonicalised_args, outputs,
-                                      named_tensors)
+                                      named_tensors, aten_name)
 
         # Print the C++ impl.
         print(function_decl, file=self.cpp)

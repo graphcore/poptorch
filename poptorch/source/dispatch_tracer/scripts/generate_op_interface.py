@@ -11,7 +11,7 @@ parser.add_argument('--ops-to-generate',
                     type=argparse.FileType('r'),
                     help='Generate a C++ binding for every call in this file.')
 
-# We use a seperate native functions.yml file for the function signitures as
+# We use a separate native functions.yml file for the function signatures as
 # these may change and we don't want to have to write them out every time.
 parser.add_argument('--pytorch-base-native-function',
                     required=False,

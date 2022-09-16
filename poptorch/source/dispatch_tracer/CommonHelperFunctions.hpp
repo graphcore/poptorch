@@ -24,13 +24,6 @@ class ValueMapper;
 
 at::Tensor copyAndCoerceType(const at::Tensor &tensor);
 
-// If initial_op is already an outplace op return it. Otherwise get the
-// corresponding outplace op and adjust the stack so the op will be handled
-// properly
-c10::OperatorHandle getOutplaceOpHandle(const c10::OperatorHandle &initial_op,
-                                        c10::Dispatcher &dispatcher,
-                                        c10::Stack &stack);
-
 // From the schema deduce which argument if any is inplace. Only return the
 // first one which is inplace. This might include an argument of an op that
 // is not truly inplace, e.g. it returns the 'out' argument in the schema

@@ -1,6 +1,9 @@
 // Copyright (c) 2021 Graphcore Ltd. All rights reserved.
 #include "CommonHelperFunctions.hpp"
 
+#include <ATen/core/function_schema.h>
+#include <ATen/core/interned_strings.h>
+#include <c10/core/TensorImpl.h>
 #include <torch/csrc/jit/ir/ir.h>
 
 #include <map>
@@ -177,54 +180,6 @@ at::Tensor copyAndCoerceType(const at::Tensor &tensor) {
     return tensor.to(coerced_scalar_type);
   }
   return tensor;
-}
-
-c10::OperatorHandle getOutplaceOpHandle(const c10::OperatorHandle &op,
-                                        c10::Dispatcher &dispatcher,
-                                        c10::Stack &stack) {
-  const auto &schema = op.schema();
-  std::string name = schema.name();
-  const std::string &overload = schema.overload_name();
-  // If ends with '_', it's inplace. Remove the "_" and use the outplace version
-  // instead.
-  if (name[name.size() - 1] == '_') {
-    // These are special cases because there is no zero / fill.
-    if (name == "aten::zero_") {
-      // aten::zero_(Tensor(a!) self)
-      // aten::zeros_like(Tensor self, *, ScalarType? dtype=None,
-      //                  Layout? layout=None, Device? device=None,
-      //                  bool? pin_memory=None,
-      //                  MemoryFormat? memory_format=None)
-      name = "aten::zeros_like";
-      // Add the remaining 5 arguments
-      for (auto i = 0u; i < 5; i++) {
-        stack.emplace_back();
-      }
-    } else if (name == "aten::fill_") {
-      // aten::fill_.Tensor(Tensor(a!) self, Tensor value)
-      // aten::fill_.Scalar(Tensor(a!) self, Scalar value)
-      // aten::full_like(Tensor self, Scalar fill_value, *,
-      //                 ScalarType? dtype=None, Layout? layout=None,
-      //                 Device? device=None, bool? pin_memory=None,
-      //                 MemoryFormat? memory_format=None
-      name = "aten::full_like";
-      // Add the remaining 5 arguments
-      for (auto i = 0u; i < 5; i++) {
-        stack.emplace_back();
-      }
-    } else {
-      name.erase(name.end() - 1, name.end());
-    }
-    auto opt_op = dispatcher.findOp({name, overload});
-    if (opt_op) {
-      return *opt_op;
-    }
-    opt_op = dispatcher.findOp({name, ""});
-    if (opt_op) {
-      return *opt_op;
-    }
-  }
-  return op;
 }
 
 std::vector<at::Tensor> getInplaceArguments(const c10::Stack &stack,
