@@ -9,6 +9,8 @@
 #include "poptorch_logging/Logging.hpp"
 
 #include "PoptorchSymbols.hpp"
+#include "popart_canonicalization/PopartCanonicalizationUtils.hpp"
+#include "poptorch/OpBuilder.hpp"
 #include "poptorch/Utils.hpp"
 
 namespace poptorch {
@@ -313,6 +315,27 @@ std::vector<std::int64_t> shapeFromTensor(torch::jit::Value *value) {
     }
   }
   return shape;
+}
+
+void castWeightAndBias(torch::jit::Graph *graph, torch::jit::Value *input,
+                       torch::jit::Value *&weight, torch::jit::Value *&bias) {
+  const c10::ScalarType input_type =
+      input->type()->expect<c10::TensorType>()->scalarType().value();
+  if (!isNone(weight->node())) {
+    const c10::ScalarType weight_type =
+        weight->type()->expect<c10::TensorType>()->scalarType().value();
+    if (weight_type != input_type) {
+      weight = createCast(graph, weight, input_type)->output();
+    }
+  }
+
+  if (!isNone(bias->node())) {
+    const c10::ScalarType bias_type =
+        bias->type()->expect<c10::TensorType>()->scalarType().value();
+    if (bias_type != input_type) {
+      bias = createCast(graph, bias, input_type)->output();
+    }
+  }
 }
 
 JitTensorInfo::JitTensorInfo(const at::Tensor &tensor) {

@@ -15,7 +15,7 @@ new_node->f_(c10::Symbol::attr("momentum"),momentum);
 return new_node;
 }
 torch::jit::Node* createGroupnormalization(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,int64_t num_groups,float epsilon) {
- torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::groupnormalization, args, ImplicitCast::All, OutputType::AsImplicitCastPromoted);
+ torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::groupnormalization, args, ImplicitCast::None, OutputType::AsFirstInput);
 new_node->i_(c10::Symbol::attr("num_groups"),num_groups);
 new_node->f_(c10::Symbol::attr("epsilon"),epsilon);
 return new_node;
