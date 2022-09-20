@@ -47,10 +47,7 @@ def Poptorch_batch_norm : Poptorch_Op<"batch_norm", [AttrSizedOperandSegments]> 
 }
 
 def Poptorch_group_norm : Poptorch_Op<"group_norm",
-                                      [AttrSizedOperandSegments,
-                                       ImplicitCastOperand<0>,
-                                       ImplicitCastOperand<1>,
-                                       ImplicitCastOperand<2>]> {
+                                      [AttrSizedOperandSegments]> {
   let arguments = (ins Poptorch_tensor:$input,
                        Optional<Poptorch_tensor>:$weight,
                        Optional<Poptorch_tensor>:$bias,

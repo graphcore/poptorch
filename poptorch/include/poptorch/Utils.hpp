@@ -53,6 +53,11 @@ std::unique_ptr<char[]> stringToUniquePtr(const std::string &str);
 // Get the tensor shape as a vector of ints.
 std::vector<std::int64_t> shapeFromTensor(torch::jit::Value *value);
 
+// Add casts as necessary such that weight and bias have the same scalar type
+// as input.
+void castWeightAndBias(torch::jit::Graph *graph, torch::jit::Value *input,
+                       torch::jit::Value *&weight, torch::jit::Value *&bias);
+
 // A replacement for PyTorch's ListType which includes the number of elements
 // unlike PyTorch's own type.
 class ListTypeWithNumElements

@@ -19,25 +19,13 @@ torch::jit::Node *convolutionHandler(torch::jit::Graph *graph,
 
   torch::jit::Value *input = node->input(0);
   torch::jit::Value *kernel = node->input(1);
+  torch::jit::Value *bias = node->input(2);
 
-  const c10::ScalarType input_type =
-      input->type()->expect<c10::TensorType>()->scalarType().value();
-  const c10::ScalarType kernel_type =
-      kernel->type()->expect<c10::TensorType>()->scalarType().value();
-
-  if (kernel_type != input_type) {
-    kernel = createCast(graph, kernel, input_type)->output();
-  }
+  castWeightAndBias(graph, input, kernel, bias);
 
   std::vector<torch::jit::Value *> inputs{input, kernel};
 
-  if (!isNone(node->input(2)->node())) {
-    torch::jit::Value *bias = node->input(2);
-    const c10::ScalarType bias_type =
-        bias->type()->expect<c10::TensorType>()->scalarType().value();
-    if (bias_type != input_type) {
-      bias = createCast(graph, bias, input_type)->output();
-    }
+  if (!isNone(bias->node())) {
     inputs.push_back(bias);
   }
 
@@ -90,25 +78,13 @@ torch::jit::Node *conv2dHandler(torch::jit::Graph *graph,
 
   torch::jit::Value *input = node->input(0);
   torch::jit::Value *kernel = node->input(1);
+  torch::jit::Value *bias = node->input(2);
 
-  const c10::ScalarType input_type =
-      input->type()->expect<c10::TensorType>()->scalarType().value();
-  const c10::ScalarType kernel_type =
-      kernel->type()->expect<c10::TensorType>()->scalarType().value();
-
-  if (kernel_type != input_type) {
-    kernel = createCast(graph, kernel, input_type)->output();
-  }
+  castWeightAndBias(graph, input, kernel, bias);
 
   std::vector<torch::jit::Value *> inputs{input, kernel};
 
-  if (!isNone(node->input(2)->node())) {
-    torch::jit::Value *bias = node->input(2);
-    const c10::ScalarType bias_type =
-        bias->type()->expect<c10::TensorType>()->scalarType().value();
-    if (bias_type != input_type) {
-      bias = createCast(graph, bias, input_type)->output();
-    }
+  if (!isNone(bias->node())) {
     inputs.push_back(bias);
   }
 

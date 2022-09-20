@@ -286,6 +286,25 @@ def test_groupNorm_exfail(trace_model):
     assert not torch.allclose(poptorch_out, native_output, atol=1e-1, rtol=0.1)
 
 
+def test_groupNorm_typing():
+    torch.manual_seed(42)
+
+    class Model(torch.nn.Module):
+        def __init__(self):
+            super(Model, self).__init__()
+            self.gn = torch.nn.GroupNorm(4, 16)
+
+        def forward(self, x):
+            return self.gn(x)
+
+    m = Model()
+    ipu_model = poptorch.inferenceModel(m)
+
+    x = torch.randn(20, 16, 50, dtype=torch.half)
+
+    assert ipu_model(x).dtype == torch.half
+
+
 instance_norm_params = [
     # norm, dims
     (nn.InstanceNorm1d, 1),

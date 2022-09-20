@@ -101,23 +101,7 @@ torch::jit::Node *batchNormHandler(torch::jit::Graph *graph,
   torch::jit::Value *weight = node->input(1);
   torch::jit::Value *bias = node->input(2);
 
-  const c10::ScalarType input_type =
-      input->type()->expect<c10::TensorType>()->scalarType().value();
-  if (!isNone(weight->node())) {
-    const c10::ScalarType weight_type =
-        weight->type()->expect<c10::TensorType>()->scalarType().value();
-    if (weight_type != input_type) {
-      weight = createCast(graph, weight, input_type)->output();
-    }
-  }
-
-  if (!isNone(bias->node())) {
-    const c10::ScalarType bias_type =
-        bias->type()->expect<c10::TensorType>()->scalarType().value();
-    if (bias_type != input_type) {
-      bias = createCast(graph, bias, input_type)->output();
-    }
-  }
+  castWeightAndBias(graph, input, weight, bias);
 
   torch::jit::Value *running_mean = node->input(3);
   torch::jit::Value *running_var = node->input(4);
@@ -190,6 +174,9 @@ torch::jit::Node *layerNormHandler(torch::jit::Graph *graph,
   torch::jit::Value *gamma = node->input(2);
   // Bias to add.
   torch::jit::Value *beta = node->input(3);
+
+  castWeightAndBias(graph, input, gamma, beta);
+
   auto numel_affine =
       std::accumulate(normalized_shape.begin(), normalized_shape.end(), 1,
                       std::multiplies<int64_t>{});
@@ -245,6 +232,8 @@ torch::jit::Node *groupNormHandler(torch::jit::Graph *graph,
   // Bias to add
   torch::jit::Value *beta = node->input(3);
 
+  castWeightAndBias(graph, input, gamma, beta);
+
   auto num_channels = shapeFromTensor(input)[1];
   maybeInitializeAffineParamConstants(graph, input, &gamma, &beta,
                                       {num_channels}, "GroupNorm");
@@ -269,6 +258,8 @@ torch::jit::Node *nativeGroupNormHandler(torch::jit::Graph *graph,
   torch::jit::Value *gamma = node->input(1);
   // Bias to add
   torch::jit::Value *beta = node->input(2);
+
+  castWeightAndBias(graph, input, gamma, beta);
 
   auto num_channels = shapeFromTensor(input)[1];
   maybeInitializeAffineParamConstants(graph, input, &gamma, &beta,
@@ -309,6 +300,8 @@ torch::jit::Node *instanceNormHandler(torch::jit::Graph *graph,
   torch::jit::Value *gamma = node->input(1);
   // Bias to add
   torch::jit::Value *beta = node->input(2);
+
+  castWeightAndBias(graph, input, gamma, beta);
 
   std::int64_t num_channels = shapeFromTensor(input)[1];
 
