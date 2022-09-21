@@ -100,6 +100,7 @@ def inference_harness(imagenet_model, trace_model):
 @unittest.mock.patch.dict("os.environ", helpers.disableSmallModel())
 @pytest.mark.parametrize("model", tested_models + untested_models)
 @pytest.mark.parametrize("trace_model", [True, False])
+@pytest.mark.extendedTestingOnly
 def test_model(model, trace_model):
     if model in untested_models:
         pytest.skip("Model not currently tested")
