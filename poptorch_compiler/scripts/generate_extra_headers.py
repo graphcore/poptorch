@@ -116,6 +116,82 @@ class VariadicValueType(ValueType):
         return super().macro_type() + "_VEC"
 
 
+def resolve_value(json_in, arg_name, type_str):
+    """ For a return value or argument in the json extract the type, default
+        value and whether the value is an attribute
+    """
+    # Basic attribute/tensor types can be handled simply
+    if type_str in attr_types or type_str in tensor_types:
+        return (ValueType(arg_name, type_str), False)
+
+    # Otherwise the type should be an anonymous type whose traits can be looked
+    # up, or "Poptorch_tensorlist" which is an instance of
+    # Variadic<Poptorch_tensor>
+    if ("anonymous" not in type_str and type_str != "Poptorch_tensorlist"):
+        raise ValueError(f"{type_str} unknown and not anonymous.")
+
+    resolved_type_details = json_in[type_str]
+    resolved_type_superclasses = resolved_type_details['!superclasses']
+
+    # Many types have Constraint or Attr/TypeContraint
+    if 'Constraint' in resolved_type_superclasses:
+        resolved_type_superclasses.remove('Constraint')
+    if 'AttrConstraint' in resolved_type_superclasses:
+        resolved_type_superclasses.remove('AttrConstraint')
+    if 'TypeConstraint' in resolved_type_superclasses:
+        resolved_type_superclasses.remove('TypeConstraint')
+
+    # Sometimes DefaultValuedAttr/OptionalAttr come alone and
+    # sometimes with Attr
+    is_attr = ("Attr" in resolved_type_superclasses
+               or "DefaultValuedAttr" in resolved_type_superclasses
+               or "OptionalAttr" in resolved_type_superclasses)
+
+    # Only attributes should have a default value
+    assert not is_attr or "default_value" not in resolved_type_details
+
+    if is_attr:
+        if "Attr" in resolved_type_superclasses:
+            resolved_type_superclasses.remove("Attr")
+
+        type_str = resolved_type_details["baseAttr"]["def"]
+        if type_str not in attr_types:
+            print(f"Unhandled type {type_str} in {__file__}")
+
+        if len(resolved_type_superclasses) != 1:
+            print(f"{arg_name} has an unexpected number of superclasses.")
+            sys.exit(1)
+
+        single_attribute = resolved_type_superclasses[0]
+        if single_attribute == "OptionalAttr":
+            return OptionalValueType(arg_name, type_str), is_attr
+        if single_attribute == "DefaultValuedAttr":
+            return ValueType(arg_name, type_str,
+                             resolved_type_details["defaultValue"]), is_attr
+        print(f"Attribute {single_attribute} not handled in {__file__}")
+        sys.exit(1)
+
+    # Handle tensors
+    if len(resolved_type_superclasses) != 1:
+        print(f"{arg_name} has an unexpected number of superclasses.")
+        sys.exit(1)
+
+    type_str = resolved_type_details["baseType"]["def"]
+    if type_str not in tensor_types:
+        print(f"Unhandled type {type_str} in {__file__}")
+        sys.exit(1)
+
+    single_attribute = resolved_type_superclasses[0]
+
+    if single_attribute == "Optional":
+        return OptionalValueType(arg_name, type_str), is_attr
+    if single_attribute == "Variadic":
+        return VariadicValueType(arg_name, type_str), is_attr
+
+    print(f"Attribute {single_attribute} not handled in {__file__}")
+    sys.exit(1)
+
+
 def vals_from_json(json_in, op_key, sub_key, allow_attributes=True):
     assert any([
         x in json_in[op_key]["!superclasses"] for x in
@@ -128,86 +204,11 @@ def vals_from_json(json_in, op_key, sub_key, allow_attributes=True):
         arg_name = arg[1]
         arg_type_str = arg[0]["def"]
 
-        # Basic attribute/tensor types can be handled simply
-        if arg_type_str in attr_types or arg_type_str in tensor_types:
-            arg_types.append(ValueType(arg_name, arg_type_str))
-            continue
+        arg_type, is_attr = resolve_value(json_in, arg_name, arg_type_str)
+        if is_attr and not allow_attributes:
+            raise ValueError(f"Attributes not permitted for {sub_key}")
 
-        # Otherwise the type should be anonymous type whose traits can be
-        # looked up, or "Poptorch_tensorlist" which is an instance of
-        # Variadic<Poptorch_tensor>
-        if ("anonymous" not in arg_type_str
-                and arg_type_str != "Poptorch_tensorlist"):
-            raise ValueError(f"{arg_type_str} unknown and not anonymous.")
-
-        resolved_type_details = json_in[arg_type_str]
-        resolved_type_superclasses = resolved_type_details['!superclasses']
-
-        # Many types have Constraint or Attr/TypeContraint
-        if 'Constraint' in resolved_type_superclasses:
-            resolved_type_superclasses.remove('Constraint')
-        if 'AttrConstraint' in resolved_type_superclasses:
-            resolved_type_superclasses.remove('AttrConstraint')
-        if 'TypeConstraint' in resolved_type_superclasses:
-            resolved_type_superclasses.remove('TypeConstraint')
-
-        # Sometimes DefaultValuedAttr/OptionalAttr come alone and
-        # sometimes with Attr
-        is_attr = ("Attr" in resolved_type_superclasses
-                   or "DefaultValuedAttr" in resolved_type_superclasses
-                   or "OptionalAttr" in resolved_type_superclasses)
-
-        if is_attr:
-            if not allow_attributes:
-                raise ValueError(f"Attributes not permitted for {sub_key}")
-
-            if "Attr" in resolved_type_superclasses:
-                resolved_type_superclasses.remove("Attr")
-
-            type_str = resolved_type_details["baseAttr"]["def"]
-            if type_str not in attr_types:
-                print(f"Unhandled type {type_str} in {__file__}")
-
-            if len(resolved_type_superclasses) != 1:
-                print(f"{arg_name} has an unexpected number of superclasses.")
-                sys.exit(1)
-
-            single_attribute = resolved_type_superclasses[0]
-            if single_attribute == "OptionalAttr":
-                arg_types.append(OptionalValueType(arg_name, type_str))
-            elif single_attribute == "DefaultValuedAttr":
-                arg_types.append(
-                    ValueType(arg_name, type_str,
-                              resolved_type_details["defaultValue"]))
-            else:
-                print(
-                    f"Attribute {single_attribute} not handled in {__file__}")
-                sys.exit(1)
-
-            continue
-
-        # Handle tensors
-        if len(resolved_type_superclasses) != 1:
-            print(f"{arg_name} has an unexpected number of superclasses.")
-            sys.exit(1)
-
-        # Only attributes should have a default value
-        assert "default_value" not in resolved_type_details
-
-        type_str = resolved_type_details["baseType"]["def"]
-        if type_str not in tensor_types:
-            print(f"Unhandled type {type_str} in {__file__}")
-            sys.exit(1)
-
-        single_attribute = resolved_type_superclasses[0]
-
-        if single_attribute == "Optional":
-            arg_types.append(OptionalValueType(arg_name, type_str))
-        elif single_attribute == "Variadic":
-            arg_types.append(VariadicValueType(arg_name, type_str))
-        else:
-            print(f"Attribute {single_attribute} not handled in {__file__}")
-            sys.exit(1)
+        arg_types.append(arg_type)
 
     return arg_types
 
