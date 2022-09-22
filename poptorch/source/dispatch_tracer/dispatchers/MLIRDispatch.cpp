@@ -486,7 +486,16 @@ poptorch_ir::TensorId MLIRDispatch::findTensor(const at::Tensor &tensor) {
           static_cast<void *>(tensor.storage().unsafeGetStorageImpl()));
 
     } else {
-      ERROR("\tCould not find tensor " << str(tensor) << std::endl);
+      if (!isIpuTensor(tensor)) {
+        ERROR("Expected an IPU tensor but got tensor(device="
+              << tensor.unsafeGetTensorImpl()->device_type()
+              << ", shape=" << tensor.unsafeGetTensorImpl()->sizes()
+              << ", dtype= " << tensor.unsafeGetTensorImpl()->dtype()
+              << ").\nConstant tensors should be moved explicitly to the IPU, "
+                 "via cpu_tensor.to(ipu_tensor.device).");
+      } else {
+        ERROR("Could not find tensor " << str(tensor) << std::endl);
+      }
     }
   }
 

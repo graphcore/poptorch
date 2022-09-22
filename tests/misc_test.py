@@ -2,6 +2,7 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 from inspect import currentframe, getframeinfo
 
+import re
 import pytest
 import torch
 import torch.nn as nn
@@ -333,3 +334,20 @@ def test_compile_without_ipu():
     t2 = torch.tensor([2.])
 
     inference_model.compile(t1, t2)
+
+
+@pytest.mark.mlirSupportRequired
+def test_error_on_cpu_tensor():
+    class Model(nn.Module):
+        def forward(self, x):
+            return torch.index_select(x, 0, torch.LongTensor([1, 0]))
+
+    model = Model()
+    inference_model = poptorch.inferenceModel(model)
+
+    t1 = torch.rand(4)
+    with pytest.raises(poptorch.Error,
+                       match=re.escape(
+                           "Expected an IPU tensor but got tensor(device=cpu, "
+                           "shape=[2], dtype= long int)")):
+        inference_model.compile(t1)
