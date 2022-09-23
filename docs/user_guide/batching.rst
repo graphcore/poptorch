@@ -4,14 +4,14 @@
 Efficient data batching
 =======================
 
-By default PopTorch will process the ``batch_size`` which you provided to
-the :py:class:`poptorch.DataLoader`.
+By default, PopTorch will process the ``batch_size`` which you provided to
+the :py:class:`poptorch.DataLoader`. This value is known as the micro-batch
+size.
 
 When using the other options below, the actual number of samples used per step
 varies to allow the IPU(s) to process data more efficiently.
 
-However, the effective (mini-)batch size for operations which depend on it (such
-as batch normalization) will not change. All that changes is how much data is
+However, the effective batch size for operations which depend on it (for example the size of mini-batches, in PyTorch's terminology, when using Pytorch's `BatchNorm <https://pytorch.org/docs/stable/generated/torch.nn.BatchNorm2d.html>`__ layers) will not change. All that changes is how much data is
 actually sent for a single step.
 
 .. note:: Failure to use :py:class:`poptorch.DataLoader` may result in
@@ -29,10 +29,9 @@ to abstract away some of the batch sizes calculations. If :py:class:`poptorch.Da
 is used in a distributed execution environment, it will ensure that each process uses
 a different subset of the dataset.
 
-If you set the ``DataLoader`` ``batch_size`` to more than 1 then each operation
-in the model will process that number of elements at any given time.
-
-See below for usage example.
+If you set the :py:class:`poptorch.DataLoader` ``batch_size`` to more than 1
+then each operation in the model will process that number of elements at any
+given time. Please see the usage example below.
 
 poptorch.AsynchronousDataAccessor
 =================================
@@ -113,20 +112,39 @@ The shape of the tensors returned by the DataLoader will be the same as before, 
 
 .. note:: This flag is not enabled by default because the behaviour is different from the upstream DataLoader.
 
+.. _device_iterations:
+
 poptorch.Options.deviceIterations
 =================================
 
-If you set :py:meth:`~poptorch.Options.deviceIterations` to more
-than 1 then you are telling PopART to execute that many batches in sequence.
+When training, a device iteration corresponds to one iteration of the training
+loop executed on the IPU, starting with data loading, followed by the forward
+and backward passes, and ending with a weight update. If
+:ref:`gradient accumulation <gradient_accumulation>` is not used then if you set
+:py:meth:`~poptorch.Options.deviceIterations` to `n`, PopTorch will carry out
+this loop `n` times (processing `n` micro-batches) on the IPU before returning
+control to the host, which will improve processing efficiency. If gradient
+accumulation is used then the number of micro-batches processed will be `n`
+multiplied by the value set using
+:py:meth:`~poptorch.options._TrainingOptions.gradientAccumulation`.
 
-Essentially, it is the equivalent of launching the IPU in a loop over that
-number of batches. This is efficient because that loop runs on the IPU
-directly.
+For inference, a device iteration corresponds to data loading and the forward pass.
 
-Note that the returned output dimensions depend on `poptorch.Options.outputMode`. The default value for `trainingModel` is `Final`, since you will often not need to
-receive all or any of the output tensors and it is more efficient not to receive them. Therefore, only the last batch of data will be returned to the host under this setting.
-You can change this behaviour by setting the value of `poptorch.Options.outputMode` to `All`. This returns the result of every batch to the host. See :py:func:`poptorch.Options.outputMode`
-for more information.
+Note that the returned output dimensions depend on
+:py:meth:`poptorch.Options.outputMode`. The default value for
+:py:func:`poptorch.trainingModel` is `Final`, since you will often not need to
+receive all or any of the output tensors and it is more efficient not to
+receive them. Therefore, only the last batch of data will be returned to the
+host under this setting. You can change this behaviour by setting the value of
+:py:meth:`poptorch.Options.outputMode`. to `All`. This returns the result of
+every batch to the host.
+
+.. note:: When running an
+  :py:class:`~poptorch.inferenceModel` with
+  :py:class:`poptorch.PipelinedExecution`, you must set
+  :py:meth:`~poptorch.Options.deviceIterations` to at least the number of
+  pipeline steps.
+
 
 .. literalinclude:: device_iterations.py
   :caption: Use of device iterations and batch size
@@ -153,15 +171,34 @@ multiple IPUs to allow automatic data parallelism across many IPUs.
 poptorch.Options.Training.gradientAccumulation
 ==============================================
 
-You need to use
+You can use
 :py:meth:`~poptorch.options._TrainingOptions.gradientAccumulation`
-when training with pipelined models because the weights are shared across
-pipeline batches so gradients will be both updated and used by subsequent
-batches out of order.
-Note :py:meth:`~poptorch.options._TrainingOptions.gradientAccumulation`
-is only needed by :py:class:`poptorch.PipelinedExecution`.
+to run a number of micro-batches before updating parameters (weights) during
+training. The number of gradient accumulations is equal to the number of
+micro-batches (batches whose size is specified as the``batch_size`` value
+provided to the :py:class:`~poptorch.DataLoader`) which are processed between
+model updates. After accumulation, PopTorch updates the model using the
+gradients accumulated from processing all the batches.
 
-See also :py:class:`poptorch.Block`.
+.. note:: When running an :py:class:`~poptorch.inferenceModel`,  you must set
+  :py:meth:`~poptorch.options._TrainingOptions.gradientAccumulation` to 1.
+
+As mentioned in :numref:`pipelined_execution`, you need to use gradient
+accumulations when training with :py:class:`poptorch.PipelinedExecution`
+because the parameters can only be updated between pipeline runs.  You need to
+set the number of accumulations to at least the number of pipeline stages.
+However, with this value, the pipeline will switch into the "ramp-down"
+period as soon as it has finished the "ramp-up" period. Using a larger number
+of gradient accmumulations means that the pipeline will run at full efficiency
+for longer. However, the increase in batches between parameter updates may
+reduce the overall training efficiency of your model. The optimal number of
+gradient accumulations is a trade off between these two factors.
+
+.. note:: :py:meth:`~poptorch.options._TrainingOptions.gradientAccumulation`
+   is only needed by :py:class:`poptorch.PipelinedExecution`. Other execution
+   modes may benefit from it because the IPUs will spend less time updating
+   parameters during training.
+
 
 .. literalinclude:: device_iterations.py
   :caption: Use of gradient accumulation

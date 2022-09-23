@@ -10,7 +10,7 @@ Options
 =======
 
 You can change how PopTorch compiles and executes models using :py:class:`poptorch.Options`.
-You can find a full list of options in :numref:`options`.
+You can find a full list of options in :numref:`api_options`.
 Broadly speaking, the options fall into the following categories:
 
 #. General options (see :py:class:`~poptorch.Options`)
@@ -24,9 +24,11 @@ Broadly speaking, the options fall into the following categories:
    `PopRun <https://docs.graphcore.ai/projects/poprun-user-guide/>`__
    (see :py:class:`opts.Distributed.* <poptorch.options._DistributedOptions>`)
 
-See :numref:`efficient_data_batching`  for a full
-explanation of how ``device_iterations`` greater than 1, ``gradient_accumulation``, and
-``replication_factor`` interact with the output and input sizes.
+See :numref:`efficient_data_batching` for a full
+explanation of how :py:meth:`~poptorch.Options.deviceIterations`,
+:py:meth:`~poptorch.options._TrainingOptions.gradientAccumulation` and
+:py:meth:`~poptorch.Options.replicationFactor` interact with a model's input and
+output sizes.
 
 You can choose to use the IPU Model instead of IPU hardware
 with the :py:meth:`~poptorch.Options.useIpuModel` option.
@@ -206,7 +208,9 @@ Multi-IPU execution strategies
 This section describes strategies to run PopTorch code on more than one IPU.
 Some of these allow you to run code in parallel on multiple IPUs.
 You will need to use one of these execution strategies for PopTorch code that
-does not fit on a single IPU.
+does not fit on a single IPU, but if you do not explicitly select one,
+PopTorch will use the default execution strategy,
+:py:class:`~poptorch.PipelinedExecution`.
 
 .. note:: In general, we advise pipelining over as few IPUs as possible.
   However, You may need to experiment to find the optimal pipeline length.
@@ -221,14 +225,12 @@ multi-IPU device:
 * :py:class:`~poptorch.ParallelPhasedExecution`
 
 You can select this with the
-:py:func:`~poptorch.Options.setExecutionStrategy` option.
+:py:func:`poptorch.Options.setExecutionStrategy` option.
 
-The default execution strategy is :py:class:`~poptorch.PipelinedExecution`.
 
-In the following,
-we first introduce the general functions that are relevant to all four
-parallel execution strategies.
-Finally, we explain the four strategies with examples.
+The following subsections first introduce the general functions which are
+relevant to all four parallel execution strategies. Next, they explain the
+four strategies with examples.
 
 By default, PopTorch will not let you run the model if the number of IPUs is
 not a power of 2.
@@ -249,8 +251,6 @@ In PopTorch, you can divide a model into blocks. Blocks are associated to stages
 stages can be grouped into phases. This chapter will describe how to define them
 and how to use them to set up different execution modes.
 
-:numref:`figStages`
-
 .. _figStages:
 .. figure:: stages_summary.png
    :width: 581
@@ -263,13 +263,15 @@ Model partitioning using blocks
 
 :py:class:`~poptorch.BeginBlock` is a wrapper class, :py:class:`~poptorch.Block`
 is a context manager, and :py:func:`~poptorch.BlockFunction` is a function
-decorator. These partition models into "blocks" that can be executed on
-different IPUs. You can use them to define model sharding on a multi-IPU device.
+decorator. You can use one or more of these to partition models into "blocks"
+that can be executed on different IPUs.
 
 You can use :py:class:`~poptorch.BeginBlock` to annotate an existing model. Each
-call, with example arguments ``(layer_n, ipu_id=m)``, places all layers before
-``layer_n`` on IPU ``m-1`` and all layers from ``layer_n`` onwards (inclusive)
-on IPU ``m``.
+call, with example arguments ``(layer_n, ipu_id=m)``, places layers enclosed in
+``layer_n`` on IPU ``m``. Note that, PopTorch places the first layers on
+``ipu_id`` 0 by default. However, layers in between
+:py:class:`~poptorch.BeginBlock` annotations will inherit that of the previous
+annotated block.
 
 .. literalinclude:: pipeline_simple.py
     :language: python
@@ -305,7 +307,7 @@ overridden by a :py:class:`~poptorch.Stage`).
 In addition, you can use the :py:func:`~poptorch.BlockFunction` function decorator
 to place functions (containing one or more layers) onto a particular block.
 Everything within that function is placed on the IPU specified (unless
-overridden by a :py:class:`~poptorch.Stage`)
+overridden by a :py:class:`~poptorch.Stage`).
 
 .. literalinclude:: pipeline_simple.py
     :language: python
@@ -328,9 +330,10 @@ in the next sections.
 :py:class:`~poptorch.BeginBlock`, :py:class:`~poptorch.Block` and
 :py:func:`~poptorch.BlockFunction`  need to follow a set of rules:
 
-* You must declare all the layers inside a :py:class:`~poptorch.Block` scope
-  to avoid missing annotations. :py:class:`~poptorch.BeginBlock`
-  doesn't have the same constraint because all the layers called after this will
+* You must declare all the layers inside a :py:class:`~poptorch.Block` scope,
+  using either the context manager or :py:func:`~poptorch.BlockFunction`, to
+  avoid missing annotations. :py:class:`~poptorch.BeginBlock` does not have this
+  constraint because all the layers called after this will
   automatically be added to the last :py:class:`~poptorch.BeginBlock`.
 * Note that PopTorch needs to reserve IPUs in powers of 2. You are
   advised to configure your model accordingly to take full advantage of the IPUs
@@ -485,40 +488,72 @@ Available execution strategies
 Note that you can use the same annotation for each execution strategy.
 They only differ in the method of parallelisation and tensor locations.
 
+.. _pipelined_execution:
+
 Pipelined execution
 ^^^^^^^^^^^^^^^^^^^
 
 :py:class:`~poptorch.PipelinedExecution` is the default execution strategy.
-It extends :ref:`sharded_execution` with parallel execution on multiple
-IPUs.
 
-Parallelisation in :py:class:`~poptorch.PipelinedExecution`
-requires :py:meth:`~poptorch.Options.deviceIterations` (required for inference
-only, but speeds up training) and
-:py:meth:`~poptorch.options._TrainingOptions.gradientAccumulation`
-(for training only) as explained in :numref:`efficient_data_batching`.
-:py:meth:`~poptorch.Options.deviceIterations` must be greater than or equal to
-the number of IPUs used by the model.
-:py:meth:`~poptorch.options._TrainingOptions.gradientAccumulation` must be
-greater than or equal to the number of pipeline stages (forward and backward).
-As well as these constraints, you must also consider the batch dimension, which
-must be a multiple of
+When running a model for inference with
+:py:class:`~poptorch.PipelinedExecution`, you must set :py:meth:`~poptorch.Options.deviceIterations` to be greater than or equal to
+the number of pipeline stages used by the model. You can also do this for
+training to improve effiency.
+
+Each time you switch IPU, PopTorch adds a new pipeline stage.
+If two consecutive blocks/stages use the same IPU, PopTorch will merge them
+into a single block/stage.
+It is usually better not to revisit an IPU, creating more than one pipeline
+stage on the same IPU, because the IPU can not run both stages at the same time.
+Hence in most cases, the number of pipeline stages for inference will be equal
+to the number of IPUs you have used.
+
+When training, PopTorch doubles the number of pipeline stages in order to run
+backpropagation, except for the last forward stage which becomes a combined
+forward and backward pipeline stage (:numref:`fig_poptorch_pipelining`).
+
+.. _fig_poptorch_pipelining:
+.. figure:: pipelined_execution.png
+  :width: 95%
+
+  PopTorch pipelined execution for training. The last forward stage is combined with the first backward stage.
+
+You must set
+:py:meth:`~poptorch.options._TrainingOptions.gradientAccumulation` to be greater
+than or equal to the number of pipeline stages (forward and backward).
+As well as these constraints, you must also consider that the number of batches
+obtained each time you call the model will be multiplied (from the conventional
+model batch size, known as the micro-batch size) by
 :py:meth:`~poptorch.Options.deviceIterations` *
 :py:meth:`~poptorch.Options.replicationFactor` *
 :py:meth:`~poptorch.options._TrainingOptions.gradientAccumulation` during
 training and :py:meth:`~poptorch.Options.deviceIterations` *
 :py:meth:`~poptorch.Options.replicationFactor` during inference.
+You can use :py:class:`poptorch.DataLoader` to abstract this calculation but
+you should still be aware that this will take place.
 
-After one stage has finished processing a batch
-on one IPU, it immediately starts processing the next batch.
-This creates a pipeline where multiple batches are processed in parallel.
+.. note:: The effective or conventional batch size for layers which depend on it
+  (such as batch normalization) is known as the micro-batch size. If you use
+  :py:class:`poptorch.DataLoader`, the ``batch_size`` which you pass to it is
+  the micro-batch size.
 
-An IPU can only start its own stage of a batch after
-its previous stage of the current batch has been processed.
-Hence, all IPUs will be occupied after a "warm-up" period.
+After each IPU has finished processing a micro-batch, the same IPU immediately
+starts processing the next micro-batch while the next IPU processes the
+micro-batch that the same IPU just processed. This creates a pipeline which
+processes multiple micro-batches in parallel.
 
-At the end of processing, a "cool-down" period is required to aggregate the results and apply weight
-updates.
+An IPU can only start its own stage of a micro-batch after the previous stage of
+that micro-batch has been processed. Hence, not all IPUs will be occupied until
+after a "ramp-up" period.
+
+There is also a "ramp-down" period at the end of processing, during which there
+are no new micro-batches entering the pipeline for the first IPU to process while
+the IPUs down the pipeline still have micro-batches to process. Hence, during
+this period, the number of IPUs occupied will reduce each step. For this reason,
+you should try using a larger value for
+:py:meth:`~poptorch.options._TrainingOptions.gradientAccumulation`. But you
+should note that reducing the frequency of parameter updates will also have
+an adverse effect on training.
 
 Although you only define the :py:class:`~poptorch.Phase` for forward passes,
 the corresponding phases for backward passes are also created.
@@ -537,10 +572,17 @@ A shard is specified using :py:class:`~poptorch.Stage`,
 or if no :py:class:`~poptorch.Stage` is specified,
 the ``user_id`` passed by
 :py:class:`~poptorch.BeginBlock` or :py:class:`~poptorch.Block` is used.
-Each shard is executed sequentially on a single IPU.
+Each shard is executed sequentially on a single IPU (:numref:`fig_poptorch_sharded`).
 You can place multiple shards on multiple IPUs.
 However, only one IPU is used at a time, while
 the other IPUs are idle.
+
+.. _fig_poptorch_sharded:
+.. figure:: sharded_execution.png
+  :width: 95%
+
+  PopTorch sharded execution for training.
+
 If an IPU is allocated to run consecutive stages,
 PopART will merge consecutive stages into one on the same IPU.
 Weights and activations will use the on-chip memory of the IPUs.
@@ -559,11 +601,11 @@ Phased execution
 features in common:
 
 * A portion of the weights and activations are transferred to and from
-  streaming memory, before and after each phase.
+  Streaming Memory, before and after each phase.
 * If the desired weights and activations are already stored in an IPU
   of the same group of IPUs,
   intra-phase cross-IPU copies can replace the copies
-  to and from streaming memory.
+  to and from Streaming Memory.
 * This specific portion is needed by the layers of the model wrapped in
   :py:class:`~poptorch.BeginBlock` or :py:class:`~poptorch.Block` in current
   :py:class:`~poptorch.Phase`.
@@ -604,7 +646,7 @@ In :py:class:`~poptorch.ParallelPhasedExecution`,
 phases are executed in parallel alternating between two groups of IPUs.
 Even phases must run on even IPUs and odd phases on odd IPUs.
 Inter-phase cross-IPU copies can replace the memory transfers to and from
-the streaming memory, if the desired weights and activations are already
+the Streaming Memory, if the desired weights and activations are already
 available in another group of IPUs.
 
 .. literalinclude:: phased_execution.py
