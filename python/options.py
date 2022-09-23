@@ -424,7 +424,11 @@ class _TrainingOptions(_options_impl.OptionsDict):
         underflow/overflow. This adjustment is known as loss scaling. This
         setting automatically sets a global loss scaling factor during training.
 
-        Note: This is an experimental feature and may not behave as expected.
+        Note: Automatic loss scaling is a preview feature. It is well tested and
+        enabled in some of our example applications, but may not behave as
+        expected in all models. Recommendation: if your model with automatic
+        loss scaling enabled does not converge or triggers a compilation error,
+        then you will need to set the loss scale manually.
 
         :param enabled:
             * True: Enable automatic loss scaling on the IPU.
