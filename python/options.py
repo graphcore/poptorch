@@ -308,10 +308,10 @@ class _TrainingOptions(_options_impl.OptionsDict):
         the  ``batch_size`` argument passed to
         :py:class:`poptorch.DataLoader`) corresponds to one gradient
         accumulation. Therefore ``gradient_accumulation`` scales the global
-        batch size (number of samples between optimiser     updates).
+        batch size (number of samples between optimiser updates).
 
         .. note:: Increasing ``gradient_accumulation`` does not alter the
-            (mini-) batch size used for batch normalisation.
+            (micro-)batch size used for batch normalisation.
 
         A large value for ``gradient_accumulation`` can improve training
         throughput by amortising optimiser update costs, most notably when using

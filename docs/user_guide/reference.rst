@@ -4,7 +4,7 @@
 API reference
 =============
 
-.. _options:
+.. _api_options:
 
 Options
 =======
