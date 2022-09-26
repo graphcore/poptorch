@@ -162,8 +162,9 @@ def soft_margin_loss_handler(x, y, red):
 
 
 # everything else
+# NOTE: alpha and beta are swapped with a gemm
 expand(
-    "addmm", lambda x, y, z, c1, c2: op.gemm(y, z, x, cfloat(c1), cfloat(c2),
-                                             clong(0), clong(0)))
+    "addmm", lambda x, y, z, beta, alpha: op.gemm(y, z, x, cfloat(
+        alpha), cfloat(beta), clong(0), clong(0)))
 
 generate(script, "c10::aten", output_dir + "/AtenHandlers.gen.cpp", globals())

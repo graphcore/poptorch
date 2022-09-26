@@ -38,11 +38,11 @@ torch::jit::Node *addmmHandler(torch::jit::Graph *graph,
   auto *y = node->input(1);
   auto *z = node->input(2);
   auto *x = node->input(0);
-  auto *c1 = node->input(3);
-  auto t0 = constantToFloat(c1->node());
-  auto *c2 = node->input(4);
-  auto t1 = constantToFloat(c2->node());
-  // gemm(y, z, x, cfloat(c1), cfloat(c2), 0, 0)
+  auto *alpha = node->input(4);
+  auto t0 = constantToFloat(alpha->node());
+  auto *beta = node->input(3);
+  auto t1 = constantToFloat(beta->node());
+  // gemm(y, z, x, cfloat(alpha), cfloat(beta), 0, 0)
   return createGemm(graph, {y, z, x}, t0, t1, 0, 0);
 }
 

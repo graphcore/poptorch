@@ -82,7 +82,7 @@ private:
 
   void removeLoneConstants();
 
-  void evalutateConstExprGraph(torch::jit::Stack *stack);
+  void evaluateConstExprGraph(torch::jit::Stack *stack);
 
   void replaceWithConstants(const torch::jit::Stack &stack);
 
@@ -128,7 +128,7 @@ void ConstExprEvaluator::evaluate() {
 
   // Evaluate the constexpr graph saving the outputs to stack
   torch::jit::Stack stack;
-  evalutateConstExprGraph(&stack);
+  evaluateConstExprGraph(&stack);
 
   // Replace outputs in the original graph, with the constants calculated from
   // the constexpr graph
@@ -232,7 +232,7 @@ void ConstExprEvaluator::removeLoneConstants() {
   }
 }
 
-void ConstExprEvaluator::evalutateConstExprGraph(torch::jit::Stack *stack) {
+void ConstExprEvaluator::evaluateConstExprGraph(torch::jit::Stack *stack) {
   torch::jit::Code code(_constexpr_graph, "");
   torch::jit::InterpreterState state(code);
 

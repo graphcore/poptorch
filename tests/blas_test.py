@@ -149,3 +149,41 @@ def test_matmul_training(bias, trace_model):
                             expected=native_loss,
                             rtol=1e-03,
                             atol=1e-03)
+
+
+@pytest.mark.parametrize(
+    "params",
+    [
+        # input_shape, beta, alpha
+        ((3, 7), 1.0, 1.0),
+        ((3, 1), 1.0, 0.75),
+        ((1, 7), 0.75, 1.0),
+        ((1), 0.75, 0.75),
+    ])
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_addmm(params, trace_model):
+    torch.manual_seed(42)
+
+    input_shape, beta, alpha = params
+
+    t1 = torch.randn(input_shape)
+    t2 = torch.randn(3, 5)
+    t3 = torch.randn(5, 7)
+
+    class AddmmModel(torch.nn.Module):
+        def __init__(self, beta, alpha):
+            super().__init__()
+            self.beta = beta
+            self.alpha = alpha
+
+        def forward(self, x1, x2, x3):
+            return torch.addmm(x1, x2, x3, beta=self.beta, alpha=self.alpha)
+
+    opts = poptorch.Options()
+    opts.Jit.traceModel(trace_model)
+
+    model = AddmmModel(beta, alpha)
+    cpu_result = model(t1, t2, t3)
+    ipu_result = poptorch.inferenceModel(model, opts)(t1, t2, t3)
+
+    helpers.assert_allclose(expected=cpu_result, actual=ipu_result)
