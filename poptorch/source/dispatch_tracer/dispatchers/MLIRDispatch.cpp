@@ -259,8 +259,9 @@ void MLIRDispatch::promoteAsParameter(at::Tensor &tensor) {
 void MLIRDispatch::promoteAsInput(at::Tensor &tensor, bool is_wrapped) {
   if (!isIpuTensor(tensor)) {
     ERROR_ON_MSG(is_wrapped, "All inputs to an `ipu_wrapper`-wrapped function "
-                             "must be an IPU tensor, but got a(n) "
-                                 << tensor.device().str() << "tensor.");
+                             "must be an IPU tensor, but got an input with "
+                             "device="
+                                 << tensor.device().type() << '.');
     ERROR("Attempted to promote a CPU tensor as an input to an IPU model.");
   }
   const std::string str = "Input/" + std::to_string(_next_input_idx++);
