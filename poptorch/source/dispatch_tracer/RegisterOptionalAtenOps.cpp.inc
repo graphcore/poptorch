@@ -2,9 +2,14 @@
 
 //TODO(T59880) rename XLA -> IPU
 TORCH_LIBRARY_IMPL(aten, XLA, m) {
+  // These ops otherwise require direct access to the storage of an
+  // `IpuTensorImpl`, so we must implement them ourselves.
+  m.impl("alias", PTC_BOXED(poptorch::fallback));
   m.impl("copy_", PTC(poptorch::copyInplace));
-  m.impl("_local_scalar_dense", PTC(poptorch::localScalarDense));
+  m.impl("detach", PTC_BOXED(poptorch::detach));
   m.impl("item", PTC(poptorch::item));
+
+  m.impl("_local_scalar_dense", PTC(poptorch::localScalarDense));
 
   m.impl("empty.memory_format", PTC(poptorch::emptyMemoryFormat));
   m.impl("empty_strided", PTC(poptorch::emptyStrided));
@@ -35,9 +40,6 @@ TORCH_LIBRARY_IMPL(aten, XLA, m) {
   m.impl("feature_dropout", PTC_BOXED(poptorch::fallback));
   m.impl("feature_dropout_", PTC_BOXED(poptorch::fallback));
   m.impl("embedding", PTC_BOXED(poptorch::fallback));
-
-  // Intercept alias to circumvent issues accessing tensor storage directly
-  m.impl("alias", PTC_BOXED(poptorch::fallback));
 
   // Needed due to "CompositeImplicitAutograd"
   m.impl("native_group_norm",

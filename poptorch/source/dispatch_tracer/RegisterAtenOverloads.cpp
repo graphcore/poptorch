@@ -747,15 +747,6 @@ TORCH_LIBRARY_IMPL(_, AutogradIPU, m) {
 */
 #include "RegisterOptionalAtenOps.cpp.inc"
 
-// TODO(T59880) rename AutogradXLA -> AutogradIPU
-// These intercepts are only for ops where we want to override torch's
-// autograd behaviour, since the AutogradXLA key has a higher dispatch
-// priority than the XLA key. Registration here is not required for
-// regular backward ops
-TORCH_LIBRARY_IMPL(aten, AutogradXLA, m) {
-  m.impl("detach", PTC_BOXED(poptorch::detach));
-}
-
 void popArgumentsFromStack(const c10::OperatorHandle &op, c10::Stack *stack) {
   ERROR_ON(op.schema().arguments().size() > stack->size());
   stack->erase(std::prev(stack->end(), op.schema().arguments().size()),
