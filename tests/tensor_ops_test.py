@@ -1085,31 +1085,6 @@ def test_detach_and_clone(with_clone, with_detach, trace_model):
         assert (weight_at_start != model.first_layer.weight).all()
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_torch_inference_mode(trace_model):
-    class SimpleModel(torch.nn.Module):
-        def __init__(self):
-            super().__init__()
-            self.fc1 = torch.nn.Linear(10, 10)
-            self.loss = torch.nn.MSELoss()
-
-        def forward(self, x):
-            x = self.fc1(x)
-            x = x[torch.arange(4, device=x.device), :]
-            loss = self.loss(x, x)
-            return loss
-
-    model = SimpleModel()
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
-    model = poptorch.inferenceModel(model.train(), options=options)
-
-    x = torch.rand(4, 10)
-
-    with torch.inference_mode():
-        model.compile(x=x)
-
-
 @helpers.printCapfdOnExit
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_requires_grad_true(capfd, trace_model):
