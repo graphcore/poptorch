@@ -76,6 +76,9 @@ class ValueType:
         self._type_str = type_str
         self._default_value = default_value
 
+    def updateDefaultValue(self, default_value):
+        self._default_value = default_value
+
     @property
     def default_value(self):
         return self._default_value
@@ -116,7 +119,7 @@ class VariadicValueType(ValueType):
         return super().macro_type() + "_VEC"
 
 
-def resolve_value(json_in, arg_name, type_str):
+def resolve_value(json_in, arg_name, type_str, is_attr=False):
     """ For a return value or argument in the json extract the type, default
         value and whether the value is an attribute
     """
@@ -143,60 +146,53 @@ def resolve_value(json_in, arg_name, type_str):
 
     # Sometimes DefaultValuedAttr/OptionalAttr come alone and
     # sometimes with Attr
-    is_attr = ("Attr" in resolved_type_superclasses
-               or "DefaultValuedAttr" in resolved_type_superclasses
-               or "OptionalAttr" in resolved_type_superclasses)
+    is_attr |= ("Attr" in resolved_type_superclasses
+                or "DefaultValuedAttr" in resolved_type_superclasses
+                or "OptionalAttr" in resolved_type_superclasses)
 
     # Only attributes should have a default value
     assert not is_attr or "default_value" not in resolved_type_details
 
-    if is_attr:
-        if "Attr" in resolved_type_superclasses:
-            resolved_type_superclasses.remove("Attr")
+    if "Attr" in resolved_type_superclasses:
+        resolved_type_superclasses.remove("Attr")
 
-        type_str = resolved_type_details["baseAttr"]["def"]
-        if type_str not in attr_types:
-            print(f"Unhandled type {type_str} in {__file__}")
+    base_type_name = "baseAttr" if is_attr else "baseType"
+    base_type_str = resolved_type_details[base_type_name]["def"]
+    base_attr, _ = resolve_value(json_in, arg_name, base_type_str, is_attr)
 
-        if len(resolved_type_superclasses) != 1:
-            print(f"{arg_name} has an unexpected number of superclasses.")
-            sys.exit(1)
-
-        single_attribute = resolved_type_superclasses[0]
-        if single_attribute == "OptionalAttr":
-            return OptionalValueType(arg_name, type_str), is_attr
-        if single_attribute == "DefaultValuedAttr":
-            return ValueType(arg_name, type_str,
-                             resolved_type_details["defaultValue"]), is_attr
-        print(f"Attribute {single_attribute} not handled in {__file__}")
-        sys.exit(1)
-
-    # Handle tensors
     if len(resolved_type_superclasses) != 1:
         print(f"{arg_name} has an unexpected number of superclasses.")
         sys.exit(1)
 
-    type_str = resolved_type_details["baseType"]["def"]
-    if type_str not in tensor_types:
-        print(f"Unhandled type {type_str} in {__file__}")
-        sys.exit(1)
-
     single_attribute = resolved_type_superclasses[0]
+    if single_attribute == f"Optional{'Attr' if is_attr else ''}":
+        if base_attr.__class__ is not ValueType:
+            print(f"{arg_name} Optional type is not supported by "
+                  f"{base_attr.__class__}")
+            sys.exit(1)
+        base_attr.__class__ = OptionalValueType
+        if is_attr:
+            base_attr.updateDefaultValue('std::nullopt')
+        return base_attr, is_attr
 
-    if single_attribute == "Optional":
-        return OptionalValueType(arg_name, type_str), is_attr
-    if single_attribute == "Variadic":
-        return VariadicValueType(arg_name, type_str), is_attr
+    if is_attr and single_attribute == "DefaultValuedAttr":
+        base_attr.updateDefaultValue(resolved_type_details["defaultValue"])
+        return base_attr, is_attr
+
+    if not is_attr and single_attribute == "Variadic":
+        if base_attr.__class__ is not ValueType:
+            print(f"{arg_name} Variadic type is not supported by "
+                  f"{base_attr.__class__}")
+            sys.exit(1)
+        base_attr.__class__ = VariadicValueType
+        return base_attr, is_attr
 
     print(f"Attribute {single_attribute} not handled in {__file__}")
     sys.exit(1)
 
 
 def vals_from_json(json_in, op_key, sub_key, allow_attributes=True):
-    assert any([
-        x in json_in[op_key]["!superclasses"] for x in
-        ['Poptorch_Op', 'Poptorch_NotImplementedOp', 'Poptorch_AbstractOp']
-    ])
+    assert 'Poptorch_BasicOp' in json_in[op_key]["!superclasses"]
 
     arg_types = []
 
@@ -213,9 +209,33 @@ def vals_from_json(json_in, op_key, sub_key, allow_attributes=True):
     return arg_types
 
 
+def checkDefaultValues(arg_types):
+    is_defaultable = True
+
+    for arg in reversed(arg_types):
+        is_default = arg.default_value is not None
+
+        if not is_defaultable and is_default:
+            if isinstance(arg, OptionalValueType):
+                arg.updateDefaultValue(None)
+            else:
+                return arg.name
+
+        is_defaultable &= is_default
+
+    return None
+
+
 # Convert all the arguments from json to ValueType
 def args_from_json(json_in, op_key):
-    return vals_from_json(json_in, op_key, "arguments")
+    arg_types = vals_from_json(json_in, op_key, "arguments")
+
+    failed_arg = checkDefaultValues(arg_types)
+    if failed_arg is not None:
+        print("Failed to default {failed_arg} in {op_key}")
+        sys.exit(1)
+
+    return arg_types
 
 
 def returns_from_json(json_in, op_key):
@@ -224,14 +244,7 @@ def returns_from_json(json_in, op_key):
 
 for key in json_in.keys():
     if key.startswith("Poptorch_"):
-        if all(x not in json_in[key]["!superclasses"] for x in [
-                "Poptorch_Op", "Poptorch_NotImplementedOp",
-                "Poptorch_AbstractOp"
-        ]):
-            continue
-
-        # Skip the stream copies. They have their own API.
-        if "Poptorch_StreamCopy" in json_in[key]["!superclasses"]:
+        if 'Poptorch_BasicOp' not in json_in[key]["!superclasses"]:
             continue
 
         op_name = json_in[key]["!name"].replace("Poptorch_", "")
@@ -298,7 +311,7 @@ for op_name in poptorch_ops:
     func_args_decl = []
     parameters = []
 
-    # Turn the args into function signitures.
+    # Turn the args into function signatures.
     for arg in poptorch_ops[op_name]["args"]:
         new_arg = builder_call_translations[arg.macro_type()] + " " + arg.name
         func_args.append(new_arg)

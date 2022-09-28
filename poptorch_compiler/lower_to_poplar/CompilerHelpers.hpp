@@ -3,6 +3,7 @@
 #define POPTORCH_COMPILER_HELPER_HPP_
 
 #include <llvm/ADT/DenseMap.h>
+#include <mlir/IR/BuiltinAttributes.h>
 #include <mlir/IR/Value.h>
 
 #include <array>
@@ -16,6 +17,7 @@
 #include <poplar/Graph.hpp>
 #include <poplar/Program.hpp>
 
+#include "dialect/Helpers.hpp"
 #include "dialect/PoptorchDialect.hpp"
 
 namespace poplar {
@@ -44,6 +46,8 @@ struct CompilerContext {
 
   std::vector<poplar::Tensor> fromSsa(mlir::ValueRange value_range);
 
+  poplar::Tensor fromSymbol(std::string_view symbol_name, mlir::Type type);
+
   std::int64_t graph_const_count = 0;
 
   // Get a seed to use for RNG functions.
@@ -63,9 +67,17 @@ struct CompilerContext {
   void addTensor(const mlir::Value &value, const poplar::Tensor &tensor,
                  bool update_if_present = false);
 
+  void addTensor(std::string_view symbol_name, const poplar::Tensor &tensor,
+                 bool update_if_present = false);
+
+  void clearLocalData();
+
 private:
-  // Map of SSA->Poplar Tensors.
+  // Local map of SSA->Poplar Tensors.
   llvm::DenseMap<mlir::Value, poplar::Tensor> _tensors;
+
+  // Local map of symbol strings -> Poplar Tensors
+  std::unordered_map<std::string, poplar::Tensor> _global_tensors;
 
   // Persistent seed to use for RNG functions.
   //
@@ -134,16 +146,6 @@ poplar::Tensor createConstantTensor(CompilerContext &context, poplar::Type type,
       (context.graph_const_count++) % context.graph.getTarget().getNumTiles();
   context.graph.setTileMapping(constant, tile_num);
   return constant;
-}
-
-// Convert any MLIR object to string.
-template <typename T> std::string mlirToStr(const T &obj) {
-  std::string str;
-  {
-    llvm::raw_string_ostream ostream(str);
-    ostream << obj;
-  }
-  return str;
 }
 
 } // namespace poptorch_ir

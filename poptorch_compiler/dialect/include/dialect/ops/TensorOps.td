@@ -1,27 +1,5 @@
 // Copyright (c) 2021 Graphcore Ltd. All rights reserved.
 
-def Poptorch_alias: Poptorch_Op<"alias", [ViewOp]> {
-    let arguments = (ins Poptorch_tensor:$input);
-    let results = (outs Poptorch_tensor:$result);
-
-    let builders = [OpBuilder<(ins "mlir::Value":$input), [{
-        $_state.addOperands({input});
-        $_state.addTypes(input.getType());
-     }]>
-    ];
-}
-
-def Poptorch_detach: Poptorch_NotImplementedOp<"detach", [ViewOp]> {
-    let arguments = (ins Poptorch_tensor:$input);
-    let results = (outs Poptorch_tensor:$result);
-
-    let builders = [OpBuilder<(ins "mlir::Value":$input), [{
-        $_state.addOperands({input});
-        $_state.addTypes(input.getType());
-     }]>
-    ];
-}
-
 def Poptorch_empty_tensor: Poptorch_Op<"empty_tensor", []> {
     let arguments = (ins I64ArrayAttr:$size, TypeAttr:$type);
     let results = (outs Poptorch_tensor:$result);
@@ -31,21 +9,6 @@ def Poptorch_empty_tensor: Poptorch_Op<"empty_tensor", []> {
         $_state.addAttribute("type", mlir::TypeAttr::get(type));
         $_state.addTypes(mlir::RankedTensorType::get(size, type));
      }]>];
-}
-
-def Poptorch_fill_: Poptorch_Op<"fill_", []> {
-    let arguments = (ins Poptorch_tensor:$input, F32Attr:$value);
-
-    let builders = [OpBuilder<(ins "mlir::ValueRange":$values,
-                                      "float":$value),[{
-        $_state.addOperands(values);
-        $_state.addAttribute("value", $_builder.getF32FloatAttr(value));
-     }]>
-    ];
-}
-
-def Poptorch_zero_: Poptorch_Op<"zero_", []> {
-    let arguments = (ins Poptorch_tensor:$input);
 }
 
 def Poptorch_triu: Poptorch_NotImplementedOp<"triu", []> {
@@ -75,13 +38,50 @@ def Poptorch_cast : Poptorch_Op<"cast", []> {
   }]>];
 }
 
-def Poptorch_copy_: Poptorch_Op<"copy_", []> {
-  let arguments = (ins Poptorch_tensor:$self, Poptorch_tensor:$src);
-  let hasCanonicalizer = 1; // See CanonicalizeInplaceCopies.cpp
+def Poptorch_overwrite: Poptorch_BasicOp<"overwrite"> {
+  let summary = "Replaces the contents of `dest` with `src`";
+  let description = [{
+    Replace the contents of `dest` with `src`.
+
+    Note that this does not have value semantics. For tensors with value
+    semantics, it will induce `dest` be replaced with `src` for all subsequent
+    operations and, for view tensors, it will be replace with view-unravelling
+    code.
+
+    We add this instead of changing the pointed to value in the builder to make
+    it easier to unravel view change operations. It also prevents inplace
+    operations from being removed by dead code elimination before they can be
+    resolved.
+  }];
+
+  let arguments = (ins Poptorch_tensor:$dest, Poptorch_tensor:$src);
+  let assemblyFormat = [{
+    `replace` $dest `with` $src attr-dict
+      `:` type($dest) `,` type($src)
+  }];
+
+  let hasCanonicalizeMethod = 1;
 }
 
+def Poptorch_copy_: Poptorch_Op<"copy_", [SameOperandsAndResultShape]> {
+  let arguments = (ins Poptorch_tensor:$self, Poptorch_tensor:$src);
+  let results = (outs Poptorch_tensor:$result);
 
-def Poptorch_print_tensor : Poptorch_Op<"print_tensor", []> {
+  let builders = [OpBuilder<(ins "mlir::Value":$self, "mlir::Value":$src), [{
+    $_state.addOperands({self, src});
+    $_state.addTypes(self.getType());
+  }]>];
+
+  let hasCanonicalizeMethod = 1;
+  let verifier = [{
+    if (self().getType() != src().getType()) {
+        ERROR("The source and destination of an inplace copy must have the same shape and dtype.");
+    }
+    return mlir::success();
+  }];
+}
+
+def Poptorch_print_tensor : Poptorch_Op<"print_tensor", [], MemoryEffects<[MemWrite]>> {
   let arguments = (ins Poptorch_tensor:$input, StrAttr:$title);
 }
 
@@ -306,22 +306,27 @@ def Poptorch_where : Poptorch_Op<"where", [SameOperandsAndResultShape]> {
   }]>];
 }
 
-def Poptorch_zeros_like : Poptorch_Op<"zeros_like", [SameOperandsAndResultShape]> {
+def Poptorch_zeros_like : Poptorch_AbstractOp<"zeros_like", [SameOperandsAndResultShape]> {
   let arguments = (ins Poptorch_tensor:$self, OptionalAttr<TypeAttr>:$dtype);
 
   let results = (outs Poptorch_tensor:$result);
-  let builders = [OpBuilder<(ins "mlir::Value":$self, "std::optional<mlir::Type>":$dtype), [{
-    $_state.addOperands(self);
-    mlir::RankedTensorType tensor = self.getType().cast<mlir::RankedTensorType>();
+  let builders = [
+    OpBuilder<(ins "mlir::Value":$self,
+                   "const std::optional<mlir::Type>&":$dtype), [{
+      $_state.addOperands(self);
+      mlir::RankedTensorType tensor = self.getType().cast<mlir::RankedTensorType>();
 
-    auto out_type = dtype.value_or(tensor.getElementType());
-    $_state.addAttribute("dtype", mlir::TypeAttr::get(out_type));
+      auto out_type = dtype.value_or(tensor.getElementType());
+      $_state.addAttribute("dtype", mlir::TypeAttr::get(out_type));
 
-    $_state.addTypes(mlir::RankedTensorType::get(tensor.getShape(), out_type));
-  }]>];
+      $_state.addTypes(mlir::RankedTensorType::get(tensor.getShape(), out_type));
+    }]>
+  ];
+
+  let hasCanonicalizeMethod = 1;
 }
 
-def Poptorch_full_like : Poptorch_NotImplementedOp<"full_like", [SameOperandsAndResultShape]> {
+def Poptorch_full_like : Poptorch_AbstractOp<"full_like", [SameOperandsAndResultShape]> {
   let arguments = (ins Poptorch_tensor:$self, F32Attr:$fill_value);
 
   let results = (outs Poptorch_tensor:$result);
@@ -331,6 +336,13 @@ def Poptorch_full_like : Poptorch_NotImplementedOp<"full_like", [SameOperandsAnd
 
     $_state.addTypes({self.getType()});
   }]>];
+
+  let hasCanonicalizeMethod = 1;
+}
+
+def Poptorch_full : Poptorch_InternalOp<"full"> {
+  let arguments = (ins F32Attr:$fill_value);
+  let results = (outs Poptorch_tensor:$result);
 }
 
 def Poptorch_one_hot : Poptorch_NotImplementedOp<"one_hot", []> {
@@ -373,7 +385,7 @@ def Poptorch_arange : Poptorch_NotImplementedOp<"arange", []> {
 }
 
 // ones(int[] size, *, ScalarType? dtype=None, Layout? layout=None, Device? device=None, bool? pin_memory=None) -> Tensor
-def Poptorch_ones: Poptorch_NotImplementedOp<"ones", []> {
+def Poptorch_ones: Poptorch_AbstractOp<"ones"> {
   let arguments = (ins I64ArrayAttr:$size,
                        OptionalAttr<TypeAttr>:$dtype);
 
@@ -386,6 +398,8 @@ def Poptorch_ones: Poptorch_NotImplementedOp<"ones", []> {
 
     $_state.addTypes(mlir::RankedTensorType::get(size, out_type));
   }]>];
+
+  let hasCanonicalizeMethod = 1;
 }
 
 def Poptorch_masked_fill_Scalar : Poptorch_NotImplementedOp<"masked_fill_Scalar", []> {

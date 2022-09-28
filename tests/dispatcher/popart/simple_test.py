@@ -116,19 +116,18 @@ def test_source_location(capfd, compiler, mode):
         if mode == "show_all":
             # If we clear the list of exclusions we will point at Torch's internals
             log.assert_matches(
-                "poptorch.transpose.*site-packages/torch/nn/functional.py")
+                "poptorch.addmm.*site-packages/torch/nn/functional.py")
             log.assert_no_matches(
-                f"poptorch.transpose.*{expected_filename}:{expected_line}")
+                f"poptorch.addmm.*{expected_filename}:{expected_line}")
         elif mode == "hide_all":
-            log.assert_matches(
-                r"poptorch.transpose.*\[unknown\]")  # no filename
+            log.assert_matches(r"poptorch.addmm.*\[unknown\]")  # no filename
             log.assert_no_matches(
-                "poptorch.transpose.*site-packages/torch/nn/functional.py")
+                "poptorch.addmm.*site-packages/torch/nn/functional.py")
             log.assert_no_matches(
-                f"poptorch.transpose.*{expected_filename}:{expected_line}")
+                f"poptorch.addmm.*{expected_filename}:{expected_line}")
         else:
             # By default: we point at the user code
             log.assert_no_matches(
-                "poptorch.transpose.*site-packages/torch/nn/functional.py")
+                "poptorch.addmm.*site-packages/torch/nn/functional.py")
             log.assert_matches(
-                f"poptorch.transpose.*{expected_filename}:{expected_line}")
+                f"poptorch.addmm.*{expected_filename}:{expected_line}")

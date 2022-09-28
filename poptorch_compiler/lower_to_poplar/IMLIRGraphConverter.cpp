@@ -90,11 +90,12 @@ void IMLIRGraphConverter::convertGraph(mlir::ModuleOp &module,
                  "Failed to open " << dot_filename << ": " << err.message());
     manager.addPass(mlir::createPrintOpGraphPass(*fd));
   }
+  // Note: we canonicalize before the outplace view ops pass since some views
+  // are implemented in terms of other views
   manager.addPass(mlir::createCanonicalizerPass());
-  // TODO(T61603) Figure out why MLIR's DCE pass doesn't do the same as our
-  // RemoveUnusedOperationsPass.
-  // manager.addPass(mlir::createSymbolDCEPass());
-  manager.addPass(createRemoveUnusedOperationsPass());
+  addOverwriteHandlingPasses(manager);
+  manager.addPass(mlir::createCanonicalizerPass());
+  manager.addPass(mlir::createCSEPass());
   addCustomPasses(manager);
 
   ERROR_ON_MSG(!mlir::succeeded(manager.run(module)),

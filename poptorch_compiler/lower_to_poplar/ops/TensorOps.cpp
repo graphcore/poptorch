@@ -18,10 +18,6 @@
 
 namespace poptorch_ir {
 
-void alias::lowerToPoplar(CompilerContext &context) {
-  context.addTensor(this->result(), context.fromSsa(this->input()));
-}
-
 void print_tensor::lowerToPoplar(CompilerContext &context) {
   poplar::Tensor tensor = context.fromSsa(this->input());
   context.seq.add(poplar::program::PrintTensor(this->title().str(), tensor));
@@ -30,13 +26,6 @@ void print_tensor::lowerToPoplar(CompilerContext &context) {
 void empty_tensor::lowerToPoplar(CompilerContext &context) {
   // Just add the result to the SSA and allocate it if it doesn't exist.
   context.fromSsa(this->result());
-}
-
-void fill_::lowerToPoplar(CompilerContext &context) {
-  poplar::Tensor in = context.fromSsa(this->input());
-  float value = this->value().convertToFloat();
-
-  popops::fill(context.graph, in, context.seq, value);
 }
 
 void cast::lowerToPoplar(CompilerContext &context) {
@@ -50,25 +39,26 @@ void cast::lowerToPoplar(CompilerContext &context) {
 void copy_::lowerToPoplar(CompilerContext &context) {
   poplar::Tensor self = context.fromSsa(this->self());
   poplar::Tensor src = context.fromSsa(this->src());
-  context.seq.add(poplar::program::Copy(src, self));
+
+  // Note the current way view operations are implemented in lower to poplar can
+  // lead to copy_ operations called with the same src and dest
+  if (self != src) {
+    context.seq.add(poplar::program::Copy(src, self));
+  }
+
+  context.addTensor(this->result(), self);
 }
 
-void zero_::lowerToPoplar(CompilerContext &context) {
-  poplar::Tensor input = context.fromSsa(this->input());
-  popops::zero(context.graph, input, context.seq);
-}
-
-// TODO(T65711): replace this with torch.zeros in a canonicalization pass so we
-// can remove the implicit dependence on the input
-void zeros_like::lowerToPoplar(CompilerContext &context) {
+void full::lowerToPoplar(CompilerContext &context) {
   const auto out_tensor_type =
       this->result().getType().cast<mlir::RankedTensorType>();
   const auto out_shape = out_tensor_type.getShape();
   const auto out_type =
       CompilerContext::poplarTypeOf(out_tensor_type.getElementType());
+  const auto value = fill_value().convertToFloat();
 
   const auto out = createConstant(context, out_type,
-                                  {out_shape.begin(), out_shape.end()}, false);
+                                  {out_shape.begin(), out_shape.end()}, value);
   context.addTensor(this->result(), out);
 }
 

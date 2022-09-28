@@ -1,6 +1,9 @@
 // Copyright (c) 2021 Graphcore Ltd. All rights reserved.
 #include "MLIRStaticGraphCompiler.hpp"
 
+#include <mlir/Dialect/MemRef/IR/MemRef.h>
+#include <mlir/IR/BuiltinTypes.h>
+
 #include <string>
 
 #include "IMLIRCompiler.hpp"
@@ -35,32 +38,47 @@ MLIRStaticGraphCompiler::compile(const PoplarTarget &target) {
 TensorId MLIRStaticGraphCompiler::addInput(const Buffer &ptr,
                                            const mlir::RankedTensorType &input,
                                            const char *name) {
-  // Add the argument to the graph args.
-  mlir::Value val = addArgumentToMainGraph(input);
-
   // Add the argument to the function args.
-  createOp<poptorch_ir::copy_from_host>(val, name);
+  auto val = createOp<poptorch_ir::copy_from_host>(input, name);
   input_callbacks.push_back({name, ptr});
   return addValue(val);
 }
 
-TensorId
-MLIRStaticGraphCompiler::addParameter(const Buffer &ptr,
-                                      const mlir::RankedTensorType &parameter,
-                                      const char *name) {
+TensorId MLIRStaticGraphCompiler::addParameter(
+    const Buffer &ptr, const mlir::RankedTensorType &parameter_type,
+    const char *name) {
+  auto memref_type = mlir::MemRefType::get(parameter_type.getShape(),
+                                           parameter_type.getElementType());
   // Add the argument to the graph args.
-  mlir::Value val = addArgumentToMainGraph(parameter);
+  addGlobalState(name, memref_type);
 
   // Write weights to the graph.
-  createOp<poptorch_ir::copy_from_host>(_write_weights_graph, val,
-                                        "Write-" + std::string(name));
+  {
+    auto from_host_val =
+        createOp<poptorch_ir::copy_from_host>(
+            _write_weights_graph, parameter_type, "Write-" + std::string(name))
+            .result();
+    createOp<poptorch_ir::copy_to_global_state>(_write_weights_graph,
+                                                from_host_val, name);
+  }
 
   // Read weights from the graph.
-  createOp<poptorch_ir::copy_to_host>(_read_weights_graph, val,
-                                      "Read-" + std::string(name));
+  {
+    auto to_host_val = createOp<copy_from_global_state>(_read_weights_graph,
+                                                        parameter_type, name)
+                           .tensor();
+    createOp<poptorch_ir::copy_to_host>(_read_weights_graph, to_host_val,
+                                        "Read-" + std::string(name));
+  }
 
   weight_callbacks.push_back({name, ptr});
-  return addValue(val);
+
+  // Read global state from the main graph
+  auto main_val =
+      createOp<copy_from_global_state>(_main_graph, parameter_type, name)
+          .tensor();
+  createOpInEpilogue<copy_to_global_state>(_main_graph, main_val, name);
+  return addValue(main_val);
 }
 
 void MLIRStaticGraphCompiler::addOutput(void *ptr, TensorId id,
@@ -71,8 +89,9 @@ void MLIRStaticGraphCompiler::addOutput(void *ptr, TensorId id,
 }
 
 void MLIRStaticGraphCompiler::addReturn() {
-  createOp<poptorch_ir::end_graph>(_write_weights_graph);
-  createOp<poptorch_ir::end_graph>(_read_weights_graph);
+  createOpInEpilogue<poptorch_ir::end_graph>(_main_graph);
+  createOpInEpilogue<poptorch_ir::end_graph>(_write_weights_graph);
+  createOpInEpilogue<poptorch_ir::end_graph>(_read_weights_graph);
 }
 
 } // namespace detail

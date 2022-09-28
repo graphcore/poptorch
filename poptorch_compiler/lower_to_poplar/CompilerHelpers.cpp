@@ -1,5 +1,6 @@
 // Copyright (c) 2022 Graphcore Ltd. All rights reserved.
 
+#include <mlir/IR/BuiltinTypes.h>
 #include <model_runtime/DeviceManager.hpp>
 
 #include <poplin/codelets.hpp>
@@ -163,6 +164,37 @@ void CompilerContext::addTensor(const mlir::Value &value,
   }
 }
 
+void CompilerContext::addTensor(std::string_view symbol_name,
+                                const poplar::Tensor &tensor,
+                                bool update_if_present) {
+  if (update_if_present) {
+    _global_tensors[std::string(symbol_name)] = tensor;
+  } else {
+    auto res = _global_tensors.insert({std::string(symbol_name), tensor});
+    ERROR_ON_MSG(!res.second,
+                 "[Internal] Tensor already present for " << symbol_name);
+  }
+}
+
+// Get the poplar tensor which corresponds to a specific value of MLIR.
+poplar::Tensor CompilerContext::fromSymbol(std::string_view symbol_name,
+                                           mlir::Type type) {
+  auto itr = _global_tensors.find(std::string(symbol_name));
+  if (itr != _global_tensors.end()) {
+    return itr->second;
+  }
+
+  const PoplarTypePair tensor_type = processType(type);
+
+  // Actually add the tensor to the graph.
+  poplar::Tensor tensor =
+      this->graph.addVariable(tensor_type.element_type, tensor_type.shape,
+                              poplar::VariableMappingMethod::LINEAR);
+
+  addTensor(symbol_name, tensor);
+  return tensor;
+}
+
 // Get the poplar tensor which corresponds to a specific value of MLIR.
 poplar::Tensor CompilerContext::fromSsa(mlir::Value value) {
   auto itr = _tensors.find(value);
@@ -204,4 +236,5 @@ poplar::Tensor &CompilerContext::getRandomSeed() {
   return *_randomSeed;
 }
 
+void CompilerContext::clearLocalData() { _tensors.clear(); }
 } // namespace poptorch_ir

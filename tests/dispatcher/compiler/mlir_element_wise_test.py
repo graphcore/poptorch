@@ -203,6 +203,9 @@ def test_unary(op, input):
     if op in (torch.asinh, torch.log1p) and torch.any(torch.isinf(input)):
         pytest.skip("TODO(T62888) `-inf` -> `nan`")
 
+    if op is torch.square and input.dtype is torch.bool:
+        pytest.skip("TODO(T68511) handle scalar attributes")
+
     torch.manual_seed(42)
     op_harness(op, input)
 

@@ -86,8 +86,9 @@ bitwiseNot_::canonicalize(bitwiseNot_ op, ::mlir::PatternRewriter &rewriter) {
   if (in_element_type.isInteger(1)) {
     auto empty =
         rewriter.create<empty_tensor>(op.getLoc(), out_shape, in_element_type);
-    rewriter.create<copy_>(op.getLoc(), empty.getResult(), op.getOperand());
-    op.getResult().replaceAllUsesWith(empty.getResult());
+    auto copy =
+        rewriter.create<copy_>(op.getLoc(), empty.getResult(), op.getOperand());
+    op.getResult().replaceAllUsesWith(copy.result());
 
     return mlir::success();
   }

@@ -85,12 +85,12 @@ void ValueMapper::addTensor(const at::Tensor &t, torch::jit::Value *val) {
   // value being tracked. Otherwise we insert and add the jit value.
   auto new_details = getTensorDetails(*t.unsafeGetTensorImpl());
   new_details->mapper = this;
-  auto itr = tensors.insert({new_details.get(), TrackedTensor{t}});
-  itr.first->second.jit = val;
-  ERROR_ON(itr.first->second.tensor_details != new_details);
+  auto itr = tensors.insert({new_details.get(), TrackedTensor{t}}).first;
+  itr->second.jit = val;
+  ERROR_ON(itr->second.tensor_details != new_details);
 
   // Ensure we maintain a lookup of torch::jit to pytorch tensor.
-  values_map.insert({val, &itr.first->second});
+  values_map.insert({val, &itr->second});
 
   _ids_tensors_map.insert({getIpuTensorId(t), new_details.get()});
 }
@@ -110,9 +110,10 @@ void ValueMapper::aliasTensor(
     const std::shared_ptr<IpuTensorDetails> &src_details) {
   auto itr = tensors.find(src_details.get());
   ERROR_ON_MSG(itr == tensors.end(), "Could not find source tensor");
-  auto itr_new = tensors.insert_or_assign(dest_details.get(), itr->second);
-  itr_new.first->second.tensor_details = dest_details;
-  itr_new.first->second.ipu_tensor_id = dest_tensor_id;
+  auto itr_new =
+      tensors.insert_or_assign(dest_details.get(), itr->second).first;
+  itr_new->second.tensor_details = dest_details;
+  itr_new->second.ipu_tensor_id = dest_tensor_id;
 }
 
 void ValueMapper::aliasTensor(IpuTensorDetails *dest_details,

@@ -329,7 +329,13 @@ void MLIRDispatch::markStep() { _compiler.compileRunAndReset(); }
 
 const at::Tensor &MLIRDispatch::copyInplace(const at::Tensor &self,
                                             const at::Tensor &src) {
-  _compiler.copy_(findTensor(self), findTensor(src));
+  auto mlir_output = _compiler.copy_(findTensor(self), findTensor(src));
+
+  std::vector<bool> requires_grad;
+  requires_grad = requiresGrad(mlir_output[0].requires_grad_types,
+                               self.requires_grad() || src.requires_grad());
+
+  outputIsInplaceOf(mlir_output[0].tensor_ids[0], self, requires_grad[0]);
 
   return self;
 }
@@ -592,8 +598,34 @@ MLIRDispatch::outputIsInplaceOf(poptorch_ir::OptionalTensorId output_id,
   ERROR_ON(output_id == poptorch_ir::none_id ||
            output_id == poptorch_ir::tensor_error_id);
 
-  poptorch_ir::TensorId actual_output = findTensor(original_input);
-  _compiler.copy_(actual_output, output_id);
+  if (_compiler.isView(output_id)) {
+    // If the source of the output is a view operation, all subsequent
+    // references to the original input should be replaced by the view. Note
+    // that view operations will change the shape of the original tensor so we
+    // can't rely on the overwrite op.
+    //
+    // This handles cases like:
+    //  def f(x):
+    //    y = x + 1
+    //    x.select_(...)
+    //    z = x + 1
+    // If we inserted an overwrite op in the to handle `select_`, we would have
+    // no globally consistent shape for x. Instead this is lowered to
+    //  func f(%x) {
+    //    %y = add(%x, 1)
+    //    %0 = select(%x, ...)
+    //    %z = add(%0, 1)
+    //  }
+    // This isn't an issue for handling view operations since the original view
+    // of x cannot be referenced after the inplace operation
+    _mapper.addTensor(original_input, output_id);
+  } else {
+    // Instead of replacing all subsequent references to the original input with
+    // the tensor we add an overwrite operation (which will cause the input to
+    // be replaced later) this makes implementing the view operations easier
+    poptorch_ir::TensorId replaced_id = findTensor(original_input);
+    _compiler.overwrite(replaced_id, output_id);
+  }
   const std::vector<std::int64_t> shape = _compiler.getSize(output_id);
   original_input.unsafeGetTensorImpl()->set_sizes_contiguous(shape);
 
@@ -611,19 +643,6 @@ std::vector<at::Tensor> MLIRDispatch::outputIsInplaceOfList(
   for (size_t i = 0; i < output_id.size(); i++) {
     outputIsInplaceOf(output_id[i], original_input[i], requires_grad[i]);
   }
-  return original_input;
-}
-
-at::Tensor MLIRDispatch::outputInplaceReshape(poptorch_ir::TensorId output_id,
-                                              const at::Tensor &original_input,
-                                              bool requires_grad) {
-  const std::vector<std::int64_t> shape = _compiler.getSize(output_id);
-  original_input.unsafeGetTensorImpl()->set_sizes_contiguous(shape);
-
-  // (Assume the original input was floating-point if requires_grad)
-  original_input.unsafeGetTensorImpl()->set_requires_grad(requires_grad);
-
-  _mapper.addTensor(original_input, output_id);
   return original_input;
 }
 

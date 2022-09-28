@@ -110,6 +110,74 @@ def test_weights_to_host(capfd):
                             expected=y)
 
 
+@pytest.mark.mlirSupportRequired
+def test_weights_to_device():
+    param = torch.tensor(1, dtype=torch.int, device='xla')
+    x = torch.tensor(3, dtype=torch.int, device='xla')
+
+    @ipu_wrapper
+    def f(x):
+        nonlocal param
+        param *= 2
+        return x + param
+
+    y = f(x).to('cpu')
+
+    assert y.item() == 5
+    assert param.to('cpu').item() == 2
+
+
+@pytest.mark.mlirSupportRequired
+def test_changing_parameters_on_host():
+    pytest.skip("TODO(T69899): Parameters currently aren't reuploaded to the "
+                "device if they have been changed on the host")
+    param = torch.tensor(1, dtype=torch.int, device='xla')
+    x = torch.tensor(3, dtype=torch.int, device='xla')
+
+    @ipu_wrapper
+    def f(x):
+        nonlocal param
+        param *= 2
+        return x + param
+
+    f(x).to('cpu')
+    assert param.to('cpu').item() == 2
+
+    param = torch.tensor(3.0, dtype=torch.int, device='xla')
+    f(x).to('cpu')
+    assert param.to('cpu').item() == 6
+
+
+@pytest.mark.mlirSupportRequired
+def test_changing_parameters_on_device():
+    pytest.skip("TODO(T69899): RegisterAtenOverloads.cpp:211: "
+                "'poptorch_cpp_error': !getHostBuffer(*impl)")
+
+    param = torch.tensor(1, dtype=torch.int, device='xla')
+    x = torch.tensor(3, dtype=torch.int, device='xla')
+
+    @ipu_wrapper
+    def f(x):
+        nonlocal param
+        param *= 2
+        return x + param
+
+    @ipu_wrapper
+    def g(x):
+        nonlocal param
+        param = torch.tensor(3, dtype=torch.int, device=param.device)
+        return param + x
+
+    f(x).to('cpu')
+    assert param.to('cpu').item() == 2
+
+    g(x)
+    assert param.to('cpu').item() == 3
+
+    f(x).to('cpu')
+    assert param.to('cpu').item() == 6
+
+
 @helpers.overridePoptorchLogLevel("TRACE")
 @pytest.mark.mlirSupportRequired
 def test_weights_to_host_after_switch(capfd):

@@ -102,7 +102,7 @@ void PoptorchCompiler::dump() { _impl->dump(); }
 bool PoptorchCompiler::isView(poptorch_ir::TensorId id) const {
   mlir::Operation *op = _impl->findValue(id).getDefiningOp();
 
-  return op->hasTrait<mlir::OpTrait::ViewOp>();
+  return op != nullptr && op->hasTrait<mlir::OpTrait::ViewOp>();
 }
 
 std::vector<std::int64_t> PoptorchCompiler::getSize(TensorId id) const {
@@ -122,7 +122,6 @@ PoptorchCompiler::getRankedTensorType(TensorId id) const {
 
 void PoptorchCompiler::addReturn() {
   // Add returns to each of the graphs.
-  _impl->createOp<poptorch_ir::end_graph>();
   _impl->addReturn();
 }
 

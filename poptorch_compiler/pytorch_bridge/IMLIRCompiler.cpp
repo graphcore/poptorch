@@ -1,6 +1,9 @@
 // Copyright (c) 2021 Graphcore Ltd. All rights reserved.
 #include "IMLIRCompiler.hpp"
 
+#include <mlir/IR/BuiltinAttributes.h>
+#include <mlir/IR/BuiltinTypes.h>
+
 #include <deque>
 #include <string>
 #include <vector>
@@ -77,6 +80,14 @@ IMLIRCompiler::IMLIRCompiler(const poptorch::CompilerOptions &options)
   resetMainGraph();
 }
 
+void IMLIRCompiler::addGlobalState(std::string_view name,
+                                   mlir::MemRefType argType) {
+  _builder.setInsertionPointToEnd(&_the_module->getRegion(0).front());
+  _builder.create<global_tensor_op>(
+      /*sym_name=*/name,
+      /*type=*/argType);
+}
+
 mlir::Value IMLIRCompiler::addArgument(mlir::FuncOp func, mlir::Type argType) {
   // Add the argument to the region.
   const auto insert_pos = func.getNumArguments();
@@ -137,14 +148,7 @@ void IMLIRCompiler::updateTensor(TensorId id, mlir::Value new_value) {
 
 void IMLIRCompiler::resetMainGraph() {
   _the_module = mlir::ModuleOp::create(_builder.getLoc());
-  // We represent our graph as a simple function.
-  auto func_type = _builder.getFunctionType({}, llvm::None);
-  _main_graph.graph = _builder.create<mlir::FuncOp>("MainGraph", func_type);
-  _the_module.push_back(_main_graph.graph);
-
-  // Add an entry block.
-  _main_graph.graph.addEntryBlock();
-  _main_graph.all_ops_can_be_lowered = true;
+  _main_graph = createSubGraph("MainGraph");
 
   // Invalidate all the values but do not clear the map:
   // the tensor IDs are still valid
@@ -169,10 +173,11 @@ bool IMLIRCompiler::allOpsCanBeLoweredToPoplar() const {
 }
 
 IMLIRCompiler::Graph IMLIRCompiler::createSubGraph(const std::string &name) {
-  Graph sub;
   auto func_type = _builder.getFunctionType({}, llvm::None);
-  sub.graph = createOp<mlir::FuncOp>(name, func_type);
-  sub.graph.addEntryBlock();
+
+  _builder.setInsertionPointToEnd(&_the_module->getRegion(0).front());
+  Graph sub(_builder.create<mlir::FuncOp>(name, func_type));
+
   return sub;
 }
 

@@ -406,7 +406,7 @@ class Poptorch_elem_binary_scalar<string name, list<OpTrait> traits = []>
     ];
 }
 
-def Poptorch_pow_Tensor_Scalar_out: Poptorch_elem_binary_scalar<"pow_Tensor_Scalar_out", [ImplicitCastOperand<0>, ImplicitCastToFloat]> {}
+def Poptorch_pow_Tensor_Scalar_out: Poptorch_elem_binary_scalar<"pow_Tensor_Scalar_out"> {}
 
 class Poptorch_binary_conditional<string name, list<OpTrait> traits = []>
         : Poptorch_Op<name, traits # [ImplicitCastOperand<0>, ImplicitCastOperand<1>]> {

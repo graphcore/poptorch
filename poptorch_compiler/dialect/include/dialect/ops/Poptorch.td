@@ -1,7 +1,7 @@
 // Copyright (c) 2021 Graphcore Ltd. All rights reserved.
 
 // ipu_print_tensor(Tensor self, str? title) -> Tensor
-def Poptorch_ipu_print_tensor : Poptorch_NotImplementedOp<"ipu_print_tensor", []> {
+def Poptorch_ipu_print_tensor : Poptorch_BasicOp<"ipu_print_tensor", [NotImplementedOp, MemoryEffects<[MemRead, MemWrite]>]> {
   let arguments = (ins Poptorch_tensor:$self,
                        OptionalAttr<StrAttr>:$title);
   let results = (outs Poptorch_tensor:$result);
@@ -88,7 +88,7 @@ def Poptorch_internal_cast : Poptorch_NotImplementedOp<"internal_cast", []> {
 }
 
 // custom_operation(Tensor[] inputs, str name, str domain, int domain_version, int num_outputs, Tensor(a!)[] outputs, str attributes) -> Tensor(a!)[]
-def Poptorch_custom_operation : Poptorch_NotImplementedOp<"custom_operation", [AttrSizedOperandSegments]> {
+def Poptorch_custom_operation : Poptorch_BasicOp<"custom_operation", [NotImplementedOp, AttrSizedOperandSegments, MemoryEffects<[MemRead]>]> {
   let arguments = (ins Poptorch_tensorlist:$inputs,
                        StrAttr:$name,
                        StrAttr:$domain,

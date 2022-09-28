@@ -9,7 +9,20 @@
 
 namespace poptorch_ir {
 
-void view::lowerToPoplar(CompilerContext &context) {
+void permuteOutplace::lowerToPoplar(poptorch_ir::CompilerContext &context) {
+  poplar::Tensor in = context.fromSsa(this->input());
+
+  auto permutation = convertIntArray<std::uint32_t>(this->dims());
+
+  poplar::Tensor view = in.dimShuffle(permutation);
+
+  context.addTensor(this->view(), view);
+}
+
+void viewOutplace::lowerToPoplar(CompilerContext &context) {
+  // Note: despite the name this currently creates an inplace view. This is
+  // because the current builder code can never produce a view which cannot be
+  // inplaced in this way.
   poplar::Tensor in = context.fromSsa(this->input());
 
   std::vector<std::size_t> new_shape =
@@ -21,68 +34,27 @@ void view::lowerToPoplar(CompilerContext &context) {
   context.addTensor(result(), in);
 }
 
-void squeezeCommon(poplar::Tensor &tensor,
-                   const std::vector<std::size_t> &dims) {
-  std::vector<std::size_t> squeeze_dims;
-  for (auto dim : dims) {
-    if (tensor.shape()[dim] == 1) {
-      squeeze_dims.push_back(dim);
+void expandOutplace::lowerToPoplar(CompilerContext &context) {
+  poplar::Tensor in = context.fromSsa(this->input());
+
+  // The new rank.
+  const std::size_t new_rank = this->shape().size();
+
+  // Add new dims which while we are still smaller than the new tensor.
+  while (in.rank() < new_rank) {
+    in = in.expand({0});
+  }
+
+  for (std::size_t dim = 0; dim < new_rank; ++dim) {
+    const std::uint64_t new_dim_int =
+        this->shape()[dim].cast<mlir::IntegerAttr>().getUInt();
+
+    // Broadcast dim `new_dim_int` times.
+    if (in.shape()[dim] != new_dim_int) {
+      in = in.broadcast(new_dim_int, dim);
     }
   }
-  tensor = tensor.squeeze(squeeze_dims);
-}
 
-void squeeze::lowerToPoplar(CompilerContext &context) {
-  poplar::Tensor in = context.fromSsa(this->input());
-
-  std::vector<std::size_t> dims(in.shape().size());
-  std::iota(dims.begin(), dims.end(), 0);
-
-  squeezeCommon(in, dims);
-  context.addTensor(result(), in);
-}
-
-void squeeze_::lowerToPoplar(CompilerContext &context) {
-  poplar::Tensor in = context.fromSsa(this->input());
-
-  std::vector<std::size_t> dims(in.shape().size());
-  std::iota(dims.begin(), dims.end(), 0);
-
-  squeezeCommon(in, dims);
-  context.addTensor(result(), in);
-}
-
-void squeeze_dim::lowerToPoplar(CompilerContext &context) {
-  poplar::Tensor in = context.fromSsa(this->input());
-  auto dim = this->dim();
-
-  squeezeCommon(in, {dim});
-  context.addTensor(result(), in);
-}
-
-void squeeze_dim_::lowerToPoplar(CompilerContext &context) {
-  poplar::Tensor in = context.fromSsa(this->input());
-  auto dim = this->dim();
-
-  squeezeCommon(in, {dim});
-  context.addTensor(result(), in);
-}
-
-void unsqueeze::lowerToPoplar(CompilerContext &context) {
-  poplar::Tensor in = context.fromSsa(this->input());
-
-  std::int64_t dim = this->dim();
-
-  if (dim < 0) {
-    // "Negative dim will correspond to unsqueeze() applied at
-    // dim = dim + input.dim() + 1."
-    // Source:
-    // https://pytorch.org/docs/stable/generated/torch.unsqueeze.html
-    dim += in.rank() + 1;
-  }
-  auto shape = in.shape();
-  shape.insert(shape.begin() + dim, 1);
-  in = in.reshape(shape);
   context.addTensor(result(), in);
 }
 
@@ -105,102 +77,48 @@ void repeat::lowerToPoplar(CompilerContext &context) {
   context.addTensor(result(), in);
 }
 
-void expand::lowerToPoplar(CompilerContext &context) {
-  poplar::Tensor in = context.fromSsa(this->input());
-
-  // The new rank.
-  const std::size_t new_rank = this->shape().size();
-
-  // Add new dims which we are still smaller than the new tensor.
-  while (in.rank() < new_rank) {
-    in = in.expand({0});
+namespace {
+poplar::Tensor performSlice(const poplar::Tensor &in, int64_t dim,
+                            int64_t start, int64_t end, int64_t stride) {
+  poplar::Tensor res = in.slice(start, end, dim);
+  if (std::abs(stride) != 1) {
+    res = res.subSample(std::abs(stride), dim);
+  }
+  if (stride < 0) {
+    res = res.reverse(dim);
   }
 
-  for (std::size_t dim = 0; dim < new_rank; ++dim) {
-    const std::uint64_t new_dim_int =
-        this->shape()[dim].cast<mlir::IntegerAttr>().getUInt();
-
-    // Broadcast dim `new_dim_int` times.
-    if (in.shape()[dim] != new_dim_int) {
-      in = in.broadcast(new_dim_int, dim);
-    }
-  }
-
-  context.addTensor(result(), in);
+  return res;
 }
+} // namespace
 
-void as_strided::lowerToPoplar(CompilerContext &context) {
-  poplar::Tensor in = context.fromSsa(this->input());
-
-  // Lets ignore the stride for now.
-  /*std::uint32_t dim = 0;
-  // Stride if needed.
-  for (mlir::Attribute stride : strides()) {
-    const std::uint64_t as_int = stride.cast<mlir::IntegerAttr>().getUInt();
-
-    // Not correct.
-    if (as_int > 1) {
-      in = in.subSample(as_int, dim++);
-    }
-  }*/
-
-  std::vector<std::size_t> new_shape =
-      convertIntArray<std::size_t>(this->size());
-  in = in.reshape(new_shape);
-
-  context.addTensor(result(), in);
-}
-
-void transpose::lowerToPoplar(CompilerContext &context) {
-  poplar::Tensor in = context.fromSsa(this->input());
-  const std::int64_t dim0 = this->dim0();
-  const std::int64_t dim1 = this->dim1();
-
-  // Get 0....N where N is the last dimension index.
-  std::vector<std::uint32_t> permutation(in.rank());
-  std::iota(permutation.begin(), permutation.end(), 0);
-
-  // Swap them.
-  std::swap(permutation[dim0], permutation[dim1]);
-
-  poplar::Tensor view = in.dimShuffle(permutation);
-
-  context.addTensor(result(), view);
-}
-
-void select::lowerToPoplar(CompilerContext &context) {
-  const poplar::Tensor self = context.fromSsa(this->self());
+void sliceOutplace::lowerToPoplar(CompilerContext &context) {
+  const poplar::Tensor in = context.fromSsa(this->input());
   const int64_t dim = this->dim();
-  const int64_t idx = this->idx();
+  const int64_t start = this->start().getValue();
+  const int64_t end = this->end().getValue();
+  const int64_t step = this->step();
 
-  poplar::Tensor res = self.slice(idx, idx + 1, dim);
-
-  // The Poplar slice doesn't remove the selected dimension
-  // from the shape, whereas Torch select expects it to be
-  // removed, this is handled properly in the MLIR shape
-  // inference so just resize to the MLIR shape instead of
-  // duplicating the logic.
-  res = reshapeToMLIRShape(res, this->result().getType());
-
-  context.addTensor(this->result(), res);
+  context.addTensor(this->result(), performSlice(in, dim, start, end, step));
 }
 
-void slice_Tensor::lowerToPoplar(CompilerContext &context) {
-  const poplar::Tensor self = context.fromSsa(this->self());
-  int64_t dim = this->dim();
-  auto start_optional = this->start();
-  auto end_optional = this->end();
-  int64_t step = this->step();
+void sliceInverse::lowerToPoplar(CompilerContext &context) {
+  const poplar::Tensor adapted_view = context.fromSsa(this->view());
+  const poplar::Tensor in = context.fromSsa(this->input());
+  const int64_t dim = this->dim();
+  const int64_t start = this->start().getValue();
+  const int64_t end = this->end().getValue();
+  const int64_t step = this->step();
 
-  int64_t start = start_optional.hasValue() ? start_optional.getValue() : 0;
-  int64_t end =
-      end_optional.hasValue() ? end_optional.getValue() : self.shape()[dim];
-  auto sliced = self.slice(start, end, dim);
-  if (step == 1) {
-    context.addTensor(this->result(), sliced);
-    return;
+  // Note that slice has reference semantics
+  auto slice = performSlice(in, dim, start, end, step);
+  // For nested slices slice and adapted_view may be the same slice. In this
+  // case we don't need to do anything
+  if (slice != adapted_view) {
+    context.seq.add(poplar::program::Copy(adapted_view, slice));
   }
-  context.addTensor(this->result(), sliced.subSample(step, dim));
+
+  context.addTensor(result(), in);
 }
 
 } // namespace poptorch_ir

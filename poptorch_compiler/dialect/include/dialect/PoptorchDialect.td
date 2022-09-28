@@ -4,6 +4,7 @@
 #define POPTORCH_IR_DIALECT
 
 include "mlir/IR/OpBase.td"
+include "mlir/Interfaces/SideEffectInterfaces.td"
 include "PoptorchInterfaces.td"
 
 def Poptorch_Dialect : Dialect {
@@ -34,17 +35,39 @@ def ImplicitCastToBool : NativeOpTrait<"ImplicitCastToBool">;
 def ImplicitCastToFloat : NativeOpTrait<"ImplicitCastToFloat">;
 
 // All operations coming through the dispatcher's fallback should inherit
-// from either Poptorch_Op if they can be lowered to Poplar or
-// Poptorch_NotImplementedOp if they cannot.
-class Poptorch_Op<string mnemonic, list<OpTrait> traits = []> :
-        Op<Poptorch_Dialect, mnemonic, traits # [DeclareOpInterfaceMethods<Poptorch_PoplarImplInterface>]>;
-
-class Poptorch_NotImplementedOp<string mnemonic, list<OpTrait> traits = []> :
-        Op<Poptorch_Dialect, mnemonic, traits # [NotImplementedOp]>;
-
-class Poptorch_AbstractOp<string mnemonic, list<OpTrait> traits = []> :
+// from Poptorch_BasicOp. The following classes are provided for convenience:
+// * Poptorch_Op for ops that can be lowered to Poplar directly,
+// * Poptorch_ViewOp for view operations which may be lowered (alternatively
+//   you may use a pass to convert a Poptorch_AbstractOp with the ViewOp trait
+//   to a Poptorch_ViewOp)
+// * Poptorch_NotImplementedOp for ops that cannot currently be lowered to
+//   poplar, or
+// * Potorch_AbstractOp for ops that will be lower using other passes
+class Poptorch_BasicOp<string mnemonic, list<OpTrait> traits = []> :
         Op<Poptorch_Dialect, mnemonic, traits>;
 
+class Poptorch_Op<string mnemonic, list<OpTrait> traits = [], MemoryEffects memory_effect = NoSideEffect> :
+        Poptorch_BasicOp<mnemonic, traits # [DeclareOpInterfaceMethods<Poptorch_PoplarImplInterface>, memory_effect]>;
+
+class Poptorch_NotImplementedOp<string mnemonic, list<OpTrait> traits = [], MemoryEffects memory_effect = NoSideEffect> : Poptorch_BasicOp<mnemonic, traits # [NotImplementedOp, memory_effect]>;
+
+class Poptorch_AbstractOp<string mnemonic, list<OpTrait> traits = [], MemoryEffects memory_effect = NoSideEffect> :
+        Poptorch_BasicOp<mnemonic, traits # [memory_effect]>;
+
+// Internal ops are created from poptorch dialect passes but cannot be built directly
+class Poptorch_InternalOp<string mnemonic, list<OpTrait> traits = [], MemoryEffects memory_effect = NoSideEffect> :
+        Op<Poptorch_Dialect, mnemonic, traits # [DeclareOpInterfaceMethods<Poptorch_PoplarImplInterface>, memory_effect]>;
+
+class Poptorch_AbstractInternalOp<string mnemonic, list<OpTrait> traits = [], MemoryEffects memory_effect = NoSideEffect> :
+        Op<Poptorch_Dialect, mnemonic, traits # [memory_effect]>;
+
+class Poptorch_ViewOp<string mnemonic, string outplaceTypeName, string inverseTypeName, list<OpTrait> traits = []>
+    : Poptorch_AbstractOp<mnemonic, traits # [Poptorch_ViewInterface, ViewOp]> {
+  let extraClassDeclaration = [{
+    using OutplaceOp = }] # outplaceTypeName # [{;
+    using InverseOp = }] # inverseTypeName # [{;
+  }];
+}
 
 def valid_ints : SignedIntOfWidths<[8, 16, 32]>;
 def valid_uints : UnsignedIntOfWidths<[8]>;

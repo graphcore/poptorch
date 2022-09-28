@@ -23,16 +23,6 @@ namespace poptorch_ir {
 
 namespace detail {
 
-// Convert any MLIR object to string.
-template <typename T> std::string mlirToStr(const T &obj) {
-  std::string str;
-  {
-    llvm::raw_string_ostream ostream(str);
-    ostream << obj;
-  }
-  return str;
-}
-
 // Returns the element type of an MLIR value.
 mlir::Type getElementType(const mlir::Value &value);
 
@@ -154,7 +144,7 @@ mlir::Type getCastToType(mlir::MLIRContext &context, const Args &...args) {
 // forward element.
 template <typename OpTy, std::size_t Ind, typename Elt>
 struct CastAndForwardElt {
-  static auto f(mlir::ImplicitLocOpBuilder &builder, mlir::FuncOp &main_graph,
+  static auto f(mlir::ImplicitLocOpBuilder &builder,
                 const mlir::Type &promote_to, Elt &&element) {
     if constexpr (implicitCastsOn<OpTy, Ind>()) {
       static_assert(
@@ -173,7 +163,6 @@ struct CastAndForwardElt {
         // updating the operand to the promoted output.
         // (poptorch_ir::cast is an automatically generated mlir::Op subclass.)
         auto casted = builder.create<poptorch_ir::cast>(element, promote_to);
-        main_graph.front().push_back(casted);
         return casted.result();
       }
     }
@@ -185,14 +174,14 @@ struct CastAndForwardElt {
 
 template <typename OpTy, std::size_t Ind>
 struct CastAndForwardElt<OpTy, Ind, llvm::SmallVector<mlir::Value, 4> &> {
-  static auto f(mlir::ImplicitLocOpBuilder &builder, mlir::FuncOp &main_graph,
+  static auto f(mlir::ImplicitLocOpBuilder &builder,
                 const mlir::Type &promote_to,
                 llvm::SmallVector<mlir::Value, 4> element) {
     if constexpr (implicitCastsOn<OpTy, Ind>()) {
       llvm::SmallVector<mlir::Value, 4> result;
       for (size_t i = 0; i < element.size(); i++) {
         result.emplace_back(CastAndForwardElt<OpTy, Ind, mlir::Value &>::f(
-            builder, main_graph, promote_to, element[i]));
+            builder, promote_to, element[i]));
       }
       return result;
     }
@@ -219,7 +208,7 @@ struct CastAndForwardElt<OpTy, Ind, llvm::SmallVector<mlir::Value, 4> &> {
 // }
 template <typename OpTy, typename... Args, std::size_t... Inds>
 auto castAndForwardImpl(mlir::ImplicitLocOpBuilder &builder,
-                        mlir::FuncOp &main_graph, const mlir::Type &promote_to,
+                        const mlir::Type &promote_to,
                         std::tuple<Args...> &&input_tuple,
                         std::index_sequence<Inds...> /*unused*/) {
   // Calls castAndForwardElt on every argument through unwidning, with "Inds"
@@ -227,7 +216,7 @@ auto castAndForwardImpl(mlir::ImplicitLocOpBuilder &builder,
   return std::make_tuple(
       CastAndForwardElt<OpTy, Inds,
                         std::tuple_element_t<Inds, std::tuple<Args...>>>::
-          f(builder, main_graph, promote_to, std::get<Inds>(input_tuple))...);
+          f(builder, promote_to, std::get<Inds>(input_tuple))...);
 }
 
 // Loop through all operands, promote to promote_to if required for implicit
@@ -236,10 +225,9 @@ auto castAndForwardImpl(mlir::ImplicitLocOpBuilder &builder,
 // and then returning the final value.
 template <typename OpTy, typename... Args>
 auto castAndForward(mlir::ImplicitLocOpBuilder &builder,
-                    mlir::FuncOp &main_graph, const mlir::Type &promote_to,
+                    const mlir::Type &promote_to,
                     std::tuple<Args...> &&input_tuple) {
-  return castAndForwardImpl<OpTy>(builder, main_graph, promote_to,
-                                  std::move(input_tuple),
+  return castAndForwardImpl<OpTy>(builder, promote_to, std::move(input_tuple),
                                   std::make_index_sequence<sizeof...(Args)>());
 }
 
@@ -250,7 +238,6 @@ auto castAndForward(mlir::ImplicitLocOpBuilder &builder,
 // main_graph, though all the implicit casting ops are.
 template <typename OpTy, typename... Args>
 OpTy implicitCastAndCreate(mlir::ImplicitLocOpBuilder &builder,
-                           mlir::FuncOp &main_graph,
                            const mlir::Type &promote_to, Args &&...args) {
   // Call the builder create method by unpacking the tuple into arguments
   // The tuple is formed all the (possibly promoted) operands, args,
@@ -259,7 +246,7 @@ OpTy implicitCastAndCreate(mlir::ImplicitLocOpBuilder &builder,
     return builder.create<OpTy>(args_inner...);
   };
   return std::apply(call_builder,
-                    castAndForward<OpTy>(builder, main_graph, promote_to,
+                    castAndForward<OpTy>(builder, promote_to,
                                          std::forward_as_tuple(args...)));
 }
 
@@ -304,6 +291,8 @@ public:
     }
   }
 
+  void addGlobalState(std::string_view name, mlir::MemRefType argType);
+
   template <typename OpTy, typename... Args> OpTy createOp(Args &&...args) {
     return createOp<OpTy>(_main_graph, std::forward<Args>(args)...);
   }
@@ -314,6 +303,14 @@ public:
   // modification.
   virtual mlir::Value findValue(TensorId tensor);
 
+  // Update the MLIR value associated to a tensor id.
+  // This is needed when an inplace view op changes the
+  // underlying type (e.g. torch.select_) or when a tensor
+  // was created by a graph and then used by another one:
+  // the tensor would be an op output in the first graph
+  // and a graph input in the second.
+  void updateTensor(TensorId id, mlir::Value new_value);
+
   bool allOpsCanBeLoweredToPoplar() const;
 
   poptorch::CompilerOptions &getMutableOptions() { return _compiler_options; }
@@ -321,19 +318,21 @@ public:
 protected:
   struct Graph {
     mlir::FuncOp graph;
+    mlir::Block::iterator epilog_start;
     // When a new op is added to the main graph using createOp we check and
     // store whether or not there is an actual handler for this op. (Some ops
     // will have been added with only shape inference and no implementation, in
     // which case we won't be able to lower them later on).
     bool all_ops_can_be_lowered{true};
-  };
 
-  // Update the MLIR value associated to a tensor id.
-  // This is typically needed when a tensor was created
-  // by a graph and then used by another one: the tensor
-  // would be an op output in the first graph and a graph
-  // input in the second.
-  void updateTensor(TensorId id, mlir::Value new_value);
+    Graph() = default;
+    explicit Graph(mlir::FuncOp func) : graph(func) {
+      // Add an entry block.
+      graph.addEntryBlock();
+
+      epilog_start = graph.front().end();
+    }
+  };
   // Remove all the ops in the main graph but do not reset
   // the tensor IDs. Any valid tensor ID passed to findValue()
   // will now return an empty Value.
@@ -343,12 +342,14 @@ protected:
 
   // Create a new op of class OpTy, possibly casting operands specified by args.
   template <typename OpTy, typename... Args>
-  OpTy createOp(Graph &graph, Args &&...args) {
+  OpTy createOp(Graph &graph, mlir::Block::iterator insert_before,
+                Args &&...args) {
+    _builder.setInsertionPoint(&graph.graph.front(), insert_before);
+
     if constexpr (isImplicitCastingOp<OpTy>()) {
       mlir::Type promote_to = getCastToType<OpTy>(context, args...);
-      OpTy op = implicitCastAndCreate<OpTy>(_builder, graph.graph, promote_to,
+      OpTy op = implicitCastAndCreate<OpTy>(_builder, promote_to,
                                             std::forward<Args>(args)...);
-      graph.graph.front().push_back(op);
       return op;
     }
 
@@ -356,8 +357,24 @@ protected:
 
     graph.all_ops_can_be_lowered &=
         !OpTy::template hasTrait<mlir::OpTrait::NotImplementedOp>();
-    graph.graph.front().push_back(op);
     return op;
+  }
+
+  template <typename OpTy, typename... Args>
+  OpTy createOp(Graph &graph, Args &&...args) {
+    return createOp<OpTy>(graph, graph.epilog_start,
+                          std::forward<Args>(args)...);
+  }
+
+  template <typename OpTy, typename... Args>
+  OpTy createOpInEpilogue(Graph &graph, Args &&...args) {
+    auto new_op = createOp<OpTy>(graph, graph.graph.front().end(),
+                                 std::forward<Args>(args)...);
+    // NOTE: this doesn't work if the added operation does any casting
+    if (graph.epilog_start == graph.graph.front().end()) {
+      graph.epilog_start = mlir::Block::iterator(new_op);
+    }
+    return new_op;
   }
 
   llvm::DenseMap<mlir::Value, TensorId> getValueMappings();

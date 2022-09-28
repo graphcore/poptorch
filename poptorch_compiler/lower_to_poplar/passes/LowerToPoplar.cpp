@@ -26,6 +26,19 @@
 namespace poptorch_ir {
 
 namespace {
+Programs getProgramType(std::string_view name) {
+  if (name == "MainGraph") {
+    return Programs::MainGraph;
+  }
+  if (name == "WeightsToDevice") {
+    return Programs::WeightsToDevice;
+  }
+  if (name == "WeightsToHost") {
+    return Programs::WeightsToHost;
+  }
+  ERROR("Unexpected program name " + std::string(name));
+}
+
 /*
   Converts the MLIR graph into a poplar graph which can then be compiled.
  */
@@ -51,10 +64,10 @@ void LowerToPoplar::runOnOperation() {
 
   poptorch::logging::info("Graph lowered to poplar:\n{}", mlirOpToStr(module));
 
-  bool first_function = true;
+  // Compile all the programs in the module
   for (mlir::FuncOp function : module.getOps<mlir::FuncOp>()) {
-    ERROR_ON_MSG(!first_function, "More than one function in the module");
-    first_function = false;
+    auto program = getProgramType(function.getName());
+    _context->clearLocalData();
 
     verifyOperations(function);
     _context->seq = poplar::program::Sequence();
@@ -63,25 +76,7 @@ void LowerToPoplar::runOnOperation() {
     function.walk(
         [&](PoplarImplInterface impl) { impl.lowerToPoplar(*_context); });
 
-    _context->programs[Programs::MainGraph] = _context->seq;
-
-    // For the read/write subfunctions do the same.
-    for (mlir::FuncOp subfunc : function.getOps<mlir::FuncOp>()) {
-      Programs program = Programs::WeightsToDevice;
-      if (subfunc.getName() == "WeightsToDevice") {
-        program = Programs::WeightsToDevice;
-      } else if (subfunc.getName() == "WeightsToHost") {
-        program = Programs::WeightsToHost;
-      }
-
-      _context->seq = poplar::program::Sequence();
-
-      // Walk over all functions with a poplar impl.
-      subfunc.walk(
-          [&](PoplarImplInterface impl) { impl.lowerToPoplar(*_context); });
-
-      _context->programs[program] = _context->seq;
-    }
+    _context->programs[program] = _context->seq;
   }
 }
 

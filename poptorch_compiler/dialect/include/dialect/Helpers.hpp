@@ -97,6 +97,16 @@ inline std::string elementTypeToString(const mlir::Type &type) {
   return "Unsupported MLIR type";
 }
 
+// Convert any MLIR object to string.
+template <typename T> std::string mlirToStr(const T &obj) {
+  std::string str;
+  {
+    llvm::raw_string_ostream ostream(str);
+    ostream << obj;
+  }
+  return str;
+}
+
 } // namespace poptorch_ir
 
 #endif // POPTORCH_CODEGEN_POPTORCH_DIALECT_HELPERS_H_

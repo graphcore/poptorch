@@ -68,13 +68,6 @@ public:
       const std::vector<at::Tensor> &original_input,
       const std::vector<bool> &requires_grad);
 
-  // Handle the special case of ops which are inplace in PyTorch but change
-  // the shape of the target tensor.
-  // NOLINTNEXTLINE
-  at::Tensor outputInplaceReshape(poptorch_ir::TensorId output_id,
-                                  const at::Tensor &original_input,
-                                  bool requires_grad);
-
   // Compute whether grad is required based on a list of requires_grad
   // determination types.  The argument requires_grad_or should be true if any
   // of the input tensors to the op had requires_grad=true (this will be used

@@ -10,14 +10,13 @@ void canonicaliseMinMax(T &op, ::mlir::PatternRewriter &rewriter) {
   if (size.empty()) {
     auto elemtype =
         operand_type.template cast<mlir::RankedTensorType>().getElementType();
-    auto copy = rewriter.create<empty_tensor>(op.getLoc(), size, elemtype);
-    rewriter.create<copy_>(op.getLoc(), copy.getResult(), op.getOperand());
+    auto empty = rewriter.create<empty_tensor>(op.getLoc(), size, elemtype);
+    auto copy =
+        rewriter.create<copy_>(op.getLoc(), empty.getResult(), op.getOperand());
     op.getResult(0).replaceAllUsesWith(copy.getResult());
-    std::vector<int64_t> shape = {};
-    auto empty = rewriter.create<empty_tensor>(
-        op.getLoc(), shape, rewriter.getIntegerType(32, true));
-    rewriter.create<zero_>(op.getLoc(), empty.getResult());
-    op.getResult(1).replaceAllUsesWith(empty.getResult());
+    auto zeros = rewriter.create<zeros_like>(op.getLoc(), op->getResult(1),
+                                             std::nullopt);
+    op.getResult(1).replaceAllUsesWith(zeros.getResult());
     rewriter.eraseOp(op);
     return;
   }
@@ -58,14 +57,13 @@ median_dim_values::canonicalize(median_dim_values op,
   if (osize.empty()) {
     auto elemtype =
         operand_type.template cast<mlir::RankedTensorType>().getElementType();
-    auto copy = rewriter.create<empty_tensor>(op.getLoc(), osize, elemtype);
-    rewriter.create<copy_>(op.getLoc(), copy.getResult(), op.getOperand());
+    auto empty = rewriter.create<empty_tensor>(op.getLoc(), osize, elemtype);
+    auto copy =
+        rewriter.create<copy_>(op.getLoc(), empty.getResult(), op.getOperand());
     op.getResult(0).replaceAllUsesWith(copy.getResult());
-    std::vector<int64_t> shape = {};
-    auto empty = rewriter.create<empty_tensor>(
-        op.getLoc(), shape, rewriter.getIntegerType(32, true));
-    rewriter.create<zero_>(op.getLoc(), empty.getResult());
-    op.getResult(1).replaceAllUsesWith(empty.getResult());
+    auto zeros = rewriter.create<zeros_like>(op.getLoc(), op->getResult(1),
+                                             std::nullopt);
+    op.getResult(1).replaceAllUsesWith(zeros.getResult());
     rewriter.eraseOp(op);
     return mlir::success();
   }

@@ -407,6 +407,7 @@ void swapLastMLIRExecutor(const std::shared_ptr<MLIRExecutor> &mlir_executor) {
     replaced_mlir_executor->copyWeightsToHostIfNeeded();
   }
   context.last_mlir_executor = mlir_executor;
+  mlir_executor->weightsToDevice();
 }
 #endif
 
