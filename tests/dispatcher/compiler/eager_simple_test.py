@@ -61,6 +61,7 @@ def test_simple_add_hw(capfd):
 @pytest.mark.mlirSupportRequired
 @pytest.mark.extendedTestingOnly
 def test_source_location(capfd, mode):
+    pytest.skip("TODO(70016): handle views in eager mode")
     import poptorch.eager  # pylint: disable=unused-import, import-outside-toplevel
 
     layer = torch.nn.Linear(1, 2).to('xla')
