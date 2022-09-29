@@ -8,6 +8,7 @@
 
 #include <utility>
 
+#include <popdist/backend.hpp>
 #include <poplar/Device.hpp>
 #include <poplar/Engine.hpp>
 #include <poplar/Graph.hpp>
@@ -72,16 +73,27 @@ void PoplarExecutor::connectStream(const std::string &string, void *ptr) {
   _impl->engine->connectStream(string, ptr);
 }
 
-void PoplarExecutor::execute() { _impl->engine->run(Programs::MainGraph); }
+void PoplarExecutor::execute() {
+  // Use a synchronized engine run in distributed environments in order to
+  // prevent host sync timeouts. It defaults to non-synchronized, regular
+  // `engine.run(...)` in non-distributed environments.
+  popdist::run(*_impl->engine, Programs::MainGraph);
+}
 
 void PoplarExecutor::weightsToDevice() {
   poptorch::logging::trace("Copying weights to device");
-  _impl->engine->run(Programs::WeightsToDevice);
+  // Use a synchronized engine run in distributed environments in order to
+  // prevent host sync timeouts. It defaults to non-synchronized, regular
+  // `engine.run(...)` in non-distributed environments.
+  popdist::run(*_impl->engine, Programs::WeightsToDevice);
 }
 
 void PoplarExecutor::weightsToHost() {
   poptorch::logging::trace("Copying weights to host");
-  _impl->engine->run(Programs::WeightsToHost);
+  // Use a synchronized engine run in distributed environments in order to
+  // prevent host sync timeouts. It defaults to non-synchronized, regular
+  // `engine.run(...)` in non-distributed environments.
+  popdist::run(*_impl->engine, Programs::WeightsToHost);
 }
 
 PoplarExecutor::PoplarExecutor(std::unique_ptr<poplar::Engine> engine) {

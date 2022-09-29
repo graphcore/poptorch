@@ -26,6 +26,7 @@ target_include_directories(lower_to_poplar PUBLIC include)
 find_package(model_runtime REQUIRED)
 find_package(popef REQUIRED)
 find_package(popit REQUIRED)
+find_package(popdist REQUIRED)
 
 # Poplar requires exceptions and LLVM disables them for efficiency so we can't
 # use the nice MLIR cmake functions here.
@@ -34,7 +35,6 @@ target_link_libraries(lower_to_poplar PRIVATE
         MLIRPass
         MLIRTransforms
         poptorch_mlir_passes
-
         model_runtime
         popef
         popit::popit
@@ -44,6 +44,7 @@ target_link_libraries(lower_to_poplar PRIVATE
         poplin
         popnn
         poputil
+        popdist
         gcl
         snap
         poptorch_logging
