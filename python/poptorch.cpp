@@ -579,6 +579,14 @@ std::string convertToString(const std::vector<char> &str) {
 std::vector<char> convertToCharVec(const std::string &str) {
   return std::vector<char>(str.begin(), str.end());
 }
+
+pybind11::list toPythonList(std::vector<at::Tensor> &&outputs) {
+  pybind11::list pylist(outputs.size());
+  for (std::size_t i = 0; i < outputs.size(); ++i) {
+    pylist[i] = torch::jit::toPyObject(std::move(outputs[i]));
+  }
+  return pylist;
+}
 } // namespace
 
 namespace bindings {
@@ -1083,7 +1091,7 @@ PYBIND11_MODULE(poptorch_core, m) { // NOLINT
            [&](const std::shared_ptr<poptorch::MLIRExecutor> mlir_executor,
                const std::vector<at::Tensor> &inputs) {
              poptorch::swapLastMLIRExecutor(mlir_executor);
-             return mlir_executor->execute(inputs);
+             return poptorch::toPythonList(mlir_executor->execute(inputs));
            })
       .def("weightsToDevice", &poptorch::MLIRExecutor::weightsToDevice)
       .def("copyWeightsToHostIfNeeded",

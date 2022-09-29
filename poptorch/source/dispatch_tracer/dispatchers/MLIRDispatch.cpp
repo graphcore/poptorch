@@ -92,10 +92,11 @@ MLIRExecutor::~MLIRExecutor() {
   copyWeightsToHostIfNeeded();
 }
 
-void MLIRExecutor::execute(const std::vector<at::Tensor> &inputs) {
+std::vector<at::Tensor>
+MLIRExecutor::execute(const std::vector<at::Tensor> &inputs) {
   try {
-    std::vector<void *> ptrs;
-    ptrs.resize(inputs.size());
+    std::vector<void *> input_ptrs;
+    input_ptrs.resize(inputs.size());
 
     // Keep the refs around.
     std::vector<at::Tensor> converted;
@@ -109,7 +110,7 @@ void MLIRExecutor::execute(const std::vector<at::Tensor> &inputs) {
         const auto &host_buffer = getHostBuffer(tensor);
         ERROR_ON_MSG(!host_buffer,
                      "Attempted to pass an IPU tensor with no `host_buffer`.");
-        ptrs[i] = host_buffer->data();
+        input_ptrs[i] = host_buffer->data();
       } else {
         ERROR_ON_MSG(!tensor.is_cpu(),
                      "Input tensors expected to either be IPU or CPU but input "
@@ -118,23 +119,36 @@ void MLIRExecutor::execute(const std::vector<at::Tensor> &inputs) {
         // Handle the implicit downcasts here:
         if (tensor.scalar_type() == at::ScalarType::Long) {
           converted.push_back(tensor.to(at::ScalarType::Int));
-          ptrs[i] = converted.back().data_ptr();
+          input_ptrs[i] = converted.back().data_ptr();
         } else if (tensor.scalar_type() == at::ScalarType::Double) {
           converted.push_back(tensor.to(at::ScalarType::Float));
-          ptrs[i] = converted.back().data_ptr();
+          input_ptrs[i] = converted.back().data_ptr();
         } else {
-          ptrs[i] = tensor.data_ptr();
+          input_ptrs[i] = tensor.data_ptr();
         }
       }
     }
 
-    _executor->execute(ptrs);
+    std::vector<at::Tensor> outputs;
+    for (const auto &[dims, type] : _executor->outputTypes()) {
+      outputs.push_back(
+          at::empty(dims, at::dtype(compilerTypeToScalarType(type))
+                              .memory_format(c10::MemoryFormat::Contiguous)));
+    }
+    std::vector<void *> output_ptrs;
+    std::transform(outputs.begin(), outputs.end(),
+                   std::back_inserter(output_ptrs),
+                   [](const at::Tensor &tensor) { return tensor.data_ptr(); });
+
+    // Mark any host buffers as invalid. This can be made much more granular, to
+    // each tensor, if required.
+    _host_buffers_are_dirty = true;
+
+    _executor->execute(input_ptrs, output_ptrs);
+
+    return outputs;
   }
   CATCH_AND_RETHROW_AS_POPTORCH_EXCEPTION
-
-  // Mark any host buffers as invalid. This can be made much more granular, to
-  // each tensor, if required.
-  _host_buffers_are_dirty = true;
 }
 
 void MLIRExecutor::weightsToDevice() {
@@ -598,26 +612,46 @@ MLIRDispatch::outputIsInplaceOf(poptorch_ir::OptionalTensorId output_id,
   ERROR_ON(output_id == poptorch_ir::none_id ||
            output_id == poptorch_ir::tensor_error_id);
 
-  if (_compiler.isView(output_id)) {
-    // If the source of the output is a view operation, all subsequent
-    // references to the original input should be replaced by the view. Note
-    // that view operations will change the shape of the original tensor so we
-    // can't rely on the overwrite op.
+  const auto original_shape = original_input.sizes();
+  const auto new_shape = _compiler.getSize(output_id);
+
+  if (original_shape != new_shape) {
+    // There are two situations where the original and new shapes may not match.
+    // This will cause issue with mismatched shapes if the mlir::Value for the
+    // tensor is not replaced.
     //
-    // This handles cases like:
-    //  def f(x):
-    //    y = x + 1
-    //    x.select_(...)
-    //    z = x + 1
+    // Firstly, for PyTorch does not always generate outputs of the correct
+    // shape. For example,
+    //   def f():
+    //     x = torch.logicalAnd(torch.tensor(True), torch.tensor(False))
+    //     return x
+    // will add an implicit output parameter with shape [0] rather than an empty
+    // shape. Leading to something like:
+    //   func f(%x) {
+    //     %0 = empty(shape=[0])
+    //     %x = logicalAnd(tensor(true), tensor(false), %0)
+    //     return %x
+    //   }
+    // Note that hiding the implicitly created output parameter is not an issue
+    // since it cannot be a view tensor.
+    //
+    // Secondly, if the source of the output is a view operation, all subsequent
+    // references to the original input should be replaced by the view. For
+    // example,
+    //   def f(x):
+    //     y = x + 1
+    //     x.select_(...)
+    //     z = x + 1
     // If we inserted an overwrite op in the to handle `select_`, we would have
     // no globally consistent shape for x. Instead this is lowered to
-    //  func f(%x) {
-    //    %y = add(%x, 1)
-    //    %0 = select(%x, ...)
-    //    %z = add(%0, 1)
-    //  }
-    // This isn't an issue for handling view operations since the original view
-    // of x cannot be referenced after the inplace operation
+    //   func f(%x) {
+    //     %y = add(%x, 1)
+    //     %0 = select(%x, ...)
+    //     %z = add(%0, 1)
+    //   }
+    // Replacing the original tensor isn't an issue when handling view
+    // operations since the original view of x cannot be referenced after the
+    // inplace operation.
     _mapper.addTensor(original_input, output_id);
   } else {
     // Instead of replacing all subsequent references to the original input with
@@ -626,8 +660,7 @@ MLIRDispatch::outputIsInplaceOf(poptorch_ir::OptionalTensorId output_id,
     poptorch_ir::TensorId replaced_id = findTensor(original_input);
     _compiler.overwrite(replaced_id, output_id);
   }
-  const std::vector<std::int64_t> shape = _compiler.getSize(output_id);
-  original_input.unsafeGetTensorImpl()->set_sizes_contiguous(shape);
+  original_input.unsafeGetTensorImpl()->set_sizes_contiguous(new_shape);
 
   if (requires_grad) {
     setRequiresGradIfFloat(original_input);

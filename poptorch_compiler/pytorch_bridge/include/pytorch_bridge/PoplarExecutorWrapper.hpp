@@ -24,10 +24,14 @@ class PoplarExecutor;
 class PoplarExecutorWrapper {
 public:
   ~PoplarExecutorWrapper();
-  PoplarExecutorWrapper(
-      PoplarExecutor &&executor,
-      std::vector<std::pair<std::string, Buffer>> &&input_callbacks);
-  void execute(const std::vector<void *> &ptrs);
+  PoplarExecutorWrapper(PoplarExecutor &&executor,
+                        std::vector<StreamInfo> &&input_callbacks,
+                        std::vector<StreamInfo> &&output_callbacks);
+
+  void execute(const std::vector<void *> &input_ptrs,
+               const std::vector<void *> &output_ptrs);
+
+  std::vector<TensorType> outputTypes() const;
 
   void weightsToDevice();
   void weightsToHost();

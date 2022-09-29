@@ -16,3 +16,20 @@ def test_ignored_values():
            'Expected it to be None')
     with pytest.raises(poptorch.Error, match=msg):
         IPUContext(to_dtype)(torch.tensor(1.0))
+
+
+@pytest.mark.mlirSupportRequired
+def test_function_reuse():
+    def f(x):
+        return x + 1
+
+    compiled = IPUContext(f)
+
+    in1 = torch.tensor(1)
+    out1 = compiled(in1)
+
+    in2 = torch.tensor(2)
+    out2 = compiled(in2)
+
+    assert out1.item() == 2
+    assert out2.item() == 3

@@ -150,21 +150,18 @@ PoplarExecutorWrapper PoptorchCompiler::compileAndLoad() {
 
   exe.load(device);
 
-  // Move across and connect callbacks, clearing them in the process
-  for (auto &pair : compiler->output_callbacks) {
-    exe.connectStream(pair.first, pair.second);
-  }
-  compiler->output_callbacks.clear();
-
   for (auto &pair : compiler->weight_callbacks) {
-    exe.connectStream("Write-" + pair.first, pair.second);
-    exe.connectStream("Read-" + pair.first, std::move(pair.second));
+    exe.connectStream(std::string("Write-") + pair.name.data(), pair.buff);
+    exe.connectStream(std::string("Read-") + pair.name.data(),
+                      std::move(pair.buff));
   }
   compiler->weight_callbacks.clear();
 
   PoplarExecutorWrapper executor(std::move(exe),
-                                 std::move(compiler->input_callbacks));
+                                 std::move(compiler->input_callbacks),
+                                 std::move(compiler->output_callbacks));
   compiler->input_callbacks.clear();
+  compiler->output_callbacks.clear();
 
   return executor;
 }

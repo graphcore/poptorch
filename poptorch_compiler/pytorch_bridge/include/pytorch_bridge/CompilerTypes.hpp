@@ -3,8 +3,10 @@
 #define POPTORCH_COMPILER_PYTORCH_BRIDGE_COMPILER_TYPES_HPP_
 
 #include <cstdint>
+#include <functional>
 #include <limits>
 #include <memory>
+#include <numeric>
 #include <vector>
 
 namespace poptorch_ir {
@@ -57,6 +59,23 @@ enum class Type : std::uint8_t {
   BFLOAT16,
   NONE,
   UNDEFINED,
+};
+
+struct TensorType {
+  std::vector<int64_t> shape;
+  poptorch_ir::Type element_type;
+
+  std::int64_t getNumElements() const {
+    return std::accumulate(shape.begin(), shape.end(), std::int64_t{1},
+                           std::multiplies<>());
+  }
+};
+
+struct StreamInfo {
+  std::vector<char> name;
+  Buffer buff;
+
+  TensorType type;
 };
 
 } // namespace poptorch_ir

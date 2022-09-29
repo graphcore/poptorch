@@ -1,14 +1,24 @@
 // Copyright (c) 2021 Graphcore Ltd. All rights reserved.
 #include "MLIRStaticGraphCompiler.hpp"
 
-#include <mlir/Dialect/MemRef/IR/MemRef.h>
 #include <mlir/IR/BuiltinTypes.h>
 
 #include <string>
 
 #include "IMLIRCompiler.hpp"
+#include "pytorch_bridge/CompilerTypes.hpp"
+#include "pytorch_bridge/PytorchBridgeUtils.hpp"
 
 namespace poptorch_ir {
+
+namespace {
+
+std::vector<char> toVectorChar(std::string_view str) {
+  return std::vector<char>(str.begin(), str.end());
+}
+
+} // namespace
+
 namespace detail {
 
 MLIRStaticGraphCompiler::MLIRStaticGraphCompiler(
@@ -40,7 +50,8 @@ TensorId MLIRStaticGraphCompiler::addInput(const Buffer &ptr,
                                            const char *name) {
   // Add the argument to the function args.
   auto val = createOp<poptorch_ir::copy_from_host>(input, name);
-  input_callbacks.push_back({name, ptr});
+  input_callbacks.push_back(poptorch_ir::StreamInfo{
+      toVectorChar(name), ptr, mlirTypeToCompilerType(input)});
   return addValue(val);
 }
 
@@ -71,7 +82,8 @@ TensorId MLIRStaticGraphCompiler::addParameter(
                                         "Read-" + std::string(name));
   }
 
-  weight_callbacks.push_back({name, ptr});
+  weight_callbacks.push_back(poptorch_ir::StreamInfo{
+      toVectorChar(name), ptr, mlirTypeToCompilerType(parameter_type)});
 
   // Read global state from the main graph
   auto main_val =
@@ -83,9 +95,18 @@ TensorId MLIRStaticGraphCompiler::addParameter(
 
 void MLIRStaticGraphCompiler::addOutput(void *ptr, TensorId id,
                                         const char *name) {
+  // The output location will be set when the program is executed
+  UNUSED(ptr);
   mlir::Value output = findValue(id);
-  createOp<poptorch_ir::copy_to_host>(output, name);
-  output_callbacks.push_back({name, ptr});
+
+  // Don't bother adding an output if there is nothing to output
+  if (output.getType().cast<mlir::RankedTensorType>().getNumElements() != 0) {
+    createOp<poptorch_ir::copy_to_host>(output, name);
+  }
+
+  output_callbacks.push_back(poptorch_ir::StreamInfo{
+      toVectorChar(name), nullptr,
+      mlirTypeToCompilerType(output.getType().cast<mlir::RankedTensorType>())});
 }
 
 void MLIRStaticGraphCompiler::addReturn() {

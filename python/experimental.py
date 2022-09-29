@@ -59,7 +59,6 @@ class IPUScope:
         # the same python id, to the earliest tensor.
         self._cpu_aliases = {}
 
-        self._outputs = []
         self._outputs_structure = None
         self._upload_weights = True
         self._skip_compilation = skip_compilation
@@ -290,9 +289,8 @@ class IPUScope:
             output = poptorch_core.execute(self._executable, args)
         elif self._compile_using == enums.Compiler.MLIR:
             # Run via the MLIR compiled binary.
-            self._executable.execute(args)
+            output = self._executable.execute(args)
             self._executable.copyWeightsToHostIfNeeded()
-            output = self._outputs
 
         if self._outputs_structure is not None:
             output = reconstructTensorStructure(self._outputs_structure,
@@ -301,23 +299,23 @@ class IPUScope:
 
     def outputs(self, tensors):
         self._outputs_structure = tensors
-        self._outputs = flattenTensorStructure(tensors)
+        output = flattenTensorStructure(tensors)
 
-        for x in self._outputs:
+        for x in output:
             if not isOnIpu(x):
                 warnings.warn("Output expected to be on the IPU but is on %s" %
                               x.device.type)
 
-        self._outputs = [
+        output = [
             out.int() if out.dtype == torch.long and isOnIpu(out) else out
-            for out in self._outputs
+            for out in output
         ]
-        self._outputs = [
+        output = [
             out.float() if out.dtype == torch.double and isOnIpu(out) else out
-            for out in self._outputs
+            for out in output
         ]
         poptorch_core.startOutputsMove()
-        self._outputs = [out.cpu() for out in self._outputs]
+        output = [out.cpu() for out in output]
         poptorch_core.endOutputsMove()
 
         poptorch_core.finalizeGraph()
@@ -532,11 +530,12 @@ def ipu_wrapper(_func: Optional[Callable] = None,
         cache = None
         args_parser: ArgsParser = ArgsParser(func, tracing=False)
         compiled_args: Optional[ArgsParser.Args] = None
-        out = None
+        output_structure = None
 
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
-            nonlocal cache, args_parser, compiled_args, out, compiler_options
+            nonlocal cache, args_parser, compiled_args, output_structure, \
+                compiler_options
 
             current_args = args_parser(args, kwargs)
             flat_args = current_args.asPackedFlatTuple()
@@ -549,22 +548,22 @@ def ipu_wrapper(_func: Optional[Callable] = None,
             if compiled_args:
                 try:
                     compiled_args.validateInputs(current_args)
-                    cache.execute(flat_args)
-                    return out
+                    out = cache.execute(flat_args)
+                    return reconstructTensorStructure(output_structure, out)
                 except poptorch_core.Error:
                     pass
 
             sess = _IPUSession(compiler_options)
-            out = sess.run(func, current_args)
+            output_structure = sess.run(func, current_args)
 
             executable = sess.compile()
-            executable.execute(flat_args)
+            out = executable.execute(flat_args)
 
             # Save this executable as compiled with these args.
             cache = executable
             compiled_args = current_args
 
-            return out
+            return reconstructTensorStructure(output_structure, out)
 
         return wrapper
 

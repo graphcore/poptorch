@@ -1,5 +1,8 @@
 // Copyright (c) 2021 Graphcore Ltd. All rights reserved.
 #include "pytorch_bridge/PytorchBridgeUtils.hpp"
+
+#include <mlir/IR/BuiltinTypes.h>
+
 #include "poptorch_logging/Error.hpp"
 
 namespace poptorch_ir {
@@ -40,6 +43,11 @@ Type mlirTypeToCompilerType(mlir::Type type) {
   }
 
   return Type::UNDEFINED;
+}
+
+TensorType mlirTypeToCompilerType(mlir::RankedTensorType type) {
+  return TensorType{type.getShape(),
+                    mlirTypeToCompilerType(type.getElementType())};
 }
 
 TorchReduction getTorchReduction(int reduction) {

@@ -46,9 +46,9 @@ public:
 
 void initialiseExceptionHandling(pybind11::handle m);
 
-void rethrowPoptorchException(const std::exception_ptr &e,
-                              const std::string &catch_file,
-                              uint64_t catch_line);
+[[noreturn]] void rethrowPoptorchException(const std::exception_ptr &e,
+                                           const std::string &catch_file,
+                                           uint64_t catch_line);
 
 } // namespace poptorch
 

@@ -8,6 +8,7 @@
 namespace poptorch_ir {
 
 Type mlirTypeToCompilerType(mlir::Type type);
+TensorType mlirTypeToCompilerType(mlir::RankedTensorType type);
 
 enum class TorchReduction { UNKNOWN = -1, NONE = 0, MEAN = 1, SUM = 2 };
 

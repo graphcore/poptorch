@@ -10,6 +10,7 @@
 
 #include "passes/PassUtils.hpp"
 #include "poptorch_logging/Logging.hpp"
+#include "pytorch_bridge/CompilerTypes.hpp"
 
 namespace poptorch_ir {
 namespace detail {
@@ -131,6 +132,10 @@ mlir::Type IMLIRCompiler::convertType(Type type) {
 mlir::RankedTensorType
 IMLIRCompiler::getTensor(Type type, const std::vector<std::int64_t> &dims) {
   return mlir::RankedTensorType::get(dims, convertType(type));
+}
+
+mlir::RankedTensorType IMLIRCompiler::getTensor(const TensorType &tensor_type) {
+  return getTensor(tensor_type.element_type, tensor_type.shape);
 }
 
 TensorId IMLIRCompiler::addValue(const mlir::Value &value) {

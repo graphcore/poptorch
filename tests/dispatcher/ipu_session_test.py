@@ -406,3 +406,19 @@ def test_no_tensor_arguments():
 
     with pytest.raises(poptorch.Error, match="No tensor inputs passed"):
         ipu_func2(42)
+
+
+@pytest.mark.mlirSupportRequired
+def test_function_reuse():
+    @ipu_wrapper
+    def f(x):
+        return x + 1
+
+    in1 = torch.tensor(1, dtype=torch.int, device='xla')
+    out1 = f(in1)
+
+    in2 = torch.tensor(2, dtype=torch.int, device='xla')
+    out2 = f(in2)
+
+    assert out1.to('cpu').item() == 2
+    assert out2.to('cpu').item() == 3

@@ -38,9 +38,9 @@ private:
 
 public:
   // Input and output callbacks to give to poplar.
-  std::vector<std::pair<std::string, Buffer>> input_callbacks;
-  std::vector<std::pair<std::string, void *>> output_callbacks;
-  std::vector<std::pair<std::string, Buffer>> weight_callbacks;
+  std::vector<StreamInfo> input_callbacks;
+  std::vector<StreamInfo> output_callbacks;
+  std::vector<StreamInfo> weight_callbacks;
 };
 
 } // namespace detail

@@ -3,6 +3,7 @@
 #define POPTORCH_COMPILER_PYTORCH_BRIDGE_IMLIR_COMPILER_HPP_
 
 #include <mlir/IR/BuiltinOps.h>
+#include <mlir/IR/BuiltinTypes.h>
 #include <mlir/IR/ImplicitLocOpBuilder.h>
 #include <mlir/IR/Types.h>
 #include <mlir/IR/Value.h>
@@ -259,6 +260,7 @@ public:
 
   mlir::RankedTensorType getTensor(Type type,
                                    const std::vector<std::int64_t> &dims);
+  mlir::RankedTensorType getTensor(const TensorType &tensor_type);
 
   static mlir::Value addArgument(mlir::FuncOp func, mlir::Type argType);
 

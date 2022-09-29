@@ -53,7 +53,7 @@ class MLIRExecutor {
 public:
   explicit MLIRExecutor(std::unique_ptr<poptorch_ir::PoplarExecutorWrapper> &&);
   ~MLIRExecutor();
-  void execute(const std::vector<at::Tensor> &inputs);
+  std::vector<at::Tensor> execute(const std::vector<at::Tensor> &inputs);
   void weightsToDevice();
 
   // Call before the MLIRExecutor is switched out.

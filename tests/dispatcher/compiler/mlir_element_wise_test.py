@@ -18,6 +18,9 @@ def op_harness(fn, *args, **kwargs):
     try:
         cpu_res = fn(*cpu_args, **kwargs)
     except RuntimeError as err:
+        if any(isinstance(x, torch.Tensor) and x.numel() == 0 for x in args):
+            pytest.skip("TODO(T69928): Empty tensors don't throw errors")
+
         str_err = str(err)
         msg = f'({re.escape(str_err)}|Verification failed for)'
 
