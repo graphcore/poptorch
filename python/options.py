@@ -1857,8 +1857,8 @@ class Options(_options_impl.OptionsDict):
             p for p in dir(type(self))
             if isinstance(getattr(type(self), p), property)
         ]
-        return (f"{type(self).__name__}("
+        return (f"{type(self).__name__}(" +
                 ", ".join(f"{k}={v.__repr__()}"
-                          for k, v in self._values.items()) + ", "
+                          for k, v in self._values.items()) + ", " +
                 ", ".join(f"{prop}={getattr(self, prop)}"
                           for prop in property_names) + ")")
