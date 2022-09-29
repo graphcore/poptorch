@@ -29,6 +29,57 @@ def test_set_options():
     poptorch.poptorch_core._validateOptions(opts.toDict())
 
 
+class TestSetOptionsFromEnvironment:
+    """Checks that we can set options through environment variables"""
+
+    def test_block(self):
+        ref = poptorch.Options()
+        opts = poptorch.Options()
+        # Just set a bunch of options and check they're successfully parsed.
+        with tempfile.TemporaryDirectory() as tmp:
+            opts.deviceIterations(2).replicationFactor(1).logDir(
+                tmp).enableSyntheticData(True)
+            try:
+                os.environ["POPTORCH_DEFAULT_OPTIONS"] = (
+                    '{"deviceIterations":2,'
+                    f'"replicationFactor":1,"logDir":"{tmp}",'
+                    '"enableSyntheticData":true}')
+                init_set = poptorch.Options()
+            finally:
+                del os.environ["POPTORCH_DEFAULT_OPTIONS"]
+
+        assert f"{ref}" != f"{opts}"
+        assert f"{opts}" == f"{init_set}"
+
+    def test_dotted_access(self):
+        ref = poptorch.Options()
+        opts = poptorch.Options()
+        opts.Precision.autocastEnabled(False)
+        try:
+            os.environ["POPTORCH_DEFAULT_OPTIONS"] = (
+                '{"Precision.autocastEnabled":false}')
+            init_set = poptorch.Options()
+        finally:
+            del os.environ["POPTORCH_DEFAULT_OPTIONS"]
+
+        assert f"{ref}" != f"{init_set}"
+        assert f"{opts}" == f"{init_set}"
+
+    def test_enum_conversion(self):
+        ref = poptorch.Options()
+        opts = poptorch.Options()
+        opts.connectionType(poptorch.ConnectionType.OnDemand)
+        try:
+            os.environ["POPTORCH_DEFAULT_OPTIONS"] = (
+                '{"connectionType":"ConnectionType.OnDemand"}')
+            init_set = poptorch.Options()
+        finally:
+            del os.environ["POPTORCH_DEFAULT_OPTIONS"]
+
+        assert f"{ref}" != f"{init_set}"
+        assert f"{opts}" == f"{init_set}"
+
+
 @pytest.mark.parametrize("key, value, expected_str", [
     ("asdfasdf", True, r"Unknown .* option .*"),
     ("dotChecks", torch.empty(1, 1), r"Unknown value type .* for option .*"),

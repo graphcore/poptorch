@@ -1,5 +1,6 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 import os
+import json
 import copy
 from typing import Optional, Union, Dict, Any, List, Set
 import torch
@@ -1272,6 +1273,30 @@ class Options(_options_impl.OptionsDict):
             logger.info("POPTORCH_CACHE_DIR is set: setting cache path to %s",
                         path)
             self.enableExecutableCaching(path)
+        self.from_json(os.environ.get("POPTORCH_DEFAULT_OPTIONS", r"{}"))
+
+    def from_json(self, string):
+        def string_to_enum(value):
+            try:
+                enum_type, enum_value = value.split(".")
+            except ValueError:
+                return value
+            try:
+                enum = getattr(getattr(enums, enum_type), enum_value)
+            except AttributeError:
+                return value
+            return getattr(enum, enum_value)
+
+        values_dict = json.loads(string)
+        for option, v in values_dict.items():
+            active_obj = self
+            for attribute in option.split("."):
+                active_obj = getattr(active_obj, attribute)
+            # This parses strings into enum type and values
+            if isinstance(v, str) and "." in v:
+                v = string_to_enum(v)
+
+            active_obj(v)
 
     def sourceLocationExcludes(self,
                                excludes: List[str]) -> "poptorch.Options":
