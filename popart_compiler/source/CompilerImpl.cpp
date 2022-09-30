@@ -412,7 +412,7 @@ void CompilerImpl::setExecutionStrategyAttributes(
 
 std::string CompilerImpl::checkSystemConfig() const {
   ERROR_ON_MSG(num_ipus == 0, "Must call createDevice() first");
-  auto dm = popart::DeviceManager::createDeviceManager();
+  auto &dm = popart::DeviceManager::createDeviceManager();
   if (dm.enumerateDevices().empty()) {
     return "\nNo IPU detected in the system: are you sure the gc-driver is "
            "enabled ?";
