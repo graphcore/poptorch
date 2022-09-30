@@ -333,22 +333,15 @@ def generate_cpp(op_target, canonicalised_args, outputs, named_tensors,
     parameters = parameters[:-1]
 
     if "PopTorchDirect" in op_target:
-        # Otherwise we are dealing with a vanilla function.
+        # We are dealing with a vanilla function.
         function_decl += add_op(op_target["PopTorchDirect"],
                                 parameters,
                                 outputs,
                                 named_tensors,
                                 has_tensor_params=has_tensor_params)
-    elif "PopTorchDirectInplace" in op_target:
-        print("Inplace ops are not supported: instead, we do an outplace op "
-              "followed by an inplace copy. Please provide a PopTorchDirect "
-              f"implementation or {op_target['PopTorchDirectInplace']} in "
-              f"{__file__}.")
-        function_decl += add_op(op_target["PopTorchDirectInplace"], parameters,
-                                outputs, named_tensors)
     else:
         raise KeyError("Couldn't find a valid PopTorch direct mapping "
-                       "(eg. PopTorchDirect, or PopTorchDirectInplace)"
+                       "(eg. PopTorchDirect)"
                        f" for {op_target}")
 
     function_decl += "}\n"

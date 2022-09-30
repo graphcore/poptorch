@@ -48,20 +48,6 @@ bitwiseNot::canonicalize(bitwiseNot op, ::mlir::PatternRewriter &rewriter) {
   return mlir::failure();
 }
 
-::mlir::LogicalResult
-bitwiseNot_::canonicalize(bitwiseNot_ op, ::mlir::PatternRewriter &rewriter) {
-  const auto result_type = op.getOperand().getType();
-  const auto result_element_type =
-      result_type.cast<mlir::RankedTensorType>().getElementType();
-
-  if (result_element_type.isInteger(1)) {
-    rewriter.replaceOpWithNewOp<logicalNot_>(op, op.getOperand());
-
-    return mlir::success();
-  }
-  return mlir::failure();
-}
-
 ::mlir::LogicalResult isnan::canonicalize(isnan op,
                                           ::mlir::PatternRewriter &rewriter) {
   const auto in_type = op.getOperand().getType();

@@ -29,7 +29,6 @@
 # hardsigmoid.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)
 - func: hardsigmoid.out
   PopTorchDirect: hardsigmoid
-  PopTorchDirectInplace: hardsigmoid_
   UnusedOutputArguments: {out}
 
 # hardswish.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)
@@ -44,7 +43,6 @@
 # hardswish_(Tensor(a!) self) -> Tensor(a!)
 - func: hardswish_
   PopTorchDirect: hardswish
-  PopTorchDirectInplace: hardswish_
 
 # func: hardshrink.out(Tensor self, Scalar lambd=0.5, *, Tensor(a!) out) -> Tensor(a!)
 - func: hardshrink.out
@@ -59,7 +57,6 @@
 # relu_(Tensor(a!) self) -> Tensor(a!)
 - func: relu_
   PopTorchDirect: relu
-  PopTorchDirectInplace: relu_
 
 # relu(Tensor self) -> Tensor
 - func: relu
@@ -108,7 +105,6 @@
 # aten::sigmoid_(Tensor(a!) self) -> Tensor(a!)
 - func: sigmoid_
   PopTorchDirect: sigmoid
-  PopTorchDirectInplace: sigmoid_
 
 # sigmoid_backward.grad_input(Tensor grad_output, Tensor output, *, Tensor(a!) grad_input) -> Tensor(a!)
 - func: sigmoid_backward.grad_input
@@ -117,7 +113,6 @@
 
 - func: silu.out
   PopTorchDirect: swish
-  PopTorchDirectInplace: swish_
   UnusedOutputArguments: {out}
 
 # gelu.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)
@@ -353,13 +348,11 @@
 # aten::mul.out(Tensor self, Tensor other, *, Tensor(a!) out) -> (Tensor(a!))
 - func: mul.out
   PopTorchDirect: mul
-  PopTorchDirectInplace: mul_
   UnusedOutputArguments: {out}
 
 # aten::div.out(Tensor self, Tensor other, *, Tensor(a!) out) -> (Tensor(a!))
 - func: div.out
   PopTorchDirect: div
-  PopTorchDirectInplace: div_
   UnusedOutputArguments: {out}
 
 # func: div.out_mode(Tensor self, Tensor other, *, str? rounding_mode, Tensor(a!) out) -> Tensor(a!)
@@ -375,13 +368,11 @@
 # func: round.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)
 - func: round.out
   PopTorchDirect: round
-  PopTorchDirectInplace: round_
   UnusedOutputArguments: {out}
 
 # func: fmod.Tensor_out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)
 - func: fmod.Tensor_out
   PopTorchDirect: rem
-  PopTorchDirectInplace: rem_
   UnusedOutputArguments: {out}
 
 # func: floor_divide(Tensor self, Tensor other) -> Tensor
@@ -391,7 +382,6 @@
 # func: sign.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)
 - func: sign.out
   PopTorchDirect: signum
-  PopTorchDirectInplace: signum_
   UnusedOutputArguments: {out}
 
 # aten::zero_(Tensor(a!) self) -> (Tensor(a!))
@@ -407,27 +397,23 @@
 # sub.out(Tensor self, Tensor other, *, Scalar alpha=1, Tensor(a!) out) -> Tensor(a!)
 - func: sub.out
   PopTorchDirect: sub
-  PopTorchDirectInplace: sub_
   UnusedOutputArguments: {out}
 
 
 # add.out(Tensor self, Tensor other, *, Scalar alpha=1, Tensor(a!) out) -> Tensor(a!)
 - func: add.out
   PopTorchDirect: add
-  PopTorchDirectInplace: add_
   UnusedOutputArguments: {out}
 
 # aten::addcmul.out(Tensor self, Tensor tensor1, Tensor tensor2, *, Scalar value=1, Tensor(a!) out) -> (Tensor(a!))
 - func: addcmul.out
   PopTorchDirect: addcmul
-  PopTorchDirectInplace: addcmul_
   UnusedOutputArguments: {out}
 
 
 # aten::addcdiv.out(Tensor self, Tensor tensor1, Tensor tensor2, *, Scalar value=1, Tensor(a!) out) -> (Tensor(a!))
 - func: addcdiv.out
   PopTorchDirect: addcdiv
-  PopTorchDirectInplace: addcdiv_
   UnusedOutputArguments: {out}
 
 # func: exp.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)
@@ -443,7 +429,6 @@
 # func: pow.Tensor_Tensor_out(Tensor self, Tensor exponent, *, Tensor(a!) out) -> Tensor(a!)
 - func: pow.Tensor_Tensor_out
   PopTorchDirect: pow
-  PopTorchDirectInplace: pow_
   UnusedOutputArguments: {out}
 
 # func: pow.Tensor_Scalar_out(Tensor self, Scalar exponent, *, Tensor(a!) out) -> Tensor(a!)
@@ -454,37 +439,31 @@
 # func: bitwise_and.Tensor_out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)
 - func: bitwise_and.Tensor_out
   PopTorchDirect: bitwiseAnd
-  PopTorchDirectInplace: bitwiseAnd_
   UnusedOutputArguments: {out}
 
 # func: bitwise_not.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)
 - func: bitwise_not.out
   PopTorchDirect: bitwiseNot
-  PopTorchDirectInplace: bitwiseNot_
   UnusedOutputArguments: {out}
 
 # func: bitwise_or.Tensor_out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)
 - func: bitwise_or.Tensor_out
   PopTorchDirect: bitwiseOr
-  PopTorchDirectInplace: bitwiseOr_
   UnusedOutputArguments: {out}
 
 # func: bitwise_xor.Tensor_out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)
 - func: bitwise_xor.Tensor_out
   PopTorchDirect: bitwiseXor
-  PopTorchDirectInplace: bitwiseXor_
   UnusedOutputArguments: {out}
 
 # func: logical_and.out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)
 - func: logical_and.out
   PopTorchDirect: logicalAnd
-  PopTorchDirectInplace: logicalAnd_
   UnusedOutputArguments: {out}
 
 # func: logical_or.out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)
 - func: logical_or.out
   PopTorchDirect: logicalOr
-  PopTorchDirectInplace: logicalOr_
   UnusedOutputArguments: {out}
 
 # func: logical_xor.out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)
@@ -495,30 +474,25 @@
 # func: logical_not.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)
 - func: logical_not.out
   PopTorchDirect: logicalNot
-  PopTorchDirectInplace: logicalNot_
   UnusedOutputArguments: {out}
 
 # abs.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)
 - func: abs.out
   PopTorchDirect: abs
-  PopTorchDirectInplace: abs_
   UnusedOutputArguments: {out}
 
 # neg.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)
 - func: neg.out
   PopTorchDirect: neg
-  PopTorchDirectInplace: neg_
   UnusedOutputArguments: {out}
 
 # func: minimum(Tensor self, Tensor other) -> Tensor
 - func: minimum
   PopTorchDirect: minimum
-  PopTorchDirectInplace: minimum_
 
 # func: maximum(Tensor self, Tensor other) -> Tensor
 - func: maximum
   PopTorchDirect: maximum
-  PopTorchDirectInplace: maximum_
 
 # func: max(Tensor self) -> Tensor
 - func: max
@@ -587,13 +561,11 @@
 # func: ceil.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)
 - func: ceil.out
   PopTorchDirect: ceil
-  PopTorchDirectInplace: ceil_
   UnusedOutputArguments: {out}
 
 # func: floor.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)
 - func: floor.out
   PopTorchDirect: floor
-  PopTorchDirectInplace: floor_
   UnusedOutputArguments: {out}
 
 # func: trunc(Tensor self) -> Tensor
@@ -613,7 +585,6 @@
 # func: atan2.out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)
 - func: atan2.out
   PopTorchDirect: atan2
-  PopTorchDirectInplace: atan2_
   UnusedOutputArguments: {out}
 
 # hardtanh.out(Tensor self, Scalar min_val=-1, Scalar max_val=1, *, Tensor(a!) out) -> Tensor(a!)
@@ -636,37 +607,31 @@
 # gt.Tensor_out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)
 - func: gt.Tensor_out
   PopTorchDirect: gt
-  PopTorchDirectInplace: gt_
   UnusedOutputArguments: {out}
 
 # ge.Tensor_out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)
 - func: ge.Tensor_out
   PopTorchDirect: gteq
-  PopTorchDirectInplace: gteq_
   UnusedOutputArguments: {out}
 
 # lt.Tensor_out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)
 - func: lt.Tensor_out
   PopTorchDirect: lt
-  PopTorchDirectInplace: lt_
   UnusedOutputArguments: {out}
 
 # le.Tensor_out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)
 - func: le.Tensor_out
   PopTorchDirect: lteq
-  PopTorchDirectInplace: lteq_
   UnusedOutputArguments: {out}
 
 # func: eq.Tensor_out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)
 - func: eq.Tensor_out
   PopTorchDirect: eq
-  PopTorchDirectInplace: eq_
   UnusedOutputArguments: {out}
 
 # func: ne.Tensor_out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)
 - func: ne.Tensor_out
   PopTorchDirect: neq
-  PopTorchDirectInplace: neq_
   UnusedOutputArguments: {out}
 
 # func: lt.Scalar_out(Tensor self, Scalar other, *, Tensor(a!) out) -> Tensor(a!)
@@ -785,7 +750,7 @@
 
 # func: feature_dropout_(Tensor(a!) self, float p, bool train) -> Tensor(a!)
 - func: feature_dropout_
-  PopTorchDirect: feature_dropout_
+  PopTorchDirect: feature_dropout
 
 
 # func: acos.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)

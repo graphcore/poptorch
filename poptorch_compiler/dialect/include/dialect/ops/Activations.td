@@ -127,13 +127,6 @@ def Poptorch_log_sigmoid_forward : Poptorch_Op<"log_sigmoid_forward", []> {
     ];
 }
 
-// Inplace versions.
-def Poptorch_hardsigmoid_: Poptorch_elem_unary_in_place<"hardsigmoid_"> {}
-def Poptorch_hardswish_: Poptorch_elem_unary_in_place<"hardswish_"> {}
-def Poptorch_swish_: Poptorch_elem_unary_in_place<"swish_"> {}
-def Poptorch_relu_: Poptorch_elem_unary_in_place<"relu_"> {}
-def Poptorch_gelu_: Poptorch_elem_unary_in_place<"gelu_"> {}
-
 // Softmax takes an additional "dim" argument.
 def Poptorch_softmax : Poptorch_Op<"softmax", [SameOperandsAndResultShape]> {
 

@@ -289,7 +289,6 @@ class Poptorch_dropout_NotImplementedOps<string name, list<OpTrait> traits = []>
 }
 
 def Poptorch_feature_dropout : Poptorch_dropout_NotImplementedOps<"feature_dropout", []> {}
-def Poptorch_feature_dropout_ : Poptorch_dropout_NotImplementedOps<"feature_dropout_", []> {}
 
 def Poptorch_where : Poptorch_Op<"where", [SameOperandsAndResultShape]> {
   let arguments = (ins Poptorch_tensor:$condition,

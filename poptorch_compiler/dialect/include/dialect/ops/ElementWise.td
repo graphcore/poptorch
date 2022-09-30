@@ -109,60 +109,6 @@ def Poptorch_log10 : Poptorch_elem_unary<"log10", [ImplicitCastOperand<0>, Impli
 def Poptorch_log2 : Poptorch_elem_unary<"log2", [ImplicitCastOperand<0>, ImplicitCastToFloat]> {}
 def Poptorch_reciprocal : Poptorch_elem_unary<"reciprocal", [ImplicitCastOperand<0>, ImplicitCastToFloat]> {}
 
-class Poptorch_elem_unary_in_place<string name, list<OpTrait> traits = []> : Poptorch_Op<name, traits> {
-    let arguments = (ins Poptorch_tensor:$in1);
-    let assemblyFormat = [{
-        `(` `(``->``)` $in1 `)` `(`type($in1)`)` attr-dict
-    }];
-}
-
-// In-place trigonometric functions.
-def Poptorch_acos_: Poptorch_elem_unary_in_place<"acos_", [ImplicitCastOperand<0>, ImplicitCastToFloat]> {}
-def Poptorch_acosh_: Poptorch_elem_unary_in_place<"acosh_", [ImplicitCastOperand<0>, ImplicitCastToFloat]> {}
-def Poptorch_asin_: Poptorch_elem_unary_in_place<"asin_", [ImplicitCastOperand<0>, ImplicitCastToFloat]> {}
-def Poptorch_asinh_: Poptorch_elem_unary_in_place<"asinh_", [ImplicitCastOperand<0>, ImplicitCastToFloat]> {}
-def Poptorch_atan_: Poptorch_elem_unary_in_place<"atan_", [ImplicitCastOperand<0>, ImplicitCastToFloat]> {}
-def Poptorch_atanh_: Poptorch_elem_unary_in_place<"atanh_", [ImplicitCastOperand<0>, ImplicitCastToFloat]> {}
-def Poptorch_cos_: Poptorch_elem_unary_in_place<"cos_", [ImplicitCastOperand<0>, ImplicitCastToFloat]> {}
-def Poptorch_cosh_: Poptorch_elem_unary_in_place<"cosh_", [ImplicitCastOperand<0>, ImplicitCastToFloat]> {}
-def Poptorch_sin_: Poptorch_elem_unary_in_place<"sin_", [ImplicitCastOperand<0>, ImplicitCastToFloat]> {}
-def Poptorch_sinh_: Poptorch_elem_unary_in_place<"sinh_", [ImplicitCastOperand<0>, ImplicitCastToFloat]> {}
-def Poptorch_tan_: Poptorch_elem_unary_in_place<"tan_", [ImplicitCastOperand<0>, ImplicitCastToFloat]> {}
-def Poptorch_tanh_: Poptorch_elem_unary_in_place<"tanh_", [ImplicitCastOperand<0>, ImplicitCastToFloat]> {}
-
-def Poptorch_abs_: Poptorch_elem_unary_in_place<"abs_"> {}
-def Poptorch_bitwiseNot_: Poptorch_elem_unary_in_place<"bitwiseNot_"> {
-    let arguments = (ins Poptorch_integral_tensor:$in1);
-    let hasCanonicalizeMethod = 1;
-}
-def Poptorch_ceil_: Poptorch_elem_unary_in_place<"ceil_"> {}
-def Poptorch_countLeadingZeros_: Poptorch_elem_unary_in_place<"countLeadingZeros_"> {}
-def Poptorch_erf_: Poptorch_elem_unary_in_place<"erf_", [ImplicitCastOperand<0>, ImplicitCastToFloat]> {}
-def Poptorch_erfc_: Poptorch_elem_unary_in_place<"erfc_", [ImplicitCastOperand<0>, ImplicitCastToFloat]> {}
-def Poptorch_exp_: Poptorch_elem_unary_in_place<"exp_"> {}
-def Poptorch_expm1_: Poptorch_elem_unary_in_place<"expm1_"> {}
-def Poptorch_floor_: Poptorch_elem_unary_in_place<"floor_"> {}
-def Poptorch_inv_: Poptorch_elem_unary_in_place<"inv_"> {}
-def Poptorch_log_: Poptorch_elem_unary_in_place<"log_", [ImplicitCastOperand<0>, ImplicitCastToFloat]> {}
-def Poptorch_log10_: Poptorch_elem_unary_in_place<"log10_", [ImplicitCastOperand<0>, ImplicitCastToFloat]> {}
-def Poptorch_log1p_: Poptorch_elem_unary_in_place<"log1p_", [ImplicitCastOperand<0>, ImplicitCastToFloat]> {}
-def Poptorch_frac_ : Poptorch_elem_unary_in_place<"frac_"> {
-    let arguments = (ins Poptorch_float_tensor:$in1);
-}
-def Poptorch_log2_: Poptorch_elem_unary_in_place<"log2_", [ImplicitCastOperand<0>, ImplicitCastToFloat]> {}
-def Poptorch_logicalNot_: Poptorch_elem_unary_in_place<"logicalNot_", [ImplicitCastOperand<0>, ImplicitCastToBool]> {}
-def Poptorch_neg_: Poptorch_elem_unary_in_place<"neg_"> {}
-def Poptorch_popcount_: Poptorch_elem_unary_in_place<"popcount_"> {}
-def Poptorch_reciprocal_ : Poptorch_elem_unary_in_place<"reciprocal_", [ImplicitCastOperand<0>, ImplicitCastToFloat]> {}
-def Poptorch_round_: Poptorch_elem_unary_in_place<"round_"> {
-    let arguments = (ins Poptorch_float_tensor:$in1);
-}
-def Poptorch_rsqrt_: Poptorch_elem_unary_in_place<"rsqrt_"> {}
-def Poptorch_sigmoid_: Poptorch_elem_unary_in_place<"sigmoid_"> {}
-def Poptorch_signum_: Poptorch_elem_unary_in_place<"signum_"> {}
-def Poptorch_sqrt_: Poptorch_elem_unary_in_place<"sqrt_"> {}
-def Poptorch_square_: Poptorch_elem_unary_in_place<"square_"> {}
-
 /*
  * Binary ops.
  */
@@ -287,72 +233,6 @@ def Poptorch_mul: Poptorch_elem_binary<"mul"> {
 }
 
 
-class Poptorch_elem_binary_in_place<string name> :  Poptorch_Op<name, []> {
-    let arguments = (ins Poptorch_tensor:$in1, Poptorch_tensor:$in2);
-    let assemblyFormat = [{
-        `(` `(``->``)` $in1 `,` $in2 `)` `(`type($in1)`,`type($in2)`)` attr-dict
-    }];
-}
-
-def Poptorch_atan2_: Poptorch_elem_binary_in_place<"atan2_"> {}
-def Poptorch_bitwiseAnd_: Poptorch_elem_binary_in_place<"bitwiseAnd_"> {}
-def Poptorch_bitwiseOr_: Poptorch_elem_binary_in_place<"bitwiseOr_"> {}
-def Poptorch_bitwiseXor_: Poptorch_elem_binary_in_place<"bitwiseXor_"> {}
-def Poptorch_bitwiseXnor_: Poptorch_elem_binary_in_place<"bitwiseXnor_"> {}
-def Poptorch_div_: Poptorch_elem_binary_in_place<"div_"> {}
-def Poptorch_eq_: Poptorch_elem_binary_in_place<"eq_"> {}
-def Poptorch_gteq_: Poptorch_elem_binary_in_place<"gteq_"> {}
-def Poptorch_gt_: Poptorch_elem_binary_in_place<"gt_"> {}
-def Poptorch_lteq_: Poptorch_elem_binary_in_place<"lteq_"> {}
-def Poptorch_logicalAnd_: Poptorch_elem_binary_in_place<"logicalAnd_"> {}
-def Poptorch_logicalOr_: Poptorch_elem_binary_in_place<"logicalOr_"> {}
-def Poptorch_lt_: Poptorch_elem_binary_in_place<"lt_"> {}
-def Poptorch_maximum_: Poptorch_elem_binary_in_place<"maximum_"> {}
-def Poptorch_minimum_: Poptorch_elem_binary_in_place<"minimum_"> {}
-def Poptorch_neq_: Poptorch_elem_binary_in_place<"neq_"> {}
-def Poptorch_pow_: Poptorch_elem_binary_in_place<"pow_"> {
-    let arguments = (ins Poptorch_non_boolean_tensor:$in1, Poptorch_non_boolean_tensor:$in2);
-}
-def Poptorch_rem_: Poptorch_elem_binary_in_place<"rem_"> {}
-def Poptorch_shiftLeft_: Poptorch_elem_binary_in_place<"shiftleft_"> {}
-def Poptorch_shiftRight_: Poptorch_elem_binary_in_place<"shiftright_"> {}
-def Poptorch_shiftRightSignExtend_: Poptorch_elem_binary_in_place<"shiftrightsignextend_"> {}
-def Poptorch_mul_: Poptorch_elem_binary_in_place<"mul_"> {}
-
-
-class Poptorch_elem_binary_in_place_with_alpha<string name> :  Poptorch_elem_binary_in_place<name> {
-    let arguments = (ins Poptorch_tensor:$in1, Poptorch_tensor:$in2, DefaultValuedAttr<F32Attr, "1.0">:$alpha);
-
-    let builders = [OpBuilder<(ins "mlir::Value":$v1, "mlir::Value":$v2, "float":$alpha),[{
-        $_state.addOperands({v1, v2});
-        $_state.addAttribute("alpha",$_builder.getF32FloatAttr(alpha));
-     }]>
-    ];
-}
-
-def Poptorch_add_: Poptorch_elem_binary_in_place_with_alpha<"add_"> {}
-def Poptorch_sub_: Poptorch_elem_binary_in_place_with_alpha<"sub_"> {}
-
-
-class Poptorch_scaled<string name> : Poptorch_Op<name, []> {
-    let arguments = (ins Poptorch_tensor:$in1, Poptorch_tensor:$in2, F32Attr:$scale);
-
-    let assemblyFormat = [{
-        `(` `(``->``)`$in1 `,` $in2 `)` `(`type($in1)`,`type($in2)`)` attr-dict
-    }];
-
-
-    let builders = [OpBuilder<(ins "mlir::Value":$v1, "mlir::Value":$v2, "float":$scale),[{
-        $_state.addOperands({v1, v2});
-        $_state.addAttribute("scale", $_builder.getF32FloatAttr(scale));
-     }]>
-    ];
-}
-
-def Poptorch_scaledadd_: Poptorch_scaled<"scaled_add_"> {}
-
-def Poptorch_scaledsub_: Poptorch_scaled<"scaled_sub_"> {}
-
 class Poptorch_addcX<string name> : Poptorch_Op<name, []> {
     let arguments = (ins Poptorch_tensor:$input, Poptorch_tensor:$tensor1, Poptorch_tensor:$tensor2, F32Attr:$value);
 
@@ -385,12 +265,10 @@ class Poptorch_addcOutplaceX<string name> : Poptorch_addcX<name> {
 
 // aten::addcmul.out(Tensor self, Tensor tensor1, Tensor tensor2, *, Scalar value=1, Tensor(a!) out) -> (Tensor(a!)
 def Poptorch_addcmul : Poptorch_addcOutplaceX<"addcmul"> {}
-def Poptorch_addcmul_ : Poptorch_addcX<"addcmul_"> {}
 
 
 // aten::addcdiv.out(Tensor self, Tensor tensor1, Tensor tensor2, *, Scalar value=1, Tensor(a!) out) -> (Tensor(a!))
 def Poptorch_addcdiv : Poptorch_addcOutplaceX<"addcdiv"> {}
-def Poptorch_addcdiv_ : Poptorch_addcX<"addcdiv_"> {}
 
 class Poptorch_elem_binary_scalar<string name, list<OpTrait> traits = []>
         : Poptorch_Op<name, traits> {
