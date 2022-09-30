@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "Tensor.hpp"
+#include "poptorch/DispatchTracer.hpp"
 #include "pytorch_bridge/CompilerTypes.hpp"
 
 namespace poptorch {
@@ -77,6 +78,8 @@ public:
   std::unordered_map<std::string, uint64_t> name_ids_map;
   std::unordered_map<uint64_t, std::string> ids_name_map;
 
+  std::unordered_map<uint64_t, PerReplicaSettings> per_replica_map;
+
   // We also need to map the values to the mlir so we can query the mlir for a
   // given value.
   std::unordered_map<torch::jit::Value *, TrackedTensor *> values_map;
@@ -104,6 +107,10 @@ public:
   torch::jit::Value *getValueForTensorList(const TensorList &list);
 
   void setParameterName(const at::Tensor &t, const std::string &name);
+
+  void setParameterPerReplica(const std::string &param_name,
+                              const at::Tensor &tensor, int comm_group_type,
+                              int shards, int variable_retrieval_mode);
 
   void replaceValue(torch::jit::Value *v_old, torch::jit::Value *v_new);
 

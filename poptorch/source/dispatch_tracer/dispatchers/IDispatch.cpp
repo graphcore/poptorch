@@ -59,6 +59,31 @@ std::string IDispatch::getParameterName(torch::jit::Value *value) {
   return it->second;
 }
 
+void IDispatch::setParameterPerReplica(const std::string &param_name,
+                                       const at::Tensor &tensor,
+                                       int comm_group_type, int shards,
+                                       int variable_retrieval_mode) {
+  _mapper.setParameterPerReplica(param_name, tensor, comm_group_type, shards,
+                                 variable_retrieval_mode);
+}
+
+bool IDispatch::getParameterPerReplica(torch::jit::Value *value,
+                                       PerReplicaSettings &settings) {
+  auto *record = _mapper.rawTensorRecord(value);
+  if (record == nullptr) {
+    logging::trace("JIT value not tracked {}", reinterpret_cast<void *>(value));
+    return false;
+  }
+  ERROR_ON_MSG(!record->tensor_details->is_parameter,
+               "%" << value->debugName() << " is not a Parameter");
+  auto it = _mapper.per_replica_map.find(record->ipu_tensor_id);
+  if (it == _mapper.per_replica_map.end()) {
+    return false;
+  }
+  settings = it->second;
+  return true;
+}
+
 void IDispatch::replaceValue(torch::jit::Value *v_old,
                              torch::jit::Value *v_new) {
   _mapper.replaceValue(v_old, v_new);

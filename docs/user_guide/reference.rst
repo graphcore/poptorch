@@ -135,6 +135,26 @@ Parallel execution
 
 .. autoclass:: poptorch.Liveness
 
+.. autoclass:: poptorch.CommGroupType
+
+.. autoclass:: poptorch.VariableRetrievalMode
+
+.. py:function:: perReplica
+
+   Call this function on a weight tensor (after applying a PopTorch wrapper with
+   :py:func:`~poptorch.inferenceModel` or :py:func:`~poptorch.trainingModel`)
+   to configure replica groups which each receive a different value of the
+   weight tensor. For details and a code example see
+   :numref:`grouping_tensor_weights`.
+
+   :param comm_group_type: The replica group arrangement to use for this tensor.
+   :type comm_group_type: poptorch.CommGroupType
+   :param shards: The number of replicas in each replica group.
+   :type shards: int
+   :param variable_retrieval_mode: The method to use when retrieving the value
+                                   of this tensor from the replicas.
+   :type variable_retrieval_mode: poptorch.VariableRetrievalMode
+
 Optimizers
 ==========
 

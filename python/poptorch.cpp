@@ -572,6 +572,14 @@ void mapParamsToNames(const pybind11::tuple &names,
   }
 }
 
+void setPerReplica(const std::string &param_name, py::handle tensor,
+                   int comm_group_type, int shards,
+                   int variable_retrieval_mode) {
+  at::Tensor t = torch::jit::toTypeInferredIValue(tensor).toTensor();
+  setParameterPerReplica(param_name, t, comm_group_type, shards,
+                         variable_retrieval_mode);
+}
+
 std::string convertToString(const std::vector<char> &str) {
   return std::string(str.data(), str.size());
 }
@@ -1122,6 +1130,7 @@ PYBIND11_MODULE(poptorch_core, m) { // NOLINT
   m.def("endOutputsMove", PTC(poptorch::endOutputsMove));
   m.def("createGraph", PTC(poptorch::createGraph));
   m.def("mapParamsToNames", PTC(poptorch::mapParamsToNames));
+  m.def("setPerReplica", PTC(poptorch::setPerReplica));
   m.def("finalizeGraph", PTC(poptorch::finalizeGraph));
   m.def("compileWithManualTracing",
         PTC(poptorch::bindings::compileWithManualTracing));

@@ -141,6 +141,15 @@ class IPUScope:
             # model to prevent IPU to CPU copies when accessing the state_dict.
             _impl.unwrapModelIfNecessary(self._model)
 
+            for name, param in self._cpu_params.items():
+                if hasattr(param, "per_replica"):
+                    if param.shape == torch.Size([]):
+                        raise _impl.createPoptorchError(
+                            "Scalars cannot be passed as per-replica weight "
+                            "tensor values")
+                    param_tensor = param.narrow(0, 0, 1).squeeze(dim=0)
+                    setattr(*self._get_module_and_name(name),
+                            torch.nn.Parameter(param_tensor))
             # TODO(T61576) We currently use a state machine to determine if
             # tensors are inputs or parameters.
             # We need to find a better solution.
@@ -191,6 +200,11 @@ class IPUScope:
 
             self._old_addresses = _impl.getBufferAndParameterAddresses(
                 self._model)
+
+            for name, param in self._cpu_params.items():
+                if hasattr(param, "per_replica"):
+                    poptorch_core.setPerReplica(name, param,
+                                                *param.per_replica)
 
         poptorch_core.startDispatch()
         _impl.setDispatchTracing(True)

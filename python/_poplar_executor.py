@@ -307,6 +307,15 @@ class PoplarExecutor:
                     return super().__torch_function__(func, types, args,
                                                       kwargs)
 
+                def perReplica(
+                        self, comm_group_type: enums.CommGroupType,
+                        shards: int,
+                        variable_retrieval_mode: enums.VariableRetrievalMode):
+                    # pylint: disable=attribute-defined-outside-init
+                    self.per_replica = (comm_group_type, shards,
+                                        variable_retrieval_mode)
+                    # pylint: enable=attribute-defined-outside-init
+
             self.PoptorchParameter = PoptorchParameter
 
             class PoptorchBuffer(torch.Tensor):
@@ -1408,7 +1417,7 @@ class PoplarExecutor:
         # Input will be in form of [ModelBatchSize * BatchPerStep, ...] so we
         # should slice it up so we compile by the ModelBatchSize alone.
         extra_poplar_batch_dims = self._options.device_iterations * \
-            self._options.replication_factor * \
+            self._options.input_replication_factor * \
             self._options.Training.gradient_accumulation
 
         if not isinstance(tensor, torch.Tensor):
@@ -1426,7 +1435,7 @@ class PoplarExecutor:
             "full explanation see the batching semantics page of the "
             "documentation.") % (tensor.shape, b_size,
                                  self._options.device_iterations,
-                                 self._options.replication_factor,
+                                 self._options.input_replication_factor,
                                  self._options.Training.gradient_accumulation,
                                  extra_poplar_batch_dims)
         return tensor if tensor.shape == torch.Size([]) else tensor.narrow(

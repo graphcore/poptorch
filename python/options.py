@@ -1258,6 +1258,7 @@ class Options(_options_impl.OptionsDict):
         self.showCompilationProgressBar(True)
         self._module_namescope_enabled = True
         super().__init__(replication_factor=1,
+                         input_replication_factor=1,
                          broadcast_buffers=True,
                          device_iterations=1,
                          log_dir=".",
@@ -1489,7 +1490,10 @@ class Options(_options_impl.OptionsDict):
         self.createOrSet(available_memory_proportion=actual_memory)
         return self
 
-    def replicationFactor(self, replication_factor: int) -> "poptorch.Options":
+    def replicationFactor(self,
+                          replication_factor: int,
+                          input_replication_factor: Optional[int] = None
+                          ) -> "poptorch.Options":
         """Number of times to replicate the model (default: 1).
 
         Replicating the model increases the data throughput of the model as
@@ -1498,10 +1502,23 @@ class Options(_options_impl.OptionsDict):
         a ``replication_factor`` of 2 will use 2 IPUs; if your model uses 4
         IPUs, a replication factor of 4 will use 16 IPUs in total.
 
+        The second parameter, ``input_replication_factor``, controls how many
+        ways the input tensors are split between the replicas. If not specified,
+        this will be the same as ``replication_factor``, so that the input
+        tensors will be split into a block for each replica. This can be smaller
+        than ``replication_factor`` if per-replica weights are being used. See
+        :ref:`grouping_tensor_weights` for further explanation.
+
         :param replication_factor:
             Number of replicas of the model to create.
+
+        :param input_replication_factor:
+            Number of ways to split the input tensors.
         """
         self.set(replication_factor=replication_factor)
+        if input_replication_factor is None:
+            input_replication_factor = replication_factor
+        self.set(input_replication_factor=input_replication_factor)
         return self
 
     def broadcastBuffers(self, broadcast_buffers: bool = True):

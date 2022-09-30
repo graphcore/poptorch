@@ -983,6 +983,8 @@ void LowerToPopartImpl::lowerParameters(std::vector<at::Tensor> *in_tensors) {
   std::function<void *(torch::jit::Value * value)> get_data_ptr;
   std::function<std::string(torch::jit::Value * value)> get_parameter_name;
   std::function<JitTensorInfo(torch::jit::Value * value)> get_type_info;
+  std::function<bool(torch::jit::Value * value, PerReplicaSettings & settings)>
+      get_parameter_per_replica;
 
   if (_built_in_params) {
     ERROR_ON_MSG(in_tensors != nullptr,
@@ -1000,6 +1002,7 @@ void LowerToPopartImpl::lowerParameters(std::vector<at::Tensor> *in_tensors) {
     get_type_info = [](torch::jit::Value *value) {
       return JitTensorInfo(value);
     };
+    get_parameter_per_replica = getParameterPerReplica;
 
     // Step 0, remove unused parameters
     // graph_t_inputs is updated but _graph.inputs() will retain unused
@@ -1115,8 +1118,22 @@ void LowerToPopartImpl::lowerParameters(std::vector<at::Tensor> *in_tensors) {
       }
 
       std::string name = _parameter_names.at(param_index);
-      auto id = _compiler.addInitializedInputTensor(
-          name.c_str(), popart_type.c_str(), info.dims, data_ptr);
+      popart_compiler::TensorId id;
+      PerReplicaSettings pr_settings;
+      if (get_parameter_per_replica &&
+          get_parameter_per_replica(value, pr_settings)) {
+        std::vector<std::int64_t> dims(info.dims.size() + 1);
+        dims[0] = pr_settings.size0;
+        memcpy(&dims[1], &info.dims[0],
+               info.dims.size() * sizeof(std::int64_t));
+        id = _compiler.addInitializedInputTensor(
+            name.c_str(), popart_type.c_str(), dims,
+            pr_settings.host_buffer->data(), pr_settings.comm_group_type,
+            pr_settings.shards, pr_settings.variable_retrieval_mode);
+      } else {
+        id = _compiler.addInitializedInputTensor(
+            name.c_str(), popart_type.c_str(), info.dims, data_ptr);
+      }
       parameter_values.push_back(value);
       parameter_popart_ids.push_back(id);
       param_index++;

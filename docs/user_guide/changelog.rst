@@ -8,6 +8,7 @@ v3.1 (Poplar SDK 3.1)
 New features
 ------------
 
+- Ability to send different values for a weight tensor to different replica groups (see :numref:`grouping_tensor_weights`)
 
 API changes
 -----------

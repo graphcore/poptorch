@@ -675,6 +675,44 @@ The default :py:class:`~poptorch.Liveness` is ``AlwaysLive``.
 ``OffChipAfterEachPhase`` may be helpful if you run a large model
 with a tight memory budget.
 
+.. _grouping_tensor_weights:
+
+Grouping tensor weights across replicas
+---------------------------------------
+
+PopTorch supports configuring weight tensors such that a different value of the
+weight tensor is sent to each replica, or to groups of replicas. This
+functionality can be used, for instance, to split a weight tensor and process
+parts of it on different groups of replicas. This functionality is accessed
+using the :py:func:`~perReplica` method on the weight tensor in question.
+
+.. literalinclude:: replica_grouped_weights.py
+    :language: python
+    :caption: How to use replica grouped weights
+    :linenos:
+    :start-after: groupedweights_start
+    :end-before: groupedweights_end
+
+In the code example above, eight replicas are used. The weight tensor ``W`` is
+split four ways between orthogonal groups, each containing two replicas.
+Orthogonal groups are organised perpendicularly to the replica ordering, so that
+in this example replicas 0 and 4 would form the first group, 1 and 5 the
+second, and so on. See :py:class:`~poptorch.CommGroupType` for other replica
+group organisation options (also illustrated in :numref:`figCommGroupTypes`),
+and :py:class:`~poptorch.VariableRetrievalMode` for options relating to how
+many replicas will be involved in value retrieval.
+
+.. figure:: comm-group-types.png
+  :name: figCommGroupTypes
+  :width: 100%
+
+  Possible CommGroupTypes
+
+Note that in this code example, the input tensor ``X`` is split two ways. This
+is achieved by passing two parameters to
+:py:meth:`~poptorch.Options.replicationFactor`. The first parameter sets the
+total number of replicas, and the second sets the number of input tensor splits.
+
 .. _optimizers:
 
 Optimizers

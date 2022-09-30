@@ -140,6 +140,10 @@ SessionOptionsImpl::SessionOptionsImpl() {
                  [&](std::uint64_t value) {
                    popart_options.replicatedGraphCount = value;
                  });
+  registerSetter(uint64_options, "input_replication_factor",
+                 [&](std::uint64_t value) {
+                   poptorch_options.input_replication_factor = value;
+                 });
   registerSetter(uint64_options, "execution_mode", [&](std::uint64_t value) {
     ERROR_ON_MSG(value >= static_cast<std::uint64_t>(ExecutionMode::N),
                  "Value for ExecutionMode out of range");
@@ -454,7 +458,7 @@ bool SessionOptions::broadcastBuffers() const {
 }
 
 std::uint64_t SessionOptions::replicationFactor() const {
-  return _impl->popart_options.replicatedGraphCount;
+  return _impl->poptorch_options.input_replication_factor;
 }
 
 void SessionOptions::setMemoryProportion(std::uint32_t ipu, float memory) {

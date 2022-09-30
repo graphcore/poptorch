@@ -43,6 +43,14 @@ enum TracingMode {
   SENTINEL
 };
 
+struct PerReplicaSettings {
+  int comm_group_type;
+  int shards;
+  int variable_retrieval_mode;
+  int64_t size0;
+  std::shared_ptr<std::vector<char>> host_buffer;
+};
+
 /*
  * When we compile we have two kinds of outputs. JIT or MLIR. JIT just returns
  * the JIT graph to be compiled by a slightly modified compile step in
@@ -97,6 +105,13 @@ void setParameterName(const at::Tensor &tensor, const std::string &name);
 
 // Return the name of a parameter or an empty string if no name was set.
 std::string getParameterName(torch::jit::Value *value);
+
+void setParameterPerReplica(const std::string &param_name,
+                            const at::Tensor &tensor, int comm_group_type,
+                            int shards, int variable_retrieval_mode);
+
+bool getParameterPerReplica(torch::jit::Value *value,
+                            PerReplicaSettings &settings);
 
 // Get a pointer to the data source for a given JIT value.
 // The value must be an IPU value.

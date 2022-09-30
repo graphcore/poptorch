@@ -54,6 +54,25 @@ void ValueMapper::setParameterName(const at::Tensor &t,
   ids_name_map.insert({id, name});
 }
 
+void ValueMapper::setParameterPerReplica(const std::string &param_name,
+                                         const at::Tensor &tensor,
+                                         int comm_group_type, int shards,
+                                         int variable_retrieval_mode) {
+  auto param_it = name_ids_map.find(param_name);
+  if (param_it == std::end(name_ids_map)) {
+    logging::warn("Parameter name {} was not found", param_name);
+    return;
+  }
+  auto data_size = tensorDataSize(tensor);
+  ERROR_ON_MSG(!tensor.is_contiguous(),
+               "Data source must be contiguous: " << str(tensor));
+  PerReplicaSettings settings = {
+      comm_group_type, shards, variable_retrieval_mode, tensor.size(0),
+      std::make_shared<std::vector<char>>(data_size)};
+  memcpy(settings.host_buffer->data(), tensor.data_ptr(), data_size);
+  per_replica_map[param_it->second] = settings;
+}
+
 // Add a tensor to the IR.
 void ValueMapper::addTensor(const at::Tensor &t, poptorch_ir::TensorId id) {
   logging::trace("Adding {} to value mapper {}, MLIR id: {}",

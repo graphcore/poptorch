@@ -378,6 +378,17 @@ std::string getParameterName(torch::jit::Value *value) {
   return context.activeDispatch()->getParameterName(value);
 }
 
+void setParameterPerReplica(const std::string &param_name,
+                            const at::Tensor &tensor, int comm_group_type,
+                            int shards, int variable_retrieval_mode) {
+  context.activeDispatch()->setParameterPerReplica(
+      param_name, tensor, comm_group_type, shards, variable_retrieval_mode);
+}
+
+bool getParameterPerReplica(torch::jit::Value *value,
+                            PerReplicaSettings &settings) {
+  return context.activeDispatch()->getParameterPerReplica(value, settings);
+}
 // Returns true if the current compilation is being handled using a dispatcher.
 //
 // This is needed because in some cases, we don't want calls to be dispatched to

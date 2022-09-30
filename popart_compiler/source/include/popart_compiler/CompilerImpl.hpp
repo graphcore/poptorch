@@ -73,6 +73,7 @@ public:
   struct ArrayInfo {
     popart::IArray &array;
     int64_t offset;
+    int64_t tensor_shard;
   };
 
   using ArrayType = popart::IArray;
@@ -95,7 +96,8 @@ public:
   void populate(const TensorArrayMap &inputs, const TensorArrayMap &outputs);
 
   template <typename T>
-  T get(const popart::TensorId &id, TensorArrayInfo *map, int64_t num_elems);
+  T get(const popart::TensorId &id, TensorArrayInfo *map, int64_t num_elems,
+        int64_t tensor_shard_count);
   static void timestamp(TensorTimestamps *time, const popart::TensorId &id);
 
   void assertNumElements(
@@ -121,6 +123,8 @@ public:
     return _out_complete_times.at(id);
   }
 
+  void setNumTensorShards(int64_t num);
+
 protected:
   TensorArrayInfo _inputs_info;
   TensorArrayInfo _outputs_info;
@@ -130,6 +134,8 @@ protected:
   TensorTimestamps _in_complete_times;
   TensorTimestamps _out_times;
   TensorTimestamps _out_complete_times;
+
+  int64_t _num_tensor_shards;
 };
 
 class WeightsIO : public popart::IWeightsIO {

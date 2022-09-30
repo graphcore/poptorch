@@ -207,6 +207,10 @@ public:
   TensorId addInitializedInputTensor(const char *name, const char *type,
                                      const std::vector<std::int64_t> &dims,
                                      void *data);
+  TensorId addInitializedInputTensor(const char *name, const char *type,
+                                     const std::vector<std::int64_t> &dims,
+                                     void *data, int comm_group_type,
+                                     int shards, int variable_retrieval_mode);
 
   bool tensorIdIsValid(TensorId id) const;
   const char *tensorName(TensorId id) const;

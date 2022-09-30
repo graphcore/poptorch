@@ -149,6 +149,8 @@ struct CompilerOptions {
   // (Not yet supported) Whether each buffer should be broadcasted from the
   // first to other replicas on each training step.
   bool broadcast_buffers{false};
+
+  std::uint64_t input_replication_factor;
 };
 
 } // namespace detail

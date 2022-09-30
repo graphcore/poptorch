@@ -244,3 +244,45 @@ class Compiler(enum.IntEnum):
     """
     PopART = poptorch_core.TracingMode.PopART
     MLIR = poptorch_core.TracingMode.MLIR
+
+
+class CommGroupType(enum.IntEnum):
+    """Grouping to be used when distributing a per-replica variable among
+       replicas. See :ref:`grouping_tensor_weights`.
+
+    - ``All``: This causes :py:func:`~perReplica` to have no effect, as the same
+               variable value is distributed to all replicas. Group count is
+               ignored.
+
+    - ``Consecutive``: Each replica group is made up of consecutive replicas,
+                       So for group size ``k``, the groups would be set up thus:
+
+                       ``{0, 1, ... k-1}, {k, ... 2k-1} ... {N-k-1, ... N-1}``
+
+    - ``Orthogonal``: Each replica group is made up by slicing the replicas
+                      orthogonally to the replica ordering. So for group size
+                      ``k``, with group count ``m = N/k``:
+
+                      ``{0, m, 2m, ...}, {1, m+1, 2m+1, ...} ... {m-1, 2m-1,
+                      ... N-1}``
+
+    - ``NoGrouping``: Each replica gets its own value of the variable. Group
+                      count is ignored.
+    """
+    All = 0
+    Consecutive = 1
+    Orthogonal = 2
+    NoGrouping = 3
+
+
+class VariableRetrievalMode(enum.IntEnum):
+    """Method to be used when retrieving the value of a grouped variable from
+       grouped replicas. See :ref:`grouping_tensor_weights`.
+
+    - ``OnePerGroup``: Return one value for each replica group (takes the value
+                       from the first replica in the group).
+
+    - ``AllReplicas``: Return a value from each replica.
+    """
+    OnePerGroup = 0
+    AllReplicas = 2

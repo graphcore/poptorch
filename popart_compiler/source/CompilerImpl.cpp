@@ -243,7 +243,8 @@ popart::ConstVoidData StepIO::in(popart::TensorId id, int64_t num_elems,
                                  bool prefetch) {
   (void)prefetch;
   timestamp(&_in_times, id);
-  return get<popart::ConstVoidData>(id, &_inputs_info, num_elems);
+  return get<popart::ConstVoidData>(id, &_inputs_info, num_elems,
+                                    _num_tensor_shards);
 }
 
 void StepIO::inComplete(popart::TensorId id, int64_t num_elems) {
@@ -253,7 +254,7 @@ void StepIO::inComplete(popart::TensorId id, int64_t num_elems) {
 
 popart::MutableVoidData StepIO::out(popart::TensorId id, int64_t num_elems) {
   timestamp(&_out_times, id);
-  return get<popart::MutableVoidData>(id, &_outputs_info, num_elems);
+  return get<popart::MutableVoidData>(id, &_outputs_info, num_elems, 1);
 }
 
 void StepIO::outComplete(popart::TensorId id) {
@@ -281,7 +282,7 @@ void StepIO::populate(const TensorArrayMap &inputs,
                       const TensorArrayMap &outputs) {
   _inputs_info.clear();
   for (const auto &input : inputs) {
-    _inputs_info.insert({input.first, {input.second, 0}});
+    _inputs_info.insert({input.first, {input.second, 0, 0}});
     _in_times[input.first].clear();
     _in_complete_times[input.first].clear();
     computeStepDataInfo(input.first, &input.second);
@@ -289,7 +290,7 @@ void StepIO::populate(const TensorArrayMap &inputs,
 
   _outputs_info.clear();
   for (const auto &output : outputs) {
-    _outputs_info.insert({output.first, {output.second, 0}});
+    _outputs_info.insert({output.first, {output.second, 0, 0}});
     _out_times[output.first].clear();
     _out_complete_times[output.first].clear();
     computeStepDataInfo(output.first, &output.second);
@@ -298,7 +299,7 @@ void StepIO::populate(const TensorArrayMap &inputs,
 
 template <typename T>
 T StepIO::get(const popart::TensorId &id, TensorArrayInfo *map,
-              int64_t num_elems) {
+              int64_t num_elems, int64_t tensor_shard_count) {
   auto it = map->find(id);
   ERROR_ON_MSG(it == map->end(), "Internal Compiler Error in StepIO");
   auto &array_info = it->second;
@@ -318,7 +319,11 @@ T StepIO::get(const popart::TensorId &id, TensorArrayInfo *map,
       static_cast<int64_t>(step_data.info.getDataTypeInfo()->nbytes()) *
       num_elems;
 
-  array_info.offset = (array_info.offset + num_bytes) % step_data.info.nbytes();
+  array_info.tensor_shard = (array_info.tensor_shard + 1) % tensor_shard_count;
+  if (array_info.tensor_shard == 0) {
+    array_info.offset =
+        (array_info.offset + num_bytes) % step_data.info.nbytes();
+  }
   return step_data;
 }
 
@@ -330,6 +335,8 @@ void StepIO::timestamp(TensorTimestamps *time, const popart::TensorId &id) {
       1000;
   time->at(id).push_back(stamp);
 }
+
+void StepIO::setNumTensorShards(int64_t num) { _num_tensor_shards = num; }
 
 const std::vector<popart::TensorId> &WeightsIO::parameterIds() const {
   return _weights_order;

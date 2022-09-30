@@ -11,6 +11,7 @@
 #include <popart/graphtransformer.hpp>
 #include <popart/ndarraywrapper.hpp>
 #include <popart/optimizer.hpp>
+#include <popart/variablesettings.hpp>
 #include <popef/Reader.hpp>
 #include <popef/Writer.hpp>
 #include <poplar/exceptions.hpp>
@@ -359,6 +360,31 @@ Compiler::addInitializedInputTensor(const char *name, const char *type,
   return _impl->ids.size() - 1;
 }
 
+TensorId Compiler::addInitializedInputTensor(
+    const char *name, const char *type, const std::vector<std::int64_t> &dims,
+    void *data, int comm_group_type, int shards, int variable_retrieval_mode) {
+  // Create the tensor info for our new tensor.
+  popart::TensorInfo info{type, dims};
+
+  // Create the inital data for the variable.
+  popart::ConstVoidData the_data;
+  the_data.data = data;
+  the_data.info = info;
+
+  popart::VariableSettings settings(
+      popart::CommGroup(popart::CommGroupType(comm_group_type), shards),
+      popart::VariableRetrievalMode(variable_retrieval_mode));
+
+  _impl->ids.push_back(_impl->active_builder->addInitializedInputTensor(
+      the_data, settings, name));
+
+  popart::TensorId id = _impl->ids[_impl->ids.size() - 1];
+
+  _impl->weights.registerParameter(id, info);
+
+  return _impl->ids.size() - 1;
+}
+
 void Compiler::addOutputTensor(TensorId output, PopartOutputMode output_mode,
                                size_t output_return_period,
                                const char *overlap) {
@@ -635,11 +661,11 @@ void Compiler::initSession(const std::vector<Optimizer> &optimizers,
 
   _impl->setOptionIfNotSet(options.globalReplicationFactor,
                            _impl->options.num_distributed_processes *
-                               options.replicatedGraphCount,
+                               _impl->options.input_replication_factor,
                            "globalReplicationFactor");
   _impl->setOptionIfNotSet(options.globalReplicaOffset,
                            _impl->options.distributed_process_id *
-                               options.replicatedGraphCount,
+                               _impl->options.input_replication_factor,
                            "globalReplicaOffset");
 
   _impl->setOptionIfNotSet(options.enableReplicatedGraphs,
@@ -1112,6 +1138,9 @@ void Compiler::run() {
   if (!isAttachedToDevice()) {
     attachToDevice();
   }
+
+  _impl->stepio.setNumTensorShards(_impl->popart_options.replicatedGraphCount /
+                                   _impl->options.input_replication_factor);
   // Execute the model on IPU.
   _impl->stepio.populate(_impl->popart_incoming, _impl->popart_outgoing);
   _impl->session->run(_impl->stepio);

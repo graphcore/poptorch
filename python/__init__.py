@@ -277,7 +277,7 @@ class DataLoader(torch.utils.data.DataLoader):
         else:
             self._combined_batch_size = batch_size * \
                 options.device_iterations * \
-                options.replication_factor * \
+                options.input_replication_factor * \
                 options.Training.gradient_accumulation
             self._options = options
 
