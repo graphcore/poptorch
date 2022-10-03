@@ -509,10 +509,15 @@ def modify_before_assign(x, step):
     return x
 
 
+def modify_region(x, step):
+    x[1:x.shape[0]:step.item(), :] += 1
+    return x
+
+
 @pytest.mark.parametrize("step_size", [1, 2])
 @pytest.mark.parametrize("op", [
     direct_assign, direct_assign_inplace, direct_fill, chained_slice,
-    modify_before_assign
+    modify_before_assign, modify_region
 ])
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_inplace_modify_slice(op, step_size, capfd, trace_model):

@@ -25,6 +25,11 @@ bool isInplaceOp(const Node *node);
 namespace poptorch {
 namespace {
 
+struct ReplaceInfo {
+  torch::jit::Value *original_input;
+  torch::jit::Value *modified_input;
+};
+
 // In-place modification of slices is a special case. When we
 // modify a slice in-place, torch produces a graph like the
 // following:
@@ -46,12 +51,13 @@ namespace {
 //   %x = input, shape = [4, 4]
 //   %1 = slice(%x), shape = [2, 2]
 //   %2 = add(%1, %1)
-//   %3 = dynamic_update(%x, $2) shape = [4, 4]
+//   %3 = dynamic_update(%x, %2) shape = [4, 4]
 //   return %3, shape = [4, 4]
 //
-torch::jit::Node *handleSliceModification(torch::jit::Graph *graph,
-                                          torch::jit::Node *node,
-                                          torch::jit::Value *modified_slice) {
+torch::jit::Node *
+handleSliceModification(torch::jit::Graph *graph, torch::jit::Node *node,
+                        torch::jit::Value *modified_slice,
+                        std::vector<ReplaceInfo> *replace_infos) {
   torch::jit::Value *input = node->input(0);
   torch::jit::Node *new_node = modified_slice->node();
   // Follow the chain of slices that are being operated on by the inplace op
@@ -78,10 +84,11 @@ torch::jit::Node *handleSliceModification(torch::jit::Graph *graph,
         createDynamicupdate(graph, {slice_input, slice_offset, modified_slice},
                             slice_dims, sizes, /* noOverlap = */ 1);
 
-    // Replace uses of slice input after inplace op with result of
-    // the dynamic update (i.e. the modified tensor)
+    // Save the slice input and the result of the dynamic update
+    // (i.e. the modified tensor) so that we can replace the original
+    // inputs after PopART canonicalisation has taken place
     auto *modified_input = dynamic_update->output();
-    slice_input->replaceAllUsesAfterNodeWith(node, modified_input);
+    replace_infos->push_back({slice_input, modified_input});
     new_node = dynamic_update;
 
     // Repeat this process for the entire chain of slices - the
@@ -164,6 +171,7 @@ public:
 
 void CanonicalizeImpl::run(torch::jit::Graph *graph) {
   logging::LogContext ctx_func("PopartCanonicalization");
+  std::vector<ReplaceInfo> replace_infos;
   for (torch::jit::Node *node : graph->nodes()) {
     logging::LogContext ctx("processing " + nodeToString(node));
     WithNodeMetadata metadata(node);
@@ -179,7 +187,8 @@ void CanonicalizeImpl::run(torch::jit::Graph *graph) {
           node->i(c10::Symbol::attr("was_inplace_on_view")) == 1;
 
       if (was_inplace_op_on_view || torch::jit::isInplaceOp(node)) {
-        new_node = handleSliceModification(graph, node, new_node->output());
+        new_node = handleSliceModification(graph, node, new_node->output(),
+                                           &replace_infos);
       }
     }
 
@@ -209,6 +218,12 @@ void CanonicalizeImpl::run(torch::jit::Graph *graph) {
         propagateHalfOnListOrTupleConstruct(new_node, false);
       }
     }
+  }
+
+  // Replace slice inputs with their modified counterparts
+  for (auto info : replace_infos) {
+    info.original_input->replaceAllUsesAfterNodeWith(
+        info.modified_input->node(), info.modified_input);
   }
 
   // Build a list of nodes marked for deletion.

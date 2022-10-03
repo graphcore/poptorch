@@ -18,6 +18,9 @@ API changes
 Bug Fixes
 ---------
 
+- Fix in-place modification of slice regions
+
+
 v3.0 (Poplar SDK 3.0)
 =====================
 
