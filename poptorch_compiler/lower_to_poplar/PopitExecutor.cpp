@@ -9,20 +9,20 @@
 #include <mlir/Transforms/Passes.h>
 
 #include <memory>
+#include <thread>
 #include <utility>
 
-#include <model_runtime/DeviceManager.hpp>
 #include <passes/CommonPasses.hpp>
-#include <poplar/Device.hpp>
 #include <poplar/Engine.hpp>
 #include <poplar/Graph.hpp>
 #include <poplar/Target.hpp>
+
+#include <popit/Device.hpp>
 
 #include "CompilerHelpers.hpp"
 #include "PopitContext.hpp"
 #include "lower_to_poplar/IMLIRGraphConverter.hpp"
 #include "lower_to_poplar/NonRestartingMLIRTimer.hpp"
-#include "lower_to_poplar/PoplarDeviceAndTarget.hpp"
 #include "passes/LowerToPopit.hpp"
 #include "poptorch_logging/Error.hpp"
 #include "poptorch_logging/Logging.hpp"
@@ -65,25 +65,69 @@ bool containsPoplarOps(mlir::ModuleOp &module) {
 }
 } // namespace
 
+bool shouldWaitIfIpuIsUnavailable() {
+  bool wait = false;
+  if (const char *env_wait_for_ipu = std::getenv("POPTORCH_WAIT_FOR_IPU")) {
+    wait = std::stoi(env_wait_for_ipu) != 0;
+    poptorch::logging::info(
+        "From POPTORCH_WAIT_FOR_IPU environment variable: If no IPU "
+        "is available: {}",
+        wait ? "Wait" : "Fail & exit");
+  }
+  return wait;
+}
+
+popit::Device getPopitDevice() {
+  bool model_enabled = false;
+  if (const char *env_use_model = std::getenv("POPTORCH_IPU_MODEL")) {
+    model_enabled = std::stoi(env_use_model) != 0;
+    ERROR_ON_MSG(model_enabled, "IPU model is unsupported in eager mode");
+  }
+  if (const char *env_use_model = std::getenv("POPTORCH_SMALL_IPU_MODEL")) {
+    model_enabled = std::stoi(env_use_model) != 0;
+    ERROR_ON_MSG(model_enabled, "IPU model is unsupported in eager mode");
+  }
+
+  // Otherwise attempt to acquire hardware
+  popit::DeviceManager device_manager;
+  auto devices = device_manager.getDevices(/*requiredNumIpus=*/1);
+  if (devices.empty()) {
+    ERROR("No devices found");
+  }
+
+  bool wait_for_ipu = shouldWaitIfIpuIsUnavailable();
+  do {
+    for (auto &device : devices) {
+      if (device.attach()) {
+        return std::move(device);
+      }
+    }
+    if (wait_for_ipu) {
+      std::this_thread::sleep_for(std::chrono::seconds(1));
+    }
+  } while (wait_for_ipu);
+  ERROR("Failed to attach to any of the IPU devices.");
+  return popit::Device();
+}
+
 PopitContext::PopitContext()
     : session(nullptr,
-              [](popit::Session *) { /* nothing to do for nullptr */ }) {}
+              [](popit::Session *) { /* nothing to do for nullptr */ }),
+      device(getPopitDevice()) {}
 
 PopitContext::~PopitContext() {
   tensors.clear();
   session.reset();
 }
 
-PopitExecutor::PopitExecutor(PoplarDevice &device)
-    : _context(std::make_unique<PopitContext>()) {
-  _context->device = device;
-  _context->target = device.getTarget();
+PopitExecutor::PopitExecutor() : _context(std::make_unique<PopitContext>()) {
+  poplar::Target target = _context->device.getTarget();
 
   _context->session =
       std::unique_ptr<popit::Session_t, decltype(&popit::destroySession)>(
-          popit::createSession(&_context->target.target()),
+          popit::createSession(&target),
           [](popit::Session *s) { popit::destroySession(s); });
-  popit::connect(_context->session.get(), &_context->device.device());
+  popit::connect(_context->session.get(), &_context->device);
 }
 
 PopitExecutor::~PopitExecutor() {}

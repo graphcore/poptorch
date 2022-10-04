@@ -10,10 +10,10 @@
 #include <unordered_map>
 #include <vector>
 
+#include <popit/Device.hpp>
 #include <popit/functions.hpp>
 #include <popit/popit.hpp>
 
-#include "lower_to_poplar/PoplarDeviceAndTarget.hpp"
 #include "pytorch_bridge/CompilerTypes.hpp"
 
 namespace mlir {
@@ -38,9 +38,8 @@ public:
   std::unordered_map<TensorId, PopitMemPtr> tensors;
 
   std::unique_ptr<popit::Session_t, void (*)(popit::Session *)> session;
-  // We need to keeep around the device used by the session or it will segfault.
-  PoplarDevice device;
-  PoplarTarget target;
+  // We need to keep around the device used by the session or it will segfault.
+  popit::Device device;
 
   // These attributes get populated by LowerToPopit
   popit::FunctionId_t popit_fn;

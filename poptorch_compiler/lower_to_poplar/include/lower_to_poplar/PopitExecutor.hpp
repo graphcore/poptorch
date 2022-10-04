@@ -17,13 +17,12 @@ class RankedTensorType;
 
 namespace poptorch_ir {
 
-class PoplarDevice;
 class PopitContext;
 class NonRestartingMLIRTimer;
 
 class PopitExecutor {
 public:
-  explicit PopitExecutor(PoplarDevice &device);
+  PopitExecutor();
 
   void compileAndRun(mlir::ModuleOp module, NonRestartingMLIRTimer &timer,
                      const llvm::DenseMap<mlir::Value, TensorId> &mappings);

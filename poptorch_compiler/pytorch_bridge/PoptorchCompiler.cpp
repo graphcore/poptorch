@@ -37,8 +37,7 @@ void PoptorchCompiler::init(ExecutionType execution_type,
     if (execution_type == ExecutionType::StaticGraph) {
       _impl = std::make_unique<detail::MLIRStaticGraphCompiler>(options);
     } else if (execution_type == ExecutionType::EagerMode) {
-      PoplarDevice device = PoplarDevice::defaultDevice();
-      _impl = std::make_unique<detail::MLIREagerCompiler>(device, options);
+      _impl = std::make_unique<detail::MLIREagerCompiler>(options);
     }
   }
   ERROR_ON(_impl == nullptr);

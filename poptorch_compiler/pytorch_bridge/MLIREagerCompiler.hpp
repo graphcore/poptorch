@@ -13,8 +13,8 @@ namespace detail {
 
 class MLIREagerCompiler : public IMLIRCompiler {
 public:
-  MLIREagerCompiler(PoplarDevice &device,
-                    const poptorch::CompilerOptions &options);
+  explicit MLIREagerCompiler(const poptorch::CompilerOptions &options);
+
   virtual ~MLIREagerCompiler() = default;
 
   TensorId addInput(const Buffer &ptr, const mlir::RankedTensorType &input,

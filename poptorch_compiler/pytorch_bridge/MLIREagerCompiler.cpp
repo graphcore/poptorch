@@ -8,9 +8,8 @@
 namespace poptorch_ir {
 namespace detail {
 
-MLIREagerCompiler::MLIREagerCompiler(PoplarDevice &device,
-                                     const poptorch::CompilerOptions &options)
-    : IMLIRCompiler(options), _executor(device) {}
+MLIREagerCompiler::MLIREagerCompiler(const poptorch::CompilerOptions &options)
+    : IMLIRCompiler(options) {}
 
 TensorId MLIREagerCompiler::addValue(const mlir::Value &value) {
   ERROR_ON(!value);

@@ -47,14 +47,6 @@ def simple_add(capfd):
     log.assert_contains("IPU -> CPU")
 
 
-@pytest.mark.mlirSupportRequired
-@pytest.mark.ipuHardwareRequired
-@helpers.printCapfdOnExit
-@helpers.overridePoptorchLogLevel("TRACE")
-def test_simple_add_hw(capfd):
-    simple_add(capfd)
-
-
 @helpers.printCapfdOnExit
 @helpers.overridePoptorchLogLevel("DEBUG")
 @pytest.mark.parametrize("mode", ["default", "show_all", "hide_all"])
@@ -135,6 +127,14 @@ def test_lazy_tensor(capfd):
 @helpers.overridePoptorchLogLevel("TRACE")
 def test_simple_add(capfd):
     pytest.skip("PopIT doesn't currently support IPUModel")
+    simple_add(capfd)
+
+
+@pytest.mark.mlirSupportRequired
+@pytest.mark.ipuHardwareRequired
+@helpers.printCapfdOnExit
+@helpers.overridePoptorchLogLevel("TRACE")
+def test_simple_add_hw(capfd):
     simple_add(capfd)
 
 
