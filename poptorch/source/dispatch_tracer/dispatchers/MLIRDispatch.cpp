@@ -605,6 +605,22 @@ poptorch_ir::TensorId MLIRDispatch::findTensor(const at::Tensor &tensor) {
   return val;
 }
 
+std::vector<poptorch_ir::TensorId>
+MLIRDispatch::findTensor(const std::vector<at::Tensor> &tensors) {
+  std::vector<poptorch_ir::TensorId> tensor_ids;
+  tensor_ids.reserve(tensors.size());
+  std::transform(tensors.begin(), tensors.end(), std::back_inserter(tensor_ids),
+                 [this](const auto &tensor) {
+                   if (tensor.defined()) {
+                     return findTensor(tensor);
+                   }
+                   return _compiler.empty_tensor({{}}, poptorch_ir::Type::NONE)
+                       .at(0)
+                       .tensor_ids.at(0);
+                 });
+  return tensor_ids;
+}
+
 at::Tensor
 MLIRDispatch::outputIsInplaceOf(poptorch_ir::OptionalTensorId output_id,
                                 const at::Tensor &original_input,
@@ -797,20 +813,27 @@ std::vector<int64_t> toBoolVector(c10::IValue &value) {
   return vec;
 }
 
-std::vector<at::Tensor> toTensorVector(c10::IValue &value,
-                                       const std::string &op) {
+at::Tensor toTensor(c10::IValue &value) { return value.toTensor(); }
+
+at::Tensor toOptionalTensor(c10::IValue &value) {
+  if (value.isNone()) {
+    return at::Tensor();
+  }
+  return value.toTensor();
+}
+
+std::vector<at::Tensor> toTensorVector(c10::IValue &value) {
   if (value.isTensorList()) {
     return value.toTensorVector();
   }
-  ERROR_ON_MSG(!value.isList(), "Expected TensorList or GenericList for "
-                                    << op << " but got " << value.tagKind());
+  ERROR_ON_MSG(!value.isList(), "Expected TensorList or GenericList but got "
+                                    << value.tagKind());
   std::vector<at::Tensor> tensors;
   auto tensor_list = value.toList();
   tensors.reserve(tensor_list.size());
   for (c10::IValue v : tensor_list) {
-    ERROR_ON_MSG(!v.isTensor(), "Expected a list of tensors for "
-                                    << op << " but found a " << v.tagKind()
-                                    << " in list");
+    ERROR_ON_MSG(!v.isTensor(), "Expected a list of tensors but found a "
+                                    << v.tagKind() << " in list");
     tensors.push_back(v.toTensor());
   }
   return tensors;

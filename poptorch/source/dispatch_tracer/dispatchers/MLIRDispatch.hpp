@@ -52,6 +52,8 @@ public:
   std::shared_ptr<MLIRExecutor> compile();
 
   poptorch_ir::TensorId findTensor(const at::Tensor &tensor);
+  std::vector<poptorch_ir::TensorId>
+  findTensor(const std::vector<at::Tensor> &tensors);
 
   // Some times pytorch specifies the output of an operation as an argument
   // without that operation being inplace, i.e matmul. In these cases we copy
