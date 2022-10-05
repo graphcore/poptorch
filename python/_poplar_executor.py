@@ -356,7 +356,8 @@ class PoplarExecutor:
         for b in self._user_model.buffers():
             if not b.__class__ in (torch.Tensor, self.PoptorchBuffer):
                 raise _impl.createPoptorchError(
-                    "All buffers must be an instance of torch.Tensor")
+                    "All buffers must be an instance of torch.Tensor "
+                    f"(Got {type(b)})")
             b.__class__ = self.PoptorchBuffer
 
     def _update_optimizer_if_needed(self):
@@ -1175,20 +1176,19 @@ class PoplarExecutor:
             return
         if self._training:
             self.copyWeightsToHostIfNeeded()
+            # Sync the optimizer's state dict back to host
+            self._optimizer.state_dict()
+
         del self._executable
         self._executable = None
 
         if not self._training:
             return
 
-        # Unwrap parmateres and buffers
-        self.load_state_dict(self.state_dict())
-
-        # unwrap the model
+        # unwrap the model, parameters and buffers
         if not _impl.isWrapped(self._user_model):
             raise _impl.createPoptorchError("model was never wrapped")
-
-        _impl.unwrapIfWrapped(self._user_model)
+        _impl.unwrapModelIfNecessary(self._user_model)
 
     def _trace_with_warning_filter(self, in_tensors_trace_view_tuple):
         # Conditionally suppress the following jit warnings when the model
