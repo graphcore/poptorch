@@ -20,6 +20,7 @@ def cleanup():
 
 mlir_available = poptorch.hasMLIRSupportOnPlatform()
 hw_available = poptorch.ipuHardwareIsAvailable()
+enable_tracing_tests = False
 
 
 def pytest_make_parametrize_id(val, argname):
@@ -47,6 +48,8 @@ def pytest_configure(config):
                              "long time to run"))
     if config.getoption("collectonly"):
         helpers.is_running_tests = False
+    global enable_tracing_tests
+    enable_tracing_tests = config.getoption("enable_tracing_tests")
 
 
 def pytest_runtest_setup(item):
@@ -54,9 +57,11 @@ def pytest_runtest_setup(item):
     if hasattr(item, 'callspec'):
         # Does it have a trace_model parameter ?
         trace_model = item.callspec.params.get("trace_model")
-        if trace_model is not None and not trace_model:
-            if not mlir_available:
+        if trace_model is not None:
+            if not trace_model and not mlir_available:
                 pytest.skip("No MLIR support on this platform.")
+            if trace_model and mlir_available and not enable_tracing_tests:
+                pytest.skip("Tracing is deprecated: not testing.")
 
     if any(item.iter_markers("mlirSupportRequired")):
         if not mlir_available:
@@ -114,6 +119,10 @@ def pytest_addoption(parser):
                      action="store_true",
                      default=False,
                      help="Only run HW tests")
+    parser.addoption("--enable-tracing-tests",
+                     action="store_true",
+                     default=False,
+                     help="Enable deprecated tracing tests")
     parser.addoption("--no-hw-tests",
                      action="store_true",
                      default=False,
