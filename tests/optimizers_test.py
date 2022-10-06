@@ -101,7 +101,7 @@ class OptimizerTestModel:
         return out_loss
 
 
-@pytest.mark.parametrize("opt", all_optimizers)
+@pytest.mark.parametrize("opt", helpers.onlyFirstIfReduced(all_optimizers))
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_optimizer(opt, trace_model):
     torch.manual_seed(42)
@@ -182,8 +182,10 @@ def test_sgd_IR(opt, trace_model):
 
 
 @helpers.printCapfdOnExit
-@pytest.mark.parametrize("opt", (poptorch.optim.Adam, poptorch.optim.AdamW,
-                                 AdamWNoBias, poptorch.optim.LAMB, LAMBNoBias))
+@pytest.mark.parametrize("opt",
+                         helpers.onlyFirstIfReduced(
+                             (poptorch.optim.Adam, poptorch.optim.AdamW,
+                              AdamWNoBias, poptorch.optim.LAMB, LAMBNoBias)))
 @pytest.mark.parametrize("accum_type", (torch.float16, torch.float))
 @pytest.mark.parametrize("first_order_type", (torch.float16, torch.float))
 @pytest.mark.parametrize("second_order_type", (torch.float16, torch.float))
@@ -438,7 +440,8 @@ def test_optimizer_SGD_nesterov(trace_model):
     model.run()
 
 
-@pytest.mark.parametrize("opt", poptorch_optimizers)
+@pytest.mark.parametrize("opt",
+                         helpers.onlyFirstIfReduced(poptorch_optimizers))
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_optimizer_const(opt, trace_model):
     torch.manual_seed(42)
@@ -464,7 +467,8 @@ def test_optimizer_const(opt, trace_model):
     model.run()
 
 
-@pytest.mark.parametrize("opt", poptorch_optimizers)
+@pytest.mark.parametrize("opt",
+                         helpers.onlyFirstIfReduced(poptorch_optimizers))
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_optimizer_mark_as_variable(opt, trace_model):
     torch.manual_seed(42)
@@ -487,7 +491,9 @@ def test_optimizer_mark_as_variable(opt, trace_model):
     model.run()
 
 
-@pytest.mark.parametrize("opt", {poptorch.optim.LAMB, LAMBNoBias})
+@pytest.mark.parametrize("opt",
+                         helpers.onlyFirstIfReduced(
+                             {poptorch.optim.LAMB, LAMBNoBias}))
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_lamb_max_weight_norm(opt, trace_model):
     torch.manual_seed(42)
@@ -620,16 +626,18 @@ def test_variable_groups(capfd, use_combined_accum, trace_model):
 
 
 @helpers.printCapfdOnExit
-@pytest.mark.parametrize("opt", (
-    (poptorch.optim.SGD, (("momentum", 0.0), ("dampening", 0.0),
-                          ("weight_decay", 0.0))),
-    (poptorch.optim.Adam, (("betas", (0.9, 0.999)), ("eps", 1e-08),
-                           ("weight_decay", 0.0), ("amsgrad", False))),
-    (poptorch.optim.AdamW, (("betas", (0.9, 0.999)), ("eps", 1e-08),
-                            ("weight_decay", 0.01), ("amsgrad", False))),
-    (poptorch.optim.RMSprop, (("momentum", 0.0), ("alpha", 0.99),
-                              ("eps", 1e-08), ("weight_decay", 0.0))),
-))
+@pytest.mark.parametrize(
+    "opt",
+    helpers.onlyFirstIfReduced((
+        (poptorch.optim.SGD, (("momentum", 0.0), ("dampening", 0.0),
+                              ("weight_decay", 0.0))),
+        (poptorch.optim.Adam, (("betas", (0.9, 0.999)), ("eps", 1e-08),
+                               ("weight_decay", 0.0), ("amsgrad", False))),
+        (poptorch.optim.AdamW, (("betas", (0.9, 0.999)), ("eps", 1e-08),
+                                ("weight_decay", 0.01), ("amsgrad", False))),
+        (poptorch.optim.RMSprop, (("momentum", 0.0), ("alpha", 0.99),
+                                  ("eps", 1e-08), ("weight_decay", 0.0))),
+    )))
 @helpers.overridePoptorchLogLevel("DEBUG")
 # pylint: disable=too-many-statements
 @pytest.mark.parametrize("trace_model", [True, False])
@@ -812,8 +820,10 @@ def test_variable_default(opt, capfd, trace_model):
                            *genRegexp("lr", is_const=False))
 
 
-@pytest.mark.parametrize(
-    "reduction", (poptorch.ReductionType.Sum, poptorch.ReductionType.Mean))
+@pytest.mark.parametrize("reduction",
+                         helpers.onlyFirstIfReduced(
+                             (poptorch.ReductionType.Sum,
+                              poptorch.ReductionType.Mean)))
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_gradient_accum(reduction, trace_model):
     torch.manual_seed(42)
@@ -853,8 +863,10 @@ def test_gradient_accum(reduction, trace_model):
     assert loss < 0.03
 
 
-@pytest.mark.parametrize(
-    "reduction", (poptorch.ReductionType.Sum, poptorch.ReductionType.Mean))
+@pytest.mark.parametrize("reduction",
+                         helpers.onlyFirstIfReduced(
+                             (poptorch.ReductionType.Sum,
+                              poptorch.ReductionType.Mean)))
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_gradient_accum_new_api(reduction, trace_model):
     torch.manual_seed(42)

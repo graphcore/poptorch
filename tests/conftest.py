@@ -43,6 +43,9 @@ def pytest_configure(config):
                             ("ipuHardwareRequired: require IPU hardware to be "
                              "available on the platform"))
     config.addinivalue_line("markers",
+                            ("excludeFromReducedTesting: exclude from "
+                             "reduced testing runs"))
+    config.addinivalue_line("markers",
                             ("extendedTestingOnly: to only include "
                              "in extended testing runs because it takes a "
                              "long time to run"))
@@ -50,6 +53,7 @@ def pytest_configure(config):
         helpers.is_running_tests = False
     global enable_tracing_tests
     enable_tracing_tests = config.getoption("enable_tracing_tests")
+    helpers.running_reduced_testing = config.getoption("reduced_testing")
 
 
 def pytest_runtest_setup(item):
@@ -85,7 +89,10 @@ def pytest_collection_modifyitems(session, config, items):  # pylint: disable=un
     force_exclude = []
     include_extended = config.getoption("extended_tests")
     for item in items:
-        if any(item.iter_markers("extendedTestingOnly")):
+        if helpers.running_reduced_testing and any(
+                item.iter_markers("excludeFromReducedTesting")):
+            force_exclude.append(item)
+        elif any(item.iter_markers("extendedTestingOnly")):
             if include_extended:
                 force_include.append(item)
             else:
@@ -133,3 +140,8 @@ def pytest_addoption(parser):
                      help=("Include all tests marked with "
                            "'extendedTestingOnly' (Takes precedence over"
                            " --no-hw-tests)"))
+    parser.addoption("--reduced-testing",
+                     action="store_true",
+                     default=False,
+                     help=("Run some tests with a reduced "
+                           "number of parameters"))

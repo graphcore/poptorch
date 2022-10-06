@@ -8,6 +8,20 @@ import poptorch.poptorch_core as poptorch_core  # type: ignore
 
 # Will be changed by conftest.py if pytest is only collecting tests
 is_running_tests = True
+# Will be changed by conftest.py if pytest is running reduced testing
+running_reduced_testing = False
+
+
+def selectIfReduced(reduced_set, full_set):
+    if running_reduced_testing:
+        return reduced_set
+    return full_set
+
+
+def onlyFirstIfReduced(full_set):
+    if running_reduced_testing:
+        return (full_set[0], )
+    return full_set
 
 
 def assert_allclose(*,

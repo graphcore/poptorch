@@ -80,8 +80,10 @@ binary_ops = [
 
 torch.manual_seed(42)
 binary_test_cases = [
+    (torch.randn(3, 3), torch.randn(3, 3)),
     (torch.tensor(2.0), torch.tensor(1.0)),
-    (torch.tensor(70), torch.tensor(3)), (torch.tensor(2), torch.tensor(1.0)),
+    (torch.tensor(70), torch.tensor(3)),
+    (torch.tensor(2), torch.tensor(1.0)),
     (torch.tensor([]), torch.tensor([])),
     (torch.tensor([[1]],
                   dtype=torch.int32), torch.tensor([[5]], dtype=torch.int32)),
@@ -92,14 +94,14 @@ binary_test_cases = [
      torch.tensor([3.0, -3.0, 3.0, -3.0, 3.0, -3.0, 3.0, -3.0])),
     (torch.tensor([12, 12, -12, -12, 11, 11, -11,
                    -11]), torch.tensor([3, -3, 3, -3, 3, -3, 3, -3])),
-    (torch.randn(3, 3), torch.randn(3, 3))
 ]
 
 
 @pytest.mark.mlirSupportRequired
 @pytest.mark.filterwarnings("ignore:floor_divide is deprecated")
 @pytest.mark.parametrize("op", binary_ops)
-@pytest.mark.parametrize("input", binary_test_cases)
+@pytest.mark.parametrize("input",
+                         helpers.onlyFirstIfReduced(binary_test_cases))
 def test_binary(op, input):
     op_harness(op, *input)
 
@@ -187,13 +189,13 @@ unary_ops = [
 ]
 
 unary_test_cases = [
+    torch.randn(3, 3),
     torch.tensor(2.0),
     torch.tensor([]),
     torch.tensor([70, 0]),
     torch.tensor([70.25, 0.125]),
     torch.tensor([[13, 8]], dtype=torch.int32),
     torch.tensor([[True, False], [True, False]]),
-    torch.randn(3, 3),
     torch.tensor([torch.nan, torch.inf, -torch.inf]),
 ]
 
@@ -201,7 +203,7 @@ unary_test_cases = [
 @pytest.mark.mlirSupportRequired
 @pytest.mark.filterwarnings("ignore:floor_divide is deprecated")
 @pytest.mark.parametrize("op", unary_ops)
-@pytest.mark.parametrize("input", unary_test_cases)
+@pytest.mark.parametrize("input", helpers.onlyFirstIfReduced(unary_test_cases))
 def test_unary(op, input):
     if op in (torch.asinh, torch.log1p) and torch.any(torch.isinf(input)):
         pytest.skip("TODO(T62888) `-inf` -> `nan`")
@@ -252,7 +254,7 @@ inplace_unary_ops = [
 
 @pytest.mark.mlirSupportRequired
 @pytest.mark.parametrize("op", inplace_unary_ops)
-@pytest.mark.parametrize("input", unary_test_cases)
+@pytest.mark.parametrize("input", helpers.onlyFirstIfReduced(unary_test_cases))
 def test_inplace_unary(op, input):
     if op in (torch.asinh_, torch.log1p_) and torch.any(torch.isinf(input)):
         pytest.skip("TODO(T62888) `-inf` -> `nan`")
@@ -262,7 +264,7 @@ def test_inplace_unary(op, input):
 
 
 @pytest.mark.mlirSupportRequired
-@pytest.mark.parametrize("input", unary_test_cases)
+@pytest.mark.parametrize("input", helpers.onlyFirstIfReduced(unary_test_cases))
 @pytest.mark.parametrize("threshold", [0., 1000., -50])
 @pytest.mark.parametrize("value", [0., 1000, -50])
 def test_threshold(input, threshold, value):
@@ -278,7 +280,8 @@ addc_test_cases = (
 
 
 @pytest.mark.mlirSupportRequired
-@pytest.mark.parametrize("input_shapes", addc_test_cases)
+@pytest.mark.parametrize("input_shapes",
+                         helpers.onlyFirstIfReduced(addc_test_cases))
 @pytest.mark.parametrize("op", (torch.addcmul, torch.addcdiv))
 def test_addc(op, input_shapes):
     inputs = [torch.randn(input_shape) for input_shape in input_shapes]
@@ -286,6 +289,10 @@ def test_addc(op, input_shapes):
 
 
 clamp_test_cases = [
+    (torch.tensor([[0.0, 1.0, 3.0],
+                   [0.0, 1.0,
+                    3.0]]), torch.tensor([[5.0, 1.0, -1.0], [-1.0, 1.0, 5.0]]),
+     torch.tensor([[-1.0, 1.0, 5.0], [-1.0, 1.0, 5.0]])),
     # TODO(pytorch 1.12): currently pytorch does not correctly call the tensor
     # overload when given a Tensor argument with empty shape
     #(torch.tensor(False)),
@@ -298,30 +305,27 @@ clamp_test_cases = [
     (torch.tensor([0.0, 1.0, 3.0]), None, torch.tensor([-1.0, 1.0, 5.0])),
     (torch.tensor([-2.0, -1.0, 1.0, 2.0]), torch.tensor([1.0, 1.0, 1.0, 1.0]),
      torch.tensor([-1.0, -1.0, -1.0, -1.0])),
-    (torch.tensor([[0.0, 1.0, 3.0],
-                   [0.0, 1.0,
-                    3.0]]), torch.tensor([[5.0, 1.0, -1.0], [-1.0, 1.0, 5.0]]),
-     torch.tensor([[-1.0, 1.0, 5.0], [-1.0, 1.0, 5.0]])),
     (torch.tensor([]), torch.tensor([])),
     (torch.tensor([]), torch.tensor([]), torch.tensor([])),
 ]
 
 
 @pytest.mark.mlirSupportRequired
-@pytest.mark.parametrize("input", clamp_test_cases)
+@pytest.mark.parametrize("input", helpers.onlyFirstIfReduced(clamp_test_cases))
 def test_clamp(input):
     op_harness(torch.clamp, *input)
 
 
 clamp_broadcast_tests = (
+    ((1, 1, 2), (4, 2)),
     ((2, 2), (2, 2), (2, 2)),
     ((3, 2, 2), (1, 2, 2), (3, 2, 1)),
-    ((1, 1, 2), (4, 2)),
 )
 
 
 @pytest.mark.mlirSupportRequired
-@pytest.mark.parametrize("input_shapes", clamp_broadcast_tests)
+@pytest.mark.parametrize("input_shapes",
+                         helpers.onlyFirstIfReduced(clamp_broadcast_tests))
 def test_clamp_broadcast(input_shapes):
     inputs = [torch.randn(input_shape) for input_shape in input_shapes]
     op_harness(torch.clamp, *inputs)
@@ -352,6 +356,7 @@ def test_many_implicit_casting(input_1_type, input_2_type):
 
 
 @pytest.mark.mlirSupportRequired
+@pytest.mark.excludeFromReducedTesting
 @pytest.mark.parametrize("input_1_type", MANY_TYPES)
 @pytest.mark.parametrize("input_2_type", MANY_TYPES)
 @pytest.mark.parametrize("return_type", MANY_TYPES)
