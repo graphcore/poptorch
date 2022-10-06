@@ -559,3 +559,24 @@ def test_inplace_modify_slice(op, step_size, capfd, trace_model):
             r"\[warning\] In\-place modification of slices with step "
             r"size other than 1 is not supported\. This may result in "
             r"unexpected behaviour\.")
+
+
+def test_index_put_on_buffer():
+    class Model(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            p_init = torch.arange(6, dtype=torch.float).reshape(2, 3)
+            self.register_buffer("p", p_init)
+
+        def forward(self, x, idx):
+            self.p[(idx, )] = x
+            return self.p
+
+    model = Model()
+    ipu_model = poptorch.inferenceModel(Model())
+
+    x = torch.empty(3).fill_(-1)
+    idx = torch.tensor([0])
+    cpu_out = model(x, idx)
+    ipu_out = ipu_model(x, idx)
+    helpers.assert_allclose(actual=ipu_out, expected=cpu_out)

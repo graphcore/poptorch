@@ -20,6 +20,7 @@ Bug Fixes
 ---------
 
 - Fix in-place modification of slice regions
+- Fix ``index_put_`` when operating in-place on buffers
 
 
 v3.0 (Poplar SDK 3.0)

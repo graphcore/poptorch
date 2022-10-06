@@ -93,7 +93,6 @@ torch::jit::Node *outplaceOp(torch::jit::Graph &graph, torch::jit::Node *node) {
 
   new_node->output()->setType(node->output()->type());
   node->output()->replaceAllUsesWith(new_node->output());
-  node->input(0)->replaceAllUsesAfterNodeWith(node, node->output());
 
   return new_node;
 }
