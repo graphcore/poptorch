@@ -493,7 +493,7 @@ def test_optimizer_mark_as_variable(opt, trace_model):
 
 @pytest.mark.parametrize("opt",
                          helpers.onlyFirstIfReduced(
-                             {poptorch.optim.LAMB, LAMBNoBias}))
+                             [poptorch.optim.LAMB, LAMBNoBias]))
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_lamb_max_weight_norm(opt, trace_model):
     torch.manual_seed(42)
