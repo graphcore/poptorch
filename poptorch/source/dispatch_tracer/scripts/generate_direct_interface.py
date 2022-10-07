@@ -360,6 +360,6 @@ class DirectMLIRGenerator:
 
         # Generate the Aten Op to the C++ function map.
         print(
-            "{{\"{}::{}\", [=](c10::Stack& stack) {{ this->{}(stack);}}}},\n".
-            format(self.namespace, aten_name, function_name),
+            f"{{\"{self.namespace}::{aten_name}\", [](MLIRDispatch& dispatch, "
+            f"c10::Stack& stack) {{ dispatch.{function_name}(stack); }}}},",
             file=self.lookup)

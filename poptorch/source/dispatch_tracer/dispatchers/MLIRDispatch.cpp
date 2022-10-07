@@ -177,7 +177,6 @@ void MLIRExecutor::copyWeightsToHostIfNeeded() {
 MLIRDispatch::MLIRDispatch(CompilerOptions const &options,
                            TensorStore *tensor_store)
     : IDispatch(tensor_store) {
-  this->generateDispatchTable();
   initCompiler(options);
 
   // Start timing how long it takes us to build the graph.
@@ -426,8 +425,8 @@ std::string MLIRDispatch::handleOp(const c10::OperatorHandle &op,
   }
 
   // First we check if we have a direct mapping onto MLIR.
-  auto mlir_handle = _direct_dispatch_lookup.find(schema_key);
-  if (mlir_handle == _direct_dispatch_lookup.end()) {
+  auto mlir_handle = direct_dispatch_lookup.find(schema_key);
+  if (mlir_handle == direct_dispatch_lookup.end()) {
     std::string s = "No shape inference handler for " + schema_key;
     // In some cases Torch will crash during the exception handling
     // so print the error message on the error channel before throwing
@@ -447,7 +446,7 @@ std::string MLIRDispatch::handleOp(const c10::OperatorHandle &op,
   // See CompilerDispatchTable.cpp, {Aten|Poptorch}ToMLIRDispatch.inc,
   // {Aten|Poptorch}ToMLIRInterface.hpp.inc and
   // {Aten|Poptorch}ToMLIRInterface.cpp.inc
-  mlir_handle->second(*stack);
+  mlir_handle->second(*this, *stack);
   return schema_key;
 }
 

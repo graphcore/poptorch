@@ -123,14 +123,14 @@ private:
   uint64_t _next_output_idx{0};
   uint64_t _next_parameter_idx{0};
 
-  // We generate the lookup tables at object creation. This is the mechanism
-  // by which we target the right MLIR operation for a given aten call.
-  void generateDispatchTable();
+public:
+  using StackFunctionType = std::function<void(MLIRDispatch &, c10::Stack &)>;
+  using DispatchTable = std::unordered_map<std::string, StackFunctionType>;
 
+private:
   // We have a set of handlers which just map an ATEN node directly onto an MLIR
   // operation.
-  using StackFunctionType = std::function<void(c10::Stack &)>;
-  std::unordered_map<std::string, StackFunctionType> _direct_dispatch_lookup;
+  static const DispatchTable direct_dispatch_lookup;
 
   std::vector<IpuTensorDetails *> _aliases_to_restore;
   void restoreAliases();
