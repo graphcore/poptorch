@@ -7,7 +7,6 @@ import os
 import threading
 import torch
 import torch.nn as nn
-import torch.optim as optim
 import pytest
 import poptorch
 from poptorch.enums import OutputMode, HalfFloatCastingBehavior, MeanReductionStrategy
@@ -310,22 +309,16 @@ def test_popart_partials(capfd, dtype, ptype, trace_model):
         log.assert_contains('"partialsType[0]":"half"')
 
 
-@helpers.printCapfdOnExit
 @pytest.mark.parametrize("optim", [
-    optim.SGD,
-    optim.Adam,
-    optim.AdamW,
-    optim.RMSprop,
     poptorch.optim.SGD,
     poptorch.optim.Adam,
     poptorch.optim.AdamW,
     poptorch.optim.RMSprop,
     poptorch.optim.LAMB,
 ])
-@helpers.overridePoptorchLogLevel("DEBUG")
-@helpers.printCapfdOnExit
+@pytest.mark.parametrize("initial_ls", [1.0, 2.0])
 @pytest.mark.parametrize("trace_model", [True, False])
-def test_automatic_loss_scaling(capfd, optim, trace_model):
+def test_automatic_loss_scaling(optim, initial_ls, trace_model):
     input = torch.ones(5)
     # Just a simple model with weights and a loss function
     model = helpers.ModelWithWeights(lambda x: x, input.shape)
@@ -335,20 +328,34 @@ def test_automatic_loss_scaling(capfd, optim, trace_model):
     opts = poptorch.Options()
     opts.Training.setAutomaticLossScaling(True)
     opts.Jit.traceModel(trace_model)
+    # Anchor the final loss scale to compare against the update factor in ipu_state
+    opts.anchorTensor("ls_final", "finalLossScale", poptorch.OutputMode.Final)
 
-    # The lr value doesn't matter here, we just want to ensure the option is set
+    # The lr value doesn't matter here, we just want to check the loss scale is updated
+    optimizer_args = {
+        "params": model.parameters(),
+        "lr": 0.0,
+        "loss_scaling": initial_ls
+    }
     if optim == poptorch.optim.SGD:
-        optimizer = optim(model.parameters(), lr=0.0, use_combined_accum=False)
-    else:
-        optimizer = optim(model.parameters(), lr=0.0)
+        optimizer_args["use_combined_accum"] = False
+
+    optimizer = optim(**optimizer_args)
     training_model = poptorch.trainingModel(model, opts, optimizer)
 
-    training_model((input, ))
+    # Compile the model first, so that we can get the ipu_state before running the model
+    training_model.compile((input, ))
+    for _ in range(5):
+        # Get the update factor before running the model. This is the value used to
+        # compute ls_final
+        ls_update_factor = optimizer.state_dict(
+        )['ipu_state']['lossScaleUpdateFactor']
+        training_model((input, ))
+        ls_final = training_model.getAnchoredTensor("ls_final")
 
-    log = helpers.LogChecker(capfd)
-    log.assert_contains(
-        'poptorch.Options set automaticLossScalingSettings.enabled '
-        'to value true')
+        # ls_final = ls_update_factor * initial_ls
+        helpers.assert_allclose(actual=initial_ls * ls_update_factor,
+                                expected=ls_final)
 
 
 @pytest.mark.ipuHardwareRequired
