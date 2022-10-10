@@ -183,6 +183,10 @@ popart::DataType popartTypeFromPoptorch(PopartType type) {
     return popart::DataType::FLOAT16;
   case PopartType::BFLOAT16:
     return popart::DataType::BFLOAT16;
+  case PopartType::FLOAT8_143:
+    return popart::DataType::FLOAT8_143;
+  case PopartType::FLOAT8_152:
+    return popart::DataType::FLOAT8_152;
   case PopartType::DOUBLE:
     return popart::DataType::DOUBLE;
   case PopartType::COMPLEX64:

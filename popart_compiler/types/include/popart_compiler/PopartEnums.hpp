@@ -43,6 +43,8 @@ enum class OptimizerType : std::uint8_t {
   _(FLOAT)                                                                     \
   _(FLOAT16)                                                                   \
   _(BFLOAT16)                                                                  \
+  _(FLOAT8_143)                                                                \
+  _(FLOAT8_152)                                                                \
   _(DOUBLE)                                                                    \
   _(COMPLEX64)                                                                 \
   _(COMPLEX128)

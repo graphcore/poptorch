@@ -210,6 +210,9 @@ at::ScalarType fromPopartType(const popart_compiler::PopartType type) {
   case popart_compiler::PopartType::COMPLEX128: {
     return at::ScalarType::ComplexDouble;
   }
+  case popart_compiler::PopartType::FLOAT8_143:
+  case popart_compiler::PopartType::FLOAT8_152:
+    ERROR("Can't convert a float8 PopART type to a PyTorch scalar type");
   default:
     ERROR("Unsupported PopART data type " << toPopartTypeStr(type));
   }
