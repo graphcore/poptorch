@@ -1,6 +1,10 @@
 // Copyright (c) 2021 Graphcore Ltd. All rights reserved.
 #ifndef GUARD_POPTORCH_SOFTPLUS_HPP
 #define GUARD_POPTORCH_SOFTPLUS_HPP
+
+// TODO(T70346): snap:: API is deprecated
+#pragma GCC diagnostic warning "-Wdeprecated-declarations"
+
 #include <memory>
 #include <string>
 #include <tuple>

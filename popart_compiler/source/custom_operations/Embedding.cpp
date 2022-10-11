@@ -1,4 +1,8 @@
 // Copyright (c) 2021, Graphcore Ltd, All rights reserved.
+
+// TODO(T70346): snap:: API is deprecated
+#pragma GCC diagnostic warning "-Wdeprecated-declarations"
+
 #include <map>
 #include <memory>
 #include <set>

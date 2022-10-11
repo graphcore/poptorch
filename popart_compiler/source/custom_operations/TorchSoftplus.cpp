@@ -1,6 +1,11 @@
 // Copyright (c) 2021 Graphcore Ltd. All rights reserved.
+
+// TODO(T70346): snap:: API is deprecated
+#pragma GCC diagnostic warning "-Wdeprecated-declarations"
+
 #include "TorchSoftplus.hpp"
 #include "popart_compiler/CustomOps.hpp"
+
 #include <popart/opmanager.hpp>
 #include <popart/opserialiser.hpp>
 #include <popart/popx/devicex.hpp>
