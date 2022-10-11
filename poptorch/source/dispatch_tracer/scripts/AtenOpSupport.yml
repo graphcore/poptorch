@@ -828,11 +828,6 @@
   PopTorchDirect: log2
   UnusedOutputArguments: {out}
 
-# func: rsqrt.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)
-- func: rsqrt.out
-  PopTorchDirect: rsqrt
-  UnusedOutputArguments: {out}
-
 # func: reciprocal.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)
 - func: reciprocal.out
   PopTorchDirect: reciprocal
@@ -851,11 +846,6 @@
 # func: tan.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)
 - func: tan.out
   PopTorchDirect: tan
-  UnusedOutputArguments: {out}
-
-# func: atan2.out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)
-- func: atan2.out
-  PopTorchDirect: atan2
   UnusedOutputArguments: {out}
 
 ##########

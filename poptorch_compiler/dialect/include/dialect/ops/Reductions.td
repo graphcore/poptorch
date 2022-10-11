@@ -489,7 +489,7 @@ def Poptorch_median_dim_values
 
 class Poptorch_multi_dim_reduction<string name> : Poptorch_NotImplementedOp<name, []> {
     let arguments = (ins Poptorch_tensor:$self, I64ArrayAttr:$dim, BoolAttr:$keepdim);
-    let results = (outs Poptorch_tensor:$values, Poptorch_tensor_no_grad:$indices);
+    let results = (outs Poptorch_tensor:$values);
     let builders = [
         OpBuilder<(ins "mlir::Value":$self, "const std::vector<std::int64_t>&":$dim,
                     "bool":$keepdim), [{
@@ -513,10 +513,8 @@ class Poptorch_multi_dim_reduction<string name> : Poptorch_NotImplementedOp<name
 
             const auto out_type = mlir::RankedTensorType::get(
                 out_shape, getElementType(self));
-            const auto out_indices_type = mlir::RankedTensorType::get(
-                out_shape, $_builder.getIntegerType(32 /*width*/, true /*signed*/));
 
-            $_state.addTypes({out_type, out_indices_type});
+            $_state.addTypes({out_type});
         }]>
     ];
 }

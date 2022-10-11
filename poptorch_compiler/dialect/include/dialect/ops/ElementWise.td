@@ -474,10 +474,22 @@ class Poptorch_elem_binary_scatter<string name, list<OpTrait> traits = []> : Pop
 }
 
 def Poptorch_scatter_src_out : Poptorch_elem_binary_scatter<"scatter_src_out"> {}
-def Poptorch_scatter_value_out : Poptorch_elem_binary_scatter<"scatter_value_out"> {}
 def Poptorch_scatter_add_out : Poptorch_elem_binary_scatter<"scatter_add_out"> {}
 
-class Poptorch_elem_binary_scatter_reduce<string name, list<OpTrait> traits = []> : Poptorch_NotImplementedOp<name, traits> {
+def Poptorch_scatter_value_out: Poptorch_NotImplementedOp<"scatter_value_out", []> {
+    let arguments = (ins Poptorch_tensor:$self, I64Attr:$dim, Poptorch_tensor:$index, F32Attr:$value);
+    let results = (outs Poptorch_tensor:$result);
+
+    let builders = [OpBuilder<(ins "mlir::Value":$self, "std::int64_t":$dim, "mlir::Value":$index, "float":$value),[{
+        $_state.addOperands({self, index});
+        $_state.addAttribute("dim", $_builder.getI64IntegerAttr(dim));
+        $_state.addAttribute("value", $_builder.getF32FloatAttr(value));
+        $_state.addTypes(self.getType());
+      }]>
+    ];
+}
+
+def Poptorch_scatter_reduce_out : Poptorch_NotImplementedOp<"scatter_reduce_out", []> {
     let arguments = (ins Poptorch_tensor:$self,
                          I64Attr:$dim,
                          Poptorch_tensor:$index,
@@ -498,8 +510,27 @@ class Poptorch_elem_binary_scatter_reduce<string name, list<OpTrait> traits = []
     ];
 }
 
-def Poptorch_scatter_reduce_out : Poptorch_elem_binary_scatter_reduce<"scatter_reduce_out"> {}
-def Poptorch_scatter_value_reduce_out : Poptorch_elem_binary_scatter_reduce<"scatter_value_reduce_out"> {}
+def Poptorch_scatter_value_reduce_out : Poptorch_NotImplementedOp<"scatter_value_reduce_out", []> {
+    let arguments = (ins Poptorch_tensor:$self,
+                         I64Attr:$dim,
+                         Poptorch_tensor:$index,
+                         F32Attr:$value,
+                         StrAttr:$reduce);
+    let results = (outs Poptorch_tensor:$result);
+
+    let builders = [OpBuilder<(ins "mlir::Value":$self,
+                                   "std::int64_t":$dim,
+                                   "mlir::Value":$index,
+                                   "float":$value,
+                                   "std::string":$reduce),[{
+        $_state.addOperands({self, index});
+        $_state.addAttribute("dim", $_builder.getI64IntegerAttr(dim));
+        $_state.addAttribute("value", $_builder.getF32FloatAttr(value));
+        $_state.addAttribute("reduce", $_builder.getStringAttr(reduce));
+        $_state.addTypes(self.getType());
+      }]>
+    ];
+}
 
 // Note: these are provided by the torch_scatter library
 class Poptorch_scatter_minmax<string name, list<OpTrait> traits = []> : Poptorch_NotImplementedOp<name, traits> {

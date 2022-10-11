@@ -46,6 +46,18 @@ add_custom_target(poptorch_decls
     ${CMAKE_CURRENT_BINARY_DIR}/AutogenCompiler.cpp.inc
 )
 
+add_custom_target(check_tablegen
+  python3 ${SCRIPTS_DIR}/check_tablegen.py
+    "${CMAKE_SOURCE_DIR}/poptorch/source/dispatch_tracer/scripts/native_functions/native_functions.1.${TORCH_MINOR_VERSION}.yml"
+    "${CMAKE_CURRENT_BINARY_DIR}/Poptorch.tblgen.out"
+    "${CMAKE_SOURCE_DIR}/poptorch/source/dispatch_tracer/scripts/AtenOpSupport.yml"
+  DEPENDS
+    ${CMAKE_SOURCE_DIR}/poptorch/source/dispatch_tracer/scripts/native_functions/native_functions.1.${TORCH_MINOR_VERSION}.yml
+    ${CMAKE_SOURCE_DIR}/poptorch/source/dispatch_tracer/scripts/AtenOpSupport.yml
+    ${TABLEGEN_OUTPUT}
+)
+
+
 add_library(generated_poptorch_decls INTERFACE)
 target_include_directories(generated_poptorch_decls INTERFACE ${CMAKE_CURRENT_BINARY_DIR}/..)
-add_dependencies(generated_poptorch_decls poptorch_decls)
+add_dependencies(generated_poptorch_decls poptorch_decls check_tablegen)
