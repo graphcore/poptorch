@@ -307,7 +307,7 @@ class PoplarExecutor:
                     return super().__torch_function__(func, types, args,
                                                       kwargs)
 
-                def perReplica(
+                def replicaGrouping(
                         self, comm_group_type: enums.CommGroupType,
                         shards: int,
                         variable_retrieval_mode: enums.VariableRetrievalMode):
@@ -1414,11 +1414,12 @@ class PoplarExecutor:
         model batch size but when we call execute we pass the full batch
         and popart will partition it up."""
 
+        input_group_count = self._options.replication_factor // \
+                            self._options.input_group_size
         # Input will be in form of [ModelBatchSize * BatchPerStep, ...] so we
         # should slice it up so we compile by the ModelBatchSize alone.
         extra_poplar_batch_dims = self._options.device_iterations * \
-            self._options.input_replication_factor * \
-            self._options.Training.gradient_accumulation
+            input_group_count * self._options.Training.gradient_accumulation
 
         if not isinstance(tensor, torch.Tensor):
             return tensor
@@ -1428,16 +1429,17 @@ class PoplarExecutor:
             "Invalid batch dimension: In the input %s, the batch "
             "dimension (%d) must be a multiple of "
             "Options.deviceIterations(%d) * "
-            "Options.replicationFactor(%d) * "
+            "(Options.replicationFactor(%d) / "
+            "Options.inputReplicaGrouping.input_group_size(%d)) * "
             "Options.Training.gradientAccumulation(%d) = %d "
             "because it is used to calculate the batch size which will "
             "be executed on the device in any given iteration. For a "
             "full explanation see the batching semantics page of the "
-            "documentation.") % (tensor.shape, b_size,
-                                 self._options.device_iterations,
-                                 self._options.input_replication_factor,
-                                 self._options.Training.gradient_accumulation,
-                                 extra_poplar_batch_dims)
+            "documentation."
+        ) % (tensor.shape, b_size, self._options.device_iterations,
+             self._options.replication_factor, self._options.input_group_size,
+             self._options.Training.gradient_accumulation,
+             extra_poplar_batch_dims)
         return tensor if tensor.shape == torch.Size([]) else tensor.narrow(
             0, 0, b_size // extra_poplar_batch_dims)
 

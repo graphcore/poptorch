@@ -525,11 +525,13 @@ As well as these constraints, you must also consider that the number of batches
 obtained each time you call the model will be multiplied (from the conventional
 model batch size, known as the micro-batch size) by
 :py:meth:`~poptorch.Options.deviceIterations` *
-:py:meth:`~poptorch.Options.replicationFactor` *
+(:py:meth:`~poptorch.Options.replicationFactor` / ``input_group_size``) *
 :py:meth:`~poptorch.options._TrainingOptions.gradientAccumulation` during
 training and :py:meth:`~poptorch.Options.deviceIterations` *
-:py:meth:`~poptorch.Options.replicationFactor` during inference.
-You can use :py:class:`poptorch.DataLoader` to abstract this calculation but
+(:py:meth:`~poptorch.Options.replicationFactor` / ``input_group_size``) during
+inference (for details of ``input_group_size`` see
+:py:meth:`~poptorch.Options.replicationFactor`). You can use
+:py:class:`poptorch.DataLoader` to abstract this calculation but
 you should still be aware that this will take place.
 
 .. note:: The effective or conventional batch size for layers which depend on it
@@ -684,7 +686,7 @@ PopTorch supports configuring weight tensors such that a different value of the
 weight tensor is sent to each replica, or to groups of replicas. This
 functionality can be used, for instance, to split a weight tensor and process
 parts of it on different groups of replicas. This functionality is accessed
-using the :py:func:`~perReplica` method on the weight tensor in question.
+using the :py:func:`~replicaGrouping` method on the weight tensor in question.
 
 .. literalinclude:: replica_grouped_weights.py
     :language: python
@@ -709,9 +711,7 @@ many replicas will be involved in value retrieval.
   Possible CommGroupTypes
 
 Note that in this code example, the input tensor ``X`` is split two ways. This
-is achieved by passing two parameters to
-:py:meth:`~poptorch.Options.replicationFactor`. The first parameter sets the
-total number of replicas, and the second sets the number of input tensor splits.
+is achieved using :py:meth:`~poptorch.Options.inputReplicaGrouping`.
 
 .. _optimizers:
 

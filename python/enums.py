@@ -247,12 +247,12 @@ class Compiler(enum.IntEnum):
 
 
 class CommGroupType(enum.IntEnum):
-    """Grouping to be used when distributing a per-replica variable among
-       replicas. See :ref:`grouping_tensor_weights`.
+    """Grouping to be used when distributing an input or per-replica variable
+       among replicas. See :ref:`grouping_tensor_weights`.
 
-    - ``All``: This causes :py:func:`~perReplica` to have no effect, as the same
-               variable value is distributed to all replicas. Group count is
-               ignored.
+    - ``All``: This causes :py:func:`~replicaGrouping` to have no effect, as the
+               same variable value is distributed to all replicas. Group count
+               is ignored. This is not valid as an input group type.
 
     - ``Consecutive``: Each replica group is made up of consecutive replicas,
                        So for group size ``k``, the groups would be set up thus:

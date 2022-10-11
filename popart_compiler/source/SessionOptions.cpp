@@ -140,10 +140,12 @@ SessionOptionsImpl::SessionOptionsImpl() {
                  [&](std::uint64_t value) {
                    popart_options.replicatedGraphCount = value;
                  });
-  registerSetter(uint64_options, "input_replication_factor",
-                 [&](std::uint64_t value) {
-                   poptorch_options.input_replication_factor = value;
-                 });
+  registerSetter(uint64_options, "input_group_size", [&](std::uint64_t value) {
+    poptorch_options.input_group_size = static_cast<std::int64_t>(value);
+  });
+  registerSetter(uint64_options, "input_cgt", [&](std::uint64_t value) {
+    poptorch_options.input_cgt = static_cast<popart::CommGroupType>(value);
+  });
   registerSetter(uint64_options, "execution_mode", [&](std::uint64_t value) {
     ERROR_ON_MSG(value >= static_cast<std::uint64_t>(ExecutionMode::N),
                  "Value for ExecutionMode out of range");
@@ -457,8 +459,9 @@ bool SessionOptions::broadcastBuffers() const {
   return _impl->poptorch_options.broadcast_buffers;
 }
 
-std::uint64_t SessionOptions::replicationFactor() const {
-  return _impl->poptorch_options.input_replication_factor;
+bool SessionOptions::hasInputReplication() const {
+  return _impl->poptorch_options.input_group_size <
+         _impl->popart_options.replicatedGraphCount;
 }
 
 void SessionOptions::setMemoryProportion(std::uint32_t ipu, float memory) {

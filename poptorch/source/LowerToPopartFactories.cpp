@@ -177,7 +177,7 @@ poptorch::LowerToPopart lowerToPopartFromTrace(
 
   InplaceGraphInfo inplace_info = handleInplaceOpsInGraph(
       *graph, traced_parameter_tensors.size(), anchors_list.size(),
-      parsed_options.replicationFactor() > 1 &&
+      parsed_options.hasInputReplication() &&
           parsed_options.broadcastBuffers());
   logGraph("Graph after handling inplace ops:", *graph, has_converted_any_half,
            input_tensors);
@@ -293,7 +293,7 @@ poptorch::LowerToPopart lowerToPopartFromDispatch(
   logging::trace("Optimised graph:\n{}", *graph);
 
   InplaceGraphInfo inplace_info = getInplaceGraphInfo(
-      anchors_list.size(), parsed_options.replicationFactor() > 1 &&
+      anchors_list.size(), parsed_options.hasInputReplication() &&
                                parsed_options.broadcastBuffers());
   logging::trace("Graph after handling inplace ops:\n{}", *graph);
 

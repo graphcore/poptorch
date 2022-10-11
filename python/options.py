@@ -1258,7 +1258,8 @@ class Options(_options_impl.OptionsDict):
         self.showCompilationProgressBar(True)
         self._module_namescope_enabled = True
         super().__init__(replication_factor=1,
-                         input_replication_factor=1,
+                         input_group_size=1,
+                         input_cgt=enums.CommGroupType.Consecutive,
                          broadcast_buffers=True,
                          device_iterations=1,
                          log_dir=".",
@@ -1490,10 +1491,7 @@ class Options(_options_impl.OptionsDict):
         self.createOrSet(available_memory_proportion=actual_memory)
         return self
 
-    def replicationFactor(self,
-                          replication_factor: int,
-                          input_replication_factor: Optional[int] = None
-                          ) -> "poptorch.Options":
+    def replicationFactor(self, replication_factor: int) -> "poptorch.Options":
         """Number of times to replicate the model (default: 1).
 
         Replicating the model increases the data throughput of the model as
@@ -1502,23 +1500,44 @@ class Options(_options_impl.OptionsDict):
         a ``replication_factor`` of 2 will use 2 IPUs; if your model uses 4
         IPUs, a replication factor of 4 will use 16 IPUs in total.
 
-        The second parameter, ``input_replication_factor``, controls how many
-        ways the input tensors are split between the replicas. If not specified,
-        this will be the same as ``replication_factor``, so that the input
-        tensors will be split into a block for each replica. This can be smaller
-        than ``replication_factor`` if per-replica weights are being used. See
-        :ref:`grouping_tensor_weights` for further explanation.
-
         :param replication_factor:
             Number of replicas of the model to create.
-
-        :param input_replication_factor:
-            Number of ways to split the input tensors.
         """
         self.set(replication_factor=replication_factor)
-        if input_replication_factor is None:
-            input_replication_factor = replication_factor
-        self.set(input_replication_factor=input_replication_factor)
+        return self
+
+    def inputReplicaGrouping(self, input_group_size: int,
+                             input_group_type: "poptorch.CommGroupType"
+                             ) -> "poptorch.Options":
+        """Allows the input batches to be split between groups of replicas, in
+        a similar way to what :py:func:`~replicaGrouping` does for weight
+        tensors.
+
+        :param input_group_size:
+            Number of replicas to place in each input replica group. Must be a
+            factor of ``replication_factor``. Defaults to 1, which will divide
+            the input evenly among all replicas.
+
+        :param input_group_type:
+            Arrangement type to use when placing replicas into input replica
+            groups. Cannot be ``poptorch.CommGroupType.All``. Defaults to
+            ``poptorch.CommGroupType.Consecutive``. For an explanation of the
+            arrangement types, see :py:class:`~poptorch.CommGroupType` and
+            :numref:`grouping_tensor_weights`.
+        """
+        if input_group_type == enums.CommGroupType.NoGrouping:
+            input_group_size = 1
+            input_group_type = enums.CommGroupType.Consecutive
+        if input_group_type == enums.CommGroupType.All:
+            raise ValueError('input_group_type cannot be All')
+        if self.replication_factor < input_group_size:
+            raise ValueError('input_group_size cannot be larger than '
+                             'replication_factor')
+        if (self.replication_factor % input_group_size) != 0:
+            raise ValueError('input_group_size must be a factor of '
+                             'replication_factor')
+        self.set(input_group_size=input_group_size)
+        self.set(input_cgt=input_group_type)
         return self
 
     def broadcastBuffers(self, broadcast_buffers: bool = True):

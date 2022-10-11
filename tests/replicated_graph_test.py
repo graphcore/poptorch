@@ -153,7 +153,8 @@ class ModelWithLoss(torch.nn.Module):
 
 
 @pytest.mark.ipuHardwareRequired
-def test_per_replica_variables():
+@pytest.mark.parametrize("orthogonalInput", [True, False])
+def test_per_replica_variables(orthogonalInput):
     # Split the weight tensor into 4, and the input data tensor into 2.
     tensor_shards = 4
     data_shards = 2
@@ -189,12 +190,18 @@ def test_per_replica_variables():
     m = ModelWithLoss(W_init)
     optim = torch.optim.SGD(m.parameters(), lr=0.01)
 
+    inputGroupType = poptorch.enums.CommGroupType.Consecutive
+    weightGroupType = poptorch.enums.CommGroupType.Orthogonal
+    if orthogonalInput:
+        inputGroupType, weightGroupType = weightGroupType, inputGroupType
     pt_opts = poptorch.Options()
-    pt_opts.replicationFactor(data_shards * tensor_shards, data_shards)
+    pt_opts.replicationFactor(data_shards * tensor_shards)
+    pt_opts.inputReplicaGrouping(tensor_shards, inputGroupType)
     pt_opts.outputMode(poptorch.OutputMode.All)
     pt_m = poptorch.trainingModel(m, optimizer=optim, options=pt_opts)
-    pt_m.W.perReplica(poptorch.enums.CommGroupType.Orthogonal, data_shards,
-                      poptorch.enums.VariableRetrievalMode.OnePerGroup)
+
+    pt_m.W.replicaGrouping(weightGroupType, data_shards,
+                           poptorch.enums.VariableRetrievalMode.OnePerGroup)
     pt_losses = []
     if data_shards > 1:
         X = X.reshape(data_shards, X.shape[0] // data_shards, *X.shape[1:])

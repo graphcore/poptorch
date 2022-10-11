@@ -68,7 +68,7 @@ public:
                               const char *value);
 
   bool broadcastBuffers() const;
-  std::uint64_t replicationFactor() const;
+  bool hasInputReplication() const;
 
 private:
   std::unique_ptr<detail::SessionOptionsImpl> _impl;

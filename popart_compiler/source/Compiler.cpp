@@ -661,11 +661,11 @@ void Compiler::initSession(const std::vector<Optimizer> &optimizers,
 
   _impl->setOptionIfNotSet(options.globalReplicationFactor,
                            _impl->options.num_distributed_processes *
-                               _impl->options.input_replication_factor,
+                               options.replicatedGraphCount,
                            "globalReplicationFactor");
   _impl->setOptionIfNotSet(options.globalReplicaOffset,
                            _impl->options.distributed_process_id *
-                               _impl->options.input_replication_factor,
+                               options.replicatedGraphCount,
                            "globalReplicaOffset");
 
   _impl->setOptionIfNotSet(options.enableReplicatedGraphs,
@@ -1139,8 +1139,10 @@ void Compiler::run() {
     attachToDevice();
   }
 
-  _impl->stepio.setNumTensorShards(_impl->popart_options.replicatedGraphCount /
-                                   _impl->options.input_replication_factor);
+  _impl->stepio.setInputGroupings(_impl->options.input_cgt,
+                                  _impl->options.input_group_size,
+                                  _impl->popart_options.replicatedGraphCount);
+
   // Execute the model on IPU.
   _impl->stepio.populate(_impl->popart_incoming, _impl->popart_outgoing);
   _impl->session->run(_impl->stepio);

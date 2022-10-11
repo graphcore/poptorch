@@ -38,11 +38,13 @@ m = ModelWithLoss(W_init)
 optim = torch.optim.SGD(m.parameters(), lr=0.01)
 
 pt_opts = poptorch.Options()
-pt_opts.replicationFactor(data_shards * tensor_shards, data_shards)
+pt_opts.replicationFactor(data_shards * tensor_shards)
+pt_opts.inputReplicaGrouping(tensor_shards,
+                             poptorch.enums.CommGroupType.Consecutive)
 pt_opts.outputMode(poptorch.OutputMode.All)
 pt_m = poptorch.trainingModel(m, optimizer=optim, options=pt_opts)
-pt_m.W.perReplica(poptorch.enums.CommGroupType.Orthogonal, data_shards,
-                  poptorch.enums.VariableRetrievalMode.OnePerGroup)
+pt_m.W.replicaGrouping(poptorch.enums.CommGroupType.Orthogonal, data_shards,
+                       poptorch.enums.VariableRetrievalMode.OnePerGroup)
 pt_losses = []
 if data_shards > 1:
     X = X.reshape(data_shards, X.shape[0] // data_shards, *X.shape[1:])

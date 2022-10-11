@@ -243,8 +243,7 @@ popart::ConstVoidData StepIO::in(popart::TensorId id, int64_t num_elems,
                                  bool prefetch) {
   (void)prefetch;
   timestamp(&_in_times, id);
-  return get<popart::ConstVoidData>(id, &_inputs_info, num_elems,
-                                    _num_tensor_shards);
+  return get<popart::ConstVoidData>(id, &_inputs_info, num_elems, true);
 }
 
 void StepIO::inComplete(popart::TensorId id, int64_t num_elems) {
@@ -254,7 +253,7 @@ void StepIO::inComplete(popart::TensorId id, int64_t num_elems) {
 
 popart::MutableVoidData StepIO::out(popart::TensorId id, int64_t num_elems) {
   timestamp(&_out_times, id);
-  return get<popart::MutableVoidData>(id, &_outputs_info, num_elems, 1);
+  return get<popart::MutableVoidData>(id, &_outputs_info, num_elems, false);
 }
 
 void StepIO::outComplete(popart::TensorId id) {
@@ -282,7 +281,7 @@ void StepIO::populate(const TensorArrayMap &inputs,
                       const TensorArrayMap &outputs) {
   _inputs_info.clear();
   for (const auto &input : inputs) {
-    _inputs_info.insert({input.first, {input.second, 0, 0}});
+    _inputs_info.insert({input.first, {input.second, 0, 0, 0}});
     _in_times[input.first].clear();
     _in_complete_times[input.first].clear();
     computeStepDataInfo(input.first, &input.second);
@@ -290,7 +289,7 @@ void StepIO::populate(const TensorArrayMap &inputs,
 
   _outputs_info.clear();
   for (const auto &output : outputs) {
-    _outputs_info.insert({output.first, {output.second, 0, 0}});
+    _outputs_info.insert({output.first, {output.second, 0, 0, 0}});
     _out_times[output.first].clear();
     _out_complete_times[output.first].clear();
     computeStepDataInfo(output.first, &output.second);
@@ -299,7 +298,7 @@ void StepIO::populate(const TensorArrayMap &inputs,
 
 template <typename T>
 T StepIO::get(const popart::TensorId &id, TensorArrayInfo *map,
-              int64_t num_elems, int64_t tensor_shard_count) {
+              int64_t num_elems, bool is_input) {
   auto it = map->find(id);
   ERROR_ON_MSG(it == map->end(), "Internal Compiler Error in StepIO");
   auto &array_info = it->second;
@@ -311,19 +310,34 @@ T StepIO::get(const popart::TensorId &id, TensorArrayInfo *map,
   T step_data;
   step_data.info = it2->second;
 
-  step_data.data = static_cast<uint8_t *>(AccessorType::getDataPointer(
-                       array_info.array)) + // NOLINT
-                   array_info.offset;
+  uint8_t *ptr =
+      static_cast<uint8_t *>(AccessorType::getDataPointer(array_info.array));
 
   int64_t num_bytes =
       static_cast<int64_t>(step_data.info.getDataTypeInfo()->nbytes()) *
       num_elems;
+  if (is_input && array_info.offset == array_info.end_offset) {
+    int64_t tidx;
+    int64_t input_group_count = _replica_count / _input_group_size;
 
-  array_info.tensor_shard = (array_info.tensor_shard + 1) % tensor_shard_count;
-  if (array_info.tensor_shard == 0) {
-    array_info.offset =
-        (array_info.offset + num_bytes) % step_data.info.nbytes();
+    if (_input_cgt == popart::CommGroupType::Consecutive) {
+      tidx = array_info.replica_idx / _input_group_size;
+    } else {
+      ERROR_ON_MSG(_input_cgt != popart::CommGroupType::Orthogonal,
+                   "Unexpected input CommGroupType " << _input_cgt);
+      tidx = array_info.replica_idx % input_group_count;
+    }
+    array_info.offset = tidx * (step_data.info.nbytes() / input_group_count);
+    array_info.end_offset =
+        ((tidx + 1) * (step_data.info.nbytes() / input_group_count)) %
+        step_data.info.nbytes();
+    array_info.replica_idx = (array_info.replica_idx + 1) % _replica_count;
   }
+
+  ptr += array_info.offset;
+  array_info.offset = (array_info.offset + num_bytes) % step_data.info.nbytes();
+
+  step_data.data = ptr;
   return step_data;
 }
 
@@ -336,7 +350,13 @@ void StepIO::timestamp(TensorTimestamps *time, const popart::TensorId &id) {
   time->at(id).push_back(stamp);
 }
 
-void StepIO::setNumTensorShards(int64_t num) { _num_tensor_shards = num; }
+void StepIO::setInputGroupings(popart::CommGroupType type,
+                               int64_t input_group_size,
+                               int64_t replica_count) {
+  _input_cgt = type;
+  _input_group_size = input_group_size;
+  _replica_count = replica_count;
+}
 
 const std::vector<popart::TensorId> &WeightsIO::parameterIds() const {
   return _weights_order;

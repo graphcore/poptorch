@@ -166,6 +166,14 @@ multiple IPUs to allow automatic data parallelism across many IPUs.
   :emphasize-lines: 13
   :linenos:
 
+poptorch.Options.inputReplicaGrouping
+=====================================
+
+:py:meth:`~poptorch.Options.inputReplicaGrouping` allows the input batches to
+be split between groups of replicas, in a similar way to what
+:py:func:`~replicaGrouping` does for weight tensors. See
+:numref:`grouping_tensor_weights`.
+
 .. _gradient_accumulation:
 
 poptorch.Options.Training.gradientAccumulation
@@ -175,7 +183,7 @@ You can use
 :py:meth:`~poptorch.options._TrainingOptions.gradientAccumulation`
 to run a number of micro-batches before updating parameters (weights) during
 training. The number of gradient accumulations is equal to the number of
-micro-batches (batches whose size is specified as the``batch_size`` value
+micro-batches (batches whose size is specified as the ``batch_size`` value
 provided to the :py:class:`~poptorch.DataLoader`) which are processed between
 model updates. After accumulation, PopTorch updates the model using the
 gradients accumulated from processing all the batches.

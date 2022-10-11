@@ -275,9 +275,11 @@ class DataLoader(torch.utils.data.DataLoader):
         if batch_size is None:
             self._combined_batch_size = None
         else:
+            input_group_count = options.replication_factor // \
+                                options.input_group_size
             self._combined_batch_size = batch_size * \
                 options.device_iterations * \
-                options.input_replication_factor * \
+                input_group_count * \
                 options.Training.gradient_accumulation
             self._options = options
 

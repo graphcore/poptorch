@@ -6,6 +6,7 @@
 #include <string>
 #include <unordered_map>
 
+#include <popart/commgroup.hpp>
 #include <popart/patterns/patterns.hpp>
 #include <popart/popx/devicexmanager.hpp>
 
@@ -150,7 +151,8 @@ struct CompilerOptions {
   // first to other replicas on each training step.
   bool broadcast_buffers{false};
 
-  std::uint64_t input_replication_factor;
+  std::int64_t input_group_size;
+  popart::CommGroupType input_cgt;
 };
 
 } // namespace detail

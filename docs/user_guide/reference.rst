@@ -139,7 +139,7 @@ Parallel execution
 
 .. autoclass:: poptorch.VariableRetrievalMode
 
-.. py:function:: perReplica
+.. py:function:: replicaGrouping
 
    Call this function on a weight tensor (after applying a PopTorch wrapper with
    :py:func:`~poptorch.inferenceModel` or :py:func:`~poptorch.trainingModel`)
