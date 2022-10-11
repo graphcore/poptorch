@@ -182,6 +182,10 @@ const IpuTensorImpl *toIpuTensorImpl(const at::TensorImpl &tensor) {
   return impl;
 }
 
+void copyDataFromCpuSource(at::Tensor &ipu_tensor, const at::Tensor &cpu_src) {
+  toIpuTensorImpl(ipu_tensor)->copyDataFromCpuSource(cpu_src);
+}
+
 // TODO(T61601) Create a proper implementation of GuardImpl
 struct GuardImpl : public c10::impl::DeviceGuardImplInterface {
   // TODO(T59880): replace XLA -> IPU
@@ -311,10 +315,6 @@ std::string str(const at::Tensor &tensor) {
 
 uint64_t tensorDataSize(const at::Tensor &tensor) {
   return tensorImplDataSize(*tensor.unsafeGetTensorImpl());
-}
-
-void copyDataFromCpuSource(at::Tensor &ipu_tensor, const at::Tensor &cpu_src) {
-  toIpuTensorImpl(ipu_tensor)->copyDataFromCpuSource(cpu_src);
 }
 
 Buffer &getHostBuffer(const at::Tensor &ipu_tensor) {

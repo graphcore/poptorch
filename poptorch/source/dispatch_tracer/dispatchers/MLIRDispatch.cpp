@@ -299,8 +299,7 @@ at::Tensor MLIRDispatch::addInput(const at::Tensor &cpu_tensor) {
 
 at::Tensor MLIRDispatch::addParameter(const at::Tensor &cpu_tensor) {
   ERROR_ON(!cpu_tensor.unsafeGetTensorImpl()->is_cpu());
-  at::Tensor tensor = _tensor_store->allocateTensor(
-      cpu_tensor.sizes(), c10::typeMetaToScalarType(cpu_tensor.dtype()));
+  at::Tensor tensor = _tensor_store->copyCpuTensorAsIpuTensor(cpu_tensor);
 
   const std::string str = "Parameter/" + std::to_string(_next_parameter_idx++);
 
@@ -308,7 +307,6 @@ at::Tensor MLIRDispatch::addParameter(const at::Tensor &cpu_tensor) {
                  static_cast<void *>(cpu_tensor.unsafeGetTensorImpl()),
                  cpu_tensor.data_ptr());
 
-  copyDataFromCpuSource(tensor, cpu_tensor);
   const poptorch_ir::TensorId value = _compiler.addParameter(
       poptorch::getHostBuffer(tensor), toCompilerShape(tensor),
       toCompilerType(tensor), str.c_str());

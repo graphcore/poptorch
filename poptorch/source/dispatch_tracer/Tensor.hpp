@@ -69,10 +69,6 @@ bool isIpuTensor(const at::Tensor &tensor);
 // Return a string containing the given tensor's metadata (device, shape, etc).
 std::string str(const at::Tensor &tensor);
 
-// Make a copy of the given CPU tensor's content and store it inside the given
-// IPU tensor.
-void copyDataFromCpuSource(at::Tensor &ipu_tensor, const at::Tensor &cpu_src);
-
 // Returns a reference to the CPU buffer of the given IPU tensor.
 Buffer &getHostBuffer(const at::Tensor &ipu_tensor);
 
