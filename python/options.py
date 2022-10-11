@@ -307,7 +307,7 @@ class _TrainingOptions(_options_impl.OptionsDict):
         Accumulate the gradient ``gradient_accumulation`` times before updating
         the model using the gradient. Each micro-batch (a batch of size equal to
         the  ``batch_size`` argument passed to
-        :py:class:`poptorch.DataLoader`) corresponds to one gradient
+        :py:class:`~poptorch.DataLoader`) corresponds to one gradient
         accumulation. Therefore ``gradient_accumulation`` scales the global
         batch size (number of samples between optimiser updates).
 
@@ -324,8 +324,8 @@ class _TrainingOptions(_options_impl.OptionsDict):
         The reason why the efficiency gains are most notable when training with
         models with multiple IPUs which express pipelined model parallelism
         (via :py:class:`~poptorch.PipelinedExecution` or by default and
-        annotating the model :py:class:`poptorch.BeginBlock` or
-        :py:class:`poptorch.Block`) is because the pipeline has "ramp up" and
+        annotating the model :py:class:`~poptorch.BeginBlock` or
+        :py:class:`~poptorch.Block`) is because the pipeline has "ramp up" and
         "ramp down" steps around each optimiser update. Increasing the
         gradient accumulation factor in this instance reduces the proportion of
         time spent in the "ramp up" and "ramp down" phases, increasing overall
@@ -686,9 +686,9 @@ class _TensorLocationOptions(_options_impl.OptionsDict):
         Allocating IO (input/output) tiles reduces the number of IPU tiles
         available for computation but allows you to reduce the latency of
         copying tensors from host to the IPUs using the function
-        :py:func:`poptorch.set_overlap_for_input`, IPUs to host using the
+        :py:func:`~poptorch.set_overlap_for_input`, IPUs to host using the
         function
-        :py:func:`poptorch.set_overlap_for_output` or to use off-chip memory
+        :py:func:`~poptorch.set_overlap_for_output` or to use off-chip memory
         with reduced by setting the option
         :py:meth:`~poptorch.TensorLocationSettings.useIOTilesToLoad`.
         As reducing the number of computation tiles may reduce peformance, you
@@ -757,8 +757,10 @@ class Stage:
     The various execution strategies are made of `Stages`: a stage consists of
     one of more `Blocks` running on one IPU.
 
-    .. seealso:: :py:class:`PipelinedExecution`, :py:class:`ShardedExecution`,
-        :py:class:`ParallelPhasedExecution`, :py:class:`SerialPhasedExecution`.
+    .. seealso:: :py:class:`~poptorch.PipelinedExecution`,
+        :py:class:`~poptorch.ShardedExecution`,
+        :py:class:`~poptorch.ParallelPhasedExecution`,
+        :py:class:`~poptorch.SerialPhasedExecution`.
     """
 
     def __init__(self, *block_ids: BlockId) -> None:
@@ -817,7 +819,7 @@ class _IExecutionStrategy:
         self._stages_manager = stages_manager
 
     def stage(self, block_id):
-        """Return the :py:class:`poptorch.Stage` the given block is belongs to.
+        """Return the :py:class:`~poptorch.Stage` the given block is belongs to.
 
         :param str block_id: A block ID.
         """
@@ -847,7 +849,8 @@ class Phase:
             blocks ``user_id``.
 
         If one or more strings are passed they will be interpreted as
-        :py:class:`Block` IDs representing a single :py:class:`Stage`.
+        :py:class:`~poptorch.Block` IDs representing a single
+        :py:class:`~poptorch.Stage`.
 
         Within a ``Phase``, the stages will be executed in parallel.
 
@@ -888,14 +891,14 @@ class PipelinedExecution(_IExecutionStrategy):
     def __init__(self, *args):
         """Pipeline the execution of the graph partitions.
         These partitions can be:
-        a :py:class:`Stage<poptorch.Stage>`, a :py:class:`Block<poptorch.Block>`
-        or a :py:class:`BeginBlock<poptorch.BeginBlock>`.
-        If none of these are passed, an :py:class:`poptorch.AutoStage` strategy
+        a :py:class:`~poptorch.Stage`, a :py:class:`~poptorch.Block`
+        or a :py:class:`~poptorch.BeginBlock`.
+        If none of these are passed, an :py:class:`~poptorch.AutoStage` strategy
         can be passed instead to decide how the stage IDs are created.
         By default, `poptorch.AutoStage.SameAsIpu` is used: The stage ID
         will be set to the selected IPU number.
-        This implies that each unique :py:class:`Block<poptorch.Block>` or
-        :py:class:`BeginBlock<poptorch.BeginBlock>` in the graph must have
+        This implies that each unique :py:class:`~poptorch.Block` or
+        :py:class:`~poptorch.BeginBlock` in the graph must have
         their `ipu_id` explicitly set when using `AutoStage`.
 
         Example 1: Blocks `user_id` are known, IPUs are inferred.
@@ -949,7 +952,7 @@ class PipelinedExecution(_IExecutionStrategy):
         >>> opts.setExecutionStrategy(poptorch.PipelinedExecution(
         ...                           poptorch.AutoStage.AutoIncrement))
 
-        :param args: Either a :py:class:`poptorch.AutoStage` strategy or an
+        :param args: Either a :py:class:`~poptorch.AutoStage` strategy or an
             explicit list of stages or block IDs.
         :type args: poptorch.AutoStage, [str], [poptorch.Stage]
 
@@ -1017,7 +1020,7 @@ class ShardedExecution(PipelinedExecution):
     >>> # Automatically create 3 shards based on the block names
     >>> opts.setExecutionStrategy(poptorch.ShardedExecution())
 
-    :param args: Either a :py:class:`poptorch.AutoStage` strategy or an
+    :param args: Either a :py:class:`~poptorch.AutoStage` strategy or an
         explicit list of stages or block IDs.
     :type args: poptorch.AutoStage, [str], [poptorch.Stage]
 
@@ -1036,12 +1039,12 @@ class _IPhasedExecution(_IExecutionStrategy):
 
         :param phases: Definition of phases must be either:
 
-            - a list of :py:class:`poptorch.Phase`
-            - a list of list of :py:class:`poptorch.Stage`
-            - a list of list of :py:class:`poptorch.Block` IDs (Each list of
-              blocks will be considered as a single :py:class:`poptorch.Stage` )
-        :type phases: [:py:class:`poptorch.Phase`],
-            [[:py:class:`poptorch.Stage`]], [[str]]
+            - a list of :py:class:`~poptorch.Phase`
+            - a list of list of :py:class:`~poptorch.Stage`
+            - a list of list of :py:class:`~poptorch.Block` IDs (Each list of
+              blocks will be considered as a single :py:class:`~poptorch.Stage`)
+        :type phases: [:py:class:`~poptorch.Phase`],
+            [[:py:class:`~poptorch.Stage`]], [[str]]
 
         """
         self._tensors_liveness = enums.Liveness.AlwaysLive
@@ -1091,7 +1094,7 @@ class _IPhasedExecution(_IExecutionStrategy):
         super().__init__(stages_manager, block_map)
 
     def phase(self, phase: int) -> "poptorch.Phase":
-        """Return the requested :py:class:`poptorch.Phase`
+        """Return the requested :py:class:`~poptorch.Phase`
 
         :param phase: Index of the phase
         """
@@ -1213,7 +1216,7 @@ class SerialPhasedExecution(_IPhasedExecution):
 
     def setTensorsLiveness(self, liveness: "poptorch.Liveness"
                            ) -> "poptorch.SerialPhasedExecution":
-        """See :py:class:`poptorch.Liveness` for more information
+        """See :py:class:`~poptorch.Liveness` for more information
         """
         assert isinstance(liveness, enums.Liveness)
         self._tensors_liveness = liveness
@@ -1228,12 +1231,11 @@ class Options(_options_impl.OptionsDict):
     """Set of all options controlling how a model is compiled and executed.
 
        Pass an instance of this class to the model wrapping functions
-       :py:func:`poptorch.inferenceModel` and :py:func:`poptorch.trainingModel`
-       to change how the model is compiled and executed. An instance includes
-       general options set within this class such as
-       :py:func:`poptorch.Options.deviceIterations` as
-       well as properties referring to categories of options such as
-       ``Training``.
+       :py:func:`~poptorch.inferenceModel` and
+       :py:func:`~poptorch.trainingModel` to change how the model is compiled
+       and executed. An instance includes general options set within this class
+       such as :py:func:`~poptorch.Options.deviceIterations` as well as
+       properties referring to categories of options such as ``Training``.
 
         >>> opts = poptorch.Options()
         >>> opts.deviceIterations(10)
@@ -1373,7 +1375,7 @@ class Options(_options_impl.OptionsDict):
     def TensorLocations(self) -> "poptorch.options._TensorLocationOptions":
         """Options related to tensor locations.
 
-        .. seealso:: :py:class:`poptorch.options._TensorLocationOptions`"""
+        .. seealso:: :py:class:`~poptorch.options._TensorLocationOptions`"""
         return self._tensor_locations
 
     @property
@@ -1383,14 +1385,14 @@ class Options(_options_impl.OptionsDict):
         You should not use these when using PopRun/PopDist. Instead use
         ``popdist.poptorch.Options`` to set these values automatically.
 
-        .. seealso:: :py:class:`poptorch.options._DistributedOptions`"""
+        .. seealso:: :py:class:`~poptorch.options._DistributedOptions`"""
         return self._distributed
 
     @property
     def Jit(self) -> "poptorch.options._JitOptions":
         """Options specific to upstream PyTorch's JIT compiler.
 
-        .. seealso:: :py:class:`poptorch.options._JitOptions`"""
+        .. seealso:: :py:class:`~poptorch.options._JitOptions`"""
         return self._jit
 
     @property
@@ -1398,14 +1400,14 @@ class Options(_options_impl.OptionsDict):
         """Options specific to the processing of the JIT graph prior to lowering
         to PopART.
 
-        .. seealso:: :py:class:`poptorch.options._PrecisionOptions`"""
+        .. seealso:: :py:class:`~poptorch.options._PrecisionOptions`"""
         return self._graphProcessing
 
     @property
     def Training(self) -> "poptorch.options._TrainingOptions":
         """Options specific to training.
 
-        .. seealso:: :py:class:`poptorch.options._TrainingOptions`"""
+        .. seealso:: :py:class:`~poptorch.options._TrainingOptions`"""
         return self._training
 
     @property
@@ -1450,9 +1452,10 @@ class Options(_options_impl.OptionsDict):
         :param strategy:
             Must be an instance of once of the execution strategy classes.
 
-        .. seealso:: :py:class:`PipelinedExecution`,
-            :py:class:`ShardedExecution`, :py:class:`ParallelPhasedExecution`,
-            :py:class:`SerialPhasedExecution`.
+        .. seealso:: :py:class:`~poptorch.PipelinedExecution`,
+            :py:class:`~poptorch.ShardedExecution`,
+            :py:class:`~poptorch.ParallelPhasedExecution`,
+            :py:class:`~poptorch.SerialPhasedExecution`.
         """
         assert isinstance(strategy, _IExecutionStrategy)
         self._execution_strategy = strategy

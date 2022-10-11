@@ -10,9 +10,9 @@ class PoptorchData:
     """Metadata to save when exporting an executable in order to be able
     to reload it.
 
-    Note: :py:func:`poptorch.load` can only be used if all the arguments are
+    Note: :py:func:`~poptorch.load` can only be used if all the arguments are
     provided
-    :py:meth:`poptorch.PoplarExecutor.loadExecutable` can be used in either
+    :py:meth:`~poptorch.PoplarExecutor.loadExecutable` can be used in either
     case (But only version and executable_inputs will be used)
     """
 

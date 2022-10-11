@@ -467,7 +467,7 @@ class PoplarExecutor:
     def options(self) -> 'poptorch.Options':
         """Access to the options.
 
-        .. seealso:: :py:class:`poptorch.Options`"""
+        .. seealso:: :py:class:`~poptorch.Options`"""
         return self._options
 
     def _debugGetPopartIR(self) -> str:
@@ -787,13 +787,13 @@ class PoplarExecutor:
 
         :param filename: Where to save the compiled executable.
         :param export_model: If `True` the Torch model will be saved in
-            the file alongside the executable. :py:func:`poptorch.load` can
+            the file alongside the executable. :py:func:`~poptorch.load` can
             be used to restore both the original Torch model, the PopTorch
             model and the executable.
             If `False` then only the executable will be exported and it will
             be the user's responsibility to call
-            :py:func:`poptorch.inferenceModel` or
-            :py:func:`poptorch.trainingModel` to re-create the PopTorch model
+            :py:func:`~poptorch.inferenceModel` or
+            :py:func:`~poptorch.trainingModel` to re-create the PopTorch model
             before calling :py:meth:`~poptorch.PoplarExecutor.loadExecutable`
             to restore the executable.
         :param save_rng_state: If `True` the random number generator's state
@@ -873,13 +873,13 @@ class PoplarExecutor:
 
         :param filename: Where to save the compiled executable.
         :param export_model: If `True` the Torch model will be saved in
-            the file alongside the executable. :py:func:`poptorch.load` can
+            the file alongside the executable. :py:func:`~poptorch.load` can
             be used to restore both the original Torch model, the PopTorch
             model and the executable.
             If `False` then only the executable will be exported and it will
             be the user's responsibility to call
-            :py:func:`poptorch.inferenceModel` or
-            :py:func:`poptorch.trainingModel` to re-create the PopTorch model
+            :py:func:`~poptorch.inferenceModel` or
+            :py:func:`~poptorch.trainingModel` to re-create the PopTorch model
             before calling :py:meth:`~poptorch.PoplarExecutor.loadExecutable`
             to restore the executable.
         """

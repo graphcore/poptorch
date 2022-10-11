@@ -327,7 +327,7 @@ def set_overlap_for_input(input_tensors, mode: "poptorch.OverlapMode"):
     You can increase performance in some cases by overlapping the copying
     from the host to IPUs with computation. However, this requires a number
     of IPU tiles to be set aside as IO tiles using
-    :py:func:`poptorch.options._TensorLocationOptions.numIOTiles` which may
+    :py:func:`~poptorch.options._TensorLocationOptions.numIOTiles` which may
     affect computation performance.
 
     You should use this function at the start of your model's `forward` method
@@ -339,7 +339,7 @@ def set_overlap_for_input(input_tensors, mode: "poptorch.OverlapMode"):
     :param mode: Control to what extent the host IO overlaps computation.
     :returns: the input tensors, specified for overlap.
 
-    .. seealso:: :py:class:`poptorch.OverlapMode`.
+    .. seealso:: :py:class:`~poptorch.OverlapMode`.
     """
 
     def set_overlap_for_input_tensor(tensor):
@@ -360,7 +360,7 @@ def set_overlap_for_output(output_tensors, mode: "poptorch.OverlapMode"):
     You can increase performance in some cases by overlapping the copying
     from the IPUs to host with computation. However, this requires a number
     of IPU tiles to be set aside as IO tiles using
-    :py:func:`poptorch.options._TensorLocationOptions.numIOTiles` which may
+    :py:func:`~poptorch.options._TensorLocationOptions.numIOTiles` which may
     affect computation performance.
 
     You should use this function at the end of your model's `forward` method,
@@ -372,7 +372,7 @@ def set_overlap_for_output(output_tensors, mode: "poptorch.OverlapMode"):
     :param mode: Control to what extent the host IO overlaps computation.
     :returns: the output tensors, specified for overlap.
 
-    .. seealso:: :py:class:`poptorch.OverlapMode`.
+    .. seealso:: :py:class:`~poptorch.OverlapMode`.
     """
 
     def set_overlap_for_output_tensor(tensor):
@@ -411,7 +411,7 @@ class Block(torch.nn.Module):
     one is specified. In addition, you can combine multiple blocks into
     a stage.
 
-    .. seealso:: :py:meth:`poptorch.Options.setExecutionStrategy`
+    .. seealso:: :py:meth:`~poptorch.Options.setExecutionStrategy`
 
     """
     # Will be set by the ExecutionStrategy before the graph is traced.
@@ -497,7 +497,7 @@ class _BlockHook():
     if one is specified. In addition, you can combine multiple blocks into a
     stage.
 
-    .. seealso:: :py:meth:`poptorch.Options.setExecutionStrategy`
+    .. seealso:: :py:meth:`~poptorch.Options.setExecutionStrategy`
     """
 
     def __init__(self, user_id, ipu_id) -> None:
@@ -556,7 +556,7 @@ def BeginBlock(layer_to_call: torch.nn.Module,
                    within PopTorch, and is separate and distinct from the device
                    ids used by ``gc-info``.
 
-    .. seealso:: :py:meth:`poptorch.Options.setExecutionStrategy`
+    .. seealso:: :py:meth:`~poptorch.Options.setExecutionStrategy`
     """
 
     if not isinstance(layer_to_call, torch.nn.Module):
@@ -610,7 +610,7 @@ def BlockFunction(user_id: Optional[str] = None, ipu_id: Optional[int] = None):
                    separate and distinct from the device ids used by
                    ``gc-info``.
 
-    .. seealso:: :py:meth:`poptorch.Options.setExecutionStrategy`
+    .. seealso:: :py:meth:`~poptorch.Options.setExecutionStrategy`
     """
 
     def decorator(func):
@@ -1010,7 +1010,7 @@ class MultiConv():
                  value: "poptorch.MultiConvPlanType") -> "poptorch.MultiConv":
         """Select the multi-convolution execution strategy.
 
-        :param value: An instance of :py:class:`MultiConvPlanType`.
+        :param value: An instance of :py:class:`~poptorch.MultiConvPlanType`.
 
         :returns: ``self``, to support method chaining.
         """

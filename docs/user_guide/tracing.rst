@@ -27,7 +27,7 @@ However, this approach suffered from several limitations:
 
 To address these issues the default is now to use the `PyTorch dispatcher <http://blog.ezyang.com/2020/09/lets-talk-about-the-pytorch-dispatcher/>`_ to build the PopTorch graph ourselves.
 
-The dispatcher frontend is supported on most PopTorch platforms (See :py:func:`poptorch.hasMLIRSupportOnPlatform`) but if
+The dispatcher frontend is supported on most PopTorch platforms (See :py:func:`~poptorch.hasMLIRSupportOnPlatform`) but if
 you run into any issue you can revert back to tracing by using :py:meth:`~poptorch.options._JitOptions.traceModel`.
 The only current PopTorch platform without dispatcher support is CentOS 7.
 

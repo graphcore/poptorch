@@ -9,8 +9,8 @@ Preparing your data
 
 Data loading in PyTorch is typically handled using `torch.utils.data.DataLoader <https://pytorch.org/docs/1.10.0/data.html#torch.utils.data.DataLoader>`_.
 
-PopTorch extends PyTorch's DataLoader with a :py:class:`poptorch.DataLoader` to enable efficient data batching with respect to PopTorch's underlying machine learning framework, PopART.
-Instantiation is almost identical to PyTorch, but you must remember to pass an instance of :py:class:`poptorch.Options`.
+PopTorch extends PyTorch's DataLoader with a :py:class:`~poptorch.DataLoader` to enable efficient data batching with respect to PopTorch's underlying machine learning framework, PopART.
+Instantiation is almost identical to PyTorch, but you must remember to pass an instance of :py:class:`~poptorch.Options`.
 
 +-------------------------------------------------+
 | PyTorch                                         |
@@ -30,7 +30,7 @@ Instantiation is almost identical to PyTorch, but you must remember to pass an i
 |   :dedent: 4                                    |
 +-------------------------------------------------+
 
-For more information about how to set :py:class:`poptorch.Options`, see :numref:`efficient_data_batching`.
+For more information about how to set :py:class:`~poptorch.Options`, see :numref:`efficient_data_batching`.
 
 Creating your model
 ===================

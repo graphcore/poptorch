@@ -588,13 +588,13 @@ def trainingModel(model: Union['torch.nn.Module', 'poptorch.PoplarExecutor'],
         Supported PyTorch optimizers: ``optim.SGD``, ``optim.Adam``, \
              ``optim.AdamW``, ``optim.RMSprop``.
 
-        Supported PopTorch optimizers: :py:class:`poptorch.optim.SGD`, \
-            :py:class:`poptorch.optim.Adam`, \
-            :py:class:`poptorch.optim.AdamW`, \
-            :py:class:`poptorch.optim.RMSprop`. \
-            :py:class:`poptorch.optim.LAMB`.
+        Supported PopTorch optimizers: :py:class:`~poptorch.optim.SGD`, \
+            :py:class:`~poptorch.optim.Adam`, \
+            :py:class:`~poptorch.optim.AdamW`, \
+            :py:class:`~poptorch.optim.RMSprop`. \
+            :py:class:`~poptorch.optim.LAMB`.
 
-    :returns: The :py:class:`poptorch.PoplarExecutor` wrapper to use in place
+    :returns: The :py:class:`~poptorch.PoplarExecutor` wrapper to use in place
         of ``model``.
     """
 
@@ -634,7 +634,7 @@ def inferenceModel(model: Union['torch.nn.Module', 'poptorch.PoplarExecutor'],
 
     :param model: The PyTorch model to wrap.
     :param options: The IPU specific options
-    :returns: The :py:class:`poptorch.PoplarExecutor` wrapper to use in place
+    :returns: The :py:class:`~poptorch.PoplarExecutor` wrapper to use in place
         of ``model``.
     """
 

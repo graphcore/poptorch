@@ -9,7 +9,7 @@ Features
 Options
 =======
 
-You can change how PopTorch compiles and executes models using :py:class:`poptorch.Options`.
+You can change how PopTorch compiles and executes models using :py:class:`~poptorch.Options`.
 You can find a full list of options in :numref:`api_options`.
 Broadly speaking, the options fall into the following categories:
 
@@ -225,7 +225,7 @@ multi-IPU device:
 * :py:class:`~poptorch.ParallelPhasedExecution`
 
 You can select this with the
-:py:func:`poptorch.Options.setExecutionStrategy` option.
+:py:func:`~poptorch.Options.setExecutionStrategy` option.
 
 
 The following subsections first introduce the general functions which are
@@ -536,7 +536,7 @@ you should still be aware that this will take place.
 
 .. note:: The effective or conventional batch size for layers which depend on it
   (such as batch normalization) is known as the micro-batch size. If you use
-  :py:class:`poptorch.DataLoader`, the ``batch_size`` which you pass to it is
+  :py:class:`~poptorch.DataLoader`, the ``batch_size`` which you pass to it is
   the micro-batch size.
 
 After each IPU has finished processing a micro-batch, the same IPU immediately
@@ -1071,7 +1071,7 @@ Make the op available to PyTorch
 
 After you have compiled the C++ implementation of the custom op, you can load
 the library file, and call the op from your PyTorch program, using the
-:py:class:`poptorch.custom_op` class.
+:py:class:`~poptorch.custom_op` class.
 
 First, load the dynamic library as shown in :numref:`loading_library_code`.
 
@@ -1205,7 +1205,7 @@ The exported file by default will contain your original PyTorch model (including
 .. important:: For your model and weights to be exported, your model must be picklable. See https://docs.python.org/3/library/pickle.html for more information.
   If your model is not picklable then use ``export_model=False``, as shown in :numref:`export_no_python`.
 
-Now both the torch model, PopTorch wrapper and executable can be restored on the target machine using :py:func:`poptorch.load`:
+Now both the torch model, PopTorch wrapper and executable can be restored on the target machine using :py:func:`~poptorch.load`:
 
 .. literalinclude:: precompilation.py
     :language: python
@@ -1216,7 +1216,7 @@ Now both the torch model, PopTorch wrapper and executable can be restored on the
     :emphasize-lines: 1
 
 In some cases you might want to provide some runtime information to select the device: you can do this
-using the ``edit_opts_fn`` argument of :py:func:`poptorch.load`:
+using the ``edit_opts_fn`` argument of :py:func:`~poptorch.load`:
 
 .. literalinclude:: precompilation.py
     :language: python
@@ -1251,7 +1251,7 @@ It means you will need to re-create and wrap the model yourself before loading t
 
 .. important:: Exported models lose their connections to other models.
 
-  For example, if you have a :py:func:`poptorch.trainingModel` and a :py:func:`poptorch.inferenceModel` based
+  For example, if you have a :py:func:`~poptorch.trainingModel` and a :py:func:`~poptorch.inferenceModel` based
   on the same PyTorch model, you wouldn't usually need to keep the weights synchronised between the two;
   PopTorch would take care of it for you, implicitly.
 

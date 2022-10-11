@@ -5,7 +5,7 @@ Efficient data batching
 =======================
 
 By default, PopTorch will process the ``batch_size`` which you provided to
-the :py:class:`poptorch.DataLoader`. This value is known as the micro-batch
+the :py:class:`~poptorch.DataLoader`. This value is known as the micro-batch
 size.
 
 When using the other options below, the actual number of samples used per step
@@ -14,7 +14,7 @@ varies to allow the IPU(s) to process data more efficiently.
 However, the effective batch size for operations which depend on it (for example the size of mini-batches, in PyTorch's terminology, when using Pytorch's `BatchNorm <https://pytorch.org/docs/stable/generated/torch.nn.BatchNorm2d.html>`__ layers) will not change. All that changes is how much data is
 actually sent for a single step.
 
-.. note:: Failure to use :py:class:`poptorch.DataLoader` may result in
+.. note:: Failure to use :py:class:`~poptorch.DataLoader` may result in
    accidentally changing the effective batch size for operations which depend on
    it, such as batch normalization.
 
@@ -25,11 +25,11 @@ poptorch.DataLoader
 ===================
 
 PopTorch provides a thin wrapper around the traditional `torch.utils.data.DataLoader <https://pytorch.org/docs/1.10.0/data.html#torch.utils.data.DataLoader>`_
-to abstract away some of the batch sizes calculations. If :py:class:`poptorch.DataLoader`
+to abstract away some of the batch sizes calculations. If :py:class:`~poptorch.DataLoader`
 is used in a distributed execution environment, it will ensure that each process uses
 a different subset of the dataset.
 
-If you set the :py:class:`poptorch.DataLoader` ``batch_size`` to more than 1
+If you set the :py:class:`~poptorch.DataLoader` ``batch_size`` to more than 1
 then each operation in the model will process that number of elements at any
 given time. Please see the usage example below.
 
@@ -131,17 +131,17 @@ multiplied by the value set using
 For inference, a device iteration corresponds to data loading and the forward pass.
 
 Note that the returned output dimensions depend on
-:py:meth:`poptorch.Options.outputMode`. The default value for
-:py:func:`poptorch.trainingModel` is `Final`, since you will often not need to
+:py:meth:`~poptorch.Options.outputMode`. The default value for
+:py:func:`~poptorch.trainingModel` is `Final`, since you will often not need to
 receive all or any of the output tensors and it is more efficient not to
 receive them. Therefore, only the last batch of data will be returned to the
 host under this setting. You can change this behaviour by setting the value of
-:py:meth:`poptorch.Options.outputMode`. to `All`. This returns the result of
+:py:meth:`~poptorch.Options.outputMode`. to `All`. This returns the result of
 every batch to the host.
 
 .. note:: When running an
   :py:class:`~poptorch.inferenceModel` with
-  :py:class:`poptorch.PipelinedExecution`, you must set
+  :py:class:`~poptorch.PipelinedExecution`, you must set
   :py:meth:`~poptorch.Options.deviceIterations` to at least the number of
   pipeline steps.
 
@@ -192,7 +192,7 @@ gradients accumulated from processing all the batches.
   :py:meth:`~poptorch.options._TrainingOptions.gradientAccumulation` to 1.
 
 As mentioned in :numref:`pipelined_execution`, you need to use gradient
-accumulations when training with :py:class:`poptorch.PipelinedExecution`
+accumulations when training with :py:class:`~poptorch.PipelinedExecution`
 because the parameters can only be updated between pipeline runs.  You need to
 set the number of accumulations to at least the number of pipeline stages.
 However, with this value, the pipeline will switch into the "ramp-down"
@@ -203,7 +203,7 @@ reduce the overall training efficiency of your model. The optimal number of
 gradient accumulations is a trade off between these two factors.
 
 .. note:: :py:meth:`~poptorch.options._TrainingOptions.gradientAccumulation`
-   is only needed by :py:class:`poptorch.PipelinedExecution`. Other execution
+   is only needed by :py:class:`~poptorch.PipelinedExecution`. Other execution
    modes may benefit from it because the IPUs will spend less time updating
    parameters during training.
 
@@ -215,7 +215,7 @@ gradient accumulations is a trade off between these two factors.
   :emphasize-lines: 12
   :linenos:
 
-In the code example below, :py:class:`poptorch.Block` introduced in
+In the code example below, :py:class:`~poptorch.Block` introduced in
 :numref:`execution_strategies` is used to divide up
 a different model into disjoint subsets of layers.
 These blocks can be shared among multiple parallel execution strategies.
@@ -226,13 +226,13 @@ These blocks can be shared among multiple parallel execution strategies.
   :start-after: annotations_start
   :end-before: annotations_end
   :emphasize-lines: 12, 14, 16, 18, 34
-  :caption: A training model making use of :py:class:`poptorch.Block`
+  :caption: A training model making use of :py:class:`~poptorch.Block`
 
-You can see the code examples of :py:class:`poptorch.SerialPhasedExecution`,
-:py:class:`poptorch.PipelinedExecution`, and
-:py:class:`poptorch.ShardedExecution` below.
+You can see the code examples of :py:class:`~poptorch.SerialPhasedExecution`,
+:py:class:`~poptorch.PipelinedExecution`, and
+:py:class:`~poptorch.ShardedExecution` below.
 
-An instance of class :py:class:`poptorch.PipelinedExecution` defines an
+An instance of class :py:class:`~poptorch.PipelinedExecution` defines an
 execution strategy that assigns layers to multiple IPUs as a pipeline. Gradient
 accumulation is used to push multiple batches through the pipeline allowing
 IPUs to run in parallel.
@@ -267,13 +267,13 @@ poptorch.Options.outputMode
 When you use a :py:func:`~poptorch.inferenceModel`, you will usually want to
 receive all the output tensors. For this reason, PopTorch will return them
 all to you by default. However, you can change this behaviour using
-:py:func:`poptorch.Options.outputMode`.
+:py:func:`~poptorch.Options.outputMode`.
 
 When you use a :py:func:`~poptorch.trainingModel`, you will often not need to
 receive all or any of the output tensors and it is more efficient not to
 receive them. For this reason, PopTorch only returns the last batch of tensors
 by default. As in the the case of ``inferenceModel``, you can change this
-behaviour using :py:func:`poptorch.Options.outputMode`.
+behaviour using :py:func:`~poptorch.Options.outputMode`.
 
 If you want to monitor training using a metric such as loss or accuracy, you
 may wish to take into account all tensors. To do this with minimal or no

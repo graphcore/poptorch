@@ -25,8 +25,8 @@ also provides IPU-specific functions.
 PopTorch supports executing native PyTorch models for both inference and training.
 To run a PyTorch model on the IPU, you must wrap your model with either:
 
-* :py:func:`poptorch.inferenceModel`
-* :py:func:`poptorch.trainingModel`
+* :py:func:`~poptorch.inferenceModel`
+* :py:func:`~poptorch.trainingModel`
 
 Both of these functions accept a PyTorch model (`torch.nn.Module <https://pytorch.org/docs/1.10.0/generated/torch.nn.Module.html#torch.nn.Module>`_) and create a
 representation of the model that can be executed on the IPU hardware.
@@ -55,14 +55,14 @@ Data batching
 =============
 
 An equivalent training loop executing the model on the IPU with PopTorch is shown
-below. The :py:class:`poptorch.DataLoader` is used to efficiently load data batches
+below. The :py:class:`~poptorch.DataLoader` is used to efficiently load data batches
 on the IPU.  PopTorch follows the data batching semantics of PopART. By default,
 this means you will just pass in data of the normal batch size. However, there are a
 number of options provided in PopTorch which will enable more efficient data
 loading. See :numref:`efficient_data_batching` for more information.
 
 Notice that the `torch.optim.AdamW <https://pytorch.org/docs/1.10.0/optim.html#torch.optim.AdamW>`_ optimiser is passed as an input argument to the
-:py:func:`poptorch.trainingModel` wrapper which applies the optimiser algorithm
+:py:func:`~poptorch.trainingModel` wrapper which applies the optimiser algorithm
 during training on the IPU.  The optimiser state is automatically managed by the
 PopART framework so there is no need to call the ``.step()`` method.  Another
 significant change from the native training loop is there is no ``loss.backward()``.
