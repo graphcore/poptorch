@@ -1,11 +1,17 @@
 // Copyright (c) 2021 Graphcore Ltd. All rights reserved.
 
+#include <mlir/IR/BuiltinTypes.h>
+
 #include <vector>
 
 #include <poplar/Graph.hpp>
+#include <poplar/OptionFlags.hpp>
 #include <poplar/Tensor.hpp>
+#include <poplar/Type.hpp>
+#include <popops/DynamicSlice.hpp>
 
 #include "../CompilerHelpers.hpp"
+#include "dialect/Poptorch.hpp"
 
 namespace poptorch_ir {
 
@@ -119,6 +125,43 @@ void sliceInverse::lowerToPoplar(CompilerContext &context) {
   }
 
   context.addTensor(result(), in);
+}
+
+void index_select::lowerToPoplar(CompilerContext &context) {
+  poplar::Tensor self = context.fromSsa(this->self());
+  const poplar::Tensor index = context.fromSsa(this->index())
+                                   .flatten()
+                                   .expand({1})
+                                   .reinterpret(poplar::UNSIGNED_INT);
+  const uint64_t dim = this->dim();
+  const auto output_size = self.numElements() / self.shape()[dim];
+
+  self = self.dimRoll(dim);
+  auto tmp_shape = self.shape();
+  self = self.flatten(1, self.rank());
+
+  poplar::OptionFlags options{};
+  options.set("usedForSlice", "true");
+  options.set("usedForUpdate", "false");
+  options.set("operationForUpdate", "none");
+
+  const popops::SlicePlan plan = popops::embedding::plan(
+      context.graph, self.elementType(), self.numElements(), output_size,
+      {index.numElements()}, options);
+
+  poplar::Tensor out = popops::multiSlice(context.graph, self, index, {0}, {1},
+                                          context.seq, plan, options);
+
+  tmp_shape.front() = out.dim(0);
+
+  const auto result_type = result().getType().cast<mlir::RankedTensorType>();
+  const auto result_mlir_shape = result_type.getShape();
+  const std::vector<std::size_t> result_shape(result_mlir_shape.begin(),
+                                              result_mlir_shape.end());
+
+  out = out.reshape(tmp_shape).dimRoll(0, dim).reshape(result_shape);
+
+  context.addTensor(result(), out);
 }
 
 } // namespace poptorch_ir

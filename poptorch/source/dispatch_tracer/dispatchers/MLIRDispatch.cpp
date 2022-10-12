@@ -109,7 +109,8 @@ MLIRExecutor::execute(const std::vector<at::Tensor> &inputs) {
         // was already set when _compiler.addInput() was called.
         const auto &host_buffer = getHostBuffer(tensor);
         ERROR_ON_MSG(!host_buffer,
-                     "Attempted to pass an IPU tensor with no `host_buffer`.");
+                     "Attempted to pass an IPU tensor as input to `execute` "
+                     "with no `host_buffer`.");
         input_ptrs[i] = host_buffer->data();
       } else {
         ERROR_ON_MSG(!tensor.is_cpu(),
