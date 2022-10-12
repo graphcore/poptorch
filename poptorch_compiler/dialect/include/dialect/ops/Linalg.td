@@ -187,7 +187,7 @@ def Poptorch_addmm : Poptorch_Op<"addmm", []> {
     ];
 }
 
-class Poptorch_not_implemented_norm<string mnemonic, list<OpTrait> traits = []> :
+class Poptorch_not_implemented_norm<string mnemonic, list<Trait> traits = []> :
     Poptorch_NotImplementedOp<mnemonic, traits> {
     let extraClassDeclaration = [{
         static llvm::SmallVector<std::int64_t, 4> inferShape(const mlir::RankedTensorType &tensor,

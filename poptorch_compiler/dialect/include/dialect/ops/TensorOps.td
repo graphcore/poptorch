@@ -73,12 +73,7 @@ def Poptorch_copy_: Poptorch_Op<"copy_", [SameOperandsAndResultShape]> {
   }]>];
 
   let hasCanonicalizeMethod = 1;
-  let verifier = [{
-    if (self().getType() != src().getType()) {
-        ERROR("The source and destination of an inplace copy must have the same shape and dtype.");
-    }
-    return mlir::success();
-  }];
+  let hasVerifier = 1;
 }
 
 def Poptorch_print_tensor : Poptorch_Op<"print_tensor", [], MemoryEffects<[MemWrite]>> {
@@ -274,7 +269,7 @@ def Poptorch_dropout : Poptorch_Op<"dropout", []> {
     ];
 }
 
-class Poptorch_dropout_NotImplementedOps<string name, list<OpTrait> traits = []> : Poptorch_NotImplementedOp<name, traits> {
+class Poptorch_dropout_NotImplementedOps<string name, list<Trait> traits = []> : Poptorch_NotImplementedOp<name, traits> {
     let arguments = (ins Poptorch_tensor:$input, F32Attr:$p, BoolAttr:$training);
 
     let results = (outs Poptorch_tensor:$result);

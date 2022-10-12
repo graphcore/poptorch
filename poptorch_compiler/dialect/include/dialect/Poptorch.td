@@ -23,8 +23,8 @@ include "ops/Poptorch.td"
 
 include "mlir/IR/SymbolInterfaces.td"
 
-def Poptorch_end_graph: Poptorch_AbstractOp<"end_graph", [HasParent<"::mlir::FuncOp">, Terminator]> {
-    let summary = "Return op";
+def Poptorch_end_graph: Poptorch_AbstractOp<"end_graph", [HasParent<"::mlir::func::FuncOp">, Terminator]> {
+  let summary = "Return op";
 }
 
 /*

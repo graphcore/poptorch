@@ -1,6 +1,7 @@
 // Copyright (c) 2021 Graphcore Ltd. All rights reserved.
 #include "IMLIRCompiler.hpp"
 
+#include <mlir/Dialect/Func/IR/FuncOps.h>
 #include <mlir/IR/BuiltinAttributes.h>
 #include <mlir/IR/BuiltinTypes.h>
 
@@ -75,7 +76,8 @@ IMLIRCompiler::IMLIRCompiler(const poptorch::CompilerOptions &options)
 
   context.getDiagEngine().registerHandler(printDiagnostic);
 
-  // Load the dialect.
+  // Load the dialects.
+  context.loadDialect<mlir::func::FuncDialect>();
   context.loadDialect<poptorch_ir::PoptorchDialect>();
 
   resetMainGraph();
@@ -89,10 +91,11 @@ void IMLIRCompiler::addGlobalState(std::string_view name,
       /*type=*/argType);
 }
 
-mlir::Value IMLIRCompiler::addArgument(mlir::FuncOp func, mlir::Type argType) {
+mlir::Value IMLIRCompiler::addArgument(mlir::func::FuncOp func,
+                                       mlir::Type argType) {
   // Add the argument to the region.
   const auto insert_pos = func.getNumArguments();
-  func.insertArgument(insert_pos, argType, {});
+  func.insertArgument(insert_pos, argType, {}, _builder.getLoc());
 
   return func.getArgument(insert_pos);
 }
@@ -181,7 +184,7 @@ IMLIRCompiler::Graph IMLIRCompiler::createSubGraph(const std::string &name) {
   auto func_type = _builder.getFunctionType({}, llvm::None);
 
   _builder.setInsertionPointToEnd(&_the_module->getRegion(0).front());
-  Graph sub(_builder.create<mlir::FuncOp>(name, func_type));
+  Graph sub(_builder.create<mlir::func::FuncOp>(name, func_type));
 
   return sub;
 }

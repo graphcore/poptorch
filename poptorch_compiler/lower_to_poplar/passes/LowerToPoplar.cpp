@@ -52,9 +52,11 @@ public:
 
   void runOnOperation() override;
 
+  mlir::StringRef getArgument() const final { return "lower-to-poplar"; }
+
 private:
   // Verify operations using MLIR's verifier.
-  static void verifyOperations(const mlir::FuncOp &function);
+  static void verifyOperations(const mlir::func::FuncOp &function);
 
   CompilerContext *_context;
 };
@@ -65,7 +67,7 @@ void LowerToPoplar::runOnOperation() {
   poptorch::logging::info("Graph lowered to poplar:\n{}", mlirOpToStr(module));
 
   // Compile all the programs in the module
-  for (mlir::FuncOp function : module.getOps<mlir::FuncOp>()) {
+  for (mlir::func::FuncOp function : module.getOps<mlir::func::FuncOp>()) {
     auto program = getProgramType(function.getName());
     _context->clearLocalData();
 
@@ -80,7 +82,7 @@ void LowerToPoplar::runOnOperation() {
   }
 }
 
-void LowerToPoplar::verifyOperations(const mlir::FuncOp &function) {
+void LowerToPoplar::verifyOperations(const mlir::func::FuncOp &function) {
   // It would be possible to call mlir::verify on the whole graph, however
   // this would not pinpoint the failing operation. Therefore, we verify each
   // op at a time, by recursing into it. Note that calling mlir::verify has some
@@ -91,7 +93,7 @@ void LowerToPoplar::verifyOperations(const mlir::FuncOp &function) {
 
     for (auto &block : region) {
       for (auto &op : block) {
-        std::string op_name = op.getName().getStringRef().str();
+        std::string const op_name = op.getName().getStringRef().str();
 
         // WeightsToDevice/Host are FuncOps, which means that they should be
         // isolated from external variables. However, this is not the case so
@@ -99,7 +101,8 @@ void LowerToPoplar::verifyOperations(const mlir::FuncOp &function) {
         // so they would have to be defined as some other type such as a
         // custom defined non-isolated function op in the tablegen. Instead,
         // we simply skip verification. The name will be "func" when calling
-        // getName on the mlir::Operation (here) rather than the mlir::funcOp.
+        // getName on the mlir::Operation (here) rather than the
+        // mlir::func::FuncOp.
         if (op_name == "func") {
           continue;
         }
@@ -121,5 +124,4 @@ createLowerToPoplarPass(CompilerContext &context) {
 
 } // namespace poptorch_ir
 
-static mlir::PassRegistration<poptorch_ir::LowerToPoplar>
-    lower("lower-to-poplar", "");
+static mlir::PassRegistration<poptorch_ir::LowerToPoplar> lower;

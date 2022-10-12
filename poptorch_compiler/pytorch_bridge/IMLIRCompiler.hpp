@@ -262,7 +262,7 @@ public:
                                    const std::vector<std::int64_t> &dims);
   mlir::RankedTensorType getTensor(const TensorType &tensor_type);
 
-  static mlir::Value addArgument(mlir::FuncOp func, mlir::Type argType);
+  mlir::Value addArgument(mlir::func::FuncOp func, mlir::Type argType);
 
   mlir::Value addArgumentToMainGraph(mlir::Type argType);
 
@@ -286,8 +286,8 @@ public:
   // the location to be set.
   void setLoc(const char *filename, std::uint64_t line, std::uint64_t col) {
     if (filename != nullptr) {
-      _builder.setLoc(mlir::FileLineColLoc::get(
-          _builder.getContext(), _builder.getIdentifier(filename), line, col));
+      _builder.setLoc(mlir::FileLineColLoc::get(_builder.getContext(), filename,
+                                                line, col));
     } else {
       _builder.setLoc(mlir::UnknownLoc::get(_builder.getContext()));
     }
@@ -319,7 +319,7 @@ public:
 
 protected:
   struct Graph {
-    mlir::FuncOp graph;
+    mlir::func::FuncOp graph;
     mlir::Block::iterator epilog_start;
     // When a new op is added to the main graph using createOp we check and
     // store whether or not there is an actual handler for this op. (Some ops
@@ -328,7 +328,7 @@ protected:
     bool all_ops_can_be_lowered{true};
 
     Graph() = default;
-    explicit Graph(mlir::FuncOp func) : graph(func) {
+    explicit Graph(mlir::func::FuncOp func) : graph(func) {
       // Add an entry block.
       graph.addEntryBlock();
 

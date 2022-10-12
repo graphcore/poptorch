@@ -19,9 +19,12 @@ set(ENABLE_WERROR ON CACHE BOOL "Treat C++ warnings as errors")
 set(EXTRA_PYTEST_ARGS "" CACHE STRING "Extra arguments to pass to pytest when generating the list of tests to run")
 
 # Always use the gold linker to avoid segfaults with PopART / Poplar on some OSes.
-set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS}  -fuse-ld=gold")
-set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS}  -fuse-ld=gold")
-set(CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS}  -fuse-ld=gold")
+if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+  find_program(GOLD_EXECUTABLE ld.gold REQUIRED)
+  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fuse-ld=gold")
+  set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fuse-ld=gold")
+  set(CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS} -fuse-ld=gold")
+endif()
 
 # Note: The next line is also parsed by scripts/utils/_utils.py
 set(TORCH_VERSION 1.10.0)

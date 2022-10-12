@@ -236,7 +236,7 @@ def Poptorch_binary_cross_entropy_with_logits_backward : Poptorch_Op<"binary_cro
     ];
 }
 
-class Poptorch_not_implemented_simple_reduced_loss<string mnemonic, list<OpTrait> traits = []> :
+class Poptorch_not_implemented_simple_reduced_loss<string mnemonic, list<Trait> traits = []> :
     Poptorch_NotImplementedOp<mnemonic, traits> {
     let extraClassDeclaration = [{
         static llvm::ArrayRef<std::int64_t> inferShape(const mlir::RankedTensorType &tensor,

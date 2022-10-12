@@ -33,10 +33,10 @@ namespace poptorch_ir {
 #undef BINARY_OP_RENAMED
 
 void add::lowerToPoplar(CompilerContext &context) {
-  poplar::Tensor input1 = context.fromSsa(this->in1());
-  poplar::Tensor input2 = context.fromSsa(this->in2());
+  poplar::Tensor const input1 = context.fromSsa(this->in1());
+  poplar::Tensor const input2 = context.fromSsa(this->in2());
 
-  float value = this->alpha().convertToFloat();
+  const float value = this->alpha().convertToFloat();
 
   poplar::Tensor out;
 
@@ -51,10 +51,10 @@ void add::lowerToPoplar(CompilerContext &context) {
 }
 
 void sub::lowerToPoplar(CompilerContext &context) {
-  poplar::Tensor input1 = context.fromSsa(this->in1());
-  poplar::Tensor input2 = context.fromSsa(this->in2());
+  poplar::Tensor const input1 = context.fromSsa(this->in1());
+  poplar::Tensor const input2 = context.fromSsa(this->in2());
 
-  float value = this->alpha().convertToFloat();
+  const float value = this->alpha().convertToFloat();
 
   poplar::Tensor out;
   if (value != 1.0f) {
@@ -68,8 +68,8 @@ void sub::lowerToPoplar(CompilerContext &context) {
 }
 
 void logicalXor::lowerToPoplar(CompilerContext &context) {
-  poplar::Tensor input1 = context.fromSsa(this->in1());
-  poplar::Tensor input2 = context.fromSsa(this->in2());
+  poplar::Tensor const input1 = context.fromSsa(this->in1());
+  poplar::Tensor const input2 = context.fromSsa(this->in2());
 
   // Implicit casting is added to the input
   assert(input1.elementType() == poplar::BOOL);
@@ -82,8 +82,8 @@ void logicalXor::lowerToPoplar(CompilerContext &context) {
 }
 
 void floor_divide::lowerToPoplar(poptorch_ir::CompilerContext &context) {
-  poplar::Tensor input1 = context.fromSsa(this->in1());
-  poplar::Tensor input2 = context.fromSsa(this->in2());
+  poplar::Tensor const input1 = context.fromSsa(this->in1());
+  poplar::Tensor const input2 = context.fromSsa(this->in2());
 
   assert(input1.elementType().isFloatingPoint() ==
          input2.elementType().isFloatingPoint());
@@ -99,8 +99,8 @@ void floor_divide::lowerToPoplar(poptorch_ir::CompilerContext &context) {
 }
 
 void remainder::lowerToPoplar(CompilerContext &context) {
-  poplar::Tensor input1 = context.fromSsa(this->in1());
-  poplar::Tensor input2 = context.fromSsa(this->in2());
+  poplar::Tensor const input1 = context.fromSsa(this->in1());
+  poplar::Tensor const input2 = context.fromSsa(this->in2());
 
   // Compute the remainder rounding towards zero and correct it if the sign of
   // the remainder is negative
@@ -109,7 +109,7 @@ void remainder::lowerToPoplar(CompilerContext &context) {
   auto op =
       pe::Select(r + pe::_2, r, (r != zero) && ((r < zero) != (pe::_2 < zero)));
 
-  poplar::Tensor out =
+  poplar::Tensor const out =
       popops::map(context.graph, op, {input1, input2}, context.seq);
   context.addTensor(this->result(), out);
 }
@@ -126,7 +126,7 @@ void remainder::lowerToPoplar(CompilerContext &context) {
 #undef UNARY_OP
 
 void trunc::lowerToPoplar(CompilerContext &context) {
-  poplar::Tensor in1 = context.fromSsa(this->in1());
+  poplar::Tensor const in1 = context.fromSsa(this->in1());
 
   auto out = popops::map(context.graph, popops::expr::UnaryOpType::TRUNC, in1,
                          context.seq);
@@ -134,7 +134,7 @@ void trunc::lowerToPoplar(CompilerContext &context) {
 }
 
 void isnan::lowerToPoplar(CompilerContext &context) {
-  poplar::Tensor self = context.fromSsa(this->self());
+  poplar::Tensor const self = context.fromSsa(this->self());
 
   auto out = popops::map(context.graph, popops::expr::UnaryOpType::IS_NAN, self,
                          context.seq);
@@ -142,41 +142,41 @@ void isnan::lowerToPoplar(CompilerContext &context) {
 }
 
 void addcmul::lowerToPoplar(CompilerContext &context) {
-  poplar::Tensor input = context.fromSsa(this->input());
-  poplar::Tensor tensor1 = context.fromSsa(this->tensor1());
-  poplar::Tensor tensor2 = context.fromSsa(this->tensor2());
-  float value = this->value().convertToFloat();
+  poplar::Tensor const input = context.fromSsa(this->input());
+  poplar::Tensor const tensor1 = context.fromSsa(this->tensor1());
+  poplar::Tensor const tensor2 = context.fromSsa(this->tensor2());
+  const float value = this->value().convertToFloat();
 
   auto expr = pe::Add(pe::_1, pe::Mul(pe::_3, pe::_2));
   if (value != 1.0f) {
     expr = pe::Add(pe::_1, pe::Mul(pe::Const(value), pe::Mul(pe::_3, pe::_2)));
   }
 
-  poplar::Tensor out =
+  poplar::Tensor const out =
       popops::map(context.graph, expr, {input, tensor1, tensor2}, context.seq);
 
   context.addTensor(this->result(), out);
 }
 
 void addcdiv::lowerToPoplar(CompilerContext &context) {
-  poplar::Tensor input = context.fromSsa(this->input());
-  poplar::Tensor tensor1 = context.fromSsa(this->tensor1());
-  poplar::Tensor tensor2 = context.fromSsa(this->tensor2());
-  float value = this->value().convertToFloat();
+  poplar::Tensor const input = context.fromSsa(this->input());
+  poplar::Tensor const tensor1 = context.fromSsa(this->tensor1());
+  poplar::Tensor const tensor2 = context.fromSsa(this->tensor2());
+  const float value = this->value().convertToFloat();
 
   auto expr = pe::Add(pe::_1, pe::Divide(pe::_2, pe::_3));
   if (value != 1.0f) {
     expr =
         pe::Add(pe::_1, pe::Mul(pe::Const(value), pe::Divide(pe::_2, pe::_3)));
   }
-  poplar::Tensor out =
+  poplar::Tensor const out =
       popops::map(context.graph, expr, {input, tensor1, tensor2}, context.seq);
 
   context.addTensor(this->result(), out);
 }
 
 void clamp::lowerToPoplar(CompilerContext &context) {
-  poplar::Tensor self = context.fromSsa(this->self());
+  poplar::Tensor const self = context.fromSsa(this->self());
 
   auto min_optional = this->min();
   auto max_optional = this->max();
@@ -193,16 +193,17 @@ void clamp::lowerToPoplar(CompilerContext &context) {
   // value is more than the max value (it seems to happen on the ipu when we are
   // broadcasting)
   auto expr = pe::Min(pe::Max(pe::_1, pe::Const(min)), pe::Const(max));
-  poplar::Tensor out = popops::map(context.graph, expr, {self}, context.seq);
+  poplar::Tensor const out =
+      popops::map(context.graph, expr, {self}, context.seq);
 
   context.addTensor(this->result(), out);
 }
 
 void clampTensor::lowerToPoplar(CompilerContext &context) {
-  poplar::Tensor self = context.fromSsa(this->self());
+  poplar::Tensor const self = context.fromSsa(this->self());
   poplar::Tensor min;
   poplar::Tensor max;
-  std::vector<uint64_t> param_shape = {self.shape()[0]};
+  const std::vector<uint64_t> param_shape = {self.shape()[0]};
   // creating numeric limit vectors
 
   min = this->min() ? context.fromSsa(this->min())
@@ -217,34 +218,34 @@ void clampTensor::lowerToPoplar(CompilerContext &context) {
   // broadcasting)
   auto expr = pe::Min(pe::Max(pe::_1, pe::_2), pe::_3);
 
-  poplar::Tensor out =
+  poplar::Tensor const out =
       popops::map(context.graph, expr, {self, min, max}, context.seq);
 
   context.addTensor(this->result(), out);
 }
 
 void sigmoid_backward::lowerToPoplar(CompilerContext &context) {
-  poplar::Tensor grad_output = context.fromSsa(this->grad_output());
-  poplar::Tensor output = context.fromSsa(this->output());
+  poplar::Tensor const grad_output = context.fromSsa(this->grad_output());
+  poplar::Tensor const output = context.fromSsa(this->output());
 
-  poplar::Tensor out = popnn::nonLinearityInputGradient(
+  poplar::Tensor const out = popnn::nonLinearityInputGradient(
       context.graph, popnn::NonLinearityType::SIGMOID, output, grad_output,
       context.seq);
   context.addTensor(this->grad_input(), out);
 }
 
 void tanh_backward::lowerToPoplar(CompilerContext &context) {
-  poplar::Tensor grad_output = context.fromSsa(this->grad_output());
-  poplar::Tensor output = context.fromSsa(this->output());
+  poplar::Tensor const grad_output = context.fromSsa(this->grad_output());
+  poplar::Tensor const output = context.fromSsa(this->output());
 
-  poplar::Tensor out = popnn::nonLinearityInputGradient(
+  poplar::Tensor const out = popnn::nonLinearityInputGradient(
       context.graph, popnn::NonLinearityType::TANH, output, grad_output,
       context.seq);
   context.addTensor(this->grad_input(), out);
 }
 
 void threshold_out::lowerToPoplar(CompilerContext &context) {
-  poplar::Tensor self = context.fromSsa(this->self());
+  poplar::Tensor const self = context.fromSsa(this->self());
   const float threshold = this->threshold().convertToFloat();
   const float value = this->value().convertToFloat();
 
@@ -258,17 +259,17 @@ void threshold_out::lowerToPoplar(CompilerContext &context) {
 }
 
 void pow_Tensor_Scalar_out::lowerToPoplar(CompilerContext &context) {
-  poplar::Tensor lhs = context.fromSsa(this->lhs());
+  poplar::Tensor const lhs = context.fromSsa(this->lhs());
   const float rhs = this->rhs().convertToFloat();
-  poplar::Tensor out = popops::map(
+  poplar::Tensor const out = popops::map(
       context.graph, pe::Pow(pe::_1, pe::Const(rhs)), {lhs}, context.seq);
   context.addTensor(this->result(), out);
 }
 
 #define UNARY_OP_IMPL_EXPR(op, expr)                                           \
   void op::lowerToPoplar(CompilerContext &context) {                           \
-    poplar::Tensor input1 = context.fromSsa(this->in1());                      \
-    poplar::Tensor out =                                                       \
+    const poplar::Tensor input1 = context.fromSsa(this->in1());                \
+    const poplar::Tensor out =                                                 \
         popops::map(context.graph, expr, {input1}, context.seq);               \
     context.addTensor(this->result(), out);                                    \
   }

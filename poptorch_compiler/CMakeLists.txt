@@ -1,12 +1,14 @@
-cmake_minimum_required(VERSION 3.4 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.14 FATAL_ERROR)
 project(poptorch_compiler)
 
 # We need -fpic if we are static
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+set(LLVM_VERSION 15.0.2)
 
-find_package(LLVM REQUIRED CONFIG)
+find_package(LLVM ${LLVM_VERSION} EXACT REQUIRED CONFIG)
+# Note: MLIR and LLD don't seem to be versioned
 find_package(MLIR REQUIRED CONFIG)
-message(STATUS "Found LLVM in dir : ${LLVM_DIR}")
+message(STATUS "Found LLVM: ${LLVM_DIR}")
 
 function(remove_shared_llvm target)
   foreach(prop INTERFACE_LINK_LIBRARIES LINK_LIBRARIES)
@@ -37,9 +39,9 @@ include(TableGen)
 include(HandleLLVMOptions)
 
 
-message(STATUS LLVM_LIBRARY_DIRS "${LLVM_LIBRARY_DIRS}")
-message(STATUS LLVM_INCLUDE_DIRS "${LLVM_INCLUDE_DIRS}")
-message(STATUS MLIR_INCLUDE_DIRS "${LLVM_INCLUDE_DIRS}")
+message(STATUS "LLVM_LIBRARY_DIRS: ${LLVM_LIBRARY_DIRS}")
+message(STATUS "LLVM_INCLUDE_DIRS: ${LLVM_INCLUDE_DIRS}")
+message(STATUS "MLIR_INCLUDE_DIRS: ${LLVM_INCLUDE_DIRS}")
 
 # LLVM library includes.
 include_directories(SYSTEM ${LLVM_INCLUDE_DIRS})
@@ -47,9 +49,14 @@ include_directories(SYSTEM ${MLIR_INCLUDE_DIRS})
 link_directories(${LLVM_LIBRARY_DIRS})
 
 # Use lld instead of gold for the poptorch_compiler (To avoid issues when linking against LLVM)
-set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS}  -fuse-ld=lld")
-set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS}  -fuse-ld=lld")
-set(CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS}  -fuse-ld=lld")
+if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+  find_package(LLD REQUIRED)
+  get_target_property(LLD_PATH lld LOCATION)
+  get_filename_component(LLD_DIR ${LLD_PATH} DIRECTORY)
+  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fuse-ld=lld -B${LLD_DIR}")
+  set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fuse-ld=lld -B${LLD_DIR}")
+  set(CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS} -fuse-ld=lld -B${LLD_DIR}")
+endif()
 
 # Setup for our sources + generated tablegen includes
 # Add the root project.

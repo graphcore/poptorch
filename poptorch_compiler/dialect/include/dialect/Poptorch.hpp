@@ -2,18 +2,19 @@
 #ifndef POPTORCH_CODEGEN_POPTORCH_IR_H_
 #define POPTORCH_CODEGEN_POPTORCH_IR_H_
 
+#include <mlir/Dialect/Func/IR/FuncOps.h>
+#include <mlir/IR/BuiltinAttributes.h>
+#include <mlir/IR/BuiltinOps.h>
+#include <mlir/IR/BuiltinTypes.h>
+#include <mlir/IR/OpDefinition.h>
+#include <mlir/IR/OpImplementation.h>
+#include <mlir/IR/PatternMatch.h>
+
 #include <algorithm>
 #include <numeric>
 #include <vector>
 
 #include "dialect/Helpers.hpp"
-
-#include "mlir/IR/BuiltinAttributes.h"
-#include "mlir/IR/BuiltinOps.h"
-#include "mlir/IR/BuiltinTypes.h"
-#include "mlir/IR/OpDefinition.h"
-#include "mlir/IR/OpImplementation.h"
-#include "mlir/IR/PatternMatch.h"
 
 /*
  * Custom traits.

@@ -15,8 +15,8 @@ namespace poptorch {
 namespace poptorch_custom_ops {
 
 FastGatherLastDimOp::FastGatherLastDimOp(
-    popart::OperatorIdentifier const &opid_,
-    popart::Op::Settings const &settings_, std::string const &debug_str)
+    const popart::OperatorIdentifier &opid_,
+    const popart::Op::Settings &settings_, const std::string &debug_str)
     : popart::Op(opid_, settings_) {
   this->_axis = -1;
   this->_debug_str = debug_str;
@@ -53,7 +53,7 @@ void FastGatherLastDimOp::setup() {
   }
 
   // idx should have same dimensions as data except for last dim
-  int data_rank = static_cast<int>(data_shape.size());
+  const int data_rank = static_cast<int>(data_shape.size());
   for (unsigned i = 0; i < data_shape.size() - 1; i++) {
     if (idx_shape[i] != data_shape[i]) {
       throw popart::error("FastGatherLastDimOp::setup(), "
@@ -100,8 +100,9 @@ static popart::OpCreator<FastGatherLastDimOp> fast_gather_op_creator(
       popart::OperatorIdentifier const &opid = info.opid;
       popart::Op::Settings const &settings = info.settings;
       popart::Attributes const &attr = info.attributes;
-      std::string debug_str = attr.getAttribute<popart::Attributes::String>(
-          "debug_str", "fast_gather_last_dim");
+      std::string const debug_str =
+          attr.getAttribute<popart::Attributes::String>("debug_str",
+                                                        "fast_gather_last_dim");
       return std::unique_ptr<popart::Op>(
           new FastGatherLastDimOp(opid, settings, debug_str));
     },
@@ -124,7 +125,8 @@ void FastGatherLastDimOpx::grow(poplar::program::Sequence &prog) const {
   auto data_tensor = getInTensor(0);
   auto idx_tensor = getInTensor(1);
 
-  FastGatherLastDimOp &fast_gather_last_dim_op = getOp<FastGatherLastDimOp>();
+  const FastGatherLastDimOp &fast_gather_last_dim_op =
+      getOp<FastGatherLastDimOp>();
   popart::Shape fwd_op_out_shape = fast_gather_last_dim_op.getOutShape();
 
   std::vector<std::size_t> fwd_out_shape(fwd_op_out_shape.size());
@@ -132,7 +134,7 @@ void FastGatherLastDimOpx::grow(poplar::program::Sequence &prog) const {
     fwd_out_shape[i] = fwd_op_out_shape[i];
   }
 
-  poplar::Tensor out_tensor =
+  poplar::Tensor const out_tensor =
       addGraphProg(graph(), prog, data_tensor, idx_tensor, fwd_out_shape);
 
   setOutTensor(0, out_tensor);
@@ -140,14 +142,14 @@ void FastGatherLastDimOpx::grow(poplar::program::Sequence &prog) const {
 
 poplar::Tensor FastGatherLastDimOpx::addGraphProg(
     poplar::Graph &graph, poplar::program::Sequence &prog,
-    poplar::Tensor const &data_tensor, poplar::Tensor const &idx_tensor,
-    std::vector<std::size_t> const &fwd_out_shape) {
+    const poplar::Tensor &data_tensor, const poplar::Tensor &idx_tensor,
+    const std::vector<std::size_t> &fwd_out_shape) {
 
   poplar::Tensor output_tensor =
       graph.addVariable(data_tensor.elementType(), fwd_out_shape, "sel_out");
   auto target = graph.getTarget();
-  unsigned num_tiles = target.getNumTiles();
-  unsigned out_rank = idx_tensor.rank();
+  const unsigned num_tiles = target.getNumTiles();
+  const unsigned out_rank = idx_tensor.rank();
 
   std::size_t alloc_cnt = 1;
   std::size_t channel_cnt = 1;
@@ -162,23 +164,23 @@ poplar::Tensor FastGatherLastDimOpx::addGraphProg(
   auto in_shape = data_tensor.shape();
   auto out_shape = fwd_out_shape;
 
-  poplar::ComputeSet gather_cs = graph.addComputeSet("FastGatherCS");
+  poplar::ComputeSet const gather_cs = graph.addComputeSet("FastGatherCS");
   std::vector<unsigned> tile_start(num_tiles, 0);
   std::vector<unsigned> tile_count(num_tiles, 0);
 
-  poplar::Tensor data_tensor_clone = graph.clone(data_tensor);
-  poplar::Tensor data_tensor_reshape =
+  poplar::Tensor const data_tensor_clone = graph.clone(data_tensor);
+  poplar::Tensor const data_tensor_reshape =
       data_tensor_clone.reshape({alloc_cnt, in_shape[out_rank - 1]});
 
-  poplar::Tensor idx_tensor_clone = graph.clone(idx_tensor);
-  poplar::Tensor idx_tensor_reshape =
+  poplar::Tensor const idx_tensor_clone = graph.clone(idx_tensor);
+  poplar::Tensor const idx_tensor_reshape =
       idx_tensor_clone.reshape({alloc_cnt, out_shape[out_rank - 1]});
-  poplar::Tensor result_tensor_reshape =
+  poplar::Tensor const result_tensor_reshape =
       output_tensor.reshape({alloc_cnt, out_shape[out_rank - 1]});
 
   std::size_t tile_idx_last = 1;
   for (std::size_t i = 0; i < alloc_cnt; ++i) {
-    std::size_t idx = (i * num_tiles) / alloc_cnt;
+    std::size_t const idx = (i * num_tiles) / alloc_cnt;
     graph.setTileMapping(data_tensor_reshape[i], idx);
     graph.setTileMapping(idx_tensor_reshape[i], idx);
     graph.setTileMapping(result_tensor_reshape[i], idx);
@@ -196,7 +198,7 @@ poplar::Tensor FastGatherLastDimOpx::addGraphProg(
       continue;
     }
 
-    poplar::VertexRef gather_vertex = graph.addVertex(
+    poplar::VertexRef const gather_vertex = graph.addVertex(
         gather_cs,
         poputil::templateVertex("FastGatherVertex", data_tensor.elementType(),
                                 idx_tensor.elementType()),
@@ -243,10 +245,10 @@ FastGatherLastDimGradOpx::FastGatherLastDimGradOpx(
 }
 
 void FastGatherLastDimGradOpx::grow(poplar::program::Sequence &prog) const {
-  poplar::Tensor grad_output_tensor = getInTensor(0);
-  poplar::Tensor idx_tensor = getInTensor(1);
+  poplar::Tensor const grad_output_tensor = getInTensor(0);
+  poplar::Tensor const idx_tensor = getInTensor(1);
 
-  FastGatherLastDimGradOp &grad_op = getOp<FastGatherLastDimGradOp>();
+  const FastGatherLastDimGradOp &grad_op = getOp<FastGatherLastDimGradOp>();
   popart::Shape fwd_in_shape = grad_op.getFwdInShape();
   std::vector<std::size_t> fwd_in_shape_2(fwd_in_shape.size());
   for (unsigned i = 0; i < fwd_in_shape.size(); i++) {
@@ -265,7 +267,7 @@ void FastGatherLastDimGradOpx::grow(poplar::program::Sequence &prog) const {
 
   auto out_tensor = cloneNcopy(prog, output);
 
-  poplar::Tensor grad_input_tensor =
+  poplar::Tensor const grad_input_tensor =
       addGraphProg(graph(), prog, grad_output_tensor, out_tensor,
                    fwd_in_shape_2, idx_tensor);
 
@@ -274,13 +276,13 @@ void FastGatherLastDimGradOpx::grow(poplar::program::Sequence &prog) const {
 
 poplar::Tensor FastGatherLastDimGradOpx::addGraphProg(
     poplar::Graph &graph, poplar::program::Sequence &prog,
-    poplar::Tensor const &grad_output_tensor, poplar::Tensor &grad_input_tensor,
-    std::vector<std::size_t> const &fwd_in_shape,
-    poplar::Tensor const &idx_tensor) {
+    const poplar::Tensor &grad_output_tensor, poplar::Tensor &grad_input_tensor,
+    const std::vector<std::size_t> &fwd_in_shape,
+    const poplar::Tensor &idx_tensor) {
 
   auto target = graph.getTarget();
-  unsigned num_tiles = target.getNumTiles();
-  unsigned grad_output_rank = grad_output_tensor.rank();
+  const unsigned num_tiles = target.getNumTiles();
+  const unsigned grad_output_rank = grad_output_tensor.rank();
 
   std::size_t alloc_cnt = 1;
   std::size_t channel_cnt = 1;
@@ -295,25 +297,28 @@ poplar::Tensor FastGatherLastDimGradOpx::addGraphProg(
   auto grad_output_shape = grad_output_tensor.shape();
   auto grad_input_shape = fwd_in_shape;
 
-  poplar::ComputeSet gather_grad_cs = graph.addComputeSet("FastGatherGradCS");
+  poplar::ComputeSet const gather_grad_cs =
+      graph.addComputeSet("FastGatherGradCS");
   std::vector<unsigned> tile_start(num_tiles, 0);
   std::vector<unsigned> tile_count(num_tiles, 0);
 
-  poplar::Tensor grad_output_tensor_clone = graph.clone(grad_output_tensor);
+  poplar::Tensor const grad_output_tensor_clone =
+      graph.clone(grad_output_tensor);
 
-  poplar::Tensor grad_output_tensor_reshape = grad_output_tensor_clone.reshape(
+  poplar::Tensor const grad_output_tensor_reshape =
+      grad_output_tensor_clone.reshape(
+          {alloc_cnt, grad_output_shape[grad_output_rank - 1]});
+
+  poplar::Tensor const idx_tensor_clone = graph.clone(idx_tensor);
+  poplar::Tensor const idx_tensor_reshape = idx_tensor_clone.reshape(
       {alloc_cnt, grad_output_shape[grad_output_rank - 1]});
 
-  poplar::Tensor idx_tensor_clone = graph.clone(idx_tensor);
-  poplar::Tensor idx_tensor_reshape = idx_tensor_clone.reshape(
-      {alloc_cnt, grad_output_shape[grad_output_rank - 1]});
-
-  poplar::Tensor grad_input_tensor_reshape = grad_input_tensor.reshape(
+  poplar::Tensor const grad_input_tensor_reshape = grad_input_tensor.reshape(
       {alloc_cnt, grad_input_shape[grad_output_rank - 1]});
 
   std::size_t tile_idx_last = 1;
   for (std::size_t i = 0; i < alloc_cnt; ++i) {
-    std::size_t idx = (i * num_tiles) / alloc_cnt;
+    std::size_t const idx = (i * num_tiles) / alloc_cnt;
     graph.setTileMapping(grad_output_tensor_reshape[i], idx);
     graph.setTileMapping(idx_tensor_reshape[i], idx);
     graph.setTileMapping(grad_input_tensor_reshape[i], idx);
@@ -331,7 +336,7 @@ poplar::Tensor FastGatherLastDimGradOpx::addGraphProg(
       continue;
     }
 
-    poplar::VertexRef gather_vertex = graph.addVertex(
+    poplar::VertexRef const gather_vertex = graph.addVertex(
         gather_grad_cs,
         poputil::templateVertex("FastGatherGradVertex",
                                 grad_output_tensor.elementType(),

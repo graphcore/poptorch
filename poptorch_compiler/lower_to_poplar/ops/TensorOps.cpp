@@ -19,7 +19,7 @@
 namespace poptorch_ir {
 
 void print_tensor::lowerToPoplar(CompilerContext &context) {
-  poplar::Tensor tensor = context.fromSsa(this->input());
+  const poplar::Tensor tensor = context.fromSsa(this->input());
   context.seq.add(poplar::program::PrintTensor(this->title().str(), tensor));
 }
 
@@ -29,16 +29,16 @@ void empty_tensor::lowerToPoplar(CompilerContext &context) {
 }
 
 void cast::lowerToPoplar(CompilerContext &context) {
-  poplar::Tensor in = context.fromSsa(this->self());
-  poplar::Tensor out =
+  const poplar::Tensor in = context.fromSsa(this->self());
+  const poplar::Tensor out =
       popops::cast(context.graph, in,
                    CompilerContext::poplarTypeOf(this->dtype()), context.seq);
   context.addTensor(this->result(), out);
 }
 
 void copy_::lowerToPoplar(CompilerContext &context) {
-  poplar::Tensor self = context.fromSsa(this->self());
-  poplar::Tensor src = context.fromSsa(this->src());
+  const poplar::Tensor self = context.fromSsa(this->self());
+  const poplar::Tensor src = context.fromSsa(this->src());
 
   // Note the current way view operations are implemented in lower to poplar can
   // lead to copy_ operations called with the same src and dest
@@ -66,7 +66,7 @@ void tensorconstant_float::lowerToPoplar(CompilerContext &context) {
   const std::vector<size_t> shape = convertIntArray<size_t>(this->shape());
   const std::vector<float> data = convertFloatArray<float>(this->data());
 
-  poplar::Tensor new_tensor =
+  const poplar::Tensor new_tensor =
       (data.size() == 1)
           ? createConstant(context, poplar::FLOAT, shape, data[0])
           : createConstantTensor(context, poplar::FLOAT, shape, data);
@@ -77,7 +77,7 @@ void tensorconstant_int::lowerToPoplar(CompilerContext &context) {
   const std::vector<size_t> shape = convertIntArray<size_t>(this->shape());
   const std::vector<int> data = convertIntArray<int>(this->data());
 
-  poplar::Tensor new_tensor =
+  const poplar::Tensor new_tensor =
       (data.size() == 1)
           ? createConstant(context, poplar::INT, shape, data[0])
           : createConstantTensor(context, poplar::INT, shape, data);
@@ -85,7 +85,7 @@ void tensorconstant_int::lowerToPoplar(CompilerContext &context) {
 }
 
 void concat::lowerToPoplar(CompilerContext &context) {
-  std::vector<poplar::Tensor> tensors = context.fromSsa(this->tensors());
+  const std::vector<poplar::Tensor> tensors = context.fromSsa(this->tensors());
 
   context.addTensor(this->result(), poplar::concat(tensors, this->dim()));
 }
@@ -106,7 +106,7 @@ void topk::lowerToPoplar(CompilerContext &context) {
     }
   }
 
-  std::uint32_t k = this->K();
+  const std::uint32_t k = this->K();
   const std::uint32_t dim = this->dim();
   const std::uint32_t last_dim = self.rank() - 1;
 
@@ -130,14 +130,15 @@ void topk::lowerToPoplar(CompilerContext &context) {
 }
 
 void dropout::lowerToPoplar(CompilerContext &context) {
-  poplar::Tensor tensor = context.fromSsa(this->input());
+  const poplar::Tensor tensor = context.fromSsa(this->input());
   const float p = this->p().convertToFloat();
   const bool training = this->training();
 
   if (training) {
     // Special case of p=1: return all zeros
     if (p == 1.0) {
-      poplar::Tensor result = context.graph.clone(tensor.elementType(), tensor);
+      const poplar::Tensor result =
+          context.graph.clone(tensor.elementType(), tensor);
       popops::zero(context.graph, result, context.seq);
       context.addTensor(this->result(), result);
       return;
@@ -145,7 +146,7 @@ void dropout::lowerToPoplar(CompilerContext &context) {
     // NB: Seeds not implemented yet.
     // Need to implement setting seed, seedModifier, and reference tensor
     // TODO(T51096)
-    poplar::Tensor result =
+    const poplar::Tensor result =
         poprand::dropout(context.graph, &context.getRandomSeed(), 0, tensor,
                          tensor, 1. - p, 1. / (1. - p), context.seq);
     context.addTensor(this->result(), result);
@@ -155,9 +156,9 @@ void dropout::lowerToPoplar(CompilerContext &context) {
 }
 
 void where::lowerToPoplar(CompilerContext &context) {
-  poplar::Tensor condition = context.fromSsa(this->condition());
-  poplar::Tensor self = context.fromSsa(this->self());
-  poplar::Tensor other = context.fromSsa(this->other());
+  const poplar::Tensor condition = context.fromSsa(this->condition());
+  const poplar::Tensor self = context.fromSsa(this->self());
+  const poplar::Tensor other = context.fromSsa(this->other());
 
   auto result =
       popops::select(context.graph, self, other, condition, context.seq);
@@ -185,9 +186,9 @@ inline std::vector<std::size_t> reshapeForExtremaOp(poplar::Tensor &input,
 
   // Reshape the input to a 2D tensor
   auto shape = input.shape();
-  std::size_t dim_0 = std::accumulate(shape.begin(), shape.end() - 1, 1,
-                                      std::multiplies<std::size_t>());
-  std::size_t dim_1 = shape.back();
+  const std::size_t dim_0 = std::accumulate(shape.begin(), shape.end() - 1, 1,
+                                            std::multiplies<std::size_t>());
+  const std::size_t dim_1 = shape.back();
   input = input.reshape({dim_0, dim_1});
   return shape;
 }
@@ -196,7 +197,7 @@ template <typename Op, typename Func>
 inline void extremaOpImpl(Op *op, Func func, CompilerContext &context) {
   poplar::Tensor self = context.fromSsa(op->self());
   const auto keepdim = op->keepdim();
-  const auto dim = op->dim().getValueOr(0);
+  const auto dim = op->dim().value_or(0);
   if (!op->dim()) {
     self = self.flatten();
   }

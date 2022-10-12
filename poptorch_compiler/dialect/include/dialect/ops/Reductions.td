@@ -172,7 +172,7 @@ def Poptorch_prod_dim : Poptorch_reduce<"prod_dim"> {
 }
 
 
-class Poptorch_NotImplemented_unary_reduction<string name, list<OpTrait> traits = []> : Poptorch_NotImplementedOp<name, traits> {
+class Poptorch_NotImplemented_unary_reduction<string name, list<Trait> traits = []> : Poptorch_NotImplementedOp<name, traits> {
     let arguments = (ins Poptorch_tensor:$input);
     let results = (outs Poptorch_tensor:$result);
 

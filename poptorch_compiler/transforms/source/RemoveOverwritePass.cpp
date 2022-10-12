@@ -1,6 +1,7 @@
 // Copyright (c) 2022 Graphcore Ltd. All rights reserved.
 #include <llvm/ADT/STLExtras.h>
 #include <llvm/ADT/SmallPtrSet.h>
+#include <llvm/ADT/StringRef.h>
 #include <mlir/IR/MLIRContext.h>
 #include <mlir/IR/PatternMatch.h>
 #include <mlir/Pass/Pass.h>
@@ -51,6 +52,8 @@ class RemoveOverwritePass final
 public:
   RemoveOverwritePass() = default;
 
+  llvm::StringRef getArgument() const final { return "remove-overwrite"; }
+
   void runOnOperation() override {
     mlir::MLIRContext *context = &getContext();
     auto func = getOperation();
@@ -71,4 +74,4 @@ createRemoveOverwritePass() {
 } // namespace poptorch_ir
 
 static mlir::PassRegistration<poptorch_ir::RemoveOverwritePass>
-    remove_redundant_overwrite("remove-overwrite", "");
+    remove_redundant_overwrite(poptorch_ir::createRemoveOverwritePass);

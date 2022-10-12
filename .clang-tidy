@@ -1,8 +1,7 @@
-Checks: '*, -abseil*, -altera*, -android*, -cppcoreguidelines*, -cert*, -modernize*, -boost*, -google*, -fuchsia*, -hicpp*, -objc*, -llvm*, -bugprone-exception-escape, -readability-uppercase-literal-suffix, -misc-non-private-member-variables-in-classes, -fuchsia-default-arguments-declarations, -fuchsia-default-arguments-calls, -readability-magic-numbers, -fuchsia-overloaded-operator, -performance-noexcept-move-constructor, -concurrency-mt-unsafe, -readability-function-cognitive-complexity, -misc-throw-by-value-catch-by-reference, -misc-no-recursion, -bugprone-narrowing-conversions, -bugprone-easily-swappable-parameters, -readability-make-member-function-const, -readability-use-anyofallof, -readability-identifier-length'
+Checks: '*, -abseil*, -altera*, -android*, -cppcoreguidelines*, -cert*, -modernize*, -boost*, -google*, -fuchsia*, -hicpp*, -objc*, -llvm*, -bugprone-exception-escape, -readability-uppercase-literal-suffix, -misc-non-private-member-variables-in-classes, -fuchsia-default-arguments-declarations, -fuchsia-default-arguments-calls, -readability-magic-numbers, -fuchsia-overloaded-operator, -performance-noexcept-move-constructor, -concurrency-mt-unsafe, -readability-function-cognitive-complexity, -misc-throw-by-value-catch-by-reference, -misc-no-recursion, -bugprone-narrowing-conversions, -bugprone-easily-swappable-parameters, -readability-make-member-function-const, -readability-use-anyofallof, -readability-identifier-length,-misc-confusable-identifiers,-bugprone-reserved-identifier,-misc-unused-using-decls'
 WarningsAsErrors: '*'
 HeaderFilterRegex: ''
 AnalyzeTemporaryDtors: false
-FormatStyle:     llvm
 CheckOptions:
   - key:             readability-identifier-naming.NamespaceCase
     value:           lower_case

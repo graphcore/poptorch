@@ -257,6 +257,48 @@ class CondaCommand(Command):
                              name=name or cmd[0])
 
 
+def get_llvm_path_from_build():
+    llvm_path = ""
+
+    def parse_cmake_cache(output, returncode):
+        # Expected to contain a line of the form:
+        # LLVM_DIR:PATH=/path/to/llvm_dir/lib/cmake/llvm
+        nonlocal llvm_path
+        for line in output.splitlines():
+            m = re.match("^LLVM_DIR:.*=(.*)/lib/cmake/llvm", line)
+            if m:
+                llvm_path = m.group(1)
+                break
+        return output, returncode
+
+    CondaCommand("cat ${CONDA_PREFIX}/../CMakeCache.txt",
+                 print_output=False,
+                 output_processor=parse_cmake_cache).run()
+    return llvm_path
+
+
+class ClangTools:
+    _llvm_path = None
+
+    @staticmethod
+    def path():
+        if ClangTools._llvm_path is None:
+            ClangTools._llvm_path = get_llvm_path_from_build()
+        return os.path.join(ClangTools._llvm_path, "bin")
+
+    @staticmethod
+    def clang_format():
+        return os.path.join(ClangTools.path(), "clang-format")
+
+    @staticmethod
+    def clang_tidy():
+        return os.path.join(ClangTools.path(), "clang-tidy")
+
+    @staticmethod
+    def clang_apply_replacements():
+        return os.path.join(ClangTools.path(), "clang-apply-replacements")
+
+
 def get_conda_activate_cmd():
     """Check if we're already inside a Conda environment, if not return the
     command to run to activate one"""
@@ -382,7 +424,7 @@ class VersionJSONParseCommand(VersionParseCommandBase):
 
 class VersionParseCommand(VersionParseCommandBase):
     def __init__(self, version_re_prefix, command_name):
-        super().__init__(f"${{CONDA_PREFIX}}/bin/{command_name}",
+        super().__init__(command_name,
                          "--version",
                          print_output=False,
                          output_processor=self._parse_version)
@@ -427,14 +469,15 @@ class ClangFormat(ILinter):
         else:
             output_processor = DiffCreator(filename, "clang-format", autofix)
 
-        return CondaCommand("clang-format",
-                            flags,
-                            filename,
-                            output_processor=output_processor,
-                            print_output=autofix)
+        return Command(ClangTools.clang_format(),
+                       flags,
+                       filename,
+                       output_processor=output_processor,
+                       print_output=autofix)
 
     def check_version(self):
-        return compare_versions_from_conda("clang-tools", "13.0.1")
+        return compare_versions_from_output(ClangTools.clang_format(),
+                                            "15.0.2", "version")
 
 
 class ClangTidy(ILinter):
@@ -507,8 +550,8 @@ class ClangTidy(ILinter):
                     print(raw_output)
                 # Apply the fixes using clang-apply-replacements
                 if self.autofix:
-                    CondaCommand("clang-apply-replacements",
-                                 self.tmp_folder.name).run()
+                    Command(ClangTools.clang_apply_replacements(),
+                            self.tmp_folder.name).run()
             return raw_output, returncode
 
     def __init__(self):
@@ -521,7 +564,7 @@ class ClangTidy(ILinter):
             if filename in self.compile_commands:
                 return self.compile_commands[filename]
             logger.warning(
-                "%s is absent from compiler_commands.json: check "
+                "%s is absent from compile_commands.json: check "
                 "CMakeLists.txt to make sure it's compiled", filename)
             # Fall through to header path to try to find
             # flags for files in the same folder
@@ -580,19 +623,19 @@ class ClangTidy(ILinter):
         for i, c in enumerate(self.configs):
             report = os.path.join(results.tmp_folder.name, f"report_{i}.yaml")
             commands.append(
-                CondaCommand(cd,
-                             "clang-tidy",
-                             "--quiet",
-                             os.path.realpath(filename),
-                             f"--export-fixes={report}",
-                             c,
-                             "--",
-                             flags,
-                             name=("clang-tidy --quiet "
-                                   f"{filename} -- {flags}"),
-                             output_processor=results,
-                             print_output_on_error=False,
-                             print_output=False))
+                Command(cd,
+                        ClangTools.clang_tidy(),
+                        "--quiet",
+                        os.path.realpath(filename),
+                        f"--export-fixes={report}",
+                        c,
+                        "--",
+                        flags,
+                        name=("clang-tidy --quiet "
+                              f"{filename} -- {flags}"),
+                        output_processor=results,
+                        print_output_on_error=False,
+                        print_output=False))
         return commands
 
     def process_compile_commands(self, commands):
@@ -625,6 +668,15 @@ class ClangTidy(ILinter):
         def parse_config(output, returncode):
             nonlocal config
             config = output.splitlines(True)
+            # For some reason clang-tidy's config contains these options it doesn't support, so filter them out.
+            excludes = [
+                "FunctionHungarianPrefix", "MethodHungarianPrefix",
+                "NamespaceHungarianPrefix"
+            ]
+            config = [
+                line for line in config
+                if not any([e in line for e in excludes])
+            ]
             return output, returncode
 
         def parse_checks(output, returncode):
@@ -670,13 +722,13 @@ class ClangTidy(ILinter):
                         output_processor=parse_system_includes).run():
             return False
 
-        if CondaCommand("clang-tidy --dump-config",
-                        print_output=False,
-                        output_processor=parse_config).run():
+        if Command(ClangTools.clang_tidy() + " --dump-config",
+                   print_output=False,
+                   output_processor=parse_config).run():
             return False
-        if CondaCommand("clang-tidy --list-checks",
-                        print_output=False,
-                        output_processor=parse_checks).run():
+        if Command(ClangTools.clang_tidy() + " --list-checks",
+                   print_output=False,
+                   output_processor=parse_checks).run():
             return False
         tests = [
             f"test -d {i} || echo \"Include folder {i} not found\""
@@ -693,7 +745,8 @@ class ClangTidy(ILinter):
                         output_processor=parse_compile_commands_file).run():
             return False
 
-        return compare_versions_from_conda("clang-tools", "13.0.1")
+        return compare_versions_from_output(ClangTools.clang_tidy(), "15.0.2",
+                                            "version")
 
     def is_enabled(self, filename, autofix):
         # Don't run Clang Tidy on the pybind11 modules because we don't know
@@ -703,26 +756,30 @@ class ClangTidy(ILinter):
 
 
 class CppLint(ILinter):
+    def cpplint(self):
+        return "${CONDA_PREFIX}/bin/cpplint"
+
     def gen_lint_command(self, filename, autofix):
-        return CondaCommand("${CONDA_PREFIX}/bin/cpplint",
-                            "--root=include --quiet",
+        return CondaCommand(self.cpplint(), "--root=include --quiet",
                             f"--filter=-{',-'.join(cpp_lint_disabled)}",
                             filename)
 
     def check_version(self):
-        return compare_versions_from_output("cpplint", "1.4.4")
+        return compare_versions_from_output(self.cpplint(), "1.4.4", "cpplint")
 
 
 class Pylint(ILinter):
+    def pylint(self):
+        return "${CONDA_PREFIX}/bin/pylint"
+
     def gen_lint_command(self, filename, autofix):
         return CondaCommand(
-            "${CONDA_PREFIX}/bin/pylint",
-            "--score=no --reports=no -j 0 --msg-template="
+            self.pylint(), "--score=no --reports=no -j 0 --msg-template="
             "'{path}:{line}:{column}:error:pylint[{symbol}({msg_id})]: {msg}'"
             " --rcfile=.pylintrc", filename)
 
     def check_version(self):
-        return compare_versions_from_output("pylint", "2.5.3")
+        return compare_versions_from_output(self.pylint(), "2.5.3", "pylint")
 
     def is_enabled(self, filename, autofix):  # pylint: disable=unused-argument
         # Don't run PyLint on the buildenv config files
@@ -730,6 +787,9 @@ class Pylint(ILinter):
 
 
 class Yapf(ILinter):
+    def yapf(self):
+        return "${CONDA_PREFIX}/bin/yapf"
+
     def gen_lint_command(self, filename, autofix):
         flags = yapf_flags
         output_processor = None
@@ -738,14 +798,14 @@ class Yapf(ILinter):
         else:
             output_processor = DiffCreator(filename, "yapf", autofix)
 
-        return CondaCommand("${CONDA_PREFIX}/bin/yapf",
+        return CondaCommand(self.yapf(),
                             flags,
                             filename,
                             output_processor=output_processor,
                             print_output=autofix)
 
     def check_version(self):
-        return compare_versions_from_output("yapf", "0.27.0")
+        return compare_versions_from_output(self.yapf(), "0.27.0", "yapf")
 
 
 class Executor:

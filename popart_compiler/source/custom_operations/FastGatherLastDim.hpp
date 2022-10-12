@@ -18,9 +18,9 @@ namespace poptorch_custom_ops {
 
 class FastGatherLastDimOp : public popart::Op {
 public:
-  FastGatherLastDimOp(popart::OperatorIdentifier const &opid_,
-                      popart::Op::Settings const &settings_,
-                      std::string const &debug_str);
+  FastGatherLastDimOp(const popart::OperatorIdentifier &opid_,
+                      const popart::Op::Settings &settings_,
+                      const std::string &debug_str);
 
   FastGatherLastDimOp(const FastGatherLastDimOp &) = default;
   FastGatherLastDimOp &operator=(const FastGatherLastDimOp &) = delete;
@@ -33,7 +33,7 @@ public:
   int64_t getAxis() const { return _axis; }
   popart::Shape getInShape() const { return _in_shape; }
   popart::Shape getOutShape() const { return _out_shape; }
-  std::string const &getDebugStr() const { return _debug_str; }
+  const std::string &getDebugStr() const { return _debug_str; }
 
 private:
   int64_t _axis;
@@ -52,9 +52,9 @@ public:
 private:
   static poplar::Tensor
   addGraphProg(poplar::Graph &graph, poplar::program::Sequence &prog,
-               poplar::Tensor const &data_tensor,
-               poplar::Tensor const &idx_tensor,
-               std::vector<std::size_t> const &fwd_out_shape);
+               const poplar::Tensor &data_tensor,
+               const poplar::Tensor &idx_tensor,
+               const std::vector<std::size_t> &fwd_out_shape);
 };
 
 class FastGatherLastDimGradOp : public popart::Op {
@@ -111,10 +111,10 @@ public:
 private:
   static poplar::Tensor
   addGraphProg(poplar::Graph &graph, poplar::program::Sequence &prog,
-               poplar::Tensor const &grad_output_tensor,
+               const poplar::Tensor &grad_output_tensor,
                poplar::Tensor &grad_input_tensor,
-               std::vector<std::size_t> const &fwd_in_shape,
-               poplar::Tensor const &idx_tensor);
+               const std::vector<std::size_t> &fwd_in_shape,
+               const poplar::Tensor &idx_tensor);
 };
 
 } // namespace poptorch_custom_ops

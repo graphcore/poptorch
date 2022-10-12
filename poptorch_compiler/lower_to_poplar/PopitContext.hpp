@@ -18,7 +18,10 @@
 
 namespace mlir {
 class Value;
+
+namespace func {
 class FuncOp;
+} // namespace func
 } // namespace mlir
 
 namespace poptorch_ir {

@@ -1,5 +1,6 @@
 // Copyright (c) 2022 Graphcore Ltd. All rights reserved.
 
+#include <mlir/Dialect/Bufferization/IR/Bufferization.h>
 #include <mlir/Dialect/MemRef/IR/MemRef.h>
 #include <mlir/IR/BuiltinTypes.h>
 #include <mlir/IR/PatternMatch.h>
@@ -54,9 +55,13 @@ struct BufferizeCopyFromGlobalState final
                              .create<mlir::memref::GetGlobalOp>(
                                  op.getLoc(), memref_type, op.handle())
                              .result();
-    auto val =
-        rewriter.create<mlir::memref::TensorLoadOp>(op.getLoc(), global_memref)
+    auto load_val =
+        rewriter.create<mlir::memref::LoadOp>(op.getLoc(), global_memref)
             .result();
+
+    auto val =
+        rewriter.create<mlir::bufferization::ToTensorOp>(op->getLoc(), load_val)
+            .getResult();
 
     rewriter.replaceOp(op, val);
 
@@ -66,7 +71,7 @@ struct BufferizeCopyFromGlobalState final
 
 class BufferizeGlobalStatePass final
     : public mlir::PassWrapper<BufferizeGlobalStatePass,
-                               mlir::OperationPass<mlir::FuncOp>> {
+                               mlir::OperationPass<mlir::func::FuncOp>> {
 public:
   BufferizeGlobalStatePass() = default;
 
@@ -83,7 +88,7 @@ public:
 
 } // namespace
 
-std::unique_ptr<mlir::OperationPass<mlir::FuncOp>>
+std::unique_ptr<mlir::OperationPass<mlir::func::FuncOp>>
 createBufferizeGlobalStatePass() {
   return std::make_unique<BufferizeGlobalStatePass>();
 }

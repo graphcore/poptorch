@@ -3,7 +3,7 @@
  * Element wise ops.
  */
 
-class Poptorch_elem_unary<string name, list<OpTrait> traits = []>
+class Poptorch_elem_unary<string name, list<Trait> traits = []>
     : Poptorch_Op<name, traits # [SameOperandsAndResultShape]> {
     let arguments = (ins Poptorch_tensor:$in1);
     let results = (outs Poptorch_tensor:$result);
@@ -112,7 +112,7 @@ def Poptorch_reciprocal : Poptorch_elem_unary<"reciprocal", [ImplicitCastOperand
 /*
  * Binary ops.
  */
-class Poptorch_elem_binary<string name, list<OpTrait> traits = []>
+class Poptorch_elem_binary<string name, list<Trait> traits = []>
   : Poptorch_Op<name, traits # [ImplicitCastOperand<0>, ImplicitCastOperand<1>]> {
     let arguments = (ins Poptorch_tensor:$in1, Poptorch_tensor:$in2);
     let results = (outs Poptorch_tensor:$result);
@@ -155,10 +155,7 @@ def Poptorch_bitwiseXnor: Poptorch_elem_binary<"bitwiseXnor"> {
 def Poptorch_div: Poptorch_elem_binary<"div", [ImplicitCastToFloat]> {}
 def Poptorch_floor_divide : Poptorch_elem_binary<"floor_divide"> {
     let arguments = (ins Poptorch_non_boolean_tensor:$in1, Poptorch_non_boolean_tensor:$in2);
-    let verifier = [{
-        emitWarning("floor_divide is deprecated. Use div with rounding_mode='trunc' for equivalent behaviour");
-        return mlir::success();
-    }];
+    let hasVerifier = 1;
 }
 def Poptorch_rem : Poptorch_elem_binary<"rem"> {
     let arguments = (ins Poptorch_non_boolean_tensor:$in1, Poptorch_non_boolean_tensor:$in2);
@@ -270,7 +267,7 @@ def Poptorch_addcmul : Poptorch_addcOutplaceX<"addcmul"> {}
 // aten::addcdiv.out(Tensor self, Tensor tensor1, Tensor tensor2, *, Scalar value=1, Tensor(a!) out) -> (Tensor(a!))
 def Poptorch_addcdiv : Poptorch_addcOutplaceX<"addcdiv"> {}
 
-class Poptorch_elem_binary_scalar<string name, list<OpTrait> traits = []>
+class Poptorch_elem_binary_scalar<string name, list<Trait> traits = []>
         : Poptorch_Op<name, traits> {
     let arguments = (ins Poptorch_tensor:$lhs, F32Attr:$rhs);
     let results = (outs Poptorch_tensor:$result);
@@ -286,7 +283,7 @@ class Poptorch_elem_binary_scalar<string name, list<OpTrait> traits = []>
 
 def Poptorch_pow_Tensor_Scalar_out: Poptorch_elem_binary_scalar<"pow_Tensor_Scalar_out"> {}
 
-class Poptorch_binary_conditional<string name, list<OpTrait> traits = []>
+class Poptorch_binary_conditional<string name, list<Trait> traits = []>
         : Poptorch_Op<name, traits # [ImplicitCastOperand<0>, ImplicitCastOperand<1>]> {
     let arguments = (ins Poptorch_tensor:$in1, Poptorch_tensor:$in2);
     let results = (outs Poptorch_tensor_no_grad:$result);
@@ -364,12 +361,7 @@ def Poptorch_clampTensor: Poptorch_Op<"clampTensor", [AttrSizedOperandSegments]>
   // defining output arguments
   let results = (outs Poptorch_non_boolean_tensor:$result);
 
-  let verifier = [{
-    if (!min() && !max()) {
-        ERROR("torch.clamp: At least one of 'min' or 'max' must not be None");
-    }
-    return mlir::success();
-  }];
+  let hasVerifier = 1;
 
   // builders allow us to tell MIR the types
   let builders = [OpBuilder<(ins "mlir::Value":$self,
@@ -461,7 +453,7 @@ def Poptorch_threshold_out: Poptorch_Op<"threshold_out", []> {
  * Scatter ops.
  */
 
-class Poptorch_elem_binary_scatter<string name, list<OpTrait> traits = []> : Poptorch_NotImplementedOp<name, traits> {
+class Poptorch_elem_binary_scatter<string name, list<Trait> traits = []> : Poptorch_NotImplementedOp<name, traits> {
     let arguments = (ins Poptorch_tensor:$self, I64Attr:$dim, Poptorch_tensor:$index, Poptorch_tensor:$src);
     let results = (outs Poptorch_tensor:$result);
 
@@ -533,7 +525,7 @@ def Poptorch_scatter_value_reduce_out : Poptorch_NotImplementedOp<"scatter_value
 }
 
 // Note: these are provided by the torch_scatter library
-class Poptorch_scatter_minmax<string name, list<OpTrait> traits = []> : Poptorch_NotImplementedOp<name, traits> {
+class Poptorch_scatter_minmax<string name, list<Trait> traits = []> : Poptorch_NotImplementedOp<name, traits> {
     let arguments = (ins Poptorch_tensor:$src,
                          Poptorch_tensor:$index,
                          I64Attr:$dim,

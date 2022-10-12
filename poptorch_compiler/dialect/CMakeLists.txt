@@ -15,14 +15,18 @@ include_directories(PRIVATE
 
 add_mlir_dialect_library(poptorch_dialect
     PoptorchDialect.cpp
+    ops/ElementWise.cpp
     ops/NormOpsHelpers.cpp
     ops/Poptorch.cpp
+    ops/TensorOps.cpp
   DEPENDS
     MLIRPoptorchIncGen
     MLIRPoptorchInterfacesIncGen
 
   LINK_LIBS PUBLIC
     MLIRIR
+    MLIRBufferizationDialect
+    MLIRFuncDialect
     generated_poptorch_decls
     poptorch_logging
 )

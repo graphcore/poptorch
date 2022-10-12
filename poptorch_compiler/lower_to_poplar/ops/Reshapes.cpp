@@ -16,11 +16,11 @@
 namespace poptorch_ir {
 
 void permuteOutplace::lowerToPoplar(poptorch_ir::CompilerContext &context) {
-  poplar::Tensor in = context.fromSsa(this->input());
+  const poplar::Tensor in = context.fromSsa(this->input());
 
   auto permutation = convertIntArray<std::uint32_t>(this->dims());
 
-  poplar::Tensor view = in.dimShuffle(permutation);
+  const poplar::Tensor view = in.dimShuffle(permutation);
 
   context.addTensor(this->view(), view);
 }
@@ -31,7 +31,7 @@ void viewOutplace::lowerToPoplar(CompilerContext &context) {
   // inplaced in this way.
   poplar::Tensor in = context.fromSsa(this->input());
 
-  std::vector<std::size_t> new_shape =
+  const std::vector<std::size_t> new_shape =
       convertIntArray<std::size_t>(this->shape());
 
   // NB intentionally inplace. PyTorch users are told when using reshape

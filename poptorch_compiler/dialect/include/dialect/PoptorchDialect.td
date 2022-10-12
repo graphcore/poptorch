@@ -43,25 +43,25 @@ def ImplicitCastToFloat : NativeOpTrait<"ImplicitCastToFloat">;
 // * Poptorch_NotImplementedOp for ops that cannot currently be lowered to
 //   poplar, or
 // * Potorch_AbstractOp for ops that will be lower using other passes
-class Poptorch_BasicOp<string mnemonic, list<OpTrait> traits = []> :
+class Poptorch_BasicOp<string mnemonic, list<Trait> traits = []> :
         Op<Poptorch_Dialect, mnemonic, traits>;
 
-class Poptorch_Op<string mnemonic, list<OpTrait> traits = [], MemoryEffects memory_effect = NoSideEffect> :
+class Poptorch_Op<string mnemonic, list<Trait> traits = [], MemoryEffects memory_effect = NoSideEffect> :
         Poptorch_BasicOp<mnemonic, traits # [DeclareOpInterfaceMethods<Poptorch_PoplarImplInterface>, memory_effect]>;
 
-class Poptorch_NotImplementedOp<string mnemonic, list<OpTrait> traits = [], MemoryEffects memory_effect = NoSideEffect> : Poptorch_BasicOp<mnemonic, traits # [NotImplementedOp, memory_effect]>;
+class Poptorch_NotImplementedOp<string mnemonic, list<Trait> traits = [], MemoryEffects memory_effect = NoSideEffect> : Poptorch_BasicOp<mnemonic, traits # [NotImplementedOp, memory_effect]>;
 
-class Poptorch_AbstractOp<string mnemonic, list<OpTrait> traits = [], MemoryEffects memory_effect = NoSideEffect> :
+class Poptorch_AbstractOp<string mnemonic, list<Trait> traits = [], MemoryEffects memory_effect = NoSideEffect> :
         Poptorch_BasicOp<mnemonic, traits # [memory_effect]>;
 
 // Internal ops are created from poptorch dialect passes but cannot be built directly
-class Poptorch_InternalOp<string mnemonic, list<OpTrait> traits = [], MemoryEffects memory_effect = NoSideEffect> :
+class Poptorch_InternalOp<string mnemonic, list<Trait> traits = [], MemoryEffects memory_effect = NoSideEffect> :
         Op<Poptorch_Dialect, mnemonic, traits # [DeclareOpInterfaceMethods<Poptorch_PoplarImplInterface>, memory_effect]>;
 
-class Poptorch_AbstractInternalOp<string mnemonic, list<OpTrait> traits = [], MemoryEffects memory_effect = NoSideEffect> :
+class Poptorch_AbstractInternalOp<string mnemonic, list<Trait> traits = [], MemoryEffects memory_effect = NoSideEffect> :
         Op<Poptorch_Dialect, mnemonic, traits # [memory_effect]>;
 
-class Poptorch_ViewOp<string mnemonic, string outplaceTypeName, string inverseTypeName, list<OpTrait> traits = []>
+class Poptorch_ViewOp<string mnemonic, string outplaceTypeName, string inverseTypeName, list<Trait> traits = []>
     : Poptorch_AbstractOp<mnemonic, traits # [Poptorch_ViewInterface, ViewOp]> {
   let extraClassDeclaration = [{
     using OutplaceOp = }] # outplaceTypeName # [{;

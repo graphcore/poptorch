@@ -2,7 +2,7 @@
 #include <llvm/ADT/STLExtras.h>
 #include <llvm/ADT/SmallPtrSet.h>
 #include <llvm/ADT/SmallVector.h>
-#include <mlir/Dialect/StandardOps/IR/Ops.h>
+#include <llvm/ADT/StringRef.h>
 #include <mlir/IR/BuiltinOps.h>
 #include <mlir/IR/MLIRContext.h>
 #include <mlir/IR/OperationSupport.h>
@@ -110,7 +110,7 @@ struct OutplaceViewOps final : public mlir::RewritePattern {
     //
     // Note: This will generate unnecessary view operations. These will be
     // cleaned up by the CSE pass (common subexpression elimination)
-    bool changed = outplaceOperands(op->getOpOperands(), rewriter);
+    const bool changed = outplaceOperands(op->getOpOperands(), rewriter);
     return mlir::success(changed);
   }
 };
@@ -121,7 +121,9 @@ class OutplaceViewOpsPass final
 public:
   OutplaceViewOpsPass() = default;
 
-  void runOnOperation() override {
+  llvm::StringRef getArgument() const final { return "outplace-view-ops"; }
+
+  void runOnOperation() final {
     mlir::MLIRContext *context = &getContext();
     auto func = getOperation();
 
@@ -141,4 +143,4 @@ createOutplaceViewOpsPass() {
 } // namespace poptorch_ir
 
 static mlir::PassRegistration<poptorch_ir::OutplaceViewOpsPass>
-    outplace_view_ops("outplace-view-ops", "");
+    outplace_view_ops(poptorch_ir::createOutplaceViewOpsPass);

@@ -1,6 +1,6 @@
 // Copyright (c) 2021 Graphcore Ltd. All rights reserved.
 
-class Poptorch_IdentityOp<string mnemonic, list<OpTrait> traits = []> : Poptorch_AbstractOp<mnemonic, traits # [ViewOp]> {
+class Poptorch_IdentityOp<string mnemonic, list<Trait> traits = []> : Poptorch_AbstractOp<mnemonic, traits # [ViewOp]> {
   let arguments = (ins Poptorch_tensor:$input);
   let results = (outs Poptorch_tensor:$result);
 
