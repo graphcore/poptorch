@@ -181,7 +181,8 @@ SessionOptionsImpl::SessionOptionsImpl() {
         popart_options.accumulateOuterFragmentSettings.schedule =
             static_cast<popart::AccumulateOuterFragmentSchedule>(value);
       });
-
+  registerSetter(uint64_options, "max_repeat_logs",
+                 [&](std::uint64_t value) { logging::setRepeatLimit(value); });
   registerSetter(container_options,
                  "accumulateOuterFragmentSettings.excludedVirtualGraphs",
                  [&](const std::pair<std::string, std::string> &p) {

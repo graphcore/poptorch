@@ -1265,6 +1265,7 @@ class Options(_options_impl.OptionsDict):
                          broadcast_buffers=True,
                          device_iterations=1,
                          log_dir=".",
+                         max_repeat_logs=4,
                          auto_round_num_ipus=False,
                          anchored_tensors={},
                          output_mode=enums.OutputMode.Default.value,
@@ -1561,6 +1562,19 @@ class Options(_options_impl.OptionsDict):
             directory)
         """
         self.set(log_dir=log_dir)
+        return self
+
+    def maxRepeatLogs(self, max_lines: Optional[int]) -> "poptorch.Options":
+        """For often-repeated log lines, set the maximum number of repeated
+           lines that will be logged.
+
+        :param max_lines:
+            If `None`, show all log messages. Otherwise suppress repeated
+            messages after `max_lines` lines. The default is to suppress after
+            4 lines.
+        """
+        self.set(max_repeat_logs=(1 << 64) -
+                 1 if max_lines is None else max_lines)
         return self
 
     def modelName(self, name: str) -> "poptorch.Options":

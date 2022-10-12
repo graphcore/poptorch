@@ -35,6 +35,7 @@ struct LoggingContext {
   LoggingContext();
   std::shared_ptr<spdlog::logger> logger;
   bool output_popart_ir{false};
+  std::uint64_t repeat_limit{4u};
 };
 
 LoggingContext &context() {
@@ -125,6 +126,10 @@ LoggingContext::LoggingContext() {
 bool outputPopartIR() {
   return context().output_popart_ir || shouldLog(Level::Trace);
 }
+
+std::uint64_t repeatLimit() { return context().repeat_limit; }
+
+void setRepeatLimit(std::uint64_t limit) { context().repeat_limit = limit; }
 
 void log(Level l, const char *msg) { context().logger->log(translate(l), msg); }
 

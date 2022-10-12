@@ -49,6 +49,21 @@ void log(Level l, const char *s, const Args &...args) {
   template <typename... Args>                                                  \
   inline void fnName(const char *s, const Args &...args) {                     \
     log(Level::lvl, s, std::forward<const Args>(args)...);                     \
+  }                                                                            \
+                                                                               \
+  template <typename... Args>                                                  \
+  inline void fnName(std::uint64_t &dedup_count, const char *s,                \
+                     const Args &...args) {                                    \
+    std::uint64_t rlimit = repeatLimit();                                      \
+    if (dedup_count > rlimit) {                                                \
+      return;                                                                  \
+    }                                                                          \
+    if (dedup_count < rlimit) {                                                \
+      log(Level::lvl, s, std::forward<const Args>(args)...);                   \
+    } else {                                                                   \
+      log(Level::lvl, "...repeated messages suppressed...");                   \
+    }                                                                          \
+    dedup_count++;                                                             \
   }
 
 MAKE_LOG_TEMPLATE(trace, Trace)

@@ -127,8 +127,10 @@ void replaceWithConstantTensor(torch::jit::Graph *graph, torch::jit::Node *n,
 void warnDoubleOutOfRange(double val, torch::jit::Node *n) {
   if (val > std::numeric_limits<float>::max() ||
       val < std::numeric_limits<float>::lowest()) {
-    logging::warn("{}: torch.float64 constant cannot be represented as a "
-                  "torch.float32",
+    static std::uint64_t log_repeat = 0;
+    logging::warn(log_repeat,
+                  "{}: torch.float64 constant cannot be "
+                  "represented as a torch.float32",
                   nodeToString(n));
   }
 }
@@ -136,8 +138,10 @@ void warnDoubleOutOfRange(double val, torch::jit::Node *n) {
 void warnLongOutOfRange(int64_t val, torch::jit::Node *n) {
   if (val > std::numeric_limits<int32_t>::max() ||
       val < std::numeric_limits<int32_t>::lowest()) {
-    logging::warn("{}: torch.int64 constant cannot be represented as a "
-                  "torch.int32",
+    static std::uint64_t log_repeat = 0;
+    logging::warn(log_repeat,
+                  "{}: torch.int64 constant cannot be represented "
+                  "as a torch.int32",
                   nodeToString(n));
   }
 }

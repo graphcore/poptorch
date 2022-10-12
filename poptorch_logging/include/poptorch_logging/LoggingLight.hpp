@@ -34,6 +34,11 @@ bool shouldLog(Level l);
 // Return true if the Popart IR should be dumped.
 bool outputPopartIR();
 
+// Return number of times logs should be allowed to repeat
+std::uint64_t repeatLimit();
+
+void setRepeatLimit(std::uint64_t limit);
+
 // Flush the log. By default it is only flushed when the underlying libc
 // decides to.
 void flush();

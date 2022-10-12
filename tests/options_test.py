@@ -23,7 +23,7 @@ def test_set_options():
     with tempfile.TemporaryDirectory() as tmp:
         opts.deviceIterations(1).setExecutionStrategy(
             poptorch.PipelinedExecution()).replicationFactor(1).logDir(
-                tmp).enableSyntheticData(True)
+                tmp).enableSyntheticData(True).maxRepeatLogs(None)
 
     poptorch.poptorch_core._validateOptions(opts.toDict())
 
