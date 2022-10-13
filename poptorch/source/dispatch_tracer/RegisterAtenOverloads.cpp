@@ -202,7 +202,7 @@ at::Tensor &copyInplace(at::Tensor &self, const at::Tensor &src,
       self = context.tensor_store.copyCpuTensorAsIpuTensor(src);
     } else if (self.is_cpu() && src.is_xla()) {
       logging::trace("copy_ IPU -> CPU, outside dispatch");
-      if (std::shared_ptr<MLIRExecutor> executor =
+      if (const std::shared_ptr<MLIRExecutor> executor =
               context.last_mlir_executor.lock()) {
         executor->copyWeightsToHostIfNeeded();
       }
@@ -213,7 +213,7 @@ at::Tensor &copyInplace(at::Tensor &self, const at::Tensor &src,
       std::memcpy(self.data_ptr(), getHostBuffer(*impl)->data(),
                   tensorImplDataSize(*impl));
     } else if (self.is_xla() && src.is_xla()) {
-      if (std::shared_ptr<MLIRExecutor> executor =
+      if (const std::shared_ptr<MLIRExecutor> executor =
               context.last_mlir_executor.lock()) {
         executor->copyWeightsToHostIfNeeded();
       }
@@ -413,7 +413,7 @@ bool isDispatcherOn() {
 
 #if POPTORCH_BUILD_MLIR_COMPILER
 void swapLastMLIRExecutor(const std::shared_ptr<MLIRExecutor> &mlir_executor) {
-  if (std::shared_ptr<MLIRExecutor> replaced_mlir_executor =
+  if (const std::shared_ptr<MLIRExecutor> replaced_mlir_executor =
           context.last_mlir_executor.lock()) {
     replaced_mlir_executor->copyWeightsToHostIfNeeded();
   }
@@ -428,7 +428,7 @@ createMLIROptions(const std::vector<std::string> &source_location_excludes) {
   std::transform(
       source_location_excludes.begin(), source_location_excludes.end(),
       std::back_inserter(options.dispatcher.source_location_excludes),
-      [](std::string const &exclude) {
+      [](const std::string &exclude) {
         return std::vector<char>(exclude.begin(), exclude.end());
       });
   return options;
@@ -665,9 +665,9 @@ void detach(const c10::OperatorHandle &op, c10::Stack *stack) {
     const auto arguments = torch::jit::last(stack, num_arguments);
 
     ERROR_ON(arguments.size() != 1);
-    at::Tensor in = arguments.front().toTensor();
+    at::Tensor const in = arguments.front().toTensor();
 
-    at::Tensor out(in.unsafeGetTensorImpl()->shallow_copy_and_detach(
+    at::Tensor const out(in.unsafeGetTensorImpl()->shallow_copy_and_detach(
         /*version_counter=*/in.unsafeGetTensorImpl()->version_counter(),
         /*allow_tensor_metadata_change=*/true));
 
@@ -758,6 +758,14 @@ TORCH_LIBRARY_IMPL(_, AutogradIPU, m) {
 */
 #include "RegisterOptionalAtenOps.cpp.inc"
 
+// TODO(T59880) rename AutogradXLA -> AutogradIPU
+// This is required to intercept detach calls when
+// moving parameters to the IPU. For some reason, these
+// cannot be intercepted using the non-autograd key
+TORCH_LIBRARY_IMPL(aten, AutogradXLA, m) {
+  m.impl("detach", PTC_BOXED(poptorch::detach));
+}
+
 void popArgumentsFromStack(const c10::OperatorHandle &op, c10::Stack *stack) {
   ERROR_ON(op.schema().arguments().size() > stack->size());
   stack->erase(std::prev(stack->end(), op.schema().arguments().size()),
@@ -765,7 +773,7 @@ void popArgumentsFromStack(const c10::OperatorHandle &op, c10::Stack *stack) {
 }
 
 void pushResultsToStack(c10::Stack *stack,
-                        std::vector<c10::IValue> const &results) {
+                        const std::vector<c10::IValue> &results) {
   stack->insert(stack->end(), results.begin(), results.end());
 }
 
@@ -791,7 +799,7 @@ void opReturningFirstArgument(const c10::OperatorHandle &op,
   if (poptorch::isDispatcherOn()) {
     poptorch::fallback(op, stack);
   } else {
-    auto const front = getNthArgument(op, stack, 0);
+    const auto front = getNthArgument(op, stack, 0);
     updateStack(op, stack, {front});
   }
 }
@@ -873,7 +881,7 @@ void dynamicSlice(const c10::OperatorHandle &op, c10::Stack *stack) {
   if (poptorch::isDispatcherOn()) {
     poptorch::fallback(op, stack);
   } else {
-    auto const self = getNthArgument(op, stack, 0).toTensor();
+    const auto self = getNthArgument(op, stack, 0).toTensor();
     auto dim = getNthArgument(op, stack, 1).toInt();
     auto t_start = getNthArgument(op, stack, 2).toTensor();
     auto st = t_start.scalar_type();
@@ -911,12 +919,13 @@ void ctcBeamSearchDecoder(const c10::OperatorHandle &op, c10::Stack *stack) {
   auto top_paths = getNthArgument(op, stack, 3).toInt();
   ERROR_ON_MSG(log_probs.sizes().size() != 3,
                "Incorrect shape for first input to CTC beam search decoder.");
-  unsigned input_len = log_probs.sizes()[0];
-  unsigned batch_size = log_probs.sizes()[1];
+  const unsigned input_len = log_probs.sizes()[0];
+  const unsigned batch_size = log_probs.sizes()[1];
 
-  at::Tensor path_probs = at::zeros({batch_size, top_paths});
-  at::Tensor path_lens = at::zeros({batch_size, top_paths});
-  at::Tensor decoded_paths = at::zeros({batch_size, top_paths, input_len});
+  at::Tensor const path_probs = at::zeros({batch_size, top_paths});
+  at::Tensor const path_lens = at::zeros({batch_size, top_paths});
+  at::Tensor const decoded_paths =
+      at::zeros({batch_size, top_paths, input_len});
 
   updateStack(op, stack, {path_probs, path_lens, decoded_paths});
 }
