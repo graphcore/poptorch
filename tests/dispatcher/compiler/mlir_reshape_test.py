@@ -88,21 +88,36 @@ def test_unbind(dim):
         assert torch.equal(i, c)
 
 
+def op_harness(fn, *args, **kwargs):
+    cpu_y = fn(*args, **kwargs)
+    ipu_y = IPUContext(fn)(*args, **kwargs)
+
+    helpers.assert_allclose(actual=ipu_y, expected=cpu_y)
+
+
 # torch.index_select
 @pytest.mark.parametrize("dim", range(-len(shape), len(shape)))
 @pytest.mark.mlirSupportRequired
 def test_index_select(dim):
     torch.manual_seed(42)
 
-    def cpu_fn(x, dim, index):
+    def op(x, dim, index):
         return torch.index_select(x, dim, index)
-
-    ipu_fn = IPUContext(cpu_fn)
 
     t = torch.randn(shape, dtype=torch.float)
     index = torch.randint(shape[dim], (shape[dim], ), dtype=torch.int32)
 
-    cpu_y = cpu_fn(t, dim, index)
-    ipu_y = ipu_fn(t, dim, index)
+    op_harness(op, t, dim, index)
 
-    helpers.assert_allclose(actual=ipu_y, expected=cpu_y)
+
+@pytest.mark.mlirSupportRequired
+@pytest.mark.parametrize("dims", [(3, 0), (-1, 1)])
+def test_transpose(dims):
+    torch.manual_seed(42)
+
+    def op(x):
+        return torch.transpose(x, *dims)
+
+    x = torch.randn(3, 2, 5, 2)
+
+    op_harness(op, x)

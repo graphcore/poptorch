@@ -107,7 +107,7 @@ def test_activations(op):
 
 
 @pytest.mark.mlirSupportRequired
-@pytest.mark.parametrize("dim", [0, 1, 2, 3])
+@pytest.mark.parametrize("dim", [-1, 0, 1, 2])
 def test_softmax(dim):
     torch.manual_seed(42)
 

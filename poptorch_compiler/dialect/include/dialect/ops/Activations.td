@@ -137,6 +137,8 @@ def Poptorch_softmax : Poptorch_Op<"softmax", [SameOperandsAndResultShape]> {
 
   let builders = [OpBuilder<(ins "mlir::Value":$input, "std::int64_t":$axis, "bool":$half_to_float), [{
         $_state.addOperands({input});
+
+        axis = convertToPositiveDim(axis, getShape(input).size());
         $_state.addAttribute("axis",$_builder.getI64IntegerAttr(axis));
         $_state.addAttribute("half_to_float",$_builder.getBoolAttr(half_to_float));
         $_state.addTypes(input.getType());

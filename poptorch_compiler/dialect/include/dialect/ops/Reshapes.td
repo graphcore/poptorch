@@ -81,19 +81,18 @@ def Poptorch_transpose: Poptorch_AbstractOp<"transpose", [ViewOp]> {
 
   let builders = [OpBuilder<(ins "mlir::Value":$value, "std::int64_t":$dim0, "std::int64_t":$dim1),[{
     $_state.addOperands({value});
+
+    mlir::RankedTensorType t1 = value.getType().cast<mlir::RankedTensorType>();
+    llvm::SmallVector<std::int64_t, 4> shape(t1.getShape().begin(),
+                                             t1.getShape().end());
+
+    dim0 = convertToPositiveDim(dim0, shape.size());
     $_state.addAttribute("dim0", $_builder.getI64IntegerAttr(dim0));
+
+    dim1 = convertToPositiveDim(dim1, shape.size());
     $_state.addAttribute("dim1", $_builder.getI64IntegerAttr(dim1));
 
     // Transpose the type.
-    mlir::RankedTensorType t1 = value.getType().cast<mlir::RankedTensorType>();
-    llvm::SmallVector<std::int64_t, 4> shape = {t1.getShape().begin(),  t1.getShape().end()};
-
-    if (dim0 < 0) {
-        dim0 += shape.size();
-    }
-    if (dim1 < 0) {
-        dim1 += shape.size();
-    }
     if (dim0 < shape.size() && dim1 < shape.size()) {
         std::swap(shape[dim0], shape[dim1]);
     }
