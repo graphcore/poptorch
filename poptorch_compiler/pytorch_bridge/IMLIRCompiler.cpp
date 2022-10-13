@@ -168,8 +168,9 @@ void IMLIRCompiler::resetMainGraph() {
 llvm::DenseMap<mlir::Value, TensorId> IMLIRCompiler::getValueMappings() {
   llvm::DenseMap<mlir::Value, TensorId> mappings;
   for (std::uint64_t i = 0; i < _value_map.size(); ++i) {
-    if (_value_map.at(i)) {
-      ERROR_ON_MSG(!mappings.try_emplace(_value_map.at(i), i).second,
+    const auto val = _value_map[i];
+    if (val) {
+      ERROR_ON_MSG(!mappings.try_emplace(val, i).second,
                    "Value mapped to more than one TensorId");
     }
   }

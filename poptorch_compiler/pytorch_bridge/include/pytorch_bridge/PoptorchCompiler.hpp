@@ -60,7 +60,7 @@ public:
   void compileRunAndReset();
 
   // Only if ExecutionType::StaticGraph is used
-  PoplarExecutorWrapper compileAndLoad();
+  std::unique_ptr<PoplarExecutorWrapper> compileAndLoad();
 
   std::vector<std::int64_t> getSize(TensorId id) const;
   Type getType(TensorId id) const;

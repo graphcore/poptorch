@@ -24,7 +24,7 @@ ValueMapper::TrackedTensor::TrackedTensor(const at::Tensor &tensor)
 
 void ValueMapper::setParameterName(const at::Tensor &t,
                                    const std::string &name) {
-  uint64_t id = ipuTensorId(t);
+  const uint64_t id = ipuTensorId(t);
   if (!isParameter(t) && !t.is_floating_point()) {
     logging::warn("Parameter {}: {} was downgraded to constant because PopART "
                   "doesn't support non floating point parameters",
@@ -66,7 +66,7 @@ void ValueMapper::setParameterPerReplica(const std::string &param_name,
   auto data_size = tensorDataSize(tensor);
   ERROR_ON_MSG(!tensor.is_contiguous(),
                "Data source must be contiguous: " << str(tensor));
-  PerReplicaSettings settings = {
+  const PerReplicaSettings settings = {
       comm_group_type, shards, variable_retrieval_mode, tensor.size(0),
       std::make_shared<std::vector<char>>(data_size)};
   memcpy(settings.host_buffer->data(), tensor.data_ptr(), data_size);
@@ -80,7 +80,7 @@ void ValueMapper::addTensor(const at::Tensor &t, poptorch_ir::TensorId id) {
                  static_cast<void *>(this), id);
   // If the tensor is already being tracked then we will update the MLIR
   // value being tracked. Otherwise we insert and add the MLIR value.
-  auto new_details = getTensorDetails(*t.unsafeGetTensorImpl());
+  auto new_details = getTensorDetails(t);
   if (new_details->mapper == nullptr) {
     // If this tensor was created by the JIT dispatcher we want the details
     // to point at the JIT's mapper not the MLIR one, so don't overwrite.
@@ -102,7 +102,7 @@ void ValueMapper::addTensor(const at::Tensor &t, torch::jit::Value *val) {
 
   // If the tensor is already being tracked then we will update the JIT
   // value being tracked. Otherwise we insert and add the jit value.
-  auto new_details = getTensorDetails(*t.unsafeGetTensorImpl());
+  auto new_details = getTensorDetails(t);
   new_details->mapper = this;
   auto itr = tensors.insert({new_details.get(), TrackedTensor{t}}).first;
   itr->second.jit = val;
@@ -148,7 +148,7 @@ void ValueMapper::aliasTensor(IpuTensorDetails *dest_details,
 }
 
 ValueMapper::TrackedTensor *ValueMapper::rawTensorRecord(const at::Tensor &t) {
-  auto itr = tensors.find(getTensorDetails(*t.unsafeGetTensorImpl()).get());
+  auto itr = tensors.find(getTensorDetails(t).get());
 
   if (itr != tensors.end()) {
     return &itr->second;
@@ -172,7 +172,7 @@ torch::jit::Value *ValueMapper::getValueForTensor(const at::Tensor &t) {
   if (!isIpuTensor(t)) {
     return nullptr;
   }
-  auto itr = tensors.find(getTensorDetails(*t.unsafeGetTensorImpl()).get());
+  auto itr = tensors.find(getTensorDetails(t).get());
 
   if (itr != tensors.end()) {
     return itr->second.jit;
@@ -185,13 +185,17 @@ poptorch_ir::TensorId ValueMapper::getMLIRForTensor(const at::Tensor &t) {
   if (!isIpuTensor(t)) {
     return poptorch_ir::tensor_error_id;
   }
-  auto itr = tensors.find(getTensorDetails(*t.unsafeGetTensorImpl()).get());
+  auto itr = tensors.find(getTensorDetails(t).get());
 
   if (itr != tensors.end()) {
     return itr->second.mlir;
   }
 
   return poptorch_ir::tensor_error_id;
+}
+
+bool ValueMapper::hasMapping(const at::Tensor &t) const {
+  return tensors.find(getTensorDetails(t).get()) != tensors.end();
 }
 
 void ValueMapper::addTensorList(const TensorList &list,

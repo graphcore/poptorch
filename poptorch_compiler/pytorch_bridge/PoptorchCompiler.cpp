@@ -56,7 +56,7 @@ void PoptorchCompiler::onOpAdded() { _impl->onOpAdded(); }
 TensorId PoptorchCompiler::addInput(const Buffer &ptr,
                                     const std::vector<std::int64_t> &shape,
                                     Type type, const char *name) {
-  mlir::RankedTensorType tensor = _impl->getTensor(type, shape);
+  const mlir::RankedTensorType tensor = _impl->getTensor(type, shape);
 
   return _impl->addInput(ptr, tensor, name);
 }
@@ -73,7 +73,7 @@ void PoptorchCompiler::setCurrentPythonCodeLocation(const char *filename,
 TensorId PoptorchCompiler::addParameter(const Buffer &ptr,
                                         const std::vector<std::int64_t> &shape,
                                         Type type, const char *name) {
-  mlir::RankedTensorType tensor = _impl->getTensor(type, shape);
+  const mlir::RankedTensorType tensor = _impl->getTensor(type, shape);
 
   return _impl->addParameter(ptr, tensor, name);
 }
@@ -114,8 +114,8 @@ Type PoptorchCompiler::getType(TensorId id) const {
 
 mlir::RankedTensorType
 PoptorchCompiler::getRankedTensorType(TensorId id) const {
-  mlir::Value val = _impl->findValue(id);
-  mlir::Type t1 = val.getType();
+  const mlir::Value val = _impl->findValue(id);
+  const mlir::Type t1 = val.getType();
   return t1.cast<mlir::RankedTensorType>();
 }
 
@@ -135,7 +135,7 @@ void PoptorchCompiler::compileRunAndReset() {
   compiler->compileRunAndReset();
 }
 
-PoplarExecutorWrapper PoptorchCompiler::compileAndLoad() {
+std::unique_ptr<PoplarExecutorWrapper> PoptorchCompiler::compileAndLoad() {
   auto *compiler = dynamic_cast<detail::MLIRStaticGraphCompiler *>(_impl.get());
   ERROR_ON_MSG(compiler == nullptr,
                "[Internal] Only static graph builders can compileAndLoad()");
@@ -144,7 +144,7 @@ PoplarExecutorWrapper PoptorchCompiler::compileAndLoad() {
       "Either no inputs or outputs were added or compiling a second time.");
 
   // Obtain the device
-  PoplarDevice device = PoplarDevice::defaultDevice();
+  const auto device = PoplarDevice::defaultDevice();
   auto exe = compiler->compile(device.getTarget());
 
   exe.load(device);
@@ -156,9 +156,9 @@ PoplarExecutorWrapper PoptorchCompiler::compileAndLoad() {
   }
   compiler->weight_callbacks.clear();
 
-  PoplarExecutorWrapper executor(std::move(exe),
-                                 std::move(compiler->input_callbacks),
-                                 std::move(compiler->output_callbacks));
+  auto executor = std::make_unique<PoplarExecutorWrapper>(
+      std::move(exe), std::move(compiler->input_callbacks),
+      std::move(compiler->output_callbacks));
   compiler->input_callbacks.clear();
   compiler->output_callbacks.clear();
 

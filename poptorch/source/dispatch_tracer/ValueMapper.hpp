@@ -36,10 +36,10 @@ private:
   // large number of lists.
   struct TensorListHash {
     size_t operator()(const TensorList &list) const {
-      std::hash<const torch::jit::Value *> hash_func;
+      const std::hash<const torch::jit::Value *> hash_func;
       size_t hash = 11;
       for (const auto *value : list) {
-        size_t hash_next = hash_func(value);
+        const size_t hash_next = hash_func(value);
         hash = hash * 31 + hash_next;
       }
       return hash;
@@ -129,6 +129,8 @@ public:
   // pointer to both tensor details.
   void aliasTensor(IpuTensorDetails *dest_details,
                    IpuTensorDetails *src_details);
+
+  bool hasMapping(const at::Tensor &t) const;
 
 protected:
   // For resolving aliases, it's useful to find a TrackedTensor from its id.

@@ -6,9 +6,11 @@
 #include <memory>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include "poptorch/DispatchTracer.hpp"
+#include "pytorch_bridge/CompilerTypes.hpp"
 
 // We don't build this on Centos TODO(T49566)
 #if POPTORCH_BUILD_MLIR_COMPILER
@@ -23,7 +25,7 @@ struct CompilerOptions;
 
 class MLIRDispatch : public IDispatch {
 public:
-  MLIRDispatch(CompilerOptions const &options, TensorStore *tensor_store);
+  MLIRDispatch(const CompilerOptions &options, TensorStore *tensor_store);
 
   at::Tensor addConstant(const at::Tensor &cpu_tensor) final;
   at::Tensor addInput(const at::Tensor &cpu_tensor) final;
@@ -43,6 +45,8 @@ public:
   void promoteAsInput(at::Tensor &tensor, bool is_wrapped = false);
 
   void promoteAsOutput(const at::Tensor &tensor, void *storage);
+
+  poptorch_ir::TensorId addEmptyTensorOp(const at::Tensor &tensor);
 
   void registerEmptyTensor(const at::Tensor &tensor) final;
 
@@ -134,6 +138,8 @@ private:
 
   std::vector<IpuTensorDetails *> _aliases_to_restore;
   void restoreAliases();
+
+  bool isDeferredEmptyTensor(const at::Tensor &tensor) const;
 };
 
 } // namespace poptorch

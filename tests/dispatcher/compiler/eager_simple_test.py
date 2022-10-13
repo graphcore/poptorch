@@ -204,3 +204,25 @@ def test_resnet18():
 
     print(f"Result cpu: {cpu} ipu: {ipu}")
     helpers.assert_allclose(expected=cpu, actual=ipu.cpu())
+
+
+@pytest.mark.ipuHardwareRequired
+@pytest.mark.mlirSupportRequired
+@helpers.overridePoptorchLogLevel("TRACE")
+def test_no_unused_empty_tensor(capfd):
+    import poptorch.eager  # pylint: disable=unused-import, import-outside-toplevel
+    poptorch.eager.eager_options.use_lazy_tensor = True
+
+    torch.manual_seed(42)
+    x = torch.randn((10, ))
+
+    def f(x):
+        return x**2 + 5
+
+    cpu_y = f(x)
+    ipu_y = f(x.to("xla")).to("cpu")
+
+    log = helpers.LogChecker(capfd)
+    log.assert_not_contains("empty_tensor")
+
+    helpers.assert_allclose(expected=cpu_y, actual=ipu_y)
