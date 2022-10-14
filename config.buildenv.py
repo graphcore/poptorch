@@ -31,6 +31,7 @@ class BuildLLVM(Installer):
             "cd build",
             "export CXX=g++",
             "export CC=gcc",
+            f"export LD_LIBRARY_PATH={env.prefix}/lib",
             f"cmake ../llvm -GNinja \
                     -DCMAKE_BUILD_TYPE=Release \
                     -DLLVM_TARGETS_TO_BUILD:STRING=host \

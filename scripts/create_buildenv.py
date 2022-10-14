@@ -325,12 +325,17 @@ class BuildenvManager:
                                 {full_template_name}")
 
         os.chdir(self.output_dir)
-        # CC / CXX -> Enable ccache for the current C / C++ compilers.
-        self.env.run_commands(
-            """echo "export CC=\\"ccache ${CC:-gcc}\\"" >> %s""" %
-            self.activate_filename,
-            """echo "export CXX=\\"ccache ${CXX:-g++}\\"" >> %s""" %
-            self.activate_filename)
+        # If ccache is available
+        try:
+            self.env.run_commands("ccache")
+            # CC / CXX -> Enable ccache for the current C / C++ compilers.
+            self.env.run_commands(
+                """echo "export CC=\\"ccache ${CC:-gcc}\\"" >> %s""" %
+                self.activate_filename,
+                """echo "export CXX=\\"ccache ${CXX:-g++}\\"" >> %s""" %
+                self.activate_filename)
+        except AssertionError:
+            pass
 
     def _create_new_env(self, installers, is_retry=False):
         """
