@@ -691,7 +691,7 @@ class _TensorLocationOptions(_options_impl.OptionsDict):
         :py:func:`~poptorch.set_overlap_for_output` or to use off-chip memory
         with reduced by setting the option
         :py:meth:`~poptorch.TensorLocationSettings.useIOTilesToLoad`.
-        As reducing the number of computation tiles may reduce peformance, you
+        As reducing the number of computation tiles may reduce performance, you
         should not use any IO tiles until you have successfully run your model
         and used profiling to identify "streamCopy" entries which take up a
         significant proportion of execution time.
@@ -1670,7 +1670,8 @@ class Options(_options_impl.OptionsDict):
         return self
 
     def useIpuId(self, ipu_id: int) -> "poptorch.Options":
-        """ Use the IPU device specified by the ID (as provided by `gc-info`)
+        """ Use the IPU device specified by the ID (as provided by
+        `gc-info <https://docs.graphcore.ai/projects/command-line-tools/en/latest/gc-info_main.html>`__).
 
         A device ID may refer to a single or to a group of IPUs (a multi-IPU
         device). The number of IPUs associated with the ID must be equal to the
@@ -1682,7 +1683,7 @@ class Options(_options_impl.OptionsDict):
         pipelined across 4 IPUs and the replication factor is 4, you will need
         to provide a device ID which represents a multi-IPU device of 16 IPUs.
 
-        You can use the the command-line tool `gc-info`: running `gc-info -a`,
+        You can use the the command-line tool `gc-info`: running `gc-info -l`,
         shows each device ID and a list of IPUs associated with the ID.
 
         :param int ipu_id: IPU device ID of a single-IPU or multi-IPU device
@@ -1867,7 +1868,7 @@ class Options(_options_impl.OptionsDict):
 
         if env_override:
             logger.warning(
-                'Profiling setting overriden by environment variable. '
+                'Profiling setting overridden by environment variable. '
                 'Check content of POPLAR_ENGINE_OPTIONS.')
 
         opts = self._popart.options.get('engineOptions', {})

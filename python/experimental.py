@@ -236,7 +236,7 @@ class IPUScope:
                 self._cpu_params[k].__class__ = torch.nn.Parameter
                 _set_param(k, k)
 
-            # Restore aliased parametesr/buffers which will not be represented
+            # Restore aliased parameters/buffers which will not be represented
             # in self._cpu_params or self._cpu_buffers
             for k, v in self._cpu_aliases.items():
                 _set_param(k, v)

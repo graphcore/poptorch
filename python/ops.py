@@ -554,7 +554,7 @@ def BeginBlock(layer_to_call: torch.nn.Module,
     :param ipu_id: The ID of the IPU to run on.
                    Note that the ``ipu_id`` is an index in a multi-IPU device
                    within PopTorch, and is separate and distinct from the device
-                   ids used by ``gc-info``.
+                   IDs used by ``gc-info``.
 
     .. seealso:: :py:meth:`~poptorch.Options.setExecutionStrategy`
     """
@@ -607,7 +607,7 @@ def BlockFunction(user_id: Optional[str] = None, ipu_id: Optional[int] = None):
     :param ipu_id: The ID of the IPU to run on.
                    Note that the ``ipu_id`` is an index
                    in a multi-IPU device within PopTorch, and is
-                   separate and distinct from the device ids used by
+                   separate and distinct from the device IDs used by
                    ``gc-info``.
 
     .. seealso:: :py:meth:`~poptorch.Options.setExecutionStrategy`
