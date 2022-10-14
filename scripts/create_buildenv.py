@@ -171,12 +171,15 @@ class BuildenvManager:
                  python_version=None,
                  use_conda_toolchains=False,
                  install_linters=False,
+                 empty_env=False,
                  **config):
         python_version = python_version or platform.python_version()
         self.output_dir = os.path.realpath(output_dir or os.getcwd())
         self.cache_dir = cache_dir or _default_cache_dir()
         self.buildenv_dir = os.path.join(self.output_dir, "buildenv")
-        self.conda_packages = [f"python={python_version}", "conda-pack=0.5.0"]
+        self.conda_packages = [f"python={python_version}"]
+        if not empty_env:
+            self.conda_packages.append("conda-pack=0.5.0")
 
         # Support for python 3.6 was removed from pip in version 22.0
         # https://pip.pypa.io/en/stable/news/#v22-0
@@ -184,7 +187,7 @@ class BuildenvManager:
             self.conda_packages.append("pip=21.1.3")
 
         is_aarch64 = _utils.get_arch_type() == "aarch64"
-        if not is_aarch64:
+        if not is_aarch64 and not empty_env:
             self.conda_packages.append("gdb=8.3")
 
         self.projects = {}
@@ -327,7 +330,13 @@ class BuildenvManager:
         os.chdir(self.output_dir)
         # If ccache is available
         try:
-            self.env.run_commands("ccache")
+
+            def ignore(_):
+                pass
+
+            self.env.run_commands("ccache -V",
+                                  stdout_handler=ignore,
+                                  stderr_handler=ignore)
             # CC / CXX -> Enable ccache for the current C / C++ compilers.
             self.env.run_commands(
                 """echo "export CC=\\"ccache ${CC:-gcc}\\"" >> %s""" %
@@ -515,6 +524,12 @@ if __name__ == "__main__":
         "-t",
         action="store_true",
         help="Use Conda toolchains instead of the system ones.")
+    parser.add_argument(
+        "--empty-env",
+        "-e",
+        action="store_true",
+        help=("Create an empty Conda environment using version of python "
+              "specified by --python-version"))
     parser.add_argument("--popart-deps",
                         action="store_true",
                         help="Install dependencies to build PopART.")
@@ -550,7 +565,7 @@ if __name__ == "__main__":
 
     manager = BuildenvManager(args.cache_dir, args.output_dir,
                               args.python_version, args.conda_toolchains,
-                              not args.no_linters)
+                              not args.no_linters, args.empty_env)
     if args.path:
         path_dir = os.path.realpath(args.path)
         project = None
@@ -564,6 +579,6 @@ if __name__ == "__main__":
         if project is None:
             project = path_dir.split(os.path.sep)[-1]
         manager.add_project(project, path_dir)
-    else:
+    elif not args.empty_env:
         manager.add_project("poptorch", _utils.sources_dir())
     manager.create(args.create_template_if_needed)
