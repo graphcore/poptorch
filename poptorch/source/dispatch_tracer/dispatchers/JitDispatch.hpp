@@ -54,6 +54,8 @@ private:
   void
   setCurrentCodeLocation(const torch::jit::SourceRange &source_location) final;
 
+  void addTensorToParamNode(const at::Tensor &cpu_tensor);
+
   // We use the MLIR dispatch for shape inference.
   MLIRDispatch _mlir_dispatch;
   InplaceInputsTracker _inplace_tracker;

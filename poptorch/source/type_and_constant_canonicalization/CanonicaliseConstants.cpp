@@ -101,11 +101,11 @@ UseOfNode getUseOfNode(torch::jit::Node *n,
 void replaceWithConstantTensor(torch::jit::Graph *graph, torch::jit::Node *n,
                                const at::Tensor &t) {
   ERROR_ON(n->kind() != c10::prim::Constant);
-  bool is_dispatcher_active = isCompilingWithDispatcher();
-  torch::jit::WithInsertPoint insert_point(n);
-  WithNodeMetadata meta(n);
+  const bool is_dispatcher_active = isCompilingWithDispatcher();
+  torch::jit::WithInsertPoint const insert_point(n);
+  const WithNodeMetadata meta(n);
 
-  poptorch::UseOfNode use_of_node = getUseOfNode(n);
+  poptorch::UseOfNode const use_of_node = getUseOfNode(n);
   auto *new_node = tensorToConstant(graph, t, use_of_node);
 
   if (!is_dispatcher_active) {
@@ -198,7 +198,7 @@ void handleTensorConstant(torch::jit::Graph *graph, torch::jit::Node *n) {
     tensor = n->t(c10::attr::value);
   }
   ERROR_ON(!tensor.defined());
-  bool was_wrapped = tensor.unsafeGetTensorImpl()->is_wrapped_number();
+  const bool was_wrapped = tensor.unsafeGetTensorImpl()->is_wrapped_number();
   if (tensor.scalar_type() == at::ScalarType::Double) {
     warnDoubleOutOfRange(
         *reinterpret_cast<double *>(tensor.unsafeGetTensorImpl()->data()), n);
@@ -222,7 +222,7 @@ void handleTensorConstant(torch::jit::Graph *graph, torch::jit::Node *n) {
 }
 
 void handleStringConstant(torch::jit::Graph *graph, torch::jit::Node *n) {
-  std::string s = n->s(c10::attr::value);
+  std::string const s = n->s(c10::attr::value);
   std::vector<int64_t> shape_vec;
   shape_vec.push_back(s.length());
 
@@ -407,8 +407,8 @@ private:
 
 void handleListOrTuple(torch::jit::Graph *graph, torch::jit::Node *n,
                        std::unordered_set<torch::jit::Node *> *to_delete) {
-  torch::jit::WithInsertPoint insert_point(n);
-  WithNodeMetadata meta(n);
+  torch::jit::WithInsertPoint const insert_point(n);
+  const WithNodeMetadata meta(n);
 
   // Use the visitor to turn the single list/tuple constant into many
   // constants and List/TupleConstructs.
@@ -427,8 +427,8 @@ void handleListOrTuple(torch::jit::Graph *graph, torch::jit::Node *n,
   // *before* canonicalisation (to permit code reuse). Hence, we canonicalise
   // in the same way.
   for (auto *prim_const : visitor.getAllConstNodes()) {
-    torch::jit::WithInsertPoint insert_point_prim_const(prim_const);
-    WithNodeMetadata prim_meta(prim_const);
+    torch::jit::WithInsertPoint const insert_point_prim_const(prim_const);
+    const WithNodeMetadata prim_meta(prim_const);
 
     // If there are NoneTypes we can skip those
     if (prim_const->output()->type() != c10::NoneType::get()) {
@@ -463,8 +463,8 @@ void recursivelySelectHostAndIPUSideConstants(
         break;
       case UseOfNode::HostSideAndPopART:
         auto *graph = use.user->owningGraph();
-        torch::jit::WithInsertPoint insert_point(use.user);
-        WithNodeMetadata meta(use.user);
+        torch::jit::WithInsertPoint const insert_point(use.user);
+        const WithNodeMetadata meta(use.user);
 
         auto same_value = [](torch::jit::Value *value) { return value; };
 
@@ -499,9 +499,9 @@ void recursivelySelectHostAndIPUSideConstants(
 void rectifyHostAndIPUSideConstants(
     torch::jit::Graph *graph,
     std::unordered_set<torch::jit::Node *> *to_delete) {
-  logging::LogContext ctx_func("rectifyHostAndIPUSideConstants");
+  logging::LogContext const ctx_func("rectifyHostAndIPUSideConstants");
   for (auto *node : graph->nodes()) {
-    logging::LogContext ctx("processing " + nodeToString(node));
+    logging::LogContext const ctx("processing " + nodeToString(node));
 
     if (node->kind() != symbols::poptorch::host_and_ipu_side_tensor_constant) {
       continue;
@@ -509,8 +509,8 @@ void rectifyHostAndIPUSideConstants(
 
     // Create two new nodes
     auto t = getNodeTensorAttrValue(node);
-    torch::jit::WithInsertPoint insert_point(node);
-    WithNodeMetadata meta(node);
+    torch::jit::WithInsertPoint const insert_point(node);
+    const WithNodeMetadata meta(node);
 
     torch::jit::Node *host_side_node = createAndInsertNode(
         graph, symbols::poptorch::host_side_tensor_constant);
@@ -532,9 +532,10 @@ void rectifyHostAndIPUSideConstants(
 void removeStateChangingNodesFromHostSideBranch(
     torch::jit::Graph *graph,
     std::unordered_set<torch::jit::Node *> *to_delete) {
-  logging::LogContext ctx_func("removeStateChangingNodesFromHostSideBranch");
+  logging::LogContext const ctx_func(
+      "removeStateChangingNodesFromHostSideBranch");
   for (auto *node : graph->nodes()) {
-    logging::LogContext ctx("processsing " + nodeToString(node));
+    logging::LogContext const ctx("processsing " + nodeToString(node));
     if (node->kind() != symbols::poptorch::host_side_tensor_constant) {
       continue;
     }
@@ -571,7 +572,7 @@ void removeStateChangingNodesFromHostSideBranch(
 
 void canonicaliseIfConstant(torch::jit::Graph *graph, torch::jit::Node *node,
                             std::unordered_set<torch::jit::Node *> *to_delete) {
-  logging::LogContext ctx("processing " + nodeToString(node));
+  logging::LogContext const ctx("processing " + nodeToString(node));
 
   if (node->kind() == c10::aten::size) {
     // This will be made a constant in the size handler
@@ -589,33 +590,33 @@ void canonicaliseIfConstant(torch::jit::Graph *graph, torch::jit::Node *node,
 
   if (node->output()->type()->isSubtypeOf(c10::NumberType::get()) ||
       node->output()->type()->isSubtypeOf(c10::BoolType::get())) {
-    logging::LogContext ctx2("handling as number constant");
+    logging::LogContext const ctx2("handling as number constant");
     handleNumberConstant(graph, node);
   } else if (node->output()->type()->isSubtypeOf(c10::TensorType::get())) {
-    logging::LogContext ctx2("handling as tensor constant");
+    logging::LogContext const ctx2("handling as tensor constant");
     handleTensorConstant(graph, node);
   } else if (node->output()->type()->isSubtypeOf(c10::StringType::get())) {
-    logging::LogContext ctx2("handling as string constant");
+    logging::LogContext const ctx2("handling as string constant");
     handleStringConstant(graph, node);
   } else if (node->output()->type()->isSubtypeOf(c10::ListType::ofBools())) {
     // Only known case is the result of an evaluated constexpr
-    logging::LogContext ctx2("handling as bool list constant");
+    logging::LogContext const ctx2("handling as bool list constant");
     handleListOrTuple(graph, node, to_delete);
   } else if (node->output()->type()->isSubtypeOf(c10::ListType::ofFloats())) {
     // Only known case is the result of an evaluated constexpr
-    logging::LogContext ctx2("handling as float list constant");
+    logging::LogContext const ctx2("handling as float list constant");
     handleListOrTuple(graph, node, to_delete);
   } else if (node->output()->type()->isSubtypeOf(c10::ListType::ofInts())) {
     // Only known case is the result of an evaluated constexpr
-    logging::LogContext ctx2("handling as int list constant");
+    logging::LogContext const ctx2("handling as int list constant");
     handleListOrTuple(graph, node, to_delete);
   } else if (node->output()->type()->isSubtypeOf(c10::ListType::ofTensors())) {
     // Only known case is the result of an evaluated constexpr
-    logging::LogContext ctx2("handling a tensor list constant");
+    logging::LogContext const ctx2("handling a tensor list constant");
     handleListOrTuple(graph, node, to_delete);
   } else if (node->output()->type()->isSubtypeOf(c10::ListType::create(
                  c10::OptionalType::create(c10::TensorType::get())))) {
-    logging::LogContext ctx2("handling an optional tensor list constant");
+    logging::LogContext const ctx2("handling an optional tensor list constant");
     handleListOrTuple(graph, node, to_delete);
   } else if (node->output()->type()->cast<c10::TupleType>()) {
     handleListOrTuple(graph, node, to_delete);
@@ -626,14 +627,38 @@ void canonicaliseIfConstant(torch::jit::Graph *graph, torch::jit::Node *node,
   to_delete->insert(node);
 }
 
+void convertReturnedInputsToConstants(torch::jit::Graph *graph) {
+  std::stack<size_t> to_erase;
+  for (auto i = 0u; i < graph->inputs().size(); i++) {
+    auto *input = graph->inputs()[i];
+    if (input->uses().size() == 1 &&
+        input->uses()[0].user->kind() == c10::prim::Return) {
+      const WithNodeMetadata meta(input->node());
+      torch::jit::Value *new_const =
+          insertConstant(graph, input->node()->ts(c10::attr::values)[i]);
+      input->replaceAllUsesWith(new_const);
+      to_erase.push(i);
+    }
+  }
+
+  while (!to_erase.empty()) {
+    graph->eraseInput(to_erase.top());
+    to_erase.pop();
+  }
+}
+
 } // namespace
 
 void canonicaliseConstants(torch::jit::Graph *graph) {
-  logging::LogContext ctx_func("CanonicaliseConstants");
-  auto nodes = graph->nodes();
+  logging::LogContext const ctx_func("CanonicaliseConstants");
   std::unordered_set<torch::jit::Node *> to_delete;
-  for (auto it = nodes.begin(); it != nodes.end(); it++) {
-    auto *node = *it;
+
+  // If any inputs are simply returned as outputs, replace
+  // those inputs with host-side-only constants so that they
+  // aren't lowered to PopART
+  convertReturnedInputsToConstants(graph);
+
+  for (auto *node : graph->nodes()) {
     canonicaliseIfConstant(graph, node, &to_delete);
   }
 

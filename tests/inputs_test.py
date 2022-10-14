@@ -843,3 +843,20 @@ def test_scalar_tensor_input(trace_model):
     s = poptorch.inferenceModel(model, options)
     x = torch.tensor(3.)  # shape = torch.Size([])
     helpers.assert_allclose(actual=s(x), expected=model(x))
+
+
+@pytest.mark.mlirSupportRequired
+def test_returned_only_inputs():
+    class Model(torch.nn.Module):
+        def forward(self, x, y):
+            return x, y
+
+    m = Model()
+    options = poptorch.Options()
+    options.Jit.traceModel(False)
+    p = poptorch.inferenceModel(m, options)
+    x = torch.tensor([1, 2])
+    y = torch.tensor([3, 4])
+
+    for cpu_out, ipu_out in zip(m(x, y), p(x, y)):
+        helpers.assert_allclose(actual=ipu_out, expected=cpu_out)

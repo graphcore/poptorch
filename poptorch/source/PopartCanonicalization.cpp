@@ -68,7 +68,8 @@ handleSliceModification(torch::jit::Graph *graph, torch::jit::Node *node,
     // Record the indices that we sliced: We need these for DynamicUpdate
     std::vector<int64_t> slice_starts = slice->is(c10::Symbol::attr("starts"));
     std::vector<int64_t> slice_ends = slice->is(c10::Symbol::attr("ends"));
-    std::vector<int64_t> slice_dims = slice->is(c10::Symbol::attr("axes"));
+    const std::vector<int64_t> slice_dims =
+        slice->is(c10::Symbol::attr("axes"));
 
     auto *slice_offset =
         createConstantInt(graph, slice_starts,
@@ -102,9 +103,8 @@ handleSliceModification(torch::jit::Graph *graph, torch::jit::Node *node,
   if (input->node()->kind() == symbols::popart::subsample) {
     auto *subsample = input->node();
     if (subsample->input(0)->node()->kind() == symbols::popart::slice) {
-      logging::warn(
-          "In-place modification of slices with step size other than 1 is "
-          "not supported. This may result in unexpected behaviour.");
+      ERROR("In-place modification of slices with step size other than 1 is "
+            "not supported.");
     }
   }
   return new_node;
@@ -170,16 +170,16 @@ public:
  */
 
 void CanonicalizeImpl::run(torch::jit::Graph *graph) {
-  logging::LogContext ctx_func("PopartCanonicalization");
+  logging::LogContext const ctx_func("PopartCanonicalization");
   std::vector<ReplaceInfo> replace_infos;
   for (torch::jit::Node *node : graph->nodes()) {
-    logging::LogContext ctx("processing " + nodeToString(node));
-    WithNodeMetadata metadata(node);
-    torch::jit::WithInsertPoint insert_point(node);
+    logging::LogContext const ctx("processing " + nodeToString(node));
+    const WithNodeMetadata metadata(node);
+    torch::jit::WithInsertPoint const insert_point(node);
     torch::jit::Node *new_node = nullptr;
-    torch::jit::Symbol kind = node->kind();
+    torch::jit::Symbol const kind = node->kind();
 
-    if (SymbolHandler handler = getHandler(kind)) {
+    if (const SymbolHandler handler = getHandler(kind)) {
       new_node = handler(graph, node);
 
       const bool was_inplace_op_on_view =
@@ -241,7 +241,7 @@ void CanonicalizeImpl::run(torch::jit::Graph *graph) {
 } // namespace
 
 void canonicalize(torch::jit::Graph *graph) {
-  CanonicalizeImpl converter;
+  const CanonicalizeImpl converter;
   converter.run(graph);
 }
 } // namespace poptorch

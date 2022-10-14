@@ -520,7 +520,7 @@ def modify_region(x, step):
     modify_before_assign, modify_region
 ])
 @pytest.mark.parametrize("trace_model", [True, False])
-def test_inplace_modify_slice(op, step_size, capfd, trace_model):
+def test_inplace_modify_slice(op, step_size, trace_model):
     t = torch.rand(4, 4)
     step = torch.tensor(step_size)
 
@@ -551,14 +551,8 @@ def test_inplace_modify_slice(op, step_size, capfd, trace_model):
             # Allow for the whole graph to be potentially pruned, in failing
             # cases (only known to happen for trace_model=True).
             assert re.match(
-                "All operations in the main graph were pruned, nothing to "
-                "compute", e.message)
-
-        testlog = helpers.LogChecker(capfd)
-        testlog.assert_matches(
-            r"\[warning\] In\-place modification of slices with step "
-            r"size other than 1 is not supported\. This may result in "
-            r"unexpected behaviour\.")
+                r"In\-place modification of slices with step "
+                r"size other than 1 is not supported\.", e.message)
 
 
 def test_index_put_on_buffer():

@@ -66,7 +66,7 @@ JITDispatch::JITDispatch(const CompilerOptions &options,
 
 at::Tensor JITDispatch::addConstant(const at::Tensor &cpu_tensor) {
   ERROR_ON(!cpu_tensor.unsafeGetTensorImpl()->is_cpu());
-  WithMetadata metadata("constant");
+  const WithMetadata metadata("constant");
 
   auto src = copyAndCoerceType(cpu_tensor);
 
@@ -83,11 +83,25 @@ at::Tensor JITDispatch::addConstant(const at::Tensor &cpu_tensor) {
   return tensor;
 }
 
+void JITDispatch::addTensorToParamNode(const at::Tensor &cpu_tensor) {
+  auto *param_node = graph->param_node();
+  if (param_node->hasAttribute(c10::attr::values)) {
+    auto tensors = param_node->ts(c10::attr::values);
+    tensors.push_back(cpu_tensor);
+    param_node->ts_(c10::attr::values, tensors);
+  } else {
+    param_node->ts_(c10::attr::values, {cpu_tensor});
+  }
+}
+
 at::Tensor JITDispatch::addTensor(const at::Tensor &cpu_tensor,
                                   bool is_parameter) {
   errorOnZeroSizedTensor(cpu_tensor);
   auto tensor = _tensor_store->copyCpuTensorAsIpuTensor(cpu_tensor);
   torch::jit::Value *value = graph->addInput(cpu_tensor.name());
+  // Add tensor to the values attribute of the graph's param node, so that
+  // input tensor values can be later retrieved from the graph
+  addTensorToParamNode(cpu_tensor);
   setSourceRangeToCurrentLocation(value->node());
   value->setType(c10::TensorType::create(tensor)->withRequiresGrad(
       cpu_tensor.requires_grad()));
@@ -102,13 +116,13 @@ at::Tensor JITDispatch::addTensor(const at::Tensor &cpu_tensor,
 }
 
 at::Tensor JITDispatch::addInput(const at::Tensor &cpu_tensor) {
-  WithMetadata metadata("input");
+  const WithMetadata metadata("input");
   return addTensor(cpu_tensor, /* is_parameter= */ false);
 }
 
 at::Tensor JITDispatch::addParameter(const at::Tensor &tensor) {
-  WithMetadata metadata("parameter");
-  at::ScalarType type = tensor.scalar_type();
+  const WithMetadata metadata("parameter");
+  at::ScalarType const type = tensor.scalar_type();
   // PopART doesn't allow non-floating point variables so add them as
   // constants instead. These will be deleted from parameters and buffers
   // in python before passed to lowering.
@@ -120,7 +134,7 @@ at::Tensor JITDispatch::addParameter(const at::Tensor &tensor) {
 
 void JITDispatch::addOutput(const at::Tensor &ipu_src,
                             const at::Tensor &cpu_dest) {
-  WithMetadata metadata("output");
+  const WithMetadata metadata("output");
   // The PopART backend will allocate its own buffers: ignore cpu_dest.
   UNUSED(cpu_dest);
   auto *record = _mapper.rawTensorRecord(ipu_src);
@@ -130,22 +144,6 @@ void JITDispatch::addOutput(const at::Tensor &ipu_src,
                    << static_cast<void *>(ipu_src.unsafeGetTensorImpl()));
 
   torch::jit::Value *val = record->jit;
-
-  // If the output is an input: add an identity op to make sure the graph
-  // is not empty.
-  // TODO(T62169) handle empty graphs better.
-  for (auto *i : graph->inputs()) {
-    if (i == val) {
-      auto *none = graph->createNone();
-      insertNodeInGraph(graph.get(), none);
-      val = createAndInsertNode(graph.get(), c10::aten::clone,
-                                {val, none->output()}, ImplicitCast::None,
-                                OutputType::AsFirstInput)
-                ->output();
-      break;
-    }
-  }
-
   logging::trace("[DISPATCHER][JIT] Graph output: Tensor ptr {}, jit ir %{} "
                  "(scalar type {})",
                  reinterpret_cast<void *>(ipu_src.unsafeGetTensorImpl()),
@@ -184,7 +182,7 @@ const at::Tensor &JITDispatch::copyInplace(const at::Tensor &self,
   ERROR_ON(!self_st.has_value());
   ERROR_ON(!src_st.has_value());
 
-  WithMetadata meta("copy_");
+  const WithMetadata meta("copy_");
   torch::jit::Value *copy =
       createAndInsertNode(graph.get(), c10::aten::copy_,
                           {self_tracked->jit, src_tracked->jit},
@@ -212,7 +210,7 @@ const at::Tensor &JITDispatch::copyInplace(const at::Tensor &self,
 }
 
 void JITDispatch::registerEmptyTensor(const at::Tensor &tensor) {
-  WithMetadata metadata("empty");
+  const WithMetadata metadata("empty");
   // Do not call copyAndCoerceType from this method:
   // the source tensor hasn't been added to the mapper yet.
 
@@ -258,9 +256,9 @@ void JITDispatch::detach(const c10::OperatorHandle &op, c10::Stack *stack,
   const auto arguments = torch::jit::last(stack, num_arguments);
 
   ERROR_ON(arguments.size() != 1);
-  at::Tensor in = arguments.front().toTensor();
+  at::Tensor const in = arguments.front().toTensor();
 
-  at::Tensor out(in.unsafeGetTensorImpl()->shallow_copy_and_detach(
+  at::Tensor const out(in.unsafeGetTensorImpl()->shallow_copy_and_detach(
       /*version_counter=*/in.unsafeGetTensorImpl()->version_counter(),
       /*allow_tensor_metadata_change=*/true));
 
@@ -295,7 +293,7 @@ void JITDispatch::fixOutput(c10::Stack &stack, torch::jit::Node *node) {
     torch::jit::Value *val = node->output(output_index);
 
     if (value.isTensor()) {
-      at::Tensor tensor = value.toTensor();
+      at::Tensor const tensor = value.toTensor();
 
       val->inferTypeFrom(copyAndCoerceType(tensor));
       _mapper.addTensor(tensor, val);
@@ -317,7 +315,7 @@ void JITDispatch::fixOutput(c10::Stack &stack, torch::jit::Node *node) {
       insertNodeInGraph(graph.get(), unpack);
 
       for (size_t i = 0; i < tensor_list.size(); ++i) {
-        at::Tensor tensor = tensor_list.at(i);
+        at::Tensor const tensor = tensor_list.at(i);
         val = unpack->output(i);
         val->inferTypeFrom(copyAndCoerceType(tensor));
         _mapper.addTensor(tensor, val);
@@ -346,7 +344,7 @@ void JITDispatch::fallback(const c10::OperatorHandle &op, c10::Stack *stack) {
   // Tag all the nodes created by the handler with the initial schema string
   // representation so that they can be traced back to top level ops in the
   // profiler.
-  WithMetadata metadata(c10::toString(schema));
+  const WithMetadata metadata(c10::toString(schema));
 
   // Create a fake IR node for us to target using the schema.
   torch::jit::Node *node = lowerFromSchema(schema, stack, *graph, _mapper);
@@ -356,7 +354,7 @@ void JITDispatch::fallback(const c10::OperatorHandle &op, c10::Stack *stack) {
     // For inplace ops, cast all input tensors to the same type as the output
     // tensor.
     auto output_type = inplace_tensors[0].scalar_type();
-    bool output_float = c10::isFloatingType(output_type);
+    const bool output_float = c10::isFloatingType(output_type);
     for (size_t i = 0; i < stack->size(); i++) {
       const c10::IValue &sv = (*stack)[i];
       if (!sv.isTensor()) {
@@ -364,7 +362,7 @@ void JITDispatch::fallback(const c10::OperatorHandle &op, c10::Stack *stack) {
       }
       const at::Tensor &tensor = sv.toTensor();
       auto input_type = tensor.scalar_type();
-      bool input_float = c10::isFloatingType(input_type);
+      const bool input_float = c10::isFloatingType(input_type);
       if (input_type == at::ScalarType::Undefined ||
           input_type == output_type || input_float != output_float ||
           !canCast(input_type, output_type)) {
@@ -440,7 +438,7 @@ void JITDispatch::fallback(const c10::OperatorHandle &op, c10::Stack *stack) {
   std::size_t i = 0;
   for (c10::IValue value : *stack) {
     if (value.isTensor()) {
-      at::Tensor tensor = value.toTensor();
+      at::Tensor const tensor = value.toTensor();
       logging::trace(
           "[DISPATCHER][JIT] Node tensor output at index {} size: ={}", i++,
           tensor.sizes());
@@ -452,7 +450,7 @@ void JITDispatch::fallback(const c10::OperatorHandle &op, c10::Stack *stack) {
   // Switcheroo the output so the inplace tensor reference is now pointing to
   // the output.
   if (!inplace_tensors.empty()) {
-    at::Tensor output = stack->at(0).toTensor();
+    at::Tensor const output = stack->at(0).toTensor();
 
     // Get the jit value we are tracking for the output.
     torch::jit::Value *value = _mapper.getValueForTensor(output);
@@ -471,7 +469,7 @@ void JITDispatch::fallback(const c10::OperatorHandle &op, c10::Stack *stack) {
         "[DISPATCHER][JIT] Inplace op is not tracking inplace argument");
 
     // Ensure the value and torch tensor shapes match
-    JitTensorInfo value_info(value);
+    const JitTensorInfo value_info(value);
     inplace_tensors[0].unsafeGetTensorImpl()->set_sizes_contiguous(
         value_info.dims);
 
