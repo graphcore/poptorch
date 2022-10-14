@@ -36,7 +36,7 @@ namespace {
 
 void saveModelProtoIfNeeded(popart::Builder *builder,
                             const char *export_proto_filename) {
-  std::string filename = export_proto_filename;
+  const std::string filename = export_proto_filename;
   if (!filename.empty()) {
     // Important: popart_compiler is compiled using C++ 14 and therefore
     // doesn't have access to the filesystem utilities so the caller is
@@ -232,7 +232,7 @@ PopartConstant::PopartConstant(const PopartType &popart_type, const void *data,
                "Adding a double constant is not supported. "
                "This should have been demoted to a float");
 
-  popart::TensorInfo info{toPopartTypeStr(popart_type), shape};
+  const popart::TensorInfo info{toPopartTypeStr(popart_type), shape};
   _data = std::make_unique<popart::ConstVoidData>(data, info);
 }
 
@@ -243,18 +243,18 @@ HostSideConstant::HostSideConstant(const PopartType &popart_type, void *data,
                                    std::vector<std::int64_t> shape)
     : _popart_type(popart_type), _shape(std::move(shape)) {
   _data.resize(data_size);
-  std::memcpy(&_data[0], data, data_size);
+  std::memcpy(_data.data(), data, data_size);
 }
 
 void HostSideConstant::copyDataTo(void *ptr) const {
-  std::memcpy(ptr, &_data[0], _data.size());
+  std::memcpy(ptr, _data.data(), _data.size());
 }
 
 TensorId Compiler::addInputTensor(const char *type,
                                   const std::vector<std::int64_t> &dims,
                                   const char *overlap) {
   // Create the tensor info for our new tensor.
-  popart::TensorInfo info{type, dims};
+  const popart::TensorInfo info{type, dims};
   popart::InputSettings settings;
 
   auto tile_set_and_strat = exchangeStrToPopartEnum(overlap);
@@ -272,7 +272,7 @@ TensorId Compiler::addInputTensor(const char *type,
 }
 
 TensorId Compiler::createTensorId(const char *name) {
-  popart::TensorId tensor(name);
+  const popart::TensorId tensor(name);
   _impl->ids.push_back(tensor);
   return _impl->ids.size() - 1;
 }
@@ -343,7 +343,7 @@ Compiler::addInitializedInputTensor(const char *name, const char *type,
                                     const std::vector<std::int64_t> &dims,
                                     void *data) {
   // Create the tensor info for our new tensor.
-  popart::TensorInfo info{type, dims};
+  const popart::TensorInfo info{type, dims};
 
   // Create the inital data for the variable.
   popart::ConstVoidData the_data;
@@ -353,7 +353,7 @@ Compiler::addInitializedInputTensor(const char *name, const char *type,
   _impl->ids.push_back(
       _impl->active_builder->addInitializedInputTensor(the_data, name));
 
-  popart::TensorId id = _impl->ids[_impl->ids.size() - 1];
+  const popart::TensorId &id = _impl->ids[_impl->ids.size() - 1];
 
   _impl->weights.registerParameter(id, info);
 
@@ -364,21 +364,21 @@ TensorId Compiler::addInitializedInputTensor(
     const char *name, const char *type, const std::vector<std::int64_t> &dims,
     void *data, int comm_group_type, int shards, int variable_retrieval_mode) {
   // Create the tensor info for our new tensor.
-  popart::TensorInfo info{type, dims};
+  const popart::TensorInfo info{type, dims};
 
   // Create the inital data for the variable.
   popart::ConstVoidData the_data;
   the_data.data = data;
   the_data.info = info;
 
-  popart::VariableSettings settings(
+  const popart::VariableSettings settings(
       popart::CommGroup(popart::CommGroupType(comm_group_type), shards),
       popart::VariableRetrievalMode(variable_retrieval_mode));
 
   _impl->ids.push_back(_impl->active_builder->addInitializedInputTensor(
       the_data, settings, name));
 
-  popart::TensorId id = _impl->ids[_impl->ids.size() - 1];
+  const popart::TensorId &id = _impl->ids[_impl->ids.size() - 1];
 
   _impl->weights.registerParameter(id, info);
 
@@ -535,7 +535,7 @@ void Compiler::setUpOutputOp(TensorId id, std::int16_t *ptr,
 
 void Compiler::initSession(const std::vector<Optimizer> &optimizers,
                            const char *export_proto_filename) {
-  logging::LogContext ctx_init_session{"Compiler::initSession"};
+  const logging::LogContext ctx_init_session{"Compiler::initSession"};
 
   logging::trace("Initializing session");
 
@@ -730,7 +730,8 @@ void Compiler::initSession(const std::vector<Optimizer> &optimizers,
 
   // Save the initializers to an external file if requested.
   if (!_impl->options.external_initializers_file.empty()) {
-    logging::LogContext ctx{"popart::Builder::saveInitializersExternally"};
+    const logging::LogContext ctx{
+        "popart::Builder::saveInitializersExternally"};
     logging::trace("Saving initializers to external file {}",
                    _impl->options.external_initializers_file);
     _impl->active_builder->saveInitializersExternally(
@@ -752,8 +753,8 @@ void Compiler::initSession(const std::vector<Optimizer> &optimizers,
   // In future, GCL and PopART will support additional options, which can be
   // exposed to the user.
   if (_impl->options.num_distributed_processes > 1) {
-    popart::CommGroup sharding_domain(popart::CommGroupType::Consecutive,
-                                      options.replicatedGraphCount);
+    const popart::CommGroup sharding_domain(popart::CommGroupType::Consecutive,
+                                            options.replicatedGraphCount);
     options.activationTensorLocationSettings.location.shardingDomain =
         sharding_domain;
     options.weightTensorLocationSettings.location.shardingDomain =
@@ -769,18 +770,20 @@ void Compiler::initSession(const std::vector<Optimizer> &optimizers,
   // Create the popart session object to actually run the graph.
   if (!_impl->is_training) {
     // Create an inference session.
-    logging::LogContext ctx{"popart::InferenceSession::createFromOnnxModel"};
+    const logging::LogContext ctx{
+        "popart::InferenceSession::createFromOnnxModel"};
     _impl->session = popart::InferenceSession::createFromOnnxModel(
         _impl->active_builder->getModelProto(), data_flow, device, {}, options,
         popart::PatternsLevel::Default,
         model_name_set ? _impl->options.model_name : "inference");
   } else {
     // Create the optimizer from user provided parameters.
-    std::unique_ptr<popart::Optimizer> optimizer =
+    const std::unique_ptr<popart::Optimizer> optimizer =
         _impl->getPopartOptimizer(optimizers);
 
     // Create the training session.
-    logging::LogContext ctx{"popart::TrainingSession::createFromOnnxModel"};
+    const logging::LogContext ctx{
+        "popart::TrainingSession::createFromOnnxModel"};
     _impl->session = popart::TrainingSession::createFromOnnxModel(
         _impl->active_builder->getModelProto(), data_flow, _impl->loss,
         *optimizer, device, {}, options, _impl->options.patterns,
@@ -793,15 +796,9 @@ void Compiler::saveExecutableToFile(const char *export_filename) const {
                "Nothing to export. This may be because the model does not run "
                "any op on the IPU.");
 
-  logging::LogContext ctx_function{"Compiler::saveExecutableToFile"};
-
-  const std::string path(export_filename);
-  std::ofstream stream(path, std::ofstream::binary);
-  ERROR_ON_MSG(!stream.is_open(), "Failed to open " << path << " for writing");
-  logging::LogContext ctx{"popart::Session::saveExecutableToStream"};
-  _impl->session->saveExecutableToStream(stream);
-  stream.flush();
-  stream.close();
+  const logging::LogContext ctx_function{"Compiler::saveExecutableToFile"};
+  const logging::LogContext ctx{"popart::Session::saveExecutable"};
+  _impl->session->saveExecutable(export_filename);
 }
 
 void Compiler::setRngState(std::uint64_t seed,
@@ -839,7 +836,7 @@ void Compiler::loadExecutableAndPrepareDevice(const char *import_filename) {
   ERROR_ON_MSG(!_impl->session, "Nothing to import. This may be because the "
                                 "model does not run any op on an IPU.");
 
-  logging::LogContext ctx{"Compiler::loadExecutableAndPrepareDevice"};
+  const logging::LogContext ctx{"Compiler::loadExecutableAndPrepareDevice"};
 
   const std::string path(import_filename);
   auto stream = std::make_shared<std::ifstream>(path, std::ifstream::binary);
@@ -888,7 +885,7 @@ void Compiler::loadEngineAndConnectStreams() {
       auto it = host_sizes.find(ptype);
       ERROR_ON_MSG(it == host_sizes.end(), "Unsupported host op type");
 
-      std::size_t number_of_elems = std::accumulate(
+      const std::size_t number_of_elems = std::accumulate(
           shape.begin(), shape.end(), 1, std::multiplies<std::size_t>());
 
       return number_of_elems * it->second;
@@ -996,12 +993,12 @@ void Compiler::compileAndPrepareDevice() {
 
     return;
   }
-  logging::LogContext ctx_func{"Compiler::compileAndPrepareDevice"};
+  const logging::LogContext ctx_func{"Compiler::compileAndPrepareDevice"};
 
   // Poplar compilation.
   try {
-    logging::LogContext ctx{"popart::Session::prepareDevice: Poplar "
-                            "compilation"};
+    const logging::LogContext ctx{"popart::Session::prepareDevice: Poplar "
+                                  "compilation"};
     logging::trace("Begining Poplar compilation.");
     constexpr bool load_engine = false;
     // Don't automatically load the engine: we want to control when this happens
@@ -1116,7 +1113,7 @@ void Compiler::updateOptimizers(const std::vector<Optimizer> &optimizers) {
   // Each of the groups of parameters are stored in a single PopART
   // optimizer that's why the vector of optimizers translates into
   // a single PopART optimizer.
-  std::unique_ptr<popart::Optimizer> optimizer =
+  const std::unique_ptr<popart::Optimizer> optimizer =
       _impl->getPopartOptimizer(optimizers);
 
   // Update the popart graph/poplar executable with new optimizer.
@@ -1164,7 +1161,7 @@ void Compiler::run() {
   _impl->memory_manager.clear();
 
   // Log the number of cycles if instrumentation is enabled
-  popart::SessionOptions &options = _impl->popart_options;
+  const popart::SessionOptions &options = _impl->popart_options;
   if (options.instrumentWithHardwareCycleCounter) {
     _cycle_count = _impl->session->getCycleCount();
     logging::debug("Total number of IPU cycles: {}", _cycle_count);
@@ -1292,7 +1289,7 @@ std::uint64_t Compiler::popartBatchDimForAnchor(TensorId id) const {
   }
 
   // Get the PopART tensor from our wrapper.
-  popart::TensorId popart_id = _impl->ids[id];
+  const popart::TensorId &popart_id = _impl->ids[id];
 
   // Check what the anchor is supposed to return.
   auto iterator = _impl->anchors.find(popart_id);
@@ -1435,7 +1432,7 @@ void Compiler::startSubgraph() {
 
   _impl->active_builder->addInputTensor(
       popart::TensorInfo{"INT64", popart::Shape{}});
-  popart::TensorId keep_going = _impl->active_builder->addInputTensor(
+  const popart::TensorId keep_going = _impl->active_builder->addInputTensor(
       popart::TensorInfo{"BOOL", popart::Shape{}});
 
   _impl->active_builder->addOutputTensor({keep_going});
@@ -1462,8 +1459,8 @@ TensorId Compiler::endForLoop(std::int32_t trip_count, std::int64_t num_outputs,
   _impl->active_builder = _impl->active_builder->getParent();
   auto ai_onnx = _impl->active_builder->aiOnnxOpset10();
 
-  PopartConstant popart_const(PopartType::INT32, &trip_count, {});
-  popart::TensorId trip_count_as_tensor =
+  const PopartConstant popart_const(PopartType::INT32, &trip_count, {});
+  const popart::TensorId trip_count_as_tensor =
       _impl->tensorConstant({}, popart_const);
 
   popart::ConstVoidData the_data;
@@ -1472,12 +1469,12 @@ TensorId Compiler::endForLoop(std::int32_t trip_count, std::int64_t num_outputs,
   the_data.data = &true_const;
   the_data.info = {"BOOL", popart::Shape{}};
 
-  popart::TensorId condition = ai_onnx.constant(the_data);
+  const popart::TensorId condition = ai_onnx.constant(the_data);
 
   std::vector<popart::TensorId> transformed_ins = {trip_count_as_tensor,
                                                    condition};
 
-  for (TensorId id : inputs) {
+  for (const TensorId id : inputs) {
     transformed_ins.push_back(_impl->ids[id]);
   }
 
@@ -1495,13 +1492,13 @@ void Compiler::pushNameScope(const char *name) {
 void Compiler::popNameScope() { _impl->active_builder->popNameScope(); }
 
 TensorId Compiler::addUntypedInputTensor() {
-  popart::TensorId out = _impl->active_builder->addUntypedInputTensor();
+  const popart::TensorId out = _impl->active_builder->addUntypedInputTensor();
   _impl->ids.push_back(out);
   return _impl->ids.size() - 1;
 }
 
 void Compiler::assertTensorIs(PopartType dataType, TensorId id) const {
-  PopartType actual_type = _impl->ids_types.at(id);
+  const PopartType actual_type = _impl->ids_types.at(id);
 
   if (__builtin_expect(
           static_cast<std::int64_t>(actual_type == PopartType::UNDEFINED), 0) !=
@@ -1570,7 +1567,7 @@ void Compiler::setMultiConvCycleBackOff(double c) {
 
 std::vector<TensorId> Compiler::endMultiConv() {
   auto outputs = _impl->endMultiConv();
-  TensorId first =
+  const TensorId first =
       HandleOutput<decltype(outputs)>{}(outputs, false, _impl.get());
   std::vector<TensorId> out_ids(outputs.size());
   std::iota(out_ids.begin(), out_ids.end(), first);
@@ -1584,7 +1581,7 @@ Compiler::addCPUCallback(const std::vector<TensorId> &inputs,
                          std::vector<std::vector<std::size_t>> input_shapes,
                          std::vector<PopartType> output_types,
                          std::vector<std::vector<std::size_t>> output_shapes) {
-  logging::LogContext ctx{"Compiler::addCPUCallback"};
+  const logging::LogContext ctx{"Compiler::addCPUCallback"};
   logging::trace("Starting CPU callback adding");
 
   // Usual poptorch -> popart tensor conversion/lookup.
@@ -1629,9 +1626,9 @@ Compiler::addCPUCallback(const std::vector<TensorId> &inputs,
   // We have to smuggle this through as a pointer as popart attribute map
   // doesn't support generic types.
   detail::CallbackInternalMetadata *as_ptr = &metadata;
-  std::intptr_t as_int = reinterpret_cast<std::intptr_t>(as_ptr);
+  const std::intptr_t as_int = reinterpret_cast<std::intptr_t>(as_ptr);
 
-  std::int64_t to_int64 = static_cast<std::int64_t>(as_int);
+  const std::int64_t to_int64 = static_cast<std::int64_t>(as_int);
 
   logging::trace("Add CPU callback has added pointer {}", to_int64);
   attributes_map.insert({poptorch_custom_ops::host_op_metadata_attr, to_int64});
@@ -1721,9 +1718,9 @@ void setPopartLogLevel(logging::Level level) {
 }
 
 void throwTestError(TestErrorType type) {
-  logging::LogContext ctx_top{"throwTestError::topLevel"};
+  const logging::LogContext ctx_top{"throwTestError::topLevel"};
   {
-    logging::LogContext ctx{"throwTestError::bottomLevel"};
+    const logging::LogContext ctx{"throwTestError::bottomLevel"};
     switch (type) {
     case TestErrorType::Poptorch: {
       ERROR("This is a PopTorch error");
@@ -1832,7 +1829,7 @@ void rethrowPopartOrPoplarException(const std::exception_ptr &eptr,
   pei.mfilename = logging::shortPoptorchFilename(filename);
   pei.mline = line;
   pei.mcategory = ErrorCategory::Other;
-  std::string extra_info;
+  const std::string extra_info;
   try {
     std::rethrow_exception(eptr);
   } catch (const popart::internal_error &ex) {
