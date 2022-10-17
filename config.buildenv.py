@@ -31,12 +31,12 @@ class BuildLLVM(Installer):
             "cd build",
             "export CXX=g++",
             "export CC=gcc",
-            f"export LD_LIBRARY_PATH={env.prefix}/lib",
             f"cmake ../llvm -GNinja \
                     -DCMAKE_BUILD_TYPE=Release \
                     -DLLVM_TARGETS_TO_BUILD:STRING=host \
                     -DLLVM_INCLUDE_GO_TESTS:BOOL=OFF \
                     -DLLVM_ENABLE_LIBCXX:BOOL=ON \
+                    -DLLVM_ENABLE_TERMINFO:BOOL=OFF \
                     -DLLVM_INSTALL_UTILS:BOOL=True \
                     -DLLVM_ENABLE_RTTI:BOOL=True \
                     -DLLVM_OPTIMIZED_TABLEGEN:BOOL=ON \
