@@ -76,7 +76,7 @@ class CondaPackages(Installer):
     """Install the list of Conda packages in the environment."""
 
     def __init__(self, *packages):
-        assert all([isinstance(p, str) for p in packages])
+        assert all(isinstance(p, str) for p in packages)
         self.packages = packages
 
 
@@ -84,7 +84,7 @@ class PipPackages(Installer):
     """Install the list of pip3 packages in the environment."""
 
     def __init__(self, *packages):
-        assert all([isinstance(p, str) for p in packages])
+        assert all(isinstance(p, str) for p in packages)
         self.packages = packages
 
     def install(self, env):
@@ -173,7 +173,16 @@ class BuildenvManager:
                  install_linters=False,
                  empty_env=False,
                  **config):
-        python_version = python_version or platform.python_version()
+        if python_version is None:
+            python_version = platform.python_version()
+            if python_version.startswith("3.6"):
+                python_version = "3.7"
+                logger.warning(
+                    "Python 3.6 is no longer supported, defaulting "
+                    "to %s, if you really want to "
+                    "use python 3.6 then use --python-version 3.6",
+                    python_version)
+
         self.output_dir = os.path.realpath(output_dir or os.getcwd())
         self.cache_dir = cache_dir or _default_cache_dir()
         self.buildenv_dir = os.path.join(self.output_dir, "buildenv")
