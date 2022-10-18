@@ -8,7 +8,6 @@ add_library(poptorch_mlir_passes STATIC
         source/Helpers.cpp
         source/OutplaceViewOpsPass.cpp
         source/RemoveOverwritePass.cpp
-        source/BufferizeCopyToGlobalStatePass.cpp
         )
 
 target_link_libraries(poptorch_mlir_passes PRIVATE
