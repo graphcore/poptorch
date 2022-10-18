@@ -308,7 +308,7 @@ def Poptorch_logicalAnd: Poptorch_binary_conditional<"logicalAnd", [ImplicitCast
 def Poptorch_logicalOr: Poptorch_binary_conditional<"logicalOr", [ImplicitCastToBool]> {}
 def Poptorch_logicalXor: Poptorch_binary_conditional<"logicalXor", [ImplicitCastToBool]> {}
 
-class Poptorch_NotImplemented_binary_conditional_scalar<string name> : Poptorch_NotImplementedOp<name, []> {
+class Poptorch_binary_conditional_scalar<string name> : Poptorch_Op<name, []> {
     let arguments = (ins Poptorch_tensor:$lhs, F32Attr:$rhs);
     let results = (outs Poptorch_tensor_no_grad:$result);
     let builders = [OpBuilder<(ins "mlir::Value":$lhs, "float":$rhs),[{
@@ -320,12 +320,12 @@ class Poptorch_NotImplemented_binary_conditional_scalar<string name> : Poptorch_
     ];
 }
 
-def Poptorch_lt_Scalar_out : Poptorch_NotImplemented_binary_conditional_scalar<"lt_Scalar_out"> {}
-def Poptorch_le_Scalar_out : Poptorch_NotImplemented_binary_conditional_scalar<"le_Scalar_out"> {}
-def Poptorch_gt_Scalar_out : Poptorch_NotImplemented_binary_conditional_scalar<"gt_Scalar_out"> {}
-def Poptorch_ge_Scalar_out : Poptorch_NotImplemented_binary_conditional_scalar<"ge_Scalar_out"> {}
-def Poptorch_eq_Scalar_out : Poptorch_NotImplemented_binary_conditional_scalar<"eq_Scalar_out"> {}
-def Poptorch_ne_Scalar_out : Poptorch_NotImplemented_binary_conditional_scalar<"ne_Scalar_out"> {}
+def Poptorch_lt_Scalar_out : Poptorch_binary_conditional_scalar<"lt_Scalar_out"> {}
+def Poptorch_le_Scalar_out : Poptorch_binary_conditional_scalar<"le_Scalar_out"> {}
+def Poptorch_gt_Scalar_out : Poptorch_binary_conditional_scalar<"gt_Scalar_out"> {}
+def Poptorch_ge_Scalar_out : Poptorch_binary_conditional_scalar<"ge_Scalar_out"> {}
+def Poptorch_eq_Scalar_out : Poptorch_binary_conditional_scalar<"eq_Scalar_out"> {}
+def Poptorch_ne_Scalar_out : Poptorch_binary_conditional_scalar<"ne_Scalar_out"> {}
 
 def Poptorch_clamp: Poptorch_Op<"clamp", []> {
   // defining input arguments
