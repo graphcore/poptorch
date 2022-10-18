@@ -14,8 +14,6 @@ import pytest
 import torch
 import poptorch
 import helpers
-if helpers.is_running_tests:
-    import pva
 
 
 class ExampleModelWithLoss(torch.nn.Module):
@@ -392,7 +390,14 @@ def process_to_generate_profiling_data():
         })
     })
 @pytest.mark.mlirSupportRequired
+# pylint: disable=import-outside-toplevel
 def test_pva_annotations():
+    try:
+        import pva
+    except RuntimeError:
+        pytest.skip(
+            "Unable to import pva: possibly a Python version mismatch?")
+
     def findPoptorchLayer(op):
         layer = json.loads(op.layer)["layer"]
         if layer == "poptorch":

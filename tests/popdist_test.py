@@ -7,7 +7,11 @@ import poptorch
 
 # pylint: disable=import-outside-toplevel
 def test_blocked_options():
-    import popdist.poptorch
+    try:
+        import popdist.poptorch
+    except ModuleNotFoundError:
+        pytest.skip(
+            "Unable to import popdist: possibly a Python version mismatch?")
     opts = popdist.poptorch.Options(ipus_per_replica=2)
 
     with pytest.raises(
@@ -39,7 +43,12 @@ def test_blocked_options():
 
 # pylint: disable=import-outside-toplevel
 def test_getters():
-    import popdist.poptorch
+    try:
+        import popdist.poptorch
+    except ModuleNotFoundError:
+        pytest.skip(
+            "Unable to import popdist: possibly a Python version mismatch?")
+
     opts = popdist.poptorch.Options(ipus_per_replica=2)
 
     assert opts.Distributed.processId == 0
@@ -49,7 +58,11 @@ def test_getters():
 # pylint: disable=protected-access,import-outside-toplevel
 @pytest.mark.ipuHardwareRequired
 def test_to_dict():
-    import popdist.poptorch
+    try:
+        import popdist.poptorch
+    except ModuleNotFoundError:
+        pytest.skip(
+            "Unable to import popdist: possibly a Python version mismatch?")
     opts = popdist.poptorch.Options(ipus_per_replica=2)
     opts.outputMode(poptorch.enums.OutputMode.All)
     opts.toDict()
