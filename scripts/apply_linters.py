@@ -90,9 +90,7 @@ class CppLinters(ILinterFamily):
     def __init__(self):
         super().__init__(["hpp", "cpp"],
                          excluded_extensions=["inc.hpp", "inc.cpp"],
-                         linters=[ClangTidy(),
-                                  ClangFormat(),
-                                  CppLint()])
+                         linters=[ClangTidy(), ClangFormat()])
 
 
 class PyLinters(ILinterFamily):
@@ -753,19 +751,6 @@ class ClangTidy(ILinter):
         # where pybind headers are.
         return "custom_cube_op.cpp" not in filename and \
                 "python/" not in filename
-
-
-class CppLint(ILinter):
-    def cpplint(self):
-        return "${CONDA_PREFIX}/bin/cpplint"
-
-    def gen_lint_command(self, filename, autofix):
-        return CondaCommand(self.cpplint(), "--root=include --quiet",
-                            f"--filter=-{',-'.join(cpp_lint_disabled)}",
-                            filename)
-
-    def check_version(self):
-        return compare_versions_from_output(self.cpplint(), "1.4.4", "cpplint")
 
 
 class Pylint(ILinter):
