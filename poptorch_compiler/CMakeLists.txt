@@ -95,6 +95,9 @@ add_subdirectory(lower_to_poplar)
 # Add the main LIB.
 add_subdirectory(pytorch_bridge)
 
+# Add the tools.
+add_subdirectory(tools)
+
 # LLVM can lead to a few link problems.
 message(STATUS "Checking LLVM link libs:\n")
 mlir_check_all_link_libraries(poptorch_compiler)

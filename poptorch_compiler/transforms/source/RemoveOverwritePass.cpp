@@ -54,6 +54,11 @@ public:
 
   llvm::StringRef getArgument() const final { return "remove-overwrite"; }
 
+  mlir::StringRef getDescription() const override {
+    return "Replace any instances of overwrite ops by just swapping out the "
+           "value IDs, in places where that's permissable.";
+  }
+
   void runOnOperation() override {
     mlir::MLIRContext *context = &getContext();
     auto func = getOperation();

@@ -61,7 +61,7 @@ struct OutplaceOverwriteOfViewOp final
     if (auto view = getOperandIfView(op.dest())) {
       // We have done an inplace operation on a reference view. We need to add
       // a view inverse, to apply the change to the outplace view back to the
-      // original tensor
+      // original tensor.
       auto *inverse = view.createInverse(rewriter, op.src());
       llvm::SmallVector<mlir::Value> tensor_operands;
       llvm::copy_if(view->getOperands(), std::back_inserter(tensor_operands),
@@ -72,7 +72,7 @@ struct OutplaceOverwriteOfViewOp final
       for (const auto &[original_operand, inverse_res] : replacements) {
         auto overwrite_op = rewriter.create<overwrite>(
             op->getLoc(), original_operand, inverse_res);
-        // Recursing here avoids the need to apply this iteratively
+        // Recursing here avoids the need to apply this iteratively.
         (void)matchAndRewrite(overwrite_op, rewriter);
       }
       rewriter.eraseOp(op);
@@ -91,8 +91,8 @@ struct OutplaceViewOps final : public mlir::RewritePattern {
   matchAndRewrite(mlir::Operation *op,
                   mlir::PatternRewriter &rewriter) const override {
     // We want to keep the original reference view operation around to make it
-    // easy to get the correct sequence of outplace view operations and
-    // overwrite ops are handled in OutplaceOverwriteOfViewOp
+    // easy to get the correct sequence of outplace view operations;
+    // overwrite ops are handled in OutplaceOverwriteOfViewOp.
     //
     // Note: we don't bother explicitly deleting the reference view operations.
     // They will be removed by dead code elimination when all the references
@@ -122,6 +122,11 @@ public:
   OutplaceViewOpsPass() = default;
 
   llvm::StringRef getArgument() const final { return "outplace-view-ops"; }
+
+  mlir::StringRef getDescription() const override {
+    return "Convert all refernce-semantics view ops to their value-semantics, "
+           "outplace equivalents (including adding inverses).";
+  }
 
   void runOnOperation() final {
     mlir::MLIRContext *context = &getContext();

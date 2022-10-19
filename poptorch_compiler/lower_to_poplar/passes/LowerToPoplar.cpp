@@ -54,6 +54,11 @@ public:
 
   mlir::StringRef getArgument() const final { return "lower-to-poplar"; }
 
+  mlir::StringRef getDescription() const override {
+    return "Construct a Poplar graph from the given MLIR graph. Does not "
+           "modify the input graph.";
+  }
+
 private:
   // Verify operations using MLIR's verifier.
   static void verifyOperations(const mlir::func::FuncOp &function);

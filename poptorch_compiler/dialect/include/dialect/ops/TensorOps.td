@@ -45,10 +45,9 @@ def Poptorch_overwrite: Poptorch_BasicOp<"overwrite"> {
 
     Note that this does not have value semantics. For tensors with value
     semantics, it will induce `dest` be replaced with `src` for all subsequent
-    operations and, for view tensors, it will be replace with view-unravelling
-    code.
+    operations. For view tensors, it will be replaced by view-unravelling code.
 
-    We add this instead of changing the pointed to value in the builder to make
+    We add this instead of changing the pointed-to value in the builder to make
     it easier to unravel view change operations. It also prevents inplace
     operations from being removed by dead code elimination before they can be
     resolved.
