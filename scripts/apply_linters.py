@@ -764,7 +764,7 @@ class Pylint(ILinter):
             " --rcfile=.pylintrc", filename)
 
     def check_version(self):
-        return compare_versions_from_output(self.pylint(), "2.5.3", "pylint")
+        return compare_versions_from_output(self.pylint(), "2.7.2", "pylint")
 
     def is_enabled(self, filename, autofix):  # pylint: disable=unused-argument
         # Don't run PyLint on the buildenv config files

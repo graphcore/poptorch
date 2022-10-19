@@ -188,7 +188,12 @@ class BuildenvManager:
 
         is_aarch64 = _utils.get_arch_type() == "aarch64"
         if not is_aarch64 and not empty_env:
-            self.conda_packages.append("gdb=8.3")
+            # There is not one version of gdb which works
+            # for both python 3.6.8 (CentOS 7) and python 3.9
+            if python_version.startswith("3.6.8"):
+                self.conda_packages.append("gdb=8.3")
+            else:
+                self.conda_packages.append("gdb=10.2")
 
         self.projects = {}
 

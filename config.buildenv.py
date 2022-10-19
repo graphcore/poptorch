@@ -55,7 +55,7 @@ installers.add(
         "make=4.3",
         "ninja=1.10.2",
         "pybind11=2.6.1",
-        "pytest=6.2.1",
+        "pytest=6.2.5",
         "pyyaml=5.3.1",
         "setuptools=58.0.4",
         "spdlog=1.8.0",
@@ -75,10 +75,11 @@ if not config.is_aarch64:
 installers.add(PipRequirements("requirements.txt"))
 
 if config.install_linters:
-    installers.add(CondaPackages(
-        "pylint=2.5.3",
-        "yapf=0.27.0",
-    ))
+    installers.add(
+        CondaPackages(
+            "pylint=2.7.2",
+            "yapf=0.27.0",
+        ))
 
 if config.build_llvm:
     installers.add(BuildLLVM())
