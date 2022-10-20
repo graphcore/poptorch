@@ -21,7 +21,8 @@ class IPUScope:
                  dict_optimizer: Optional[dict] = None,
                  optimizer: Optimizer = None,
                  compile_using=enums.Compiler.PopART,
-                 skip_compilation=False):
+                 skip_compilation=False,
+                 per_replica_params: Optional[dict] = None):
 
         if not isinstance(inputs, (list, tuple)):
             raise ValueError("You can only pass a list or tuple as the "
@@ -62,6 +63,7 @@ class IPUScope:
         self._outputs_structure = None
         self._upload_weights = True
         self._skip_compilation = skip_compilation
+        self._per_replica_params = per_replica_params
 
         mlir_compiler_options = CompilerOptions()
         mlir_compiler_options.source_location_excludes = self._options._source_location_excludes  # pylint: disable=line-too-long
@@ -141,15 +143,16 @@ class IPUScope:
             # model to prevent IPU to CPU copies when accessing the state_dict.
             _impl.unwrapModelIfNecessary(self._model)
 
-            for name, param in self._cpu_params.items():
-                if hasattr(param, "per_replica"):
-                    if param.shape == torch.Size([]):
-                        raise _impl.createPoptorchError(
-                            "Scalars cannot be passed as per-replica weight "
-                            "tensor values")
-                    param_tensor = param.narrow(0, 0, 1).squeeze(dim=0)
-                    setattr(*self._get_module_and_name(name),
-                            torch.nn.Parameter(param_tensor))
+            if self._per_replica_params is not None:
+                for name, param in self._cpu_params.items():
+                    if name in self._per_replica_params:
+                        if param.shape == torch.Size([]):
+                            raise _impl.createPoptorchError(
+                                "Scalars cannot be passed as per-replica "
+                                "weight tensor values")
+                        param_tensor = param.narrow(0, 0, 1).squeeze(dim=0)
+                        setattr(*self._get_module_and_name(name),
+                                torch.nn.Parameter(param_tensor))
             # TODO(T61576) We currently use a state machine to determine if
             # tensors are inputs or parameters.
             # We need to find a better solution.
@@ -201,10 +204,11 @@ class IPUScope:
             self._old_addresses = _impl.getBufferAndParameterAddresses(
                 self._model)
 
-            for name, param in self._cpu_params.items():
-                if hasattr(param, "per_replica"):
-                    poptorch_core.setPerReplica(name, param,
-                                                *param.per_replica)
+            if self._per_replica_params is not None:
+                for name, param in self._cpu_params.items():
+                    if name in self._per_replica_params:
+                        poptorch_core.setPerReplica(
+                            name, param, *self._per_replica_params[name])
 
         poptorch_core.startDispatch()
         _impl.setDispatchTracing(True)
@@ -340,7 +344,7 @@ class IPUScope:
 #               can be picked up
 class _IPUContext:
     def __init__(self, func, compiler, options, training, optimizer,
-                 dict_optimizer, model):
+                 dict_optimizer, model, per_replica_params):
         functools.update_wrapper(self, func)
         self.func = func
         self.ipu = None
@@ -350,6 +354,7 @@ class _IPUContext:
         self.optimizer = optimizer
         self.dict_optimizer = dict_optimizer
         self.model = model
+        self.per_replica_params = per_replica_params
 
     def compile(self, *args, **kwargs):
         return self._compileOrLoadExecutable(args, kwargs)
@@ -375,7 +380,8 @@ class _IPUContext:
                       optimizer=self.optimizer,
                       dict_optimizer=self.dict_optimizer,
                       compile_using=self.compiler,
-                      skip_compilation=filename is not None) as ipu:
+                      skip_compilation=filename is not None,
+                      per_replica_params=self.per_replica_params) as ipu:
 
             for idx, t in enumerate(tensor_args):
                 if t.requires_grad:
@@ -446,7 +452,8 @@ def IPUContext(func=None,
                training: bool = False,
                optimizer: Optimizer = None,
                dict_optimizer: Optional[dict] = None,
-               model: Optional['torch.nn.Module'] = None):
+               model: Optional['torch.nn.Module'] = None,
+               per_replica_params: Optional[dict] = None):
     if dict_optimizer is None:
         dict_optimizer = {}
 
@@ -457,13 +464,13 @@ def IPUContext(func=None,
 
         def wrapper(f):
             return _IPUContext(f, compiler, options, training, optimizer,
-                               dict_optimizer, model)
+                               dict_optimizer, model, per_replica_params)
 
         return wrapper
     # Otherwise the decorator has no extra args: just pass the
     # default arguments
     return _IPUContext(func, compiler, options, training, optimizer,
-                       dict_optimizer, model)
+                       dict_optimizer, model, per_replica_params)
 
 
 class _IPUSession:

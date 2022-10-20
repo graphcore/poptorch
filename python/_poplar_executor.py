@@ -208,6 +208,7 @@ class PoplarExecutor:
             self._cached_rng_state = [self._options.random_seed]
 
         self._dict_optimizer = {}
+        self.per_replica_params = {}
         self._training = training
         self._dirty_host_weights = False
         self._trace = None
@@ -306,15 +307,6 @@ class PoplarExecutor:
                         kwargs = {}
                     return super().__torch_function__(func, types, args,
                                                       kwargs)
-
-                def replicaGrouping(
-                        self, comm_group_type: enums.CommGroupType,
-                        shards: int,
-                        variable_retrieval_mode: enums.VariableRetrievalMode):
-                    # pylint: disable=attribute-defined-outside-init
-                    self.per_replica = (comm_group_type, shards,
-                                        variable_retrieval_mode)
-                    # pylint: enable=attribute-defined-outside-init
 
             self.PoptorchParameter = PoptorchParameter
 
@@ -456,7 +448,35 @@ class PoplarExecutor:
         return _printing.module_repr(self._user_model)
 
     def __getattr__(self, attr):
-        return getattr(self._user_model, attr)
+        model_attr = getattr(self._user_model, attr)
+        # We apply this wrapper here rather than adding it to PoptorchParameter
+        # for two reasons:
+        # 1) We might supply the same model to multiple PopTorch wrappers
+        #    (particularly we might supply it to trainingModel() and then
+        #     to inferenceModel()), and we need to be able to distinguish
+        #     between replicaGrouping() calls on each wrapper.
+        # 2) We don't wrap inference parameters in PoptorchParameter normally,
+        #    but we might want to use replicaGrouping() with inference models.
+        #    If we do start doing PoptorchParameter wraps on inference models,
+        #    we'd end up pointlessly copying weights back from the device.
+        if isinstance(model_attr, torch.nn.Parameter):
+            model = self
+
+            class ReplicaGroupingWrapper:
+                def replicaGrouping(
+                        self, comm_group_type: enums.CommGroupType,
+                        shards: int,
+                        variable_retrieval_mode: enums.VariableRetrievalMode):
+                    model.per_replica_params[attr] = (comm_group_type, shards,
+                                                      variable_retrieval_mode)
+
+                def __getattr__(self, attr):
+                    if attr == "replicaGrouping":
+                        return self.replicaGrouping
+                    return getattr(model_attr, attr)
+
+            return ReplicaGroupingWrapper()
+        return model_attr
 
     @property
     def model(self) -> 'torch.nn.Module':
@@ -597,7 +617,8 @@ class PoplarExecutor:
                              options=self._options,
                              training=self._training,
                              optimizer=self._optimizer,
-                             dict_optimizer=self._dict_optimizer)
+                             dict_optimizer=self._dict_optimizer,
+                             per_replica_params=self.per_replica_params)
             if executable_filename is not None:
                 ctx.loadExecutable(executable_filename, *in_tensors.args,
                                    **in_tensors.kwargs)
@@ -1199,7 +1220,7 @@ class PoplarExecutor:
         ]
 
         def filterWarnings(warning):
-            return not any([m in str(warning.message) for m in rng_warnings])
+            return not any(m in str(warning.message) for m in rng_warnings)
 
         warns = []
         with warnings.catch_warnings(record=True) as caught:
