@@ -58,7 +58,6 @@ def simple_add(capfd):
 @pytest.mark.mlirSupportRequired
 @pytest.mark.extendedTestingOnly
 def test_source_location(capfd, mode):
-    pytest.skip("TODO(70016): handle views in eager mode")
     import poptorch.eager  # pylint: disable=unused-import, import-outside-toplevel
 
     layer = torch.nn.Linear(1, 2).to('xla')
@@ -82,22 +81,16 @@ def test_source_location(capfd, mode):
     log = helpers.LogChecker(capfd)
     if mode == "show_all":
         # If we clear the list of exclusions we will point at Torch's internals
-        log.assert_matches(
-            "poptorch.transpose.*site-packages/torch/nn/functional.py")
-        log.assert_no_matches(
-            f"poptorch.transpose.*{expected_filename}:{expected_line}")
+        log.assert_matches("site-packages/torch/nn/functional.py")
+        log.assert_no_matches(f"{expected_filename}:{expected_line}")
     elif mode == "hide_all":
-        log.assert_matches(r"poptorch.transpose.*\[unknown\]")  # no filename
-        log.assert_no_matches(
-            "poptorch.transpose.*site-packages/torch/nn/functional.py")
-        log.assert_no_matches(
-            f"poptorch.transpose.*{expected_filename}:{expected_line}")
+        log.assert_matches(r"\[unknown\]")  # no filename
+        log.assert_no_matches("site-packages/torch/nn/functional.py")
+        log.assert_no_matches(f"{expected_filename}:{expected_line}")
     else:
         # By default: we point at the user code
-        log.assert_no_matches(
-            "poptorch.transpose.*site-packages/torch/nn/functional.py")
-        log.assert_matches(
-            f"poptorch.transpose.*{expected_filename}:{expected_line}")
+        log.assert_no_matches("site-packages/torch/nn/functional.py")
+        log.assert_matches(f"{expected_filename}:{expected_line}")
 
 
 @helpers.printCapfdOnExit
