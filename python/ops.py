@@ -657,8 +657,8 @@ def custom_op(inputs: Tuple["torch.Tensor"],
         # input to be provided to example_output (since it is only supposed
         # to be a template). Otherwise the compiler may recognise the alias.
         grad = output.requires_grad
-        transformed_outputs.append(torch.zeros_like(output,
-                                                    requires_grad=grad))
+        transformed_outputs.append(
+            torch.zeros_like(output, requires_grad=grad, device=output.device))
 
     if attributes is not None:
         # Handle attributes list
