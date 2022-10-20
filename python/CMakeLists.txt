@@ -10,4 +10,4 @@ install(FILES ${python_files}  py.typed DESTINATION "${INSTALL_PYDIR}")
 
 # Compile the Pybind11 module using setup.py (Called by generate_python_package.py
 run_poptorch_install_command(
-  "python3 ${PROJECT_SOURCE_DIR}/scripts/generate_python_package.py install ${GENERATE_PYTHON_PACKAGE_FLAGS} --include-dir ${CMAKE_INSTALL_PREFIX}/include --lib-dir ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR} --output-dir ${CMAKE_INSTALL_PREFIX} --python-dir ${INSTALL_PYDIR}" "${PROJECT_SOURCE_DIR}" "poptorch_core.so module compilation")
+  "python3 ${PROJECT_SOURCE_DIR}/scripts/generate_python_package.py install ${GENERATE_PYTHON_PACKAGE_FLAGS} --include-dir ${CMAKE_INSTALL_PREFIX}/include --lib-dir ${CMAKE_INSTALL_FULL_LIBDIR} --output-dir ${CMAKE_INSTALL_PREFIX} --python-dir ${INSTALL_PYDIR}" "${PROJECT_SOURCE_DIR}" "poptorch_core.so module compilation")

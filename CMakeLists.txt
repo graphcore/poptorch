@@ -240,24 +240,24 @@ add_subdirectory(docs/user_guide)
 
 add_custom_target(poptorch_standalone_wheel
   WORKING_DIRECTORY ${CMAKE_INSTALL_PREFIX}
-  COMMAND python3 ${PROJECT_SOURCE_DIR}/scripts/generate_python_package.py bdist_wheel ${GENERATE_PYTHON_PACKAGE_FLAGS} --include-dir ${CMAKE_INSTALL_PREFIX}/include --lib-dir ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR} --output-dir ${CMAKE_INSTALL_PREFIX}/dist --python-dir ${INSTALL_PYDIR} --standalone "${popart_LIB_DIR}:${POPLAR_DIR}"
+  COMMAND python3 ${PROJECT_SOURCE_DIR}/scripts/generate_python_package.py bdist_wheel ${GENERATE_PYTHON_PACKAGE_FLAGS} --include-dir ${CMAKE_INSTALL_PREFIX}/include --lib-dir ${CMAKE_INSTALL_FULL_LIBDIR} --output-dir ${CMAKE_INSTALL_PREFIX}/dist --python-dir ${INSTALL_PYDIR} --standalone "${popart_LIB_DIR}:${POPLAR_DIR}"
   DEPENDS poptorch
 )
 add_custom_target(poptorch_standalone_sdist
   WORKING_DIRECTORY ${CMAKE_INSTALL_PREFIX}
-  COMMAND python3 ${PROJECT_SOURCE_DIR}/scripts/generate_python_package.py sdist ${GENERATE_PYTHON_PACKAGE_FLAGS} --include-dir ${CMAKE_INSTALL_PREFIX}/include --lib-dir ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR} --output-dir ${CMAKE_INSTALL_PREFIX}/dist --python-dir ${INSTALL_PYDIR} --standalone "${popart_LIB_DIR}:${POPLAR_DIR}"
+  COMMAND python3 ${PROJECT_SOURCE_DIR}/scripts/generate_python_package.py sdist ${GENERATE_PYTHON_PACKAGE_FLAGS} --include-dir ${CMAKE_INSTALL_PREFIX}/include --lib-dir ${CMAKE_INSTALL_FULL_LIBDIR} --output-dir ${CMAKE_INSTALL_PREFIX}/dist --python-dir ${INSTALL_PYDIR} --standalone "${popart_LIB_DIR}:${POPLAR_DIR}"
   DEPENDS poptorch
 )
 
 add_custom_target(poptorch_wheel
   WORKING_DIRECTORY ${CMAKE_INSTALL_PREFIX}
-  COMMAND python3 ${PROJECT_SOURCE_DIR}/scripts/generate_python_package.py bdist_wheel ${GENERATE_PYTHON_PACKAGE_FLAGS} --include-dir ${CMAKE_INSTALL_PREFIX}/include --lib-dir ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR} --output-dir ${CMAKE_INSTALL_PREFIX}/dist --python-dir ${INSTALL_PYDIR}
+  COMMAND python3 ${PROJECT_SOURCE_DIR}/scripts/generate_python_package.py bdist_wheel ${GENERATE_PYTHON_PACKAGE_FLAGS} --include-dir ${CMAKE_INSTALL_PREFIX}/include --lib-dir ${CMAKE_INSTALL_FULL_LIBDIR} --output-dir ${CMAKE_INSTALL_PREFIX}/dist --python-dir ${INSTALL_PYDIR}
   DEPENDS poptorch
 )
 
 add_custom_target(poptorch_sdist
   WORKING_DIRECTORY ${CMAKE_INSTALL_PREFIX}
-  COMMAND python3 ${PROJECT_SOURCE_DIR}/scripts/generate_python_package.py sdist ${GENERATE_PYTHON_PACKAGE_FLAGS} --include-dir ${CMAKE_INSTALL_PREFIX}/include --lib-dir ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR} --output-dir ${CMAKE_INSTALL_PREFIX}/dist --python-dir ${INSTALL_PYDIR}
+  COMMAND python3 ${PROJECT_SOURCE_DIR}/scripts/generate_python_package.py sdist ${GENERATE_PYTHON_PACKAGE_FLAGS} --include-dir ${CMAKE_INSTALL_PREFIX}/include --lib-dir ${CMAKE_INSTALL_FULL_LIBDIR} --output-dir ${CMAKE_INSTALL_PREFIX}/dist --python-dir ${INSTALL_PYDIR}
   DEPENDS poptorch
 )
 
