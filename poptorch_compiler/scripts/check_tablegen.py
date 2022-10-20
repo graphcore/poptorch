@@ -4,6 +4,8 @@ Check that the PyTorch op definitions in native_functions.yaml match the
 TableGen definitions.
 """
 
+import copy
+import itertools
 import json
 import re
 import string
@@ -41,14 +43,32 @@ bracketedname_bang_re = re.compile(r"\([^\)]*!\)")
 bracketedname_re = re.compile(r"\([^\)]*\)")
 
 
-def process_types(types):
+def has_more_close_braces(str, open='[', close=']'):
+    count = 0
+    for c in str:
+        if c == open:
+            count += 1
+        elif c == close:
+            count -= 1
+    return count < 0
+
+
+def process_types(types, extract_names=False):
+    if len(types) == 1 and types[0] == '':
+        return []
+    types = [x.strip() for x in types]
+    types = [x for x in types if not x == '*' and not has_more_close_braces(x)]
     has_default = ["=" in x.rpartition(" ")[2] for x in types]
-    types = [x.strip().rsplit(" ", 1)[0] for x in types]
-    types = [x for x in types if not x == '*']
+    types = [x.rsplit(" ", 1) for x in types]
+    if extract_names:
+        names = [x[1].strip().rsplit('=', 1)[0] for x in types]
+    types = [x[0] for x in types]
     types = [index_re.sub("[]", x) for x in types]
     types = [bracketedname_bang_re.sub("?", x) for x in types]
     types = [bracketedname_re.sub("", x) for x in types]
     types = [x + "?" if y else x for x, y in zip(types, has_default)]
+    if extract_names:
+        types = list(zip(types, names))
     return types
 
 
@@ -58,7 +78,7 @@ for f in function_prototypes:
     if m is None:
         raise RuntimeError("Couldn't parse function prototype {}".format(f))
     fname = m.group(1).strip()
-    params = process_types(m.group(2).split(","))
+    params = process_types(m.group(2).split(","), True)
     ret = m.group(3).strip(string.whitespace)
     if ret.startswith("(") and ret.endswith(")"):
         ret = ret[1:len(ret) - 1]
@@ -125,11 +145,45 @@ for yf in yml_files:
         tblgen_params = tblgen[tblgen_func]['params']
         tblgen_results = tblgen[tblgen_func]['results']
 
+        def to_set(dict_or_set):
+            if isinstance(dict_or_set, dict):
+                return set(dict_or_set.keys())
+            if isinstance(dict_or_set, set):
+                return dict_or_set
+            return {dict_or_set}
+
+        ignored_args = set()
+        if 'IgnoredArgs' in entry:
+            ignored_args.update(to_set(entry['IgnoredArgs']))
+        if 'UnusedOutputArguments' in entry:
+            ignored_args.update(to_set(entry['UnusedOutputArguments']))
+
+        def filter_ignored_pytorch_args(pt, ignored_args):
+            pt_copy = []
+            ignored_args_copy = copy.copy(ignored_args)
+            for ptt_type, ptt_name in pt:
+                if ptt_name in ignored_args_copy:
+                    ignored_args_copy.remove(ptt_name)
+                else:
+                    pt_copy.append(ptt_type)
+            return pt_copy, ignored_args_copy
+
+        filtered_pytorch_params, unremoved_args = filter_ignored_pytorch_args(
+            pytorch_params, ignored_args)
+        if len(unremoved_args) > 0:
+            failed = True
+            print("Failed function:")
+            print("")
+            print(fname)
+            print("  PyTorch params: {}".format(pytorch_params))
+            print(f"  Ignored Args: {ignored_args}")
+            print(f"  Missing Ignored Args: {unremoved_args}")
+            print("")
+            continue
+
         def check_types(pt, tg):
             mismatches = []
-            for i in range(max(len(pt), len(tg))):
-                ptt = pt[i] if i < len(pt) else None
-                tgt = tg[i] if i < len(tg) else None
+            for ptt, tgt in itertools.zip_longest(pt, tg):
                 tgtOptional = False
                 if tgt is not None and tgt.endswith("?"):
                     tgt = tgt[:len(tgt) - 1]
@@ -153,13 +207,14 @@ for yf in yml_files:
 
         mismatches = []
         try:
-            mismatches.extend(check_types(pytorch_params, tblgen_params))
+            mismatches.extend(
+                check_types(filtered_pytorch_params, tblgen_params))
             mismatches.extend(check_types(pytorch_results, tblgen_results))
         except RuntimeError:
             print("Failed function:")
             print("")
             print(fname)
-            print("  PyTorch params: {}".format(pytorch_params))
+            print("  PyTorch params: {}".format(filtered_pytorch_params))
             print("  TableGen params: {}".format(tblgen_params))
             print("  PyTorch results: {}".format(pytorch_results))
             print("  TableGen results: {}".format(tblgen_results))

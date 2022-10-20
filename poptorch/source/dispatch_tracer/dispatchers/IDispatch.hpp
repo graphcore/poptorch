@@ -23,11 +23,14 @@ public:
   virtual ~IDispatch();
 
   // Input tensor is a CPU tensor, returns an IPU tensor.
-  virtual at::Tensor addInput(const at::Tensor &cpu_tensor) = 0;
+  virtual void addInput(const at::Tensor &cpu_tensor,
+                        const at::Tensor &ipu_tensor) = 0;
   // Constant tensor is a CPU tensor, returns an IPU tensor.
-  virtual at::Tensor addConstant(const at::Tensor &cpu_tensor) = 0;
+  virtual void addConstant(const at::Tensor &cpu_tensor,
+                           const at::Tensor &ipu_tensor) = 0;
   // Input tensor is a CPU tensor, returns an IPU tensor.
-  virtual at::Tensor addParameter(const at::Tensor &cpu_tensor) = 0;
+  virtual void addParameter(const at::Tensor &cpu_tensor,
+                            const at::Tensor &ipu_tensor) = 0;
   // Source tensor is an IPU tensor, destination is a CPU tensor.
   virtual void addOutput(const at::Tensor &ipu_src,
                          const at::Tensor &cpu_dest) = 0;
@@ -48,11 +51,6 @@ public:
   // simply ask the dispatchers to acknowledge the created empty tensor and we
   // create it manually in the base function registration.
   virtual void registerEmptyTensor(const at::Tensor &empty) = 0;
-
-  // Sets up a an inplace copy in the graph from src to self. Returns self
-  // unaltered as a convenience.
-  virtual const at::Tensor &copyInplace(const at::Tensor &self,
-                                        const at::Tensor &src) = 0;
 
   void *getDataSource(torch::jit::Value *val);
   bool isParameter(torch::jit::Value *val);

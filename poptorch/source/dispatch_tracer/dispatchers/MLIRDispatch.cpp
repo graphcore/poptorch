@@ -195,11 +195,12 @@ void MLIRDispatch::initCompiler(const CompilerOptions &options) {
   }
 }
 
-at::Tensor MLIRDispatch::addConstant(const at::Tensor &cpu_tensor) {
+void MLIRDispatch::addConstant(const at::Tensor &cpu_tensor,
+                               const at::Tensor &ipu_tensor) {
   ERROR_ON(!cpu_tensor.unsafeGetTensorImpl()->is_cpu());
   if (isEagerMode()) {
     // Everything is considered an input in eager mode.
-    return addInput(cpu_tensor);
+    addInput(cpu_tensor, ipu_tensor);
   }
 
   const auto cpu_dtype = cpu_tensor.scalar_type();
@@ -221,11 +222,7 @@ at::Tensor MLIRDispatch::addConstant(const at::Tensor &cpu_tensor) {
                   coerced_cpu_tensor.scalar_type());
   }
 
-  // Create the IPU tensor constant.
-  at::Tensor tensor = _tensor_store->allocateTensor(
-      coerced_cpu_tensor.sizes(), coerced_cpu_tensor.scalar_type());
-
-  const auto shape = tensor.sizes().vec();
+  const auto shape = ipu_tensor.sizes().vec();
 
   poptorch_ir::TensorId val;
   if (coerced_cpu_tensor.scalar_type() == c10::ScalarType::Float) {
@@ -237,7 +234,7 @@ at::Tensor MLIRDispatch::addConstant(const at::Tensor &cpu_tensor) {
     const std::vector<int32_t> tmp(data, data + coerced_cpu_tensor.numel());
     val = _compiler.tensorconstant_int(tmp, shape).at(0).tensor_ids.at(0);
   } else {
-    ERROR("Tensor constants of scalar type " << tensor.scalar_type()
+    ERROR("Tensor constants of scalar type " << ipu_tensor.scalar_type()
                                              << " are not supported.");
   }
 
@@ -256,11 +253,10 @@ at::Tensor MLIRDispatch::addConstant(const at::Tensor &cpu_tensor) {
                  static_cast<void *>(cpu_tensor.unsafeGetTensorImpl()),
                  cpu_tensor.data_ptr());
 
-  _mapper.addTensor(tensor, val);
-  return tensor;
+  _mapper.addTensor(ipu_tensor, val);
 }
 
-void MLIRDispatch::promoteAsParameter(at::Tensor &tensor) {
+void MLIRDispatch::promoteAsParameter(const at::Tensor &tensor) {
   ERROR_ON(!isIpuTensor(tensor));
   const std::string str = "Parameter/" + std::to_string(_next_parameter_idx++);
   const poptorch_ir::TensorId value = _compiler.addParameter(
@@ -270,7 +266,7 @@ void MLIRDispatch::promoteAsParameter(at::Tensor &tensor) {
   setIsParameter(tensor, true);
 }
 
-void MLIRDispatch::promoteAsInput(at::Tensor &tensor, bool is_wrapped) {
+void MLIRDispatch::promoteAsInput(const at::Tensor &tensor, bool is_wrapped) {
   if (!isIpuTensor(tensor)) {
     ERROR_ON_MSG(is_wrapped, "All inputs to an `ipu_wrapper`-wrapped function "
                              "must be an IPU tensor, but got an input with "
@@ -286,33 +282,26 @@ void MLIRDispatch::promoteAsInput(at::Tensor &tensor, bool is_wrapped) {
   setIsParameter(tensor, false);
 }
 
-at::Tensor MLIRDispatch::addInput(const at::Tensor &cpu_tensor) {
+void MLIRDispatch::addInput(const at::Tensor &cpu_tensor,
+                            const at::Tensor &ipu_tensor) {
+  ERROR_ON(!cpu_tensor.unsafeGetTensorImpl()->is_cpu());
   logging::trace("[DISPATCHER] Adding input: {} with cpu ptr {}",
                  static_cast<void *>(cpu_tensor.unsafeGetTensorImpl()),
                  cpu_tensor.data_ptr());
-  at::Tensor tensor = _tensor_store->copyCpuTensorAsIpuTensor(cpu_tensor);
-
-  promoteAsInput(tensor);
-
-  return tensor;
+  poptorch::TensorStore::copyCpuTensorAsIpuTensor(ipu_tensor, cpu_tensor);
+  promoteAsInput(ipu_tensor);
 }
 
-at::Tensor MLIRDispatch::addParameter(const at::Tensor &cpu_tensor) {
+void MLIRDispatch::addParameter(const at::Tensor &cpu_tensor,
+                                const at::Tensor &ipu_tensor) {
   ERROR_ON(!cpu_tensor.unsafeGetTensorImpl()->is_cpu());
-  at::Tensor tensor = _tensor_store->copyCpuTensorAsIpuTensor(cpu_tensor);
-
-  const std::string str = "Parameter/" + std::to_string(_next_parameter_idx++);
 
   logging::trace("[DISPATCHER] Adding parameter: {} with cpu ptr {}",
                  static_cast<void *>(cpu_tensor.unsafeGetTensorImpl()),
                  cpu_tensor.data_ptr());
 
-  const poptorch_ir::TensorId value = _compiler.addParameter(
-      poptorch::getHostBuffer(tensor), toCompilerShape(tensor),
-      toCompilerType(tensor), str.c_str());
-  _mapper.addTensor(tensor, value);
-  setIsParameter(tensor, true);
-  return tensor;
+  poptorch::TensorStore::copyCpuTensorAsIpuTensor(ipu_tensor, cpu_tensor);
+  promoteAsParameter(ipu_tensor);
 }
 
 void MLIRDispatch::promoteAsOutput(const at::Tensor &tensor, void *storage) {
@@ -342,19 +331,6 @@ void MLIRDispatch::finalizeGraph() {
 }
 
 void MLIRDispatch::markStep() { _compiler.compileRunAndReset(); }
-
-const at::Tensor &MLIRDispatch::copyInplace(const at::Tensor &self,
-                                            const at::Tensor &src) {
-  auto mlir_output = _compiler.copy_(findTensor(self), findTensor(src));
-
-  std::vector<bool> requires_grad;
-  requires_grad = requiresGrad(mlir_output[0].requires_grad_types,
-                               self.requires_grad() || src.requires_grad());
-
-  outputIsInplaceOf(mlir_output[0].tensor_ids[0], self, requires_grad[0]);
-
-  return self;
-}
 
 void packStack(c10::Stack & /*unused*/) {}
 

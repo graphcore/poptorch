@@ -66,14 +66,12 @@ bitwiseNot::canonicalize(bitwiseNot op, ::mlir::PatternRewriter &rewriter) {
 ::mlir::LogicalResult signum::canonicalize(signum op,
                                            ::mlir::PatternRewriter &rewriter) {
   const auto in_type = op.getResult().getType().cast<mlir::RankedTensorType>();
-  std::vector<std::int64_t> out_shape(in_type.getShape());
+  const std::vector<std::int64_t> out_shape(in_type.getShape());
   const auto in_element_type = in_type.getElementType();
 
   if (in_element_type.isInteger(1)) {
-    auto empty =
-        rewriter.create<empty_tensor>(op.getLoc(), out_shape, in_element_type);
     auto copy =
-        rewriter.create<copy_>(op.getLoc(), empty.getResult(), op.getOperand());
+        rewriter.create<::poptorch_ir::clone>(op.getLoc(), op.getOperand());
     op.getResult().replaceAllUsesWith(copy.result());
 
     return mlir::success();

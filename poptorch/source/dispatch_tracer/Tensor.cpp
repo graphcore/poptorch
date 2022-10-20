@@ -33,8 +33,8 @@ c10::DispatchKeySet dispatch_key_set{c10::DispatchKey::XLA,
 // Return the data size in bytes of a tensor (i.e num_elems * elem_size)
 uint64_t tensorImplDataSize(const at::TensorImpl &impl) {
   auto shape = impl.sizes();
-  std::int64_t nelems = std::accumulate(shape.begin(), shape.end(), 1,
-                                        std::multiplies<std::int64_t>());
+  std::int64_t const nelems = std::accumulate(shape.begin(), shape.end(), 1,
+                                              std::multiplies<std::int64_t>());
   auto elem_size = impl.itemsize();
   return nelems * elem_size;
 }
@@ -182,7 +182,8 @@ const IpuTensorImpl *toIpuTensorImpl(const at::TensorImpl &tensor) {
   return impl;
 }
 
-void copyDataFromCpuSource(at::Tensor &ipu_tensor, const at::Tensor &cpu_src) {
+void copyDataFromCpuSource(const at::Tensor &ipu_tensor,
+                           const at::Tensor &cpu_src) {
   toIpuTensorImpl(ipu_tensor)->copyDataFromCpuSource(cpu_src);
 }
 
@@ -280,7 +281,7 @@ bool isIpuTensor(const at::Tensor &tensor) {
   return tryIpuTensorImpl(tensor) != nullptr;
 }
 
-void setIsParameter(at::Tensor &tensor, bool is_parameter) {
+void setIsParameter(const at::Tensor &tensor, bool is_parameter) {
   toIpuTensorImpl(tensor)->details->is_parameter = is_parameter;
 }
 
@@ -345,7 +346,7 @@ void errorOnZeroSizedTensor(const at::Tensor &tensor) {
   }
 }
 
-void initHostBuffer(at::Tensor &ipu_tensor) {
+void initHostBuffer(const at::Tensor &ipu_tensor) {
   auto *impl = toIpuTensorImpl(ipu_tensor);
   auto data_size = tensorImplDataSize(*impl);
   impl->details->host_buffer = std::make_shared<std::vector<char>>(data_size);
@@ -356,7 +357,7 @@ at::Tensor TensorStore::allocateTensor(
     c10::optional<at::Device> device, c10::optional<at::Layout> /*layout*/,
     c10::optional<bool> /*pin_memory*/,
     c10::optional<at::MemoryFormat> /*memory_format*/) {
-  at::ScalarType scalar_type = scalarTypeOrDefault(dtype);
+  at::ScalarType const scalar_type = scalarTypeOrDefault(dtype);
   auto coerced_scalar_type = coerceToSupportedType(scalar_type);
   auto strides = at::detail::defaultStrides(size);
 
@@ -388,22 +389,16 @@ at::Tensor TensorStore::allocateTensor(
   return output;
 }
 
-at::Tensor TensorStore::copyCpuTensorAsIpuTensor(const at::Tensor &cpu_tensor) {
+void TensorStore::copyCpuTensorAsIpuTensor(const at::Tensor &ipu_tensor,
+                                           const at::Tensor &cpu_tensor) {
   ERROR_ON(!cpu_tensor.unsafeGetTensorImpl()->is_cpu());
-
-  at::Tensor tensor = allocateTensor(
-      cpu_tensor.sizes(), c10::typeMetaToScalarType(cpu_tensor.dtype()));
-
-  tensor = copyAndCoerceType(tensor);
 
   logging::trace("[DISPATCHER] Copying CPU tensor {} with data_ptr {}",
                  static_cast<void *>(cpu_tensor.unsafeGetTensorImpl()),
                  cpu_tensor.data_ptr());
-  copyDataFromCpuSource(tensor, cpu_tensor);
+  copyDataFromCpuSource(ipu_tensor, cpu_tensor);
 
-  tensor.set_requires_grad(cpu_tensor.requires_grad());
-
-  return tensor;
+  ipu_tensor.set_requires_grad(cpu_tensor.requires_grad());
 }
 
 } // namespace poptorch

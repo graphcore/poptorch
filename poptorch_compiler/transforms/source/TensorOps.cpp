@@ -26,15 +26,20 @@ CANONICALIZE_TO_FULL(zeros_like, rewriter.getF32FloatAttr(0.0f))
 CANONICALIZE_TO_FULL(full_like,
                      op->getAttrOfType<mlir::FloatAttr>("fill_value"))
 
-::mlir::LogicalResult copy_::canonicalize(copy_ op,
+::mlir::LogicalResult clone::canonicalize(clone op,
                                           ::mlir::PatternRewriter &rewriter) {
-  if (op.self().getType() != op.src().getType() && op.self().hasOneUse()) {
-    // If the destination has a single use we may replace the copy_ with
-    // a cast. Otherwise the types being different is a bug. This bug is caught
-    // in the verifier for copy_.
-    rewriter.replaceOpWithNewOp<cast>(
-        op, op.src(),
-        op.self().getType().cast<mlir::RankedTensorType>().getElementType());
+  // If neither the source and destination are written to after this operation,
+  // it is safe to remove the clone operation and just replace dest with src.
+  const bool src_has_value_semantics =
+      !isOperandView(op.src()) &&
+      llvm::none_of(op.src().getUses(), [&](const mlir::OpOperand &operand) {
+        return op->isBeforeInBlock(operand.getOwner()) && isInplace(operand);
+      });
+  const bool dest_has_value_semantics =
+      llvm::none_of(op.result().getUses(), isInplace);
+  if (dest_has_value_semantics && src_has_value_semantics) {
+    rewriter.replaceOp(op, op.src());
+
     return mlir::success();
   }
   return mlir::failure();

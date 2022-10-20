@@ -25,9 +25,12 @@ public:
   // The JIT graph we are building up.
   std::shared_ptr<torch::jit::Graph> graph;
 
-  at::Tensor addConstant(const at::Tensor &cpu_tensor) final;
-  at::Tensor addInput(const at::Tensor &cpu_tensor) final;
-  at::Tensor addParameter(const at::Tensor &cpu_tensor) final;
+  void addConstant(const at::Tensor &cpu_tensor,
+                   const at::Tensor &ipu_tensor) final;
+  void addInput(const at::Tensor &cpu_tensor,
+                const at::Tensor &ipu_tensor) final;
+  void addParameter(const at::Tensor &cpu_tensor,
+                    const at::Tensor &ipu_tensor) final;
   void addOutput(const at::Tensor &ipu_src, const at::Tensor &cpu_dest) final;
   void finalizeGraph() final;
 
@@ -38,9 +41,6 @@ public:
 
   void registerEmptyTensor(const at::Tensor &tensor) final;
 
-  const at::Tensor &copyInplace(const at::Tensor &self,
-                                const at::Tensor &src) final;
-
   // Node will be updated to the new target post canonicalisation.
   void fixOutput(c10::Stack &stack, torch::jit::Node *node);
 
@@ -48,7 +48,8 @@ public:
                                             bool replicas_needing_broadcast);
 
 private:
-  at::Tensor addTensor(const at::Tensor &cpu_tensor, bool is_parameter);
+  void addTensor(const at::Tensor &cpu_tensor, const at::Tensor &ipu_tensor,
+                 bool is_parameter);
 
   const std::vector<std::vector<char>> &getSourceLocationExcludes() const final;
   void

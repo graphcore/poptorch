@@ -80,7 +80,6 @@
 # func: prelu(Tensor self, Tensor weight) -> Tensor
 - func: prelu
   PopTorchDirect: prelu
-  UnusedOutputArguments: {out}
 
 # tanh.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)
 - func: tanh.out
@@ -224,10 +223,9 @@
 - func: repeat
   PopTorchDirect: repeat
 
-# func: gather.out(Tensor self, int dim, Tensor index, *, bool sparse_grad=False, Tensor(a!) out) -> Tensor(a!)
+# func: gather(Tensor self, int dim, Tensor index, *, bool sparse_grad=False) -> Tensor
 - func: gather
   PopTorchDirect: gather
-  UnusedOutputArguments: {out}
 
 # func: constant_pad_nd(Tensor self, int[] pad, Scalar value=0) -> Tensor
 - func: constant_pad_nd
@@ -307,7 +305,6 @@
 # This isn't being forwarded to 'upsample_nearest3d.out' so we need to do our own computation of the output_size
 - func: upsample_nearest3d.vec
   PopTorchDirect: upsample_nearest3d_vec
-  UnusedOutputArguments: {out}
 
 # func: upsample_bicubic2d.out(Tensor self, int[2] output_size, bool align_corners, float? scales_h=None, float? scales_w=None, *, Tensor(a!) out) -> Tensor(a!)
 - func: upsample_bicubic2d.out
@@ -1039,6 +1036,17 @@
 #########
 # Misc
 #########
+
+# func: copy_(Tensor(a!) self, Tensor src, bool non_blocking=False) -> Tensor(a!)
+- func: copy_
+  PopTorchDirect: clone
+  UnusedOutputArguments: {self}
+  IgnoreArgs: non_blocking
+
+# func: clone(Tensor self, *, MemoryFormat? memory_format=None) -> Tensor
+- func: clone
+  PopTorchDirect: clone
+  IgnoreArgs: memory_format
 
 # to.dtype(Tensor(a) self, ScalarType dtype, bool non_blocking=False,
 #          bool copy=False, MemoryFormat? memory_format=None) -> Tensor(a)

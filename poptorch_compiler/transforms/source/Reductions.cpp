@@ -8,11 +8,8 @@ void canonicaliseMinMax(T &op, ::mlir::PatternRewriter &rewriter) {
   auto operand_type = op.getOperand().getType();
   auto size = operand_type.template cast<mlir::RankedTensorType>().getShape();
   if (size.empty()) {
-    auto elemtype =
-        operand_type.template cast<mlir::RankedTensorType>().getElementType();
-    auto empty = rewriter.create<empty_tensor>(op.getLoc(), size, elemtype);
     auto copy =
-        rewriter.create<copy_>(op.getLoc(), empty.getResult(), op.getOperand());
+        rewriter.create<::poptorch_ir::clone>(op.getLoc(), op.getOperand());
     op.getResult(0).replaceAllUsesWith(copy.getResult());
     auto zeros = rewriter.create<zeros_like>(op.getLoc(), op->getResult(1),
                                              std::nullopt);
@@ -55,11 +52,8 @@ median_dim_values::canonicalize(median_dim_values op,
   auto operand_type = op.getOperand().getType();
   auto osize = operand_type.cast<mlir::RankedTensorType>().getShape();
   if (osize.empty()) {
-    auto elemtype =
-        operand_type.template cast<mlir::RankedTensorType>().getElementType();
-    auto empty = rewriter.create<empty_tensor>(op.getLoc(), osize, elemtype);
     auto copy =
-        rewriter.create<copy_>(op.getLoc(), empty.getResult(), op.getOperand());
+        rewriter.create<::poptorch_ir::clone>(op.getLoc(), op.getOperand());
     op.getResult(0).replaceAllUsesWith(copy.getResult());
     auto zeros = rewriter.create<zeros_like>(op.getLoc(), op->getResult(1),
                                              std::nullopt);
@@ -68,7 +62,7 @@ median_dim_values::canonicalize(median_dim_values op,
     return mlir::success();
   }
 
-  int64_t dim = op.dim();
+  const int64_t dim = op.dim();
   auto keepdim = op.keepdim();
   auto size = osize[dim < 0 ? dim + osize.size() : dim];
   auto half_size = ((size + 1) >> 1);

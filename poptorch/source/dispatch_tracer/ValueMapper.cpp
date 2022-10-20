@@ -93,12 +93,11 @@ void ValueMapper::addTensor(const at::Tensor &t, poptorch_ir::TensorId id) {
   _ids_tensors_map.insert({getIpuTensorId(t), new_details.get()});
 }
 
-void ValueMapper::addTensor(const at::Tensor &t, torch::jit::Value *val) {
-  ERROR_ON_MSG(val == nullptr, "torch::jit::Value* cannot be null");
+void ValueMapper::addTensorUnchecked(const at::Tensor &t,
+                                     torch::jit::Value *val) {
   logging::trace("Adding {} to value mapper {}, JIT ir: {}",
                  static_cast<void *>(t.unsafeGetTensorImpl()),
                  static_cast<void *>(this), val->debugName());
-  validateTensorShapeAndType(val, t);
 
   // If the tensor is already being tracked then we will update the JIT
   // value being tracked. Otherwise we insert and add the jit value.
@@ -112,6 +111,12 @@ void ValueMapper::addTensor(const at::Tensor &t, torch::jit::Value *val) {
   values_map.insert({val, &itr->second});
 
   _ids_tensors_map.insert({getIpuTensorId(t), new_details.get()});
+}
+void ValueMapper::addTensor(const at::Tensor &t, torch::jit::Value *val) {
+  ERROR_ON_MSG(val == nullptr, "torch::jit::Value* cannot be null");
+  validateTensorShapeAndType(val, t);
+
+  addTensorUnchecked(t, val);
 }
 
 void ValueMapper::addCopiedTensor(const at::TensorImpl *dest,

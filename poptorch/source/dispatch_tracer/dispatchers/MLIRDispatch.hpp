@@ -27,9 +27,12 @@ class MLIRDispatch : public IDispatch {
 public:
   MLIRDispatch(const CompilerOptions &options, TensorStore *tensor_store);
 
-  at::Tensor addConstant(const at::Tensor &cpu_tensor) final;
-  at::Tensor addInput(const at::Tensor &cpu_tensor) final;
-  at::Tensor addParameter(const at::Tensor &cpu_tensor) final;
+  void addConstant(const at::Tensor &cpu_tensor,
+                   const at::Tensor &ipu_tensor) final;
+  void addInput(const at::Tensor &cpu_tensor,
+                const at::Tensor &ipu_tensor) final;
+  void addParameter(const at::Tensor &cpu_tensor,
+                    const at::Tensor &ipu_tensor) final;
   void addOutput(const at::Tensor &ipu_src, const at::Tensor &cpu_dest) final;
   void finalizeGraph() final;
   void markStep() final;
@@ -40,18 +43,15 @@ public:
   void detach(const c10::OperatorHandle &op, c10::Stack *stack,
               bool moving_parameters) final;
 
-  void promoteAsParameter(at::Tensor &tensor);
+  void promoteAsParameter(const at::Tensor &tensor);
 
-  void promoteAsInput(at::Tensor &tensor, bool is_wrapped = false);
+  void promoteAsInput(const at::Tensor &tensor, bool is_wrapped = false);
 
   void promoteAsOutput(const at::Tensor &tensor, void *storage);
 
   poptorch_ir::TensorId addEmptyTensorOp(const at::Tensor &tensor);
 
   void registerEmptyTensor(const at::Tensor &tensor) final;
-
-  const at::Tensor &copyInplace(const at::Tensor &self,
-                                const at::Tensor &src) final;
 
   std::shared_ptr<MLIRExecutor> compile();
 

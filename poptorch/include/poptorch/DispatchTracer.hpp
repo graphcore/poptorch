@@ -165,9 +165,9 @@ std::uint64_t getIpuTensorId(const at::Tensor &tensor);
 
 // Promote these tensors as args passed in to the model. This is used in
 // IPUSession to determine which inputs are likely to change.
-void promoteArgsAsInputs(std::vector<at::Tensor> &args);
+void promoteArgsAsInputs(const std::vector<at::Tensor> &args);
 
-void promoteOutputs(std::vector<at::Tensor> &outputs);
+void promoteOutputs(const std::vector<at::Tensor> &outputs);
 
 bool movingParameters();
 

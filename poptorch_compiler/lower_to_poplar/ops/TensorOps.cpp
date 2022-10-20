@@ -36,17 +36,12 @@ void cast::lowerToPoplar(CompilerContext &context) {
   context.addTensor(this->result(), out);
 }
 
-void copy_::lowerToPoplar(CompilerContext &context) {
-  const poplar::Tensor self = context.fromSsa(this->self());
+void clone::lowerToPoplar(poptorch_ir::CompilerContext &context) {
   const poplar::Tensor src = context.fromSsa(this->src());
 
-  // Note the current way view operations are implemented in lower to poplar can
-  // lead to copy_ operations called with the same src and dest
-  if (self != src) {
-    context.seq.add(poplar::program::Copy(src, self));
-  }
-
-  context.addTensor(this->result(), self);
+  auto dest = context.graph.clone(src);
+  context.seq.add(poplar::program::Copy(src, dest));
+  context.addTensor(this->result(), dest);
 }
 
 void full::lowerToPoplar(CompilerContext &context) {

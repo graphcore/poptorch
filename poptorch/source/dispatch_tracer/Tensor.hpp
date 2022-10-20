@@ -46,7 +46,7 @@ struct IpuTensorDetails {
 uint64_t tensorImplDataSize(const at::TensorImpl &impl);
 
 // Mark an IPU tensor as being a parameter or not.
-void setIsParameter(at::Tensor &tensor, bool is_parameter);
+void setIsParameter(const at::Tensor &tensor, bool is_parameter);
 
 // Return true if the given IPU tensor is a parameter.
 bool isParameter(const at::Tensor &tensor);
@@ -85,7 +85,7 @@ getTensorDetails(const at::Tensor &ipu_tensor) {
 
 void errorOnZeroSizedTensor(const at::Tensor &tensor);
 
-void initHostBuffer(at::Tensor &ipu_tensor);
+void initHostBuffer(const at::Tensor &ipu_tensor);
 
 /** Host-side storage for `ipu` tensors.
  *
@@ -115,7 +115,8 @@ public:
   // Create a new IPU tensor by copying the data from the given CPU tensor in to
   // the new IPU tensor's host_buffer. Input tensor is a CPU tensor, returns an
   // IPU tensor.
-  at::Tensor copyCpuTensorAsIpuTensor(const at::Tensor &cpu_tensor);
+  static void copyCpuTensorAsIpuTensor(const at::Tensor &ipu_tensor,
+                                       const at::Tensor &cpu_tensor);
 
 private:
   poptorch_ir::TensorId _next_tensor_id{1};

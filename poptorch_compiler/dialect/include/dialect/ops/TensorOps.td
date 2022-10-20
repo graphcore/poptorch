@@ -62,17 +62,16 @@ def Poptorch_overwrite: Poptorch_BasicOp<"overwrite"> {
   let hasCanonicalizeMethod = 1;
 }
 
-def Poptorch_copy_: Poptorch_Op<"copy_", [SameOperandsAndResultShape]> {
-  let arguments = (ins Poptorch_tensor:$self, Poptorch_tensor:$src);
+def Poptorch_clone: Poptorch_Op<"clone", [SameOperandsAndResultShape]> {
+  let arguments = (ins Poptorch_tensor:$src);
   let results = (outs Poptorch_tensor:$result);
 
-  let builders = [OpBuilder<(ins "mlir::Value":$self, "mlir::Value":$src), [{
-    $_state.addOperands({self, src});
-    $_state.addTypes(self.getType());
+  let builders = [OpBuilder<(ins "mlir::Value":$src), [{
+    $_state.addOperands({src});
+    $_state.addTypes(src.getType());
   }]>];
 
   let hasCanonicalizeMethod = 1;
-  let hasVerifier = 1;
 }
 
 def Poptorch_print_tensor : Poptorch_Op<"print_tensor", [], MemoryEffects<[MemWrite]>> {

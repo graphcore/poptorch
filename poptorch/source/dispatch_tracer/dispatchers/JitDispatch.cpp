@@ -64,23 +64,20 @@ JITDispatch::JITDispatch(const CompilerOptions &options,
     : IDispatch(tensor_store), graph(std::make_shared<torch::jit::Graph>()),
       _mlir_dispatch(options, tensor_store) {}
 
-at::Tensor JITDispatch::addConstant(const at::Tensor &cpu_tensor) {
+void JITDispatch::addConstant(const at::Tensor &cpu_tensor,
+                              const at::Tensor &ipu_tensor) {
   ERROR_ON(!cpu_tensor.unsafeGetTensorImpl()->is_cpu());
+
+  const auto src = cpu_tensor.to(ipu_tensor.scalar_type());
+
   const WithMetadata metadata("constant");
-
-  auto src = copyAndCoerceType(cpu_tensor);
-
-  at::Tensor tensor =
-      _tensor_store->allocateTensor(src.sizes(), src.scalar_type());
-
   auto *value = insertConstant(graph.get(), src);
 
   logging::trace("[DISPATCHER] Adding constant: Value {} with cpu ptr {}",
                  static_cast<void *>(value), cpu_tensor.data_ptr());
 
-  _mapper.addTensor(tensor, value);
-  setIsParameter(tensor, false);
-  return tensor;
+  _mapper.addTensor(ipu_tensor, value);
+  setIsParameter(ipu_tensor, false);
 }
 
 void JITDispatch::addTensorToParamNode(const at::Tensor &cpu_tensor) {
@@ -94,42 +91,48 @@ void JITDispatch::addTensorToParamNode(const at::Tensor &cpu_tensor) {
   }
 }
 
-at::Tensor JITDispatch::addTensor(const at::Tensor &cpu_tensor,
-                                  bool is_parameter) {
+void JITDispatch::addTensor(const at::Tensor &cpu_tensor,
+                            const at::Tensor &ipu_tensor, bool is_parameter) {
+  ERROR_ON(!cpu_tensor.unsafeGetTensorImpl()->is_cpu());
   errorOnZeroSizedTensor(cpu_tensor);
-  auto tensor = _tensor_store->copyCpuTensorAsIpuTensor(cpu_tensor);
+
+  const auto src = cpu_tensor.to(ipu_tensor.dtype());
+  TensorStore::copyCpuTensorAsIpuTensor(ipu_tensor, src);
+
   torch::jit::Value *value = graph->addInput(cpu_tensor.name());
   // Add tensor to the values attribute of the graph's param node, so that
   // input tensor values can be later retrieved from the graph
-  addTensorToParamNode(cpu_tensor);
+  addTensorToParamNode(src);
   setSourceRangeToCurrentLocation(value->node());
-  value->setType(c10::TensorType::create(tensor)->withRequiresGrad(
-      cpu_tensor.requires_grad()));
+  value->setType(c10::TensorType::create(ipu_tensor)
+                     ->withRequiresGrad(cpu_tensor.requires_grad()));
 
   logging::trace("[DISPATCHER] Adding {}: Value {} with cpu ptr {}",
                  is_parameter ? "parameter" : "input",
-                 static_cast<void *>(value), cpu_tensor.data_ptr());
+                 static_cast<void *>(value), src.data_ptr());
   _inplace_tracker.addTensor(value);
-  _mapper.addTensor(tensor, value);
-  setIsParameter(tensor, is_parameter);
-  return tensor;
+
+  _mapper.addTensor(ipu_tensor, value);
+  setIsParameter(ipu_tensor, is_parameter);
 }
 
-at::Tensor JITDispatch::addInput(const at::Tensor &cpu_tensor) {
+void JITDispatch::addInput(const at::Tensor &cpu_tensor,
+                           const at::Tensor &ipu_tensor) {
   const WithMetadata metadata("input");
-  return addTensor(cpu_tensor, /* is_parameter= */ false);
+  addTensor(cpu_tensor, ipu_tensor, /* is_parameter= */ false);
 }
 
-at::Tensor JITDispatch::addParameter(const at::Tensor &tensor) {
+void JITDispatch::addParameter(const at::Tensor &cpu_tensor,
+                               const at::Tensor &ipu_tensor) {
   const WithMetadata metadata("parameter");
-  at::ScalarType const type = tensor.scalar_type();
+  const at::ScalarType type = cpu_tensor.scalar_type();
   // PopART doesn't allow non-floating point variables so add them as
   // constants instead. These will be deleted from parameters and buffers
   // in python before passed to lowering.
   if (!at::isFloatingType(type)) {
-    return addConstant(tensor);
+    return addConstant(cpu_tensor, ipu_tensor);
   }
-  return addTensor(tensor, /* is_parameter= */ true);
+  addTensor(cpu_tensor, ipu_tensor, /* is_parameter= */ true);
 }
 
 void JITDispatch::addOutput(const at::Tensor &ipu_src,
@@ -157,56 +160,6 @@ void JITDispatch::addOutput(const at::Tensor &ipu_src,
 void JITDispatch::finalizeGraph() {
   // Clear the code location
   setCurrentPythonCodeLocation({});
-}
-
-// copy_(Tensor(a!) self, Tensor src, bool non_blocking=False) -> Tensor(a!)
-const at::Tensor &JITDispatch::copyInplace(const at::Tensor &self,
-                                           const at::Tensor &src) {
-  ValueMapper::TrackedTensor *self_tracked = _mapper.rawTensorRecord(self);
-  ValueMapper::TrackedTensor *src_tracked = _mapper.rawTensorRecord(src);
-  ERROR_ON(self_tracked == nullptr);
-  ERROR_ON(src_tracked == nullptr);
-
-  logging::trace(
-      "[DISPATCHER][JIT] copyInplace: src tensor {} (jit ir %{}), self tensor "
-      "{} (jit ir %{})",
-      static_cast<void *>(src.unsafeGetTensorImpl()),
-      src_tracked->jit->debugName(),
-      static_cast<void *>(self.unsafeGetTensorImpl()),
-      self_tracked->jit->debugName());
-
-  auto self_st =
-      self_tracked->jit->type()->expect<c10::TensorType>()->scalarType();
-  auto src_st =
-      src_tracked->jit->type()->expect<c10::TensorType>()->scalarType();
-  ERROR_ON(!self_st.has_value());
-  ERROR_ON(!src_st.has_value());
-
-  const WithMetadata meta("copy_");
-  torch::jit::Value *copy =
-      createAndInsertNode(graph.get(), c10::aten::copy_,
-                          {self_tracked->jit, src_tracked->jit},
-                          ImplicitCast::None, OutputType::AsFirstInput, 1)
-          ->output();
-
-  copy->setType(
-      self_tracked->jit->type()->expect<c10::TensorType>()->withRequiresGrad(
-          src_tracked->jit->type()->expect<c10::TensorType>()->requiresGrad()));
-
-  // The copy_ node's output is now an alias of self, so mark it as such; this
-  // essentially mirrors what JITDispatch::fallback would do.
-  auto *aliased_input = _inplace_tracker.eraseCurrentAlias(self_tracked->jit);
-  if (aliased_input != nullptr) {
-    _inplace_tracker.registerAlias(aliased_input, copy);
-  }
-
-  self_tracked->jit = copy;
-
-  self.set_requires_grad(src.requires_grad());
-  logging::trace("[DISPATCHER][JIT] copyInplace: self tensor new jit ir %{}",
-                 self_tracked->jit->debugName());
-
-  return self;
 }
 
 void JITDispatch::registerEmptyTensor(const at::Tensor &tensor) {

@@ -18,7 +18,6 @@ add_mlir_dialect_library(poptorch_dialect
     ops/ElementWise.cpp
     ops/NormOpsHelpers.cpp
     ops/Poptorch.cpp
-    ops/TensorOps.cpp
   DEPENDS
     MLIRPoptorchIncGen
     MLIRPoptorchInterfacesIncGen

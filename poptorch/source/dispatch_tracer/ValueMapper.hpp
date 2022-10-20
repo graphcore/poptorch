@@ -96,6 +96,10 @@ public:
 
   poptorch_ir::TensorId getMLIRForTensor(const at::Tensor &t);
 
+  // There are cases where pytorch creates tensors of the wrong type (for
+  // example when copying data to the ipu from an tensor of integers). In this
+  // case we want to add the tensor anyway without running the type checks
+  void addTensorUnchecked(const at::Tensor &t, torch::jit::Value *val);
   void addTensor(const at::Tensor &t, torch::jit::Value *val);
 
   void addTensor(const at::Tensor &t, poptorch_ir::TensorId id);

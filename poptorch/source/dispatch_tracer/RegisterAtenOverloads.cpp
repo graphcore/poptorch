@@ -3,7 +3,9 @@
 #include <ATen/core/function_schema.h>
 #include <ATen/native/CPUFallback.h>
 #include <c10/core/ScalarType.h>
+#include <c10/core/TensorImpl.h>
 #include <torch/csrc/autograd/autograd_not_implemented_fallback.h>
+#include <torch/csrc/jit/frontend/source_range.h>
 #include <torch/csrc/jit/frontend/tracer.h>
 #include <torch/csrc/jit/ir/ir.h>
 #include <torch/csrc/jit/runtime/interpreter.h>
@@ -183,11 +185,22 @@ void hostSideCast(void *dest, c10::ScalarType dest_scalar_type, void *src,
 #endif
 
 // copy_(Tensor(a!) self, Tensor src, bool non_blocking=False) -> Tensor(a!)
-at::Tensor &copyInplace(at::Tensor &self, const at::Tensor &src,
-                        bool /*non_blocking*/) {
-  logging::trace("[DISPATCHER] Intercepting aten::copy_");
-  logging::trace("[Input copy_] self {}", str(self));
-  logging::trace("[Input copy_] src {}", str(src));
+void copyInplace(const c10::OperatorHandle &op, c10::Stack *stack) {
+  const c10::FunctionSchema &schema = op.schema();
+  const auto num_arguments = schema.arguments().size();
+  auto arguments = torch::jit::last(stack, num_arguments);
+
+  // In an ideal world self would be allowed to change to reflect type coercion.
+  // Unfortunately, pytorch's boxed function interface does not properly support
+  // outputs. To work around this if need to re-allocate self we map both the
+  // new and old values is the value mapper within the dispatcher.
+  // Self is marked as const here to ensure we don't accidentally change it
+  const at::Tensor self = arguments.at(0).toTensor();
+  const at::Tensor src = arguments.at(1).toTensor();
+
+  logging::debug("[DISPATCHER] Intercepting aten::copy_");
+  logging::trace("[Input] self {}", str(self));
+  logging::trace("[Input] src {}", str(src));
 
 #if POPTORCH_BUILD_MLIR_COMPILER
   if (!context.hasActiveDispatch()) {
@@ -199,7 +212,13 @@ at::Tensor &copyInplace(at::Tensor &self, const at::Tensor &src,
                    "Unsupported scalar type `"
                        << scalar_type << "'. Please cast to `" << coerced_type
                        << "' before moving this tensor to the IPU.");
-      self = context.tensor_store.copyCpuTensorAsIpuTensor(src);
+
+      ERROR_ON(self.scalar_type() != src.scalar_type());
+
+      logging::trace("[DISPATCHER] Copying CPU tensor {} with data_ptr {}",
+                     static_cast<void *>(src.unsafeGetTensorImpl()),
+                     src.data_ptr());
+      poptorch::TensorStore::copyCpuTensorAsIpuTensor(self, src);
     } else if (self.is_cpu() && src.is_xla()) {
       logging::trace("copy_ IPU -> CPU, outside dispatch");
       if (const std::shared_ptr<MLIRExecutor> executor =
@@ -237,8 +256,7 @@ at::Tensor &copyInplace(at::Tensor &self, const at::Tensor &src,
         ERROR_ON_MSG(self_buffer->size() != src_buffer->size(),
                      "Failed to copy_ outside dispatch: src and self host-side "
                      "buffer sizes are not equal.");
-        std::memcpy(self_buffer->data(), src_buffer->data(),
-                    tensorImplDataSize(*src.unsafeGetTensorImpl()));
+        *self_buffer = *src_buffer;
       }
     } else {
       ERROR("Intercepted unexpected copy_ outside dispatch: only copies "
@@ -246,7 +264,9 @@ at::Tensor &copyInplace(at::Tensor &self, const at::Tensor &src,
             "themselves are supported.");
     }
 
-    return self;
+    torch::jit::drop(stack, num_arguments);
+    torch::jit::push(stack, self);
+    return;
   }
 #endif
 
@@ -258,10 +278,8 @@ at::Tensor &copyInplace(at::Tensor &self, const at::Tensor &src,
     if (src.is_cpu()) {
       std::stringstream ss;
       ss << "copy_ CPU -> IPU ";
-      // TODO(T61574) use already allocated self instead of allocating a new
-      // tensor.
       if (isParameter(self)) {
-        self = context.activeDispatch()->addParameter(downCastIfNeeded(src));
+        context.activeDispatch()->addParameter(downCastIfNeeded(src), self);
         // Make sure the parameter flag is preserved.
         ss << "parameter";
       } else {
@@ -271,20 +289,23 @@ at::Tensor &copyInplace(at::Tensor &self, const at::Tensor &src,
             "to True.");
 
         if (context.graph_inputs.count(src.unsafeGetTensorImpl()) > 0) {
-          self = context.activeDispatch()->addInput(downCastIfNeeded(src));
+          context.activeDispatch()->addInput(downCastIfNeeded(src), self);
         } else {
-          self = context.activeDispatch()->addConstant(downCastIfNeeded(src));
+          context.activeDispatch()->addConstant(downCastIfNeeded(src), self);
         }
         ss << "input";
         // Make sure the parameter flag is preserved.
       }
       ss << ", new self " << str(self);
       logging::debug(ss.str().c_str());
+
+      torch::jit::drop(stack, num_arguments);
+      torch::jit::push(stack, self);
     } else {
       // TODO(T59880) rename is_xla() -> is_ipu()
       ERROR_ON(!src.is_xla());
-      logging::debug("copy_ IPU {} -> IPU {}", src.dtype(), self.dtype());
-      context.activeDispatch()->copyInplace(self, src);
+      logging::trace("copy_ IPU {} -> IPU {}", src.dtype(), self.dtype());
+      context.activeDispatch()->fallback(op, stack);
     }
   } else {
     ERROR_ON(!self.is_cpu());
@@ -295,6 +316,9 @@ at::Tensor &copyInplace(at::Tensor &self, const at::Tensor &src,
                    "dispatcher. Instead, return this output as an IPU tensor.");
       logging::debug("copy_ output IPU -> CPU");
       context.activeDispatch()->addOutput(src, self);
+
+      torch::jit::drop(stack, num_arguments);
+      torch::jit::push(stack, self);
     } else {
       ERROR("Unexpected tensor of type "
             << src.unsafeGetTensorImpl()->device_type()
@@ -302,8 +326,6 @@ at::Tensor &copyInplace(at::Tensor &self, const at::Tensor &src,
                "the IPU?");
     }
   }
-
-  return self;
 }
 
 } // namespace
@@ -690,12 +712,12 @@ std::uint64_t getIpuTensorId(const at::Tensor &tensor) {
   return ipuTensorId(tensor);
 }
 
-void promoteArgsAsInputs(std::vector<at::Tensor> &args) {
+void promoteArgsAsInputs(const std::vector<at::Tensor> &args) {
 #if POPTORCH_BUILD_MLIR_COMPILER
   auto *mlir = dynamic_cast<MLIRDispatch *>(context.activeDispatch());
   ERROR_ON(mlir == nullptr);
 
-  for (at::Tensor &arg : args) {
+  for (const at::Tensor &arg : args) {
     mlir->promoteAsInput(arg, true);
   }
 #else
@@ -704,12 +726,12 @@ void promoteArgsAsInputs(std::vector<at::Tensor> &args) {
 #endif
 }
 
-void promoteOutputs(std::vector<at::Tensor> &outputs) {
+void promoteOutputs(const std::vector<at::Tensor> &outputs) {
 #if POPTORCH_BUILD_MLIR_COMPILER
   auto *mlir = dynamic_cast<MLIRDispatch *>(context.activeDispatch());
   ERROR_ON(mlir == nullptr);
 
-  for (at::Tensor &out : outputs) {
+  for (const at::Tensor &out : outputs) {
     if (!getHostBuffer(out)) {
       initHostBuffer(out);
     }
