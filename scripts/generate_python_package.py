@@ -103,7 +103,7 @@ class ExtOnly:
         self.ext = ext
 
     def _is_ignored(self, file):
-        return not any([file.endswith(ext) for ext in self.ext])
+        return not any(file.endswith(ext) for ext in self.ext)
 
     def __call__(self, adir, filenames):
         # Return the files to ignore
@@ -150,10 +150,13 @@ with tempfile.TemporaryDirectory() as tmp_dir:
 
     # distutils doesn't like spaces in CXX (https://github.com/mapnik/python-mapnik/issues/99#issuecomment-527591113)
     env = {**os.environ}
+    cc = env.get("CC", "gcc")
     cxx = env.get("CXX", "g++")
-    if " " in cxx:
-        cxx = cxx.split(" ")[-1]
+    # Only keep the real compiler: e.g "cmake gcc" -> "gcc"
+    cc = cc.split(" ")[-1]
+    cxx = cxx.split(" ")[-1]
     env["CXX"] = cxx
+    env["CC"] = cc
     start = datetime.datetime.now()
     if args.target == "install":
         subprocess.check_call(
