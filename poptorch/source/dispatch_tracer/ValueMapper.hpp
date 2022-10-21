@@ -59,6 +59,7 @@ public:
   // Each tensor we are tracking has a short record containing a pointer to the
   // tensor and its corresponding values in the two IRs.
   struct TrackedTensor {
+    explicit TrackedTensor(std::shared_ptr<IpuTensorDetails> details);
     explicit TrackedTensor(const at::Tensor &tensor);
 
     // The PyTorch tensor impl. Most of the time it is "the tensor" on the
@@ -68,13 +69,10 @@ public:
     std::shared_ptr<IpuTensorDetails> tensor_details;
 
     // The value in JIT IR
-    torch::jit::Value *jit;
+    torch::jit::Value *jit = nullptr;
 
     // The value in our mlir backend.
-    poptorch_ir::TensorId mlir;
-
-    // Unique ID of the storage associated to this tensor.
-    IpuTensorId ipu_tensor_id;
+    poptorch_ir::TensorId mlir = poptorch_ir::tensor_error_id;
   };
 
   TrackedTensor *rawTensorRecord(const at::Tensor &t);
@@ -83,6 +81,7 @@ public:
 
   torch::jit::Value *getValueForTensor(const at::Tensor &t);
 
+  poptorch_ir::TensorId getMLIRForTensor(const IpuTensorDetails *t);
   poptorch_ir::TensorId getMLIRForTensor(const at::Tensor &t);
 
   // There are cases where pytorch creates tensors of the wrong type (for
@@ -91,6 +90,8 @@ public:
   void addTensorUnchecked(const at::Tensor &t, torch::jit::Value *val);
   void addTensor(const at::Tensor &t, torch::jit::Value *val);
 
+  void addTensor(std::shared_ptr<IpuTensorDetails> details,
+                 poptorch_ir::TensorId id);
   void addTensor(const at::Tensor &t, poptorch_ir::TensorId id);
 
   void addTensorList(const TensorList &list, torch::jit::Value *val);
@@ -118,7 +119,6 @@ public:
   // already be added to this mapper. The MLIR or JIT value will now map to the
   // same tensor details and PopTorch tensor id as the destination tensor.
   void aliasTensor(const std::shared_ptr<IpuTensorDetails> &dest_details,
-                   IpuTensorId dest_tensor_id,
                    const std::shared_ptr<IpuTensorDetails> &src_details);
 
   // Creating an alias from src to dest as above, but locating the original

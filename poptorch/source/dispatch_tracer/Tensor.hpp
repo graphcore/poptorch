@@ -37,6 +37,8 @@ struct IpuTensorDetails {
   // still be accessed through the ValueMapper.
   IpuTensorImpl *parent;
   ValueMapper *mapper = nullptr;
+  IpuTensorId tensor_id;
+
   poptorch_ir::TensorType type;
   std::vector<int64_t> strides;
   std::string name;

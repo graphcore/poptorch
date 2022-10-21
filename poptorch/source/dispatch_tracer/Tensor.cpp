@@ -79,7 +79,7 @@ struct IpuTensorImpl : public at::TensorImpl {
   // it exists). Shouldn't be called directly: use shallow_copy_and_detach()
   // instead.
   IpuTensorImpl(const IpuTensorImpl &src)
-      : IpuTensorImpl(src.dtype(), src.device(), src.tensor_id,
+      : IpuTensorImpl(src.dtype(), src.device(),
                       src.sizes_and_strides_.sizes_arrayref(),
                       src.sizes_and_strides_.strides_arrayref(),
                       std::make_shared<IpuTensorDetails>(*src.details)) {}
@@ -92,7 +92,7 @@ struct IpuTensorImpl : public at::TensorImpl {
   }
 
   IpuTensorImpl(const caffe2::TypeMeta data_type, c10::Device device,
-                uint64_t id, c10::IntArrayRef sizes, c10::IntArrayRef strides,
+                c10::IntArrayRef sizes, c10::IntArrayRef strides,
                 const std::shared_ptr<IpuTensorDetails> &details_)
       : at::TensorImpl(dispatch_key_set, data_type, device), details(details_) {
     details->parent = this;
@@ -103,7 +103,6 @@ struct IpuTensorImpl : public at::TensorImpl {
       sizes_and_strides_.stride_at(dim) = strides.at(dim);
     }
 
-    tensor_id = id;
     set_storage_access_should_throw();
     set_has_contiguity_policy(
         at::TensorImpl::HasContiguityPolicy::CustomBehavior);
@@ -122,7 +121,7 @@ struct IpuTensorImpl : public at::TensorImpl {
         /*allow_tensor_metadata_change=*/allow_tensor_metadata_change);
     impl->refresh_numel();
 
-    details->alias_of = this->tensor_id;
+    details->alias_of = this->details->tensor_id;
     if (details->mapper != nullptr) {
       details->mapper->addCopiedTensor(impl.get(), this);
     }
@@ -140,7 +139,7 @@ struct IpuTensorImpl : public at::TensorImpl {
         /*allow_tensor_metadata_change=*/allow_tensor_metadata_change);
     impl->refresh_numel();
 
-    details->alias_of = this->tensor_id;
+    details->alias_of = this->details->tensor_id;
     if (details->mapper != nullptr) {
       details->mapper->addCopiedTensor(impl.get(), this);
     }
@@ -170,7 +169,6 @@ struct IpuTensorImpl : public at::TensorImpl {
   }
 
   std::shared_ptr<IpuTensorDetails> details;
-  uint64_t tensor_id;
 
 private:
   const char *tensorimpl_type_name() const override { return "IpuTensorImpl"; }
@@ -272,11 +270,11 @@ bool IpuTensorDetails::isAlive() const {
 }
 
 uint64_t ipuTensorId(const at::Tensor &tensor) {
-  return toIpuTensorImpl(tensor)->tensor_id;
+  return getTensorDetails(tensor)->tensor_id;
 }
 
 uint64_t ipuTensorId(const at::TensorImpl &tensor) {
-  return toIpuTensorImpl(tensor)->tensor_id;
+  return toIpuTensorImpl(tensor)->details->tensor_id;
 }
 
 bool isIpuTensor(const at::Tensor &tensor) {
@@ -305,7 +303,7 @@ std::string str(const at::Tensor &tensor) {
     ss << " type " << device_type;
     if (device_type == at::DeviceType::XLA) {
       auto *ipu_tensor = toIpuTensorImpl(tensor);
-      ss << " ID " << ipu_tensor->tensor_id;
+      ss << " ID " << ipu_tensor->details->tensor_id;
       if (ipu_tensor->details->is_parameter) {
         ss << " is_parameter";
       }
@@ -357,10 +355,12 @@ at::Tensor TensorStore::allocateTensor(
   auto coerced_scalar_type = coerceToSupportedType(scalar_type);
   auto strides = at::detail::defaultStrides(size);
 
+  auto details = std::make_shared<IpuTensorDetails>();
+  details->tensor_id = _next_tensor_id++;
+
   at::Tensor output = at::detail::make_tensor<IpuTensorImpl>(
       c10::scalarTypeToTypeMeta(coerced_scalar_type),
-      deviceOrDefaultIpu(device), _next_tensor_id++, size, strides,
-      std::make_shared<IpuTensorDetails>());
+      deviceOrDefaultIpu(device), size, strides, std::move(details));
 
   for (size_t dim = 0; dim < size.size(); ++dim) {
     ERROR_ON_MSG(size.at(dim) < 0, "Invalid tensor shape: dimension "
