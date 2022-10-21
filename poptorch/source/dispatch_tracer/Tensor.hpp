@@ -6,9 +6,15 @@
 
 #include <memory>
 #include <string>
+#include <variant>
 #include <vector>
 
 #include "pytorch_bridge/CompilerTypes.hpp"
+#include "pytorch_bridge/IpuSession.hpp"
+
+namespace poptorch_ir {
+class IIpuSession;
+}
 
 namespace poptorch {
 
@@ -30,18 +36,24 @@ struct IpuTensorDetails {
   // still be accessed through the ValueMapper.
   IpuTensorImpl *parent;
   ValueMapper *mapper = nullptr;
-  std::vector<int64_t> sizes;
+  poptorch_ir::TensorType type;
   std::vector<int64_t> strides;
   std::string name;
   bool is_parameter = false;
   Buffer host_buffer;
   std::optional<std::uint64_t> alias_of;
 
+  poptorch_ir::TensorType getTensorType() const;
+  bool isAlive() const;
+
   int64_t dim();
   c10::IntArrayRef sizesArrayref();
   c10::IntArrayRef stridesArrayref();
   int64_t numel();
 };
+
+poptorch_ir::Type toCompilerType(const at::ScalarType &elem_type);
+poptorch_ir::Type toCompilerType(const at::Tensor &tensor);
 
 uint64_t tensorImplDataSize(const at::TensorImpl &impl);
 
@@ -85,8 +97,6 @@ getTensorDetails(const at::Tensor &ipu_tensor) {
 
 void errorOnZeroSizedTensor(const at::Tensor &tensor);
 
-void initHostBuffer(const at::Tensor &ipu_tensor);
-
 /** Host-side storage for `ipu` tensors.
  *
  *  This allows the user to convert tensors and modules to `ipu` using
@@ -102,6 +112,8 @@ public:
   TensorStore() = default;
   TensorStore(const TensorStore &) = delete;
   TensorStore(TensorStore &&) = delete;
+  TensorStore &operator=(TensorStore &) = delete;
+  TensorStore &operator=(TensorStore &&) = delete;
 
   // Create a new IPU tensor.
   at::Tensor
@@ -112,14 +124,27 @@ public:
                  c10::optional<bool> pin_memory = c10::nullopt,
                  c10::optional<at::MemoryFormat> memory_format = c10::nullopt);
 
-  // Create a new IPU tensor by copying the data from the given CPU tensor in to
-  // the new IPU tensor's host_buffer. Input tensor is a CPU tensor, returns an
-  // IPU tensor.
-  static void copyCpuTensorAsIpuTensor(const at::Tensor &ipu_tensor,
-                                       const at::Tensor &cpu_tensor);
+  void allocateBuffer(const at::Tensor &ipu_tensor);
+
+  void copyOnIpu(const at::Tensor &ipu_dest, const at::Tensor &ipu_src);
+  void copyFromCpu(const at::Tensor &ipu_dest, const at::Tensor &cpu_src);
+  void copyToCpu(const at::Tensor &cpu_dest, const at::Tensor &ipu_src);
+
+  void enableEagerMode();
+  const std::shared_ptr<poptorch_ir::IIpuSession> &getIpuSession() const;
+
+  void reset();
 
 private:
+  void allocateBuffer(IpuTensorDetails &details);
+
   poptorch_ir::TensorId _next_tensor_id{1};
+  std::shared_ptr<poptorch_ir::IIpuSession> _ipu_session =
+#if POPTORCH_BUILD_MLIR_COMPILER
+      poptorch_ir::createStaticSession();
+#else
+      nullptr;
+#endif
 };
 
 } // namespace poptorch

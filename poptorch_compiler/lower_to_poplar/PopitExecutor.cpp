@@ -2,6 +2,7 @@
 #include "lower_to_poplar/PopitExecutor.hpp"
 
 #include <mlir/IR/BuiltinOps.h>
+#include <mlir/IR/BuiltinTypes.h>
 #include <mlir/IR/MLIRContext.h>
 #include <mlir/Pass/Pass.h>
 #include <mlir/Pass/PassManager.h>
@@ -20,180 +21,95 @@
 #include <popit/Device.hpp>
 
 #include "CompilerHelpers.hpp"
-#include "PopitContext.hpp"
 #include "lower_to_poplar/IMLIRGraphConverter.hpp"
 #include "lower_to_poplar/NonRestartingMLIRTimer.hpp"
+#include "lower_to_poplar/PopitSession.hpp"
 #include "passes/LowerToPopit.hpp"
 #include "poptorch_logging/Error.hpp"
 #include "poptorch_logging/Logging.hpp"
+#include "pytorch_bridge/CompilerTypes.hpp"
 
 namespace poptorch_ir {
 
 namespace {
 class MLIRToPopitConverter final : public IMLIRGraphConverter {
 public:
-  explicit MLIRToPopitConverter(PopitContext &popit) : _context(popit) {}
+  explicit MLIRToPopitConverter(PopitDeviceFunction &func) : _func(func) {}
 
 protected:
   void addCustomPasses(mlir::PassManager &manager) override {
-    manager.addPass(createLowerToPopitPass(_context));
+    manager.addPass(createLowerToPopitPass(_func));
   }
 
 private:
-  PopitContext &_context;
+  PopitDeviceFunction &_func;
 };
 
-PopitMemPtr allocatePopitTensor(PopitContext &context,
-                                const mlir::RankedTensorType &type) {
-  const popit::TensorSpec tensor_spec = getTensorSpec(type);
-  const popit::TensorShape tensor_shape = tensor_spec.shape;
-  std::uint64_t numel =
-      std::accumulate(tensor_shape.begin(), tensor_shape.end(), 1,
-                      std::multiplies<std::uint64_t>{});
+auto extractInputsAndOutputs(
+    mlir::ModuleOp module,
+    const llvm::DenseMap<mlir::Value, TensorId> &mappings) {
+  std::vector<TensorId> inputs;
+  std::vector<TensorId> outputs;
 
-  return PopitMemPtr(
-      popit::malloc(context.session.get(), tensor_spec.type, numel));
-}
+  for (mlir::func::FuncOp function : module.getOps<mlir::func::FuncOp>()) {
+    inputs.clear();
+    outputs.clear();
+    inputs.reserve(function.getArguments().size());
+    llvm::transform(function.getArguments(), std::back_inserter(inputs),
+                    [&](const mlir::Value &argument) {
+                      auto it = mappings.find(argument);
+                      // This can only happen if a pass in MLIRToPopitConverter
+                      // replaces one of the graph inputs. We can't support this
+                      // because we've got no way to map the new graph input to
+                      // a Torch tensor.
+                      ERROR_ON_MSG(
+                          it == mappings.end(),
+                          "[Internal] Input Value not found in tensor map");
+                      return it->second;
+                    });
+    function.walk([&](poptorch_ir::output_tensor output) {
+      const auto it = mappings.find(output.tensor());
+      // This can only happen if a pass in MLIRToPopitConverter
+      // replaces one of the graph inputs. We can't support this
+      // because we've got no way to map the new graph input to
+      // a Torch tensor.
+      ERROR_ON_MSG(it == mappings.end(),
+                   "[Internal] Output Value not found in tensor map");
 
-bool containsPoplarOps(mlir::ModuleOp &module) {
-  bool found_op = false;
-  module.walk([&](PoplarImplInterface) {
-    found_op = true;
-    return mlir::WalkResult::interrupt();
-  });
-  return found_op;
+      outputs.emplace_back(it->second);
+    });
+  }
+
+  return std::pair(inputs, outputs);
 }
 } // namespace
 
-bool shouldWaitIfIpuIsUnavailable() {
-  bool wait = false;
-  if (const char *env_wait_for_ipu = std::getenv("POPTORCH_WAIT_FOR_IPU")) {
-    wait = std::stoi(env_wait_for_ipu) != 0;
-    poptorch::logging::info(
-        "From POPTORCH_WAIT_FOR_IPU environment variable: If no IPU "
-        "is available: {}",
-        wait ? "Wait" : "Fail & exit");
-  }
-  return wait;
-}
-
-popit::Device getPopitDevice() {
-  bool model_enabled = false;
-  if (const char *env_use_model = std::getenv("POPTORCH_IPU_MODEL")) {
-    model_enabled = std::stoi(env_use_model) != 0;
-    ERROR_ON_MSG(model_enabled, "IPU model is unsupported in eager mode");
-  }
-  if (const char *env_use_model = std::getenv("POPTORCH_SMALL_IPU_MODEL")) {
-    model_enabled = std::stoi(env_use_model) != 0;
-    ERROR_ON_MSG(model_enabled, "IPU model is unsupported in eager mode");
-  }
-
-  // Otherwise attempt to acquire hardware
-  popit::DeviceManager device_manager;
-  auto devices = device_manager.getDevices(/*requiredNumIpus=*/1);
-  if (devices.empty()) {
-    ERROR("No devices found");
-  }
-
-  bool wait_for_ipu = shouldWaitIfIpuIsUnavailable();
-  do {
-    for (auto &device : devices) {
-      if (device.attach()) {
-        return std::move(device);
-      }
-    }
-    if (wait_for_ipu) {
-      std::this_thread::sleep_for(std::chrono::seconds(1));
-    }
-  } while (wait_for_ipu);
-  ERROR("Failed to attach to any of the IPU devices.");
-  return popit::Device();
-}
-
-PopitContext::PopitContext()
-    : session(nullptr,
-              [](popit::Session *) { /* nothing to do for nullptr */ }),
-      device(getPopitDevice()) {}
-
-PopitContext::~PopitContext() {
-  tensors.clear();
-  session.reset();
-}
-
-PopitExecutor::PopitExecutor() : _context(std::make_unique<PopitContext>()) {
-  poplar::Target target = _context->device.getTarget();
-
-  _context->session =
-      std::unique_ptr<popit::Session_t, decltype(&popit::destroySession)>(
-          popit::createSession(&target),
-          [](popit::Session *s) { popit::destroySession(s); });
-  popit::connect(_context->session.get(), &_context->device);
-}
-
-PopitExecutor::~PopitExecutor() {}
-
-void PopitExecutor::addInput(const Buffer &ptr,
-                             const mlir::RankedTensorType &input, TensorId id) {
-  PopitMemPtr tensor = allocatePopitTensor(*_context, input);
-  popit::copyFromHost(ptr->data(), tensor.get());
-  ERROR_ON(!_context->tensors.try_emplace(id, tensor).second);
-}
-
-void PopitExecutor::readOutput(TensorId id, void *ptr) {
-  auto it = _context->tensors.find(id);
-  ERROR_ON_MSG(it == _context->tensors.end(), "Unknown tensor ID " << id);
-  poptorch::logging::trace("Copying tensor {} to host pointer {}", id, ptr);
-  popit::copyToHost(it->second.get(), reinterpret_cast<char *>(ptr));
-}
-
-void PopitExecutor::freeTensor(TensorId id) { _context->tensors.erase(id); }
-
-void PopitExecutor::compileAndRun(
-    mlir::ModuleOp module, NonRestartingMLIRTimer &timer,
-    const llvm::DenseMap<mlir::Value, TensorId> &mappings) {
-
-  if (!containsPoplarOps(module)) {
-    poptorch::logging::trace("MLIR graph empty: skipping compileAndRun()");
-    return;
-  }
+PopitDeviceFunction::PopitDeviceFunction(
+    EagerIpuSession &context, mlir::ModuleOp module,
+    NonRestartingMLIRTimer &timer,
+    const llvm::DenseMap<mlir::Value, TensorId> &mappings)
+    : _context(&context) {
 
   auto compile_popit = timer.nestAndScope("Compiling popit");
 
-  MLIRToPopitConverter converter(*_context);
+  std::tie(_input_ids, _output_ids) = extractInputsAndOutputs(module, mappings);
+
+  MLIRToPopitConverter converter{*this};
   converter.convertGraph(module, timer);
   compile_popit.stop();
+}
 
-  auto run_popit = timer.nestAndScope("Executing popit");
-
-  // Map graph input values to PopIT memory pointers.
-  std::vector<popit::Mem_t *> inputs;
-  inputs.reserve(_context->inputs.size());
-  for (auto &input : _context->inputs) {
-    auto it = mappings.find(input);
-    // This can only happen if a pass in MLIRToPopitConverter replaces one of
-    // the graph inputs. We can't support this because we've got no way to map
-    // the new graph input to a Torch tensor.
-    ERROR_ON_MSG(it == mappings.end(),
-                 "[Internal] Input Value not found in tensor map");
-    inputs.push_back(_context->tensors.at(it->second).get());
-  }
-
+void PopitDeviceFunction::run(const std::vector<popit::Mem_t *> &inputs,
+                              const std::vector<popit::Mem_t *> &outputs) {
   // Execute the function
-  std::vector<popit::Mem_t *> outputs =
-      popit::call(_context->session.get(), _context->popit_fn,
-                  /* ipuIndex=*/0, inputs);
+  popit::call(_context->session.get(), _popit_fn,
+              /* ipuIndex=*/0, inputs, outputs);
+}
 
-  // Map PopIT memory pointers to graph outputs.
-  ERROR_ON(outputs.size() != _context->output_ids.size());
-  for (std::uint64_t i = 0; i < outputs.size(); i++) {
-    auto id = _context->output_ids.at(i);
-    auto out = _context->tensors.find(id);
-    if (out == _context->tensors.end()) {
-      _context->tensors.try_emplace(id, PopitMemPtr(outputs.at(i)));
-    } else {
-      out->second = PopitMemPtr(outputs.at(i));
-    }
-  }
-  run_popit.stop();
+const std::vector<TensorId> &PopitDeviceFunction::getOutputs() const {
+  return _output_ids;
+}
+const std::vector<TensorId> &PopitDeviceFunction::getInputs() const {
+  return _input_ids;
 }
 } // namespace poptorch_ir

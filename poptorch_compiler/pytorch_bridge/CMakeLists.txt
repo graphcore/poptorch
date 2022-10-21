@@ -12,6 +12,7 @@ if (POPTORCH_BUILD_MLIR_COMPILER)
     PoplarExecutorWrapper.cpp
     Ops.cpp
     PytorchBridgeUtils.cpp
+    IpuSession.cpp
   )
 
 # This is needed as PopIR will look for its symbols in our MLIR static libs when it links against PopTorch.

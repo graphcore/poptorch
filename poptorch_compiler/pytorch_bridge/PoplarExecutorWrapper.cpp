@@ -50,11 +50,11 @@ void PoplarExecutorWrapper::execute(const std::vector<void *> &input_ptrs,
       // Release the source previously used and switch to the user provided
       // pointer.
       _impl->input_callbacks[i].buff.reset();
-      _impl->executor.connectStream(_impl->input_callbacks[i].name.data(),
+      _impl->executor.connectStream(_impl->input_callbacks[i].nameStringView(),
                                     input_ptrs[i]);
     } else {
       ERROR_ON(!_impl->input_callbacks[i].buff);
-      _impl->executor.connectStream(_impl->input_callbacks[i].name.data(),
+      _impl->executor.connectStream(_impl->input_callbacks[i].nameStringView(),
                                     _impl->input_callbacks[i].buff->data());
     }
   }
@@ -69,8 +69,8 @@ void PoplarExecutorWrapper::execute(const std::vector<void *> &input_ptrs,
         // Release the source previously used and switch to the user provided
         // pointer.
         _impl->output_callbacks[i].buff.reset();
-        _impl->executor.connectStream(_impl->output_callbacks[i].name.data(),
-                                      output_ptrs[i]);
+        _impl->executor.connectStream(
+            _impl->output_callbacks[i].nameStringView(), output_ptrs[i]);
       } else {
         ERROR("Missing output " << i);
       }

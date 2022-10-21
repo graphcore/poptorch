@@ -11,6 +11,8 @@
 
 namespace poptorch_ir {
 
+class Buffer;
+
 namespace detail {
 
 class MLIRStaticGraphCompiler : public IMLIRCompiler {
@@ -20,13 +22,12 @@ public:
   // Compile graph by running both PopTorch compiler passes and poplar
   // compilation.
   poptorch_ir::PoplarExecutor compile(const PoplarTarget &target);
-  TensorId addInput(const Buffer &ptr, const mlir::RankedTensorType &input,
+  TensorId addInput(const mlir::RankedTensorType &input,
                     const char *name) override;
 
-  TensorId addParameter(const Buffer &ptr,
-                        const mlir::RankedTensorType &parameter,
+  TensorId addParameter(Buffer &ptr, const mlir::RankedTensorType &parameter,
                         const char *name) override;
-  void addOutput(void *ptr, TensorId id, const char *name) override;
+  void addOutput(TensorId id, const char *name) override;
   void addReturn() override;
 
 private:

@@ -25,7 +25,10 @@
 
 #include "../CommonHelperFunctions.hpp"
 #include "../Tensor.hpp"
+#include "poptorch_logging/Error.hpp"
 #include "pytorch_bridge/CompilerTypes.hpp"
+#include "pytorch_bridge/IpuSession.hpp"
+#include "pytorch_bridge/PoptorchCompiler.hpp"
 
 namespace poptorch {
 
@@ -38,44 +41,6 @@ void setRequiresGradIfFloat(const at::Tensor &tensor) {
   if (c10::isFloatingType(tensor.scalar_type())) {
     tensor.set_requires_grad(true);
   }
-}
-
-poptorch_ir::Type toCompilerType(const at::ScalarType &elem_type) {
-  switch (elem_type) {
-  case at::ScalarType::Bool:
-    return poptorch_ir::Type::BOOL;
-  case at::ScalarType::Byte:
-    return poptorch_ir::Type::UNSIGNED_CHAR;
-  case at::ScalarType::Char:
-    return poptorch_ir::Type::CHAR;
-  case at::ScalarType::Float:
-  case at::ScalarType::Double: // We will convert this.
-    return poptorch_ir::Type::FLOAT;
-  case at::ScalarType::Half:
-    return poptorch_ir::Type::HALF;
-  case at::ScalarType::Short:
-    return poptorch_ir::Type::SHORT;
-  case at::ScalarType::Int:
-  case at::ScalarType::Long: // We will convert this.
-    return poptorch_ir::Type::INT;
-  default:
-    ERROR("Unsupported tensor input type from pytorch: " << elem_type);
-  }
-}
-
-poptorch_ir::Type toCompilerType(const at::Tensor &tensor) {
-  const at::ScalarType elem_type = tensor.scalar_type();
-
-  return toCompilerType(elem_type);
-}
-
-std::vector<std::int64_t> toCompilerShape(const at::Tensor &tensor) {
-  std::vector<std::int64_t> shape;
-  shape.reserve(tensor.dim());
-  for (const std::int64_t dim : tensor.sizes()) {
-    shape.push_back(dim);
-  }
-  return shape;
 }
 
 } // namespace
@@ -107,7 +72,7 @@ MLIRExecutor::execute(const std::vector<at::Tensor> &inputs) {
       if (tensor.is_xla()) {
         // This is the tensor we used to compile the executable: the pointer
         // was already set when _compiler.addInput() was called.
-        const auto &host_buffer = getHostBuffer(tensor);
+        const auto &host_buffer = getHostBuffer(tensor).getCpuData();
         ERROR_ON_MSG(!host_buffer,
                      "Attempted to pass an IPU tensor as input to `execute` "
                      "with no `host_buffer`.");
@@ -184,14 +149,17 @@ MLIRDispatch::MLIRDispatch(const CompilerOptions &options,
   _compiler.startTraceTiming();
 }
 
+void MLIRDispatch::reset() { *this = MLIRDispatch(_opts, _tensor_store); }
+
 void MLIRDispatch::initCompiler(const CompilerOptions &options) {
+  _opts = options;
   // Init our MLIR compiler.
-  if (options.eager.eager_mode) {
+  if (_opts.eager.eager_mode) {
     _compiler.init(poptorch_ir::ExecutionType::EagerMode,
-                   poptorch_ir::CompilerBackend::Poplar, options);
+                   poptorch_ir::CompilerBackend::Poplar, _opts);
   } else {
     _compiler.init(poptorch_ir::ExecutionType::StaticGraph,
-                   poptorch_ir::CompilerBackend::Poplar, options);
+                   poptorch_ir::CompilerBackend::Poplar, _opts);
   }
 }
 
@@ -222,7 +190,10 @@ void MLIRDispatch::addConstant(const at::Tensor &cpu_tensor,
                   coerced_cpu_tensor.scalar_type());
   }
 
-  const auto shape = ipu_tensor.sizes().vec();
+  // Create the IPU tensor constant.
+  const auto compiler_type = getTensorDetails(ipu_tensor)->getTensorType();
+
+  const auto &shape = compiler_type.shape;
 
   poptorch_ir::TensorId val;
   if (coerced_cpu_tensor.scalar_type() == c10::ScalarType::Float) {
@@ -246,7 +217,8 @@ void MLIRDispatch::addConstant(const at::Tensor &cpu_tensor,
       (c10::isFloatingType(cpu_dtype) && cpu_dtype != c10::ScalarType::Float &&
        cpu_dtype != c10::ScalarType::Double);
   if (should_recast) {
-    val = _compiler.cast(val, toCompilerType(cpu_dtype)).at(0).tensor_ids.at(0);
+    val =
+        _compiler.cast(val, compiler_type.element_type).at(0).tensor_ids.at(0);
   }
 
   logging::trace("[DISPATCHER] Adding constant: {} with cpu ptr {}",
@@ -259,9 +231,9 @@ void MLIRDispatch::addConstant(const at::Tensor &cpu_tensor,
 void MLIRDispatch::promoteAsParameter(const at::Tensor &tensor) {
   ERROR_ON(!isIpuTensor(tensor));
   const std::string str = "Parameter/" + std::to_string(_next_parameter_idx++);
+  const auto compiler_type = getTensorDetails(tensor)->getTensorType();
   const poptorch_ir::TensorId value = _compiler.addParameter(
-      poptorch::getHostBuffer(tensor), toCompilerShape(tensor),
-      toCompilerType(tensor), str.c_str());
+      poptorch::getHostBuffer(tensor), compiler_type, str.c_str());
   _mapper.addTensor(tensor, value);
   setIsParameter(tensor, true);
 }
@@ -275,9 +247,9 @@ void MLIRDispatch::promoteAsInput(const at::Tensor &tensor, bool is_wrapped) {
     ERROR("Attempted to promote a CPU tensor as an input to an IPU model.");
   }
   const std::string str = "Input/" + std::to_string(_next_input_idx++);
-  const poptorch_ir::TensorId value = _compiler.addInput(
-      poptorch::getHostBuffer(tensor), toCompilerShape(tensor),
-      toCompilerType(tensor), str.c_str());
+  const auto compiler_type = getTensorDetails(tensor)->getTensorType();
+  const poptorch_ir::TensorId value =
+      _compiler.addInput(compiler_type, str.c_str());
   _mapper.addTensor(tensor, value);
   setIsParameter(tensor, false);
 }
@@ -288,7 +260,7 @@ void MLIRDispatch::addInput(const at::Tensor &cpu_tensor,
   logging::trace("[DISPATCHER] Adding input: {} with cpu ptr {}",
                  static_cast<void *>(cpu_tensor.unsafeGetTensorImpl()),
                  cpu_tensor.data_ptr());
-  poptorch::TensorStore::copyCpuTensorAsIpuTensor(ipu_tensor, cpu_tensor);
+  _tensor_store->copyFromCpu(ipu_tensor, cpu_tensor);
   promoteAsInput(ipu_tensor);
 }
 
@@ -300,18 +272,18 @@ void MLIRDispatch::addParameter(const at::Tensor &cpu_tensor,
                  static_cast<void *>(cpu_tensor.unsafeGetTensorImpl()),
                  cpu_tensor.data_ptr());
 
-  poptorch::TensorStore::copyCpuTensorAsIpuTensor(ipu_tensor, cpu_tensor);
+  _tensor_store->copyFromCpu(ipu_tensor, cpu_tensor);
   promoteAsParameter(ipu_tensor);
 }
 
-void MLIRDispatch::promoteAsOutput(const at::Tensor &tensor, void *storage) {
+void MLIRDispatch::promoteAsOutput(const at::Tensor &tensor) {
   const std::string str = "Output/" + std::to_string(_next_output_idx++);
   const poptorch_ir::TensorId id = _mapper.getMLIRForTensor(tensor);
-  logging::trace("[DISPATCHER] Marking output: {} with storage ptr {}",
-                 static_cast<void *>(tensor.unsafeGetTensorImpl()), storage);
+  logging::trace("[DISPATCHER] Marking output: {}",
+                 static_cast<void *>(tensor.unsafeGetTensorImpl()));
 
   if (id != poptorch_ir::tensor_error_id && id != poptorch_ir::none_id) {
-    _compiler.addOutput(id, storage, str.c_str());
+    _compiler.addOutput(id, str.c_str());
   }
 }
 
@@ -321,8 +293,13 @@ bool MLIRDispatch::isDeferredEmptyTensor(const at::Tensor &tensor) const {
 
 void MLIRDispatch::addOutput(const at::Tensor &ipu_src,
                              const at::Tensor &cpu_dest) {
-  void *storage = cpu_dest.data_ptr();
-  promoteAsOutput(ipu_src, storage);
+  promoteAsOutput(ipu_src);
+
+  if (extractOutputImmediately()) {
+    markStep();
+
+    _tensor_store->copyToCpu(cpu_dest, ipu_src);
+  }
 }
 
 void MLIRDispatch::finalizeGraph() {
@@ -330,7 +307,66 @@ void MLIRDispatch::finalizeGraph() {
   _compiler.endTraceTiming();
 }
 
-void MLIRDispatch::markStep() { _compiler.compileRunAndReset(); }
+namespace {
+class AllocationMap : public poptorch_ir::IAllocationMap {
+public:
+  AllocationMap(ValueMapper &mapper, poptorch_ir::IIpuSession &session)
+      : _mapper(&mapper), _session(&session) {}
+
+  popit::Mem_t *getAllocation(poptorch_ir::TensorId id) const override {
+    auto *details = _mapper->getTensorDetailsForMlirId(id);
+    ERROR_ON(!details);
+    ERROR_ON(!details->host_buffer.hasData());
+    return details->host_buffer.getPopitData().get();
+  }
+  popit::Mem_t *getOrAllocate(poptorch_ir::TensorId id) override {
+    auto *details = _mapper->getTensorDetailsForMlirId(id);
+    ERROR_ON(!details);
+    if (!details->host_buffer.hasData()) {
+      details->host_buffer = _session->allocate(details->getTensorType());
+    }
+    return details->host_buffer.getPopitData().get();
+  }
+
+private:
+  ValueMapper *_mapper;
+  poptorch_ir::IIpuSession *_session;
+};
+
+class LivenessMap : public poptorch_ir::ILivenessMap {
+public:
+  explicit LivenessMap(ValueMapper &mapper) : _mapper{&mapper} {}
+  bool isAlive(poptorch_ir::TensorId id) const override {
+    auto *details = _mapper->getTensorDetailsForMlirId(id);
+    return details != nullptr && details->isAlive();
+  }
+
+private:
+  ValueMapper *_mapper;
+};
+
+template <typename Func> class CallOnExit : Func {
+public:
+  explicit CallOnExit(Func f) : Func(std::move(f)) {}
+  ~CallOnExit() { std::invoke(*static_cast<Func *>(this)); }
+};
+} // namespace
+
+void MLIRDispatch::markStep() {
+  // Reset the dispatcher after compiling so it can be reused
+  const auto cleanup = CallOnExit([&] { reset(); });
+
+  if (_compiler.isTrivialGraph()) {
+    poptorch::logging::trace("MLIR graph empty: skipping compilation()");
+    return;
+  }
+
+  const LivenessMap liveness_map{_mapper};
+  auto device_func =
+      _compiler.compile(*_tensor_store->getIpuSession(), liveness_map);
+  AllocationMap alloc_map{_mapper, *_tensor_store->getIpuSession()};
+  device_func.run(alloc_map);
+}
 
 void packStack(c10::Stack & /*unused*/) {}
 
@@ -382,7 +418,7 @@ void MLIRDispatch::detach(const c10::OperatorHandle &op, c10::Stack *stack,
 const std::vector<std::vector<char>> &
 MLIRDispatch::getSourceLocationExcludes() const {
 #if POPTORCH_BUILD_MLIR_COMPILER
-  return _compiler.getOptions().dispatcher.source_location_excludes;
+  return _opts.dispatcher.source_location_excludes;
 #else
   return {};
 #endif
@@ -439,6 +475,7 @@ std::string MLIRDispatch::handleOp(const c10::OperatorHandle &op,
 }
 
 void MLIRDispatch::findAndPromoteExternalTensors(c10::Stack *stack) {
+#if POPTORCH_BUILD_MLIR_COMPILER
   for (auto &value : *stack) {
     if (!value.isTensor()) {
       continue;
@@ -446,14 +483,21 @@ void MLIRDispatch::findAndPromoteExternalTensors(c10::Stack *stack) {
 
     auto &tensor = value.toTensor();
 
-    if (!isEagerMode() && isIpuTensor(tensor) && !_mapper.hasMapping(tensor)) {
+    // Note: that tensors constructed from empty_tensor are ipu tensors that
+    // don't live in the value mapper without data. All other tensor arguments
+    // should have data
+    if (isIpuTensor(tensor) && !_mapper.hasMapping(tensor) &&
+        getHostBuffer(tensor).hasData()) {
       if (const auto original = getTensorDetails(tensor)->alias_of) {
         _aliases_to_restore.push_back(getTensorDetails(tensor).get());
       }
+      logging::trace("[DISPATCHER] Adding parameter {} from tensor store",
+                     str(tensor));
 
       promoteAsParameter(tensor);
     }
   }
+#endif
 }
 
 void MLIRDispatch::fallback(const c10::OperatorHandle &op, c10::Stack *stack) {
@@ -468,8 +512,10 @@ void MLIRDispatch::fallback(const c10::OperatorHandle &op, c10::Stack *stack) {
 
   ERROR_ON_MSG(!_compiler.allOpsCanBeLoweredToPoplar(),
                schema_key << " cannot currently be lowered to Poplar");
-  // Let the compiler know we added a new op to the graph.
-  _compiler.onOpAdded();
+
+  if (shouldRunAllOpsSynchronously()) {
+    markStep();
+  }
 }
 
 void MLIRDispatch::restoreAliases() {
@@ -734,9 +780,19 @@ std::vector<at::Tensor> MLIRDispatch::makeEmptyOutputTensorList(
   return output;
 }
 
+bool MLIRDispatch::isEagerMode() const { return _opts.eager.eager_mode; }
+
+bool MLIRDispatch::shouldRunAllOpsSynchronously() const {
+  return _opts.eager.eager_mode && !_opts.eager.use_lazy_tensor;
+}
+
+bool MLIRDispatch::extractOutputImmediately() const {
+  return _opts.eager.eager_mode;
+}
+
 CompilerOptions &MLIRDispatch::getMutableCompilerOptions() {
 #if POPTORCH_BUILD_MLIR_COMPILER
-  return _compiler.getMutableOptions();
+  return _opts;
 #else
   ERROR("PopTorch must be compiled with POPTORCH_BUILD_MLIR_COMPILER=ON");
 #endif
@@ -883,14 +939,14 @@ std::optional<const char *> toOptionalStr(c10::IValue &value) {
 }
 
 poptorch_ir::Type toCompilerType(c10::IValue &value) {
-  return toCompilerType(value.toScalarType());
+  return poptorch::toCompilerType(value.toScalarType());
 }
 
 std::optional<poptorch_ir::Type> toOptionalCompilerType(c10::IValue &value) {
   if (value.isNone()) {
     return std::nullopt;
   }
-  return toCompilerType(value.toScalarType());
+  return poptorch::toCompilerType(value.toScalarType());
 }
 
 std::optional<double> toOptionalDouble(c10::IValue &value) {
@@ -914,7 +970,4 @@ std::optional<double> toOptionalDouble(c10::IValue &value) {
 #include "PoptorchToMLIRInterface.cpp.inc"
 #include "TorchScatterToMLIRInterface.cpp.inc"
 
-bool MLIRDispatch::isEagerMode() const {
-  return _compiler.getOptions().eager.eager_mode;
-}
 } // namespace poptorch

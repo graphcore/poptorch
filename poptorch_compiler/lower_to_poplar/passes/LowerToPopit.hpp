@@ -16,10 +16,10 @@ class TensorSpec;
 
 namespace poptorch_ir {
 
-class PopitContext;
+class PopitDeviceFunction;
 
 std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
-createLowerToPopitPass(PopitContext &context);
+createLowerToPopitPass(PopitDeviceFunction &func);
 
 popit::TensorSpec getTensorSpec(mlir::Type mlirType);
 

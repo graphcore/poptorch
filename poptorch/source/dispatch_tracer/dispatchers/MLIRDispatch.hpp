@@ -14,6 +14,7 @@
 
 // We don't build this on Centos TODO(T49566)
 #if POPTORCH_BUILD_MLIR_COMPILER
+#include "pytorch_bridge/CompilerOptions.hpp"
 #include "pytorch_bridge/PoptorchCompiler.hpp"
 #endif
 
@@ -21,7 +22,6 @@
 #include "IDispatch.hpp"
 
 namespace poptorch {
-struct CompilerOptions;
 
 class MLIRDispatch : public IDispatch {
 public:
@@ -47,7 +47,7 @@ public:
 
   void promoteAsInput(const at::Tensor &tensor, bool is_wrapped = false);
 
-  void promoteAsOutput(const at::Tensor &tensor, void *storage);
+  void promoteAsOutput(const at::Tensor &tensor);
 
   poptorch_ir::TensorId addEmptyTensorOp(const at::Tensor &tensor);
 
@@ -90,6 +90,8 @@ public:
       const std::vector<bool> &requires_grad);
 
   bool isEagerMode() const;
+  bool shouldRunAllOpsSynchronously() const;
+  bool extractOutputImmediately() const;
   CompilerOptions &getMutableCompilerOptions();
   const std::vector<std::vector<char>> &getSourceLocationExcludes() const final;
 
@@ -114,6 +116,9 @@ private:
   void
   setCurrentCodeLocation(const torch::jit::SourceRange &source_location) final;
 
+  // Reset the dispatcher back to first construction
+  void reset();
+
   void initCompiler(const CompilerOptions &compilerOptions);
 // We don't build this on Centos TODO(T49566)
 #if POPTORCH_BUILD_MLIR_COMPILER
@@ -135,6 +140,10 @@ private:
   // We have a set of handlers which just map an ATEN node directly onto an MLIR
   // operation.
   static const DispatchTable direct_dispatch_lookup;
+
+#if POPTORCH_BUILD_MLIR_COMPILER
+  CompilerOptions _opts;
+#endif
 
   std::vector<IpuTensorDetails *> _aliases_to_restore;
   void restoreAliases();

@@ -64,8 +64,8 @@ poptorch_core.setCustomCodeletsPath(
 
 
 @atexit.register
-def poptorchCleanUp():
-    poptorch_core.destroyDispatcher()
+def poptorchAtExit():
+    poptorch_core.poptorchAtExit()
 
 
 def load(filename: str,
@@ -89,7 +89,7 @@ def load(filename: str,
     try:
         data = _poptorch_data.parse(serialized_data, __version__)
     except AssertionError as e:
-        raise AssertionError("Invalid file %s: %s" % (filename, e))
+        raise AssertionError("Invalid file %s: %s" % (filename, e)) from e
 
     assert data.model and data.training is not None, (
         f"{filename} is a valid PopTorch file but was created"

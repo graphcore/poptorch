@@ -1,6 +1,7 @@
 // Copyright (c) 2021 Graphcore Ltd. All rights reserved.
 #include "LowerToPopit.hpp"
 
+#include <iterator>
 #include <string>
 #include <utility>
 #include <vector>
@@ -12,23 +13,24 @@
 #include "mlir/IR/Verifier.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
+#include "llvm/ADT/STLExtras.h"
 
 #include "../CompilerHelpers.hpp"
-#include "../PopitContext.hpp"
 #include "passes/PassUtils.hpp"
 
+#include <popit/functions.hpp>
 #include <poplar/Graph.hpp>
 #include <poplar/Program.hpp>
 #include <popops/Fill.hpp>
 #include <poprand/RandomGen.hpp>
 
 #include "dialect/PoptorchDialect.hpp"
+#include "lower_to_poplar/PopitExecutor.hpp"
+#include "lower_to_poplar/PopitSession.hpp"
 #include "poptorch_logging/Error.hpp"
 #include "poptorch_logging/Logging.hpp"
 
 namespace poptorch_ir {
-
-namespace {
 
 /*
   Converts the MLIR graph into a poplar graph which can then be compiled
@@ -38,7 +40,7 @@ class LowerToPopit final
     : public mlir::PassWrapper<LowerToPopit,
                                mlir::OperationPass<mlir::ModuleOp>> {
 public:
-  void init(PopitContext *context) { _context = context; }
+  explicit LowerToPopit(PopitDeviceFunction *func) : _func(func) {}
 
   void runOnOperation() override;
 
@@ -53,7 +55,7 @@ private:
   // Verify operations using MLIR's verifier.
   static void verifyOperations(const mlir::func::FuncOp &function);
 
-  PopitContext *_context;
+  PopitDeviceFunction *_func;
 };
 
 void LowerToPopit::runOnOperation() {
@@ -67,34 +69,25 @@ void LowerToPopit::runOnOperation() {
     first_function = false;
     verifyOperations(function);
 
-    // Find all the inputs
-    _context->inputs.clear();
-    _context->inputs.reserve(function.getNumArguments());
-    for (auto &argument : function.getArguments()) {
-      _context->inputs.push_back(argument);
-    }
-
-    // Create the PopIT specs.
+    // Find all the inputs and create the PopIT specs.
     std::vector<popit::TensorSpec> input_specs;
-    input_specs.reserve(_context->inputs.size());
-    for (auto &input : _context->inputs) {
-      input_specs.push_back(getTensorSpec(input.getType()));
-    }
+    input_specs.reserve(function.getArguments().size());
+    llvm::transform(
+        function.getArguments(), std::back_inserter(input_specs),
+        [](const auto &argument) { return getTensorSpec(argument.getType()); });
 
-    // This lambda will actually be called by popitCall, so we need to make
-    // sure it doesn't depend on "this" as this object will not exist anymore
-    // and it will segfault.
-    PopitContext *ctx = _context;
     auto popit_fn =
-        [&](poplar::Graph &graph, std::vector<poplar::Tensor> &tensors,
+        [&function](
+            poplar::Graph &graph, std::vector<poplar::Tensor> &tensors,
             poplar::program::Sequence &program) -> std::vector<poplar::Tensor> {
       CompilerContext context(graph, program);
 
       // Add all the graph inputs to the context.
-      ERROR_ON_MSG(ctx->inputs.size() != tensors.size(),
+      ERROR_ON_MSG(function.getArguments().size() != tensors.size(),
                    "Number of inputs mismatch");
-      for (std::uint64_t i = 0; i < tensors.size(); i++) {
-        context.addTensor(ctx->inputs.at(i), tensors.at(i));
+      for (const auto &[input, poplar_tensor] :
+           llvm::zip(function.getArguments(), tensors)) {
+        context.addTensor(input, poplar_tensor);
       }
 
       // Walk over all functions with a poplar impl.
@@ -103,19 +96,17 @@ void LowerToPopit::runOnOperation() {
 
       // All the tensors that were written to are outputs.
       std::vector<poplar::Tensor> outputs;
-      ctx->output_ids.clear();
       function.walk([&](poptorch_ir::output_tensor output) {
         outputs.push_back(context.fromSsa(output.tensor()));
-        ctx->output_ids.push_back(output.tensorIdAttr().getInt());
       });
 
       return outputs;
     };
 
     // Add the function
-    _context->popit_fn =
-        popit::addFunction(_context->session.get(), input_specs, /*inouts=*/{},
-                           popit_fn, function.getName().str());
+    _func->_popit_fn =
+        popit::addFunction(_func->_context->session.get(), input_specs,
+                           /*inouts=*/{}, popit_fn, function.getName().str());
   }
 }
 
@@ -153,8 +144,6 @@ void LowerToPopit::verifyOperations(const mlir::func::FuncOp &function) {
   }
 }
 
-} // namespace
-
 popit::TensorSpec getTensorSpec(mlir::Type mlirType) {
   // Turn it into a ranked tensor.
   mlir::RankedTensorType const tensor_type =
@@ -173,13 +162,12 @@ popit::TensorSpec getTensorSpec(mlir::Type mlirType) {
   return {type, shape};
 }
 
+// Note: this pass isn't registered because it doesn't have any side effect
+// visible in the graph
 std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
-createLowerToPopitPass(PopitContext &context) {
-  auto pass = std::make_unique<LowerToPopit>();
-  pass->init(&context);
+createLowerToPopitPass(PopitDeviceFunction &func) {
+  auto pass = std::make_unique<LowerToPopit>(&func);
   return std::move(pass);
 }
 
 } // namespace poptorch_ir
-
-static mlir::PassRegistration<poptorch_ir::LowerToPopit> lower;

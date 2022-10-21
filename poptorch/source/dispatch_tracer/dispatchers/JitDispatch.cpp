@@ -97,7 +97,7 @@ void JITDispatch::addTensor(const at::Tensor &cpu_tensor,
   errorOnZeroSizedTensor(cpu_tensor);
 
   const auto src = cpu_tensor.to(ipu_tensor.dtype());
-  TensorStore::copyCpuTensorAsIpuTensor(ipu_tensor, src);
+  _tensor_store->copyFromCpu(ipu_tensor, src);
 
   torch::jit::Value *value = graph->addInput(cpu_tensor.name());
   // Add tensor to the values attribute of the graph's param node, so that

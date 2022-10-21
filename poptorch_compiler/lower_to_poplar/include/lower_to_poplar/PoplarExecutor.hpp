@@ -56,8 +56,8 @@ public:
   // Connect to a poplar stream with a fixed location in memory.
   // Each time Poplar copies data to/from the named stream, it will read/write
   // to/from this memory locaiton.
-  void connectStream(const std::string &string, void *ptr);
-  void connectStream(const std::string &string, Buffer ptr);
+  void connectStream(std::string_view string, void *ptr);
+  void connectStream(std::string_view string, CpuBuffer ptr);
 
 private:
   // Impl

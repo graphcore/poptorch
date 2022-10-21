@@ -18,6 +18,16 @@ namespace detail {
 
 namespace {
 
+bool containsPoplarOps(const mlir::ModuleOp &module) {
+  bool found_op = false;
+  // mlir does not have a const version of walk despite it being useful
+  const_cast<mlir::ModuleOp &>(module).walk([&](PoplarImplInterface) {
+    found_op = true;
+    return mlir::WalkResult::interrupt();
+  });
+  return found_op;
+}
+
 mlir::LogicalResult printDiagnostic(mlir::Diagnostic &d) {
   poptorch::logging::Level lvl;
   switch (d.getSeverity()) {
@@ -72,7 +82,7 @@ bool higherThan(mlir::Type &lhs, mlir::Type &rhs) {
 IMLIRCompiler::IMLIRCompiler(const poptorch::CompilerOptions &options)
     : root_timer(timing_manager.getRootTimer()),
       _builder(mlir::UnknownLoc::get(&context), &context),
-      _compiler_options(options) {
+      _compiler_options(&options) {
 
   context.getDiagEngine().registerHandler(printDiagnostic);
 
@@ -81,6 +91,10 @@ IMLIRCompiler::IMLIRCompiler(const poptorch::CompilerOptions &options)
   context.loadDialect<poptorch_ir::PoptorchDialect>();
 
   resetMainGraph();
+}
+
+bool IMLIRCompiler::isTrivialGraph() const {
+  return !containsPoplarOps(_the_module);
 }
 
 void IMLIRCompiler::addGlobalState(std::string_view name,
@@ -146,7 +160,7 @@ TensorId IMLIRCompiler::addValue(const mlir::Value &value) {
   return _value_map.size() - 1;
 }
 
-mlir::Value IMLIRCompiler::findValue(TensorId tensor) {
+mlir::Value IMLIRCompiler::findValue(TensorId tensor) const {
   return _value_map.at(tensor);
 }
 
@@ -165,7 +179,7 @@ void IMLIRCompiler::resetMainGraph() {
   }
 }
 
-llvm::DenseMap<mlir::Value, TensorId> IMLIRCompiler::getValueMappings() {
+llvm::DenseMap<mlir::Value, TensorId> IMLIRCompiler::getValueMappings() const {
   llvm::DenseMap<mlir::Value, TensorId> mappings;
   for (std::uint64_t i = 0; i < _value_map.size(); ++i) {
     const auto val = _value_map[i];

@@ -5,8 +5,10 @@
 #include <mlir/IR/Operation.h>
 #include <mlir/Support/Timing.h>
 
+#include <memory>
 #include <utility>
 
+#include "lower_to_poplar/PopitSession.hpp"
 #include "lower_to_poplar/PoplarDeviceAndTarget.hpp"
 #include "pytorch_bridge/CompilerOptions.hpp"
 #include "pytorch_bridge/PytorchBridgeUtils.hpp"
@@ -27,6 +29,10 @@ PoptorchCompiler::~PoptorchCompiler() {
   }
 }
 
+PoptorchCompiler::PoptorchCompiler(PoptorchCompiler &&other) = default;
+PoptorchCompiler &
+PoptorchCompiler::operator=(PoptorchCompiler &&other) = default;
+
 void PoptorchCompiler::init(ExecutionType execution_type,
                             CompilerBackend compiler_backend,
                             const poptorch::CompilerOptions &options) {
@@ -43,22 +49,10 @@ void PoptorchCompiler::init(ExecutionType execution_type,
   ERROR_ON(_impl == nullptr);
 }
 
-const poptorch::CompilerOptions &PoptorchCompiler::getOptions() const {
-  return const_cast<PoptorchCompiler *>(this)->getMutableOptions();
-}
+TensorId PoptorchCompiler::addInput(const TensorType &type, const char *name) {
+  const mlir::RankedTensorType tensor = _impl->getTensor(type);
 
-poptorch::CompilerOptions &PoptorchCompiler::getMutableOptions() {
-  return _impl->getMutableOptions();
-}
-
-void PoptorchCompiler::onOpAdded() { _impl->onOpAdded(); }
-
-TensorId PoptorchCompiler::addInput(const Buffer &ptr,
-                                    const std::vector<std::int64_t> &shape,
-                                    Type type, const char *name) {
-  const mlir::RankedTensorType tensor = _impl->getTensor(type, shape);
-
-  return _impl->addInput(ptr, tensor, name);
+  return _impl->addInput(tensor, name);
 }
 
 void PoptorchCompiler::setCurrentPythonCodeLocation(const char *filename,
@@ -70,16 +64,15 @@ void PoptorchCompiler::setCurrentPythonCodeLocation(const char *filename,
   }
 }
 
-TensorId PoptorchCompiler::addParameter(const Buffer &ptr,
-                                        const std::vector<std::int64_t> &shape,
-                                        Type type, const char *name) {
-  const mlir::RankedTensorType tensor = _impl->getTensor(type, shape);
+TensorId PoptorchCompiler::addParameter(Buffer &ptr, const TensorType &type,
+                                        const char *name) {
+  const mlir::RankedTensorType tensor = _impl->getTensor(type);
 
   return _impl->addParameter(ptr, tensor, name);
 }
 
-void PoptorchCompiler::addOutput(TensorId id, void *ptr, const char *name) {
-  _impl->addOutput(ptr, id, name);
+void PoptorchCompiler::addOutput(TensorId id, const char *name) {
+  _impl->addOutput(id, name);
 }
 
 void PoptorchCompiler::startTraceTiming() {
@@ -128,11 +121,17 @@ bool PoptorchCompiler::allOpsCanBeLoweredToPoplar() const {
   return _impl->allOpsCanBeLoweredToPoplar();
 }
 
-void PoptorchCompiler::compileRunAndReset() {
+bool PoptorchCompiler::isTrivialGraph() const {
+  return _impl->isTrivialGraph();
+}
+PopitDeviceFunctionWrapper
+PoptorchCompiler::compile(IIpuSession &session, const ILivenessMap &liveness) {
   auto *compiler = dynamic_cast<detail::MLIREagerCompiler *>(_impl.get());
-  ERROR_ON_MSG(compiler == nullptr,
-               "[Internal] Only eager builders can compileRunAndReset()");
-  compiler->compileRunAndReset();
+
+  ERROR_ON_MSG(
+      compiler == nullptr,
+      "[internal] Only eager builders may call compile(session, liveness)");
+  return compiler->compile(dynamic_cast<EagerIpuSession &>(session), liveness);
 }
 
 std::unique_ptr<PoplarExecutorWrapper> PoptorchCompiler::compileAndLoad() {
@@ -150,8 +149,9 @@ std::unique_ptr<PoplarExecutorWrapper> PoptorchCompiler::compileAndLoad() {
   exe.load(device);
 
   for (auto &pair : compiler->weight_callbacks) {
-    exe.connectStream(std::string("Write-") + pair.name.data(), pair.buff);
-    exe.connectStream(std::string("Read-") + pair.name.data(),
+    exe.connectStream(
+        std::string("Write-") + std::string(pair.nameStringView()), pair.buff);
+    exe.connectStream(std::string("Read-") + std::string(pair.nameStringView()),
                       std::move(pair.buff));
   }
   compiler->weight_callbacks.clear();

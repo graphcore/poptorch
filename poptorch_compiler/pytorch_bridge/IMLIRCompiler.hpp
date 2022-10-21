@@ -22,6 +22,8 @@
 
 namespace poptorch_ir {
 
+class Buffer;
+
 namespace detail {
 
 // Returns the element type of an MLIR value.
@@ -256,6 +258,8 @@ public:
   explicit IMLIRCompiler(const poptorch::CompilerOptions &options);
   virtual ~IMLIRCompiler() = default;
 
+  bool isTrivialGraph() const;
+
   mlir::Type convertType(Type type);
 
   mlir::RankedTensorType getTensor(Type type,
@@ -266,17 +270,15 @@ public:
 
   mlir::Value addArgumentToMainGraph(mlir::Type argType);
 
-  virtual TensorId addInput(const Buffer &ptr,
-                            const mlir::RankedTensorType &input,
+  virtual TensorId addInput(const mlir::RankedTensorType &input,
                             const char *name) = 0;
 
-  virtual TensorId addParameter(const Buffer &ptr,
+  virtual TensorId addParameter(Buffer &ptr,
                                 const mlir::RankedTensorType &parameter,
                                 const char *name) = 0;
-  virtual void addOutput(void *ptr, TensorId id, const char *name) = 0;
+  virtual void addOutput(TensorId id, const char *name) = 0;
   virtual void addReturn() = 0;
 
-  virtual void onOpAdded() {}
   // Print module to stderr
   void dump() { _the_module->dump(); }
 
@@ -301,9 +303,7 @@ public:
 
   virtual TensorId addValue(const mlir::Value &value);
 
-  // Can't be const because in some cases it might trigger some graph
-  // modification.
-  virtual mlir::Value findValue(TensorId tensor);
+  mlir::Value findValue(TensorId tensor) const;
 
   // Update the MLIR value associated to a tensor id.
   // This is needed when an inplace view op changes the
@@ -314,8 +314,6 @@ public:
   void updateTensor(TensorId id, mlir::Value new_value);
 
   bool allOpsCanBeLoweredToPoplar() const;
-
-  poptorch::CompilerOptions &getMutableOptions() { return _compiler_options; }
 
 protected:
   struct Graph {
@@ -379,7 +377,7 @@ protected:
     return new_op;
   }
 
-  llvm::DenseMap<mlir::Value, TensorId> getValueMappings();
+  llvm::DenseMap<mlir::Value, TensorId> getValueMappings() const;
 
 public:
   // We need to maintain some MLIR state.
@@ -412,7 +410,7 @@ protected:
   mlir::ModuleOp _the_module;
 
   // Options to use in the compiler
-  poptorch::CompilerOptions _compiler_options;
+  const poptorch::CompilerOptions *_compiler_options;
 };
 
 } // namespace detail

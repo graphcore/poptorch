@@ -3,8 +3,10 @@
 
 #include <ATen/ATen.h>
 #include <ATen/OpaqueTensorImpl.h>
+#include <c10/core/ScalarType.h>
 
 #include <functional>
+#include <iterator>
 #include <memory>
 #include <numeric>
 #include <string>
@@ -18,6 +20,7 @@
 #include "poptorch/Utils.hpp"
 #include "poptorch_logging/Error.hpp"
 #include "poptorch_logging/Logging.hpp"
+#include "pytorch_bridge/CompilerTypes.hpp"
 
 namespace poptorch {
 
@@ -30,12 +33,40 @@ c10::DispatchKeySet dispatch_key_set{c10::DispatchKey::XLA,
 
 } // namespace
 
+poptorch_ir::Type toCompilerType(const at::ScalarType &elem_type) {
+  switch (elem_type) {
+  case at::ScalarType::Bool:
+    return poptorch_ir::Type::BOOL;
+  case at::ScalarType::Byte:
+    return poptorch_ir::Type::UNSIGNED_CHAR;
+  case at::ScalarType::Char:
+    return poptorch_ir::Type::CHAR;
+  case at::ScalarType::Float:
+  case at::ScalarType::Double: // We will convert this.
+    return poptorch_ir::Type::FLOAT;
+  case at::ScalarType::Half:
+    return poptorch_ir::Type::HALF;
+  case at::ScalarType::Short:
+    return poptorch_ir::Type::SHORT;
+  case at::ScalarType::Int:
+  case at::ScalarType::Long: // We will convert this.
+    return poptorch_ir::Type::INT;
+  default:
+    ERROR("Unsupported tensor input type from pytorch: " << elem_type);
+  }
+}
+
+poptorch_ir::Type toCompilerType(const at::Tensor &tensor) {
+  auto dtype = tensor.dtype();
+  return toCompilerType(dtype.toScalarType());
+}
+
 // Return the data size in bytes of a tensor (i.e num_elems * elem_size)
 uint64_t tensorImplDataSize(const at::TensorImpl &impl) {
   auto shape = impl.sizes();
-  std::int64_t const nelems = std::accumulate(shape.begin(), shape.end(), 1,
+  const std::int64_t nelems = std::accumulate(shape.begin(), shape.end(), 1,
                                               std::multiplies<std::int64_t>());
-  auto elem_size = impl.itemsize();
+  const auto elem_size = impl.itemsize();
   return nelems * elem_size;
 }
 
@@ -53,10 +84,11 @@ struct IpuTensorImpl : public at::TensorImpl {
                       src.sizes_and_strides_.strides_arrayref(),
                       std::make_shared<IpuTensorDetails>(*src.details)) {}
 
-  ~IpuTensorImpl() {
-    details->parent = nullptr;
-    details->sizes = sizes_and_strides_.sizes_arrayref().vec();
+  void release_resources() override {
+    details->type = details->getTensorType();
     details->strides = sizes_and_strides_.strides_arrayref().vec();
+    details->parent = nullptr;
+    details.reset();
   }
 
   IpuTensorImpl(const caffe2::TypeMeta data_type, c10::Device device,
@@ -120,21 +152,6 @@ struct IpuTensorImpl : public at::TensorImpl {
     return true;
   }
 
-  void copyDataFromCpuSource(const at::Tensor &cpu_src) {
-    auto data_size = tensorImplDataSize(*this);
-    ERROR_ON_MSG(tensorDataSize(cpu_src) != data_size,
-                 "Data size mismatch between source tensor ("
-                     << str(cpu_src) << "), of size " << tensorDataSize(cpu_src)
-                     << "; and destination tensor, of size " << data_size
-                     << '.');
-    ERROR_ON_MSG(!cpu_src.is_contiguous(),
-                 "Data source must be contiguous: " << str(cpu_src));
-    if (!details->host_buffer) {
-      details->host_buffer = std::make_shared<std::vector<char>>(data_size);
-    }
-    memcpy(details->host_buffer->data(), cpu_src.data_ptr(), data_size);
-  }
-
   void set_size(int64_t dim, int64_t new_size) override {
     UNUSED(dim);
     UNUSED(new_size);
@@ -180,11 +197,6 @@ const IpuTensorImpl *toIpuTensorImpl(const at::TensorImpl &tensor) {
                                     << &tensor << " is "
                                     << tensor.device_type());
   return impl;
-}
-
-void copyDataFromCpuSource(const at::Tensor &ipu_tensor,
-                           const at::Tensor &cpu_src) {
-  toIpuTensorImpl(ipu_tensor)->copyDataFromCpuSource(cpu_src);
 }
 
 // TODO(T61601) Create a proper implementation of GuardImpl
@@ -241,18 +253,36 @@ private:
 C10_REGISTER_GUARD_IMPL(XLA, GuardImpl)
 } // namespace
 
+poptorch_ir::TensorType IpuTensorDetails::getTensorType() const {
+  if (parent != nullptr) {
+    poptorch_ir::TensorType local_type;
+    auto dtype = parent->dtype();
+    local_type.element_type = toCompilerType(dtype.toScalarType());
+    local_type.shape = parent->sizes().vec();
+
+    return local_type;
+  }
+
+  return type;
+}
+
+bool IpuTensorDetails::isAlive() const {
+  // TODO(T64272): Actually detect whether this is alive in python
+  return parent != nullptr;
+}
+
 int64_t IpuTensorDetails::dim() {
   if (parent != nullptr) {
     return parent->dim();
   }
-  return sizes.size();
+  return type.shape.size();
 }
 
 c10::IntArrayRef IpuTensorDetails::sizesArrayref() {
   if (parent != nullptr) {
     return parent->sizes();
   }
-  return c10::IntArrayRef(sizes);
+  return c10::IntArrayRef(type.shape);
 }
 
 c10::IntArrayRef IpuTensorDetails::stridesArrayref() {
@@ -266,7 +296,7 @@ int64_t IpuTensorDetails::numel() {
   if (parent != nullptr) {
     return parent->numel();
   }
-  return c10::multiply_integers(std::begin(sizes), std::end(sizes));
+  return type.getNumElements();
 }
 
 uint64_t ipuTensorId(const at::Tensor &tensor) {
@@ -319,7 +349,7 @@ uint64_t tensorDataSize(const at::Tensor &tensor) {
 }
 
 Buffer &getHostBuffer(const at::Tensor &ipu_tensor) {
-  return toIpuTensorImpl(ipu_tensor)->details->host_buffer;
+  return getHostBuffer(*toIpuTensorImpl(ipu_tensor));
 }
 
 Buffer &getHostBuffer(const at::TensorImpl &ipu_tensor) {
@@ -346,18 +376,12 @@ void errorOnZeroSizedTensor(const at::Tensor &tensor) {
   }
 }
 
-void initHostBuffer(const at::Tensor &ipu_tensor) {
-  auto *impl = toIpuTensorImpl(ipu_tensor);
-  auto data_size = tensorImplDataSize(*impl);
-  impl->details->host_buffer = std::make_shared<std::vector<char>>(data_size);
-}
-
 at::Tensor TensorStore::allocateTensor(
     c10::IntArrayRef size, c10::optional<at::ScalarType> dtype,
     c10::optional<at::Device> device, c10::optional<at::Layout> /*layout*/,
     c10::optional<bool> /*pin_memory*/,
     c10::optional<at::MemoryFormat> /*memory_format*/) {
-  at::ScalarType const scalar_type = scalarTypeOrDefault(dtype);
+  const at::ScalarType scalar_type = scalarTypeOrDefault(dtype);
   auto coerced_scalar_type = coerceToSupportedType(scalar_type);
   auto strides = at::detail::defaultStrides(size);
 
@@ -389,16 +413,73 @@ at::Tensor TensorStore::allocateTensor(
   return output;
 }
 
-void TensorStore::copyCpuTensorAsIpuTensor(const at::Tensor &ipu_tensor,
-                                           const at::Tensor &cpu_tensor) {
-  ERROR_ON(!cpu_tensor.unsafeGetTensorImpl()->is_cpu());
-
-  logging::trace("[DISPATCHER] Copying CPU tensor {} with data_ptr {}",
-                 static_cast<void *>(cpu_tensor.unsafeGetTensorImpl()),
-                 cpu_tensor.data_ptr());
-  copyDataFromCpuSource(ipu_tensor, cpu_tensor);
-
-  ipu_tensor.set_requires_grad(cpu_tensor.requires_grad());
+void TensorStore::allocateBuffer(IpuTensorDetails &details) {
+  details.host_buffer = _ipu_session->allocate(details.getTensorType());
 }
 
+void TensorStore::allocateBuffer(const at::Tensor &ipu_tensor) {
+  auto &details = *getTensorDetails(ipu_tensor);
+  allocateBuffer(details);
+}
+
+void TensorStore::copyOnIpu(const at::Tensor &ipu_dest,
+                            const at::Tensor &ipu_src) {
+  ERROR_ON_MSG(ipu_dest.dtype() != ipu_src.dtype(),
+               "Copy operations cannot cast outside of the dispatcher.");
+  const auto &src_details = getTensorDetails(ipu_src);
+
+  const auto &dest_details = getTensorDetails(ipu_dest);
+  allocateBuffer(*dest_details);
+  _ipu_session->copyDataOnDevice(dest_details->host_buffer,
+                                 src_details->host_buffer);
+
+  ipu_dest.set_requires_grad(ipu_src.requires_grad());
+}
+
+void TensorStore::copyFromCpu(const at::Tensor &ipu_dest,
+                              const at::Tensor &cpu_src) {
+  logging::trace("[DISPATCHER] Copying from CPU tensor {} with data_ptr {}",
+                 static_cast<void *>(cpu_src.unsafeGetTensorImpl()),
+                 cpu_src.data_ptr());
+
+  ERROR_ON(cpu_src.dtype() != ipu_dest.dtype());
+  ERROR_ON(cpu_src.sizes() != ipu_dest.sizes());
+
+  const auto &details = getTensorDetails(ipu_dest);
+
+  allocateBuffer(*details);
+  _ipu_session->copyDataFromCpuSource(
+      details->host_buffer, static_cast<const char *>(cpu_src.data_ptr()));
+
+  ipu_dest.set_requires_grad(cpu_src.requires_grad());
+}
+
+void TensorStore::copyToCpu(const at::Tensor &cpu_dest,
+                            const at::Tensor &ipu_src) {
+  logging::trace("[DISPATCHER] Copying to CPU tensor {} with data_ptr {}",
+                 static_cast<void *>(cpu_dest.unsafeGetTensorImpl()),
+                 cpu_dest.data_ptr());
+
+  ERROR_ON(ipu_src.dtype() != cpu_dest.dtype());
+  ERROR_ON(ipu_src.sizes() != cpu_dest.sizes());
+
+  const auto &details = getTensorDetails(ipu_src);
+
+  _ipu_session->copyDataToCpu(static_cast<char *>(cpu_dest.data_ptr()),
+                              details->host_buffer);
+}
+
+const std::shared_ptr<poptorch_ir::IIpuSession> &
+TensorStore::getIpuSession() const {
+  return _ipu_session;
+}
+void TensorStore::enableEagerMode() {
+#if POPTORCH_BUILD_MLIR_COMPILER
+  _ipu_session = poptorch_ir::createEagerSession();
+#else
+  ERROR("PopTorch must be compiled with POPTORCH_BUILD_MLIR_COMPILER=ON to "
+        "use eager mode.");
+#endif
+}
+void TensorStore::reset() { _ipu_session = nullptr; }
 } // namespace poptorch

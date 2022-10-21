@@ -3,10 +3,15 @@
 #define POPTORCH_LOWER_TO_POPLAR_POPIT_EXECUTOR_HPP_
 
 #include <llvm/ADT/DenseMap.h>
+
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "pytorch_bridge/CompilerTypes.hpp"
+#include "pytorch_bridge/IpuSession.hpp"
+
+#include "popit/popit.hpp"
 
 namespace mlir {
 class ModuleOp;
@@ -17,25 +22,32 @@ class RankedTensorType;
 
 namespace poptorch_ir {
 
-class PopitContext;
+class EagerIpuSession;
 class NonRestartingMLIRTimer;
 
-class PopitExecutor {
+class PopitDeviceFunction {
 public:
-  PopitExecutor();
+  PopitDeviceFunction(EagerIpuSession &context, mlir::ModuleOp module,
+                      NonRestartingMLIRTimer &timer,
+                      const llvm::DenseMap<mlir::Value, TensorId> &mappings);
 
-  void compileAndRun(mlir::ModuleOp module, NonRestartingMLIRTimer &timer,
-                     const llvm::DenseMap<mlir::Value, TensorId> &mappings);
-  void addInput(const Buffer &ptr, const mlir::RankedTensorType &input,
-                TensorId id);
-  void readOutput(TensorId id, void *ptr);
+  void run(const std::vector<popit::Mem_t *> &inputs,
+           const std::vector<popit::Mem_t *> &outputs);
 
-  void freeTensor(TensorId id);
+  const std::vector<TensorId> &getInputs() const;
+  const std::vector<TensorId> &getOutputs() const;
 
-  ~PopitExecutor();
+  friend class LowerToPopit;
 
 private:
-  std::unique_ptr<PopitContext> _context;
+  // These attributes get populated by LowerToPopit
+  popit::FunctionId_t _popit_fn;
+  std::vector<TensorId> _input_ids;
+  std::vector<TensorId> _output_ids;
+
+  // Note we need to be careful that PopitFunctions aren't called after their
+  // context is destroyed
+  EagerIpuSession *_context;
 };
 
 } // namespace poptorch_ir

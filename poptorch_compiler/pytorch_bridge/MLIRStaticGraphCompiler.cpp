@@ -7,6 +7,7 @@
 
 #include "IMLIRCompiler.hpp"
 #include "pytorch_bridge/CompilerTypes.hpp"
+#include "pytorch_bridge/IpuSession.hpp"
 #include "pytorch_bridge/PytorchBridgeUtils.hpp"
 
 namespace poptorch_ir {
@@ -45,18 +46,17 @@ MLIRStaticGraphCompiler::compile(const PoplarTarget &target) {
   return exe;
 }
 
-TensorId MLIRStaticGraphCompiler::addInput(const Buffer &ptr,
-                                           const mlir::RankedTensorType &input,
+TensorId MLIRStaticGraphCompiler::addInput(const mlir::RankedTensorType &input,
                                            const char *name) {
   // Add the argument to the function args.
   auto val = createOp<poptorch_ir::copy_from_host>(input, name);
   input_callbacks.push_back(poptorch_ir::StreamInfo{
-      toVectorChar(name), ptr, mlirTypeToCompilerType(input)});
+      toVectorChar(name), nullptr, mlirTypeToCompilerType(input)});
   return addValue(val);
 }
 
 TensorId MLIRStaticGraphCompiler::addParameter(
-    const Buffer &ptr, const mlir::RankedTensorType &parameter_type,
+    Buffer &ptr, const mlir::RankedTensorType &parameter_type,
     const char *name) {
   auto memref_type = mlir::MemRefType::get(parameter_type.getShape(),
                                            parameter_type.getElementType());
@@ -82,8 +82,9 @@ TensorId MLIRStaticGraphCompiler::addParameter(
                                         "Read-" + std::string(name));
   }
 
-  weight_callbacks.push_back(poptorch_ir::StreamInfo{
-      toVectorChar(name), ptr, mlirTypeToCompilerType(parameter_type)});
+  weight_callbacks.push_back(
+      poptorch_ir::StreamInfo{toVectorChar(name), ptr.getCpuData(),
+                              mlirTypeToCompilerType(parameter_type)});
 
   // Read global state from the main graph
   auto main_val =
@@ -93,11 +94,9 @@ TensorId MLIRStaticGraphCompiler::addParameter(
   return addValue(main_val);
 }
 
-void MLIRStaticGraphCompiler::addOutput(void *ptr, TensorId id,
-                                        const char *name) {
+void MLIRStaticGraphCompiler::addOutput(TensorId id, const char *name) {
   // The output location will be set when the program is executed
-  UNUSED(ptr);
-  mlir::Value output = findValue(id);
+  const mlir::Value output = findValue(id);
 
   // Don't bother adding an output if there is nothing to output
   if (output.getType().cast<mlir::RankedTensorType>().getNumElements() != 0) {

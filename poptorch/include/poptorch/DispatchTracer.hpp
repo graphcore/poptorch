@@ -156,6 +156,9 @@ void endOutputsMove();
 // Return true if we should be compiling with the dispatcher.
 bool isCompilingWithDispatcher();
 
+// Cleans up all objects associated with poptorch
+void poptorchAtExit();
+
 // Destroy the active dispatcher object.
 void destroyDispatcher();
 

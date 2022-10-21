@@ -6,9 +6,10 @@ import torchvision.models as models
 import pytest
 import helpers
 
-# Skipped whilst the new PopIT API is implemented which will resolve this issue.
-pytest.skip("TODO(T67886): Shape mis-match on copy between [1] and []",
-            allow_module_level=True)
+pytest.skip(
+    "TODO(T70626): We currently fail to start a device in eager mode: "
+    "Failed to load GraphcoreBinary",
+    allow_module_level=True)
 
 
 def simple_add(capfd):

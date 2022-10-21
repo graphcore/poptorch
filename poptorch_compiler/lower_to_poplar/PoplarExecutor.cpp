@@ -12,6 +12,7 @@
 #include <poplar/Device.hpp>
 #include <poplar/Engine.hpp>
 #include <poplar/Graph.hpp>
+#include <poplar/StringRef.hpp>
 #include <poplar/Target.hpp>
 
 #include "CompilerHelpers.hpp"
@@ -34,7 +35,7 @@ public:
 
   // Keep a reference to the buffers which are currently connected to
   // Poplar callbacks.
-  std::map<std::string, Buffer> owned_buffers;
+  std::map<std::string, CpuBuffer> owned_buffers;
 };
 
 PoplarExecutableImpl::PoplarExecutableImpl(std::unique_ptr<poplar::Engine> e)
@@ -63,14 +64,16 @@ void PoplarExecutor::load(const PoplarDevice &device) {
   _impl->engine->load(device.device());
 }
 
-void PoplarExecutor::connectStream(const std::string &string, Buffer ptr) {
-  _impl->owned_buffers.insert_or_assign(string, ptr);
-  _impl->engine->connectStream(string, ptr->data());
+void PoplarExecutor::connectStream(std::string_view string, CpuBuffer ptr) {
+  _impl->owned_buffers.insert_or_assign(std::string(string), ptr);
+  _impl->engine->connectStream(poplar::StringRef(string.data(), string.size()),
+                               ptr->data());
 }
 
-void PoplarExecutor::connectStream(const std::string &string, void *ptr) {
-  _impl->owned_buffers.erase(string);
-  _impl->engine->connectStream(string, ptr);
+void PoplarExecutor::connectStream(std::string_view string, void *ptr) {
+  _impl->owned_buffers.erase(std::string(string));
+  _impl->engine->connectStream(poplar::StringRef(string.data(), string.size()),
+                               ptr);
 }
 
 void PoplarExecutor::execute() {

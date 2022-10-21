@@ -20,6 +20,11 @@ class IDispatch {
 public:
   explicit IDispatch(TensorStore *tensor_store);
 
+  IDispatch(IDispatch &&other) noexcept = default;
+  IDispatch &operator=(IDispatch &&other) noexcept = default;
+  IDispatch(const IDispatch &other) noexcept = delete;
+  IDispatch &operator=(const IDispatch &other) noexcept = delete;
+
   virtual ~IDispatch();
 
   // Input tensor is a CPU tensor, returns an IPU tensor.

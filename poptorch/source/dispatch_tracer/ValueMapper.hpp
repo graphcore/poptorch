@@ -47,6 +47,13 @@ private:
   };
 
 public:
+  ValueMapper() = default;
+
+  ValueMapper(ValueMapper &&) noexcept;
+  ValueMapper &operator=(ValueMapper &&) noexcept;
+  ValueMapper(const ValueMapper &) = delete;
+  ValueMapper &operator=(const ValueMapper &) = delete;
+
   ~ValueMapper();
 
   // Each tensor we are tracking has a short record containing a pointer to the
@@ -69,24 +76,6 @@ public:
     // Unique ID of the storage associated to this tensor.
     uint64_t ipu_tensor_id;
   };
-
-  // We map each PyTorch tensor to a record of all the metadata we are tracking
-  // about that tensor in the tensor map.
-  std::unordered_map<IpuTensorDetails *, TrackedTensor> tensors;
-
-  // Mapping between parameter / buffer names and tensor IDs
-  std::unordered_map<std::string, uint64_t> name_ids_map;
-  std::unordered_map<uint64_t, std::string> ids_name_map;
-
-  std::unordered_map<uint64_t, PerReplicaSettings> per_replica_map;
-
-  // We also need to map the values to the mlir so we can query the mlir for a
-  // given value.
-  std::unordered_map<torch::jit::Value *, TrackedTensor *> values_map;
-
-  // Map each prim::ListConstruct to a corresponding jit output value.
-  std::unordered_map<TensorList, torch::jit::Value *, TensorListHash>
-      tensor_lists;
 
   TrackedTensor *rawTensorRecord(const at::Tensor &t);
 
@@ -119,6 +108,7 @@ public:
   void replaceValue(torch::jit::Value *v_old, torch::jit::Value *v_new);
 
   IpuTensorDetails *getTensorDetailsForId(uint64_t id) const;
+  IpuTensorDetails *getTensorDetailsForMlirId(poptorch_ir::TensorId id) const;
 
   // Create an alias from the `src_details` tensor details to the tensor
   // described by `dest_details` and `dest_tensor_id`. The source tensor must
@@ -136,9 +126,32 @@ public:
 
   bool hasMapping(const at::Tensor &t) const;
 
+  // We map each PyTorch tensor to a record of all the metadata we are tracking
+  // about that tensor in the tensor map.
+  std::unordered_map<IpuTensorDetails *, TrackedTensor> tensors;
+
+  // Mapping between parameter / buffer names and tensor IDs
+  std::unordered_map<std::string, uint64_t> name_ids_map;
+  std::unordered_map<uint64_t, std::string> ids_name_map;
+
+  std::unordered_map<uint64_t, PerReplicaSettings> per_replica_map;
+
+  // We also need to map the values to the mlir so we can query the mlir for a
+  // given value.
+  std::unordered_map<torch::jit::Value *, TrackedTensor *> values_map;
+
+  // Map each prim::ListConstruct to a corresponding jit output value.
+  std::unordered_map<TensorList, torch::jit::Value *, TensorListHash>
+      tensor_lists;
+
 protected:
   // For resolving aliases, it's useful to find a TrackedTensor from its id.
   std::unordered_map<uint64_t, IpuTensorDetails *> _ids_tensors_map;
+  std::unordered_map<poptorch_ir::TensorId, IpuTensorDetails *>
+      _mlir_id_tensors_map;
+
+private:
+  void removeMapperFromDetails();
 };
 
 } // namespace poptorch

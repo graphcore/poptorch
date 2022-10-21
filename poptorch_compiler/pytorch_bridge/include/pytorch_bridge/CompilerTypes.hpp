@@ -12,7 +12,7 @@
 namespace poptorch_ir {
 
 // Host blob of memory containing data to transfer to the IPU.
-using Buffer = std::shared_ptr<std::vector<char>>;
+using CpuBuffer = std::shared_ptr<std::vector<char>>;
 
 // A token representing an SSA value on our side. PyTorch records it's
 // tensors->TensorId and we record TensorId->mlir::Value. This stops either side
@@ -63,7 +63,7 @@ enum class Type : std::uint8_t {
 
 struct TensorType {
   std::vector<int64_t> shape;
-  poptorch_ir::Type element_type;
+  Type element_type;
 
   std::int64_t getNumElements() const {
     return std::accumulate(shape.begin(), shape.end(), std::int64_t{1},
@@ -73,9 +73,13 @@ struct TensorType {
 
 struct StreamInfo {
   std::vector<char> name;
-  Buffer buff;
+  CpuBuffer buff;
 
   TensorType type;
+
+  std::string_view nameStringView() const {
+    return std::string_view(name.data(), name.size());
+  }
 };
 
 } // namespace poptorch_ir
