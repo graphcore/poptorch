@@ -166,7 +166,12 @@ with tempfile.TemporaryDirectory() as tmp_dir:
             shutil.rmtree(dst_dir)
         shutil.copytree("poptorch/lib", dst_dir, ignore=ExtOnly(".so"))
     else:
+        extra_opts = ""
+        if args.target == "sdist":
+            extra_opts = "--formats=zip"
         subprocess.check_call(
-            f"python3 setup.py {args.target} -d {output_dir}".split(), env=env)
+            f"python3 setup.py {args.target} -d {output_dir} {extra_opts}".
+            split(),
+            env=env)
     print(f"Time to generate {args.target} in {output_dir} : "
           f"{datetime.datetime.now()-start}")
