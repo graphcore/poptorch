@@ -50,19 +50,8 @@ void IDispatch::setParameterName(const at::Tensor &tensor,
   _mapper.setParameterName(tensor, name);
 }
 
-std::string IDispatch::getParameterName(torch::jit::Value *value) {
-  auto *record = _mapper.rawTensorRecord(value);
-  if (record == nullptr) {
-    logging::trace("JIT value not tracked {}", reinterpret_cast<void *>(value));
-    return "";
-  }
-  ERROR_ON_MSG(!record->tensor_details->is_parameter,
-               "%" << value->debugName() << " is not a Parameter");
-  auto it = _mapper.ids_name_map.find(record->ipu_tensor_id);
-  if (it == _mapper.ids_name_map.end()) {
-    return "";
-  }
-  return it->second;
+std::string IDispatch::getParameterName(torch::jit::Value *value) const {
+  return _mapper.getParameterName(value);
 }
 
 void IDispatch::setParameterPerReplica(const std::string &param_name,
@@ -74,19 +63,12 @@ void IDispatch::setParameterPerReplica(const std::string &param_name,
 }
 
 bool IDispatch::getParameterPerReplica(torch::jit::Value *value,
-                                       PerReplicaSettings &settings) {
-  auto *record = _mapper.rawTensorRecord(value);
-  if (record == nullptr) {
-    logging::trace("JIT value not tracked {}", reinterpret_cast<void *>(value));
+                                       PerReplicaSettings &settings) const {
+  auto res = _mapper.getParameterPerReplica(value);
+  if (!res.has_value()) {
     return false;
   }
-  ERROR_ON_MSG(!record->tensor_details->is_parameter,
-               "%" << value->debugName() << " is not a Parameter");
-  auto it = _mapper.per_replica_map.find(record->ipu_tensor_id);
-  if (it == _mapper.per_replica_map.end()) {
-    return false;
-  }
-  settings = it->second;
+  settings = std::move(*res);
   return true;
 }
 

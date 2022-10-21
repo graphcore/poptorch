@@ -63,13 +63,13 @@ public:
   void replaceValue(torch::jit::Value *v_old, torch::jit::Value *v_new);
 
   void setParameterName(const at::Tensor &tensor, const std::string &name);
-  std::string getParameterName(torch::jit::Value *val);
+  std::string getParameterName(torch::jit::Value *val) const;
 
   void setParameterPerReplica(const std::string &param_name,
                               const at::Tensor &tensor, int comm_group_type,
                               int shards, int variable_retrieval_mode);
   bool getParameterPerReplica(torch::jit::Value *value,
-                              PerReplicaSettings &settings);
+                              PerReplicaSettings &settings) const;
 
 protected:
   // We use the value mapper to map between incoming at::Tensors and JIR/MLIR
