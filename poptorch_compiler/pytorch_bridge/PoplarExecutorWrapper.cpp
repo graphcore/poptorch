@@ -46,7 +46,8 @@ void PoplarExecutorWrapper::execute(const std::vector<void *> &input_ptrs,
   ERROR_ON(input_ptrs.size() != _impl->input_callbacks.size());
   for (std::size_t i = 0; i < _impl->input_callbacks.size(); ++i) {
     // Did the user provide a new pointer for this input?
-    if (input_ptrs[i] != nullptr) {
+    if (_impl->input_callbacks[i].type.getNumElements() == 0 ||
+        input_ptrs[i] != nullptr) {
       // Release the source previously used and switch to the user provided
       // pointer.
       _impl->input_callbacks[i].buff.reset();
