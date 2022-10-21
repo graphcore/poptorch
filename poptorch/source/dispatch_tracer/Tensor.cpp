@@ -271,34 +271,6 @@ bool IpuTensorDetails::isAlive() const {
   return parent != nullptr;
 }
 
-int64_t IpuTensorDetails::dim() {
-  if (parent != nullptr) {
-    return parent->dim();
-  }
-  return type.shape.size();
-}
-
-c10::IntArrayRef IpuTensorDetails::sizesArrayref() {
-  if (parent != nullptr) {
-    return parent->sizes();
-  }
-  return c10::IntArrayRef(type.shape);
-}
-
-c10::IntArrayRef IpuTensorDetails::stridesArrayref() {
-  if (parent != nullptr) {
-    return parent->strides();
-  }
-  return c10::IntArrayRef(strides);
-}
-
-int64_t IpuTensorDetails::numel() {
-  if (parent != nullptr) {
-    return parent->numel();
-  }
-  return type.getNumElements();
-}
-
 uint64_t ipuTensorId(const at::Tensor &tensor) {
   return toIpuTensorImpl(tensor)->tensor_id;
 }

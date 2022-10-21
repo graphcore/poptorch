@@ -74,7 +74,7 @@ public:
     poptorch_ir::TensorId mlir;
 
     // Unique ID of the storage associated to this tensor.
-    uint64_t ipu_tensor_id;
+    IpuTensorId ipu_tensor_id;
   };
 
   TrackedTensor *rawTensorRecord(const at::Tensor &t);
@@ -110,7 +110,7 @@ public:
 
   void replaceValue(torch::jit::Value *v_old, torch::jit::Value *v_new);
 
-  IpuTensorDetails *getTensorDetailsForId(uint64_t id) const;
+  IpuTensorDetails *getTensorDetailsForId(IpuTensorId id) const;
   IpuTensorDetails *getTensorDetailsForMlirId(poptorch_ir::TensorId id) const;
 
   // Create an alias from the `src_details` tensor details to the tensor
@@ -118,7 +118,7 @@ public:
   // already be added to this mapper. The MLIR or JIT value will now map to the
   // same tensor details and PopTorch tensor id as the destination tensor.
   void aliasTensor(const std::shared_ptr<IpuTensorDetails> &dest_details,
-                   uint64_t dest_tensor_id,
+                   IpuTensorId dest_tensor_id,
                    const std::shared_ptr<IpuTensorDetails> &src_details);
 
   // Creating an alias from src to dest as above, but locating the original
@@ -135,10 +135,10 @@ private:
   std::unordered_map<IpuTensorDetails *, TrackedTensor> _tensors;
 
   // Mapping between parameter / buffer names and tensor IDs
-  std::unordered_map<std::string, uint64_t> _name_ids_map;
-  std::unordered_map<uint64_t, std::string> _ids_name_map;
+  std::unordered_map<std::string, IpuTensorId> _name_ids_map;
+  std::unordered_map<IpuTensorId, std::string> _ids_name_map;
 
-  std::unordered_map<uint64_t, PerReplicaSettings> _per_replica_map;
+  std::unordered_map<IpuTensorId, PerReplicaSettings> _per_replica_map;
 
   // We also need to map the values to the mlir so we can query the mlir for a
   // given value.
@@ -149,7 +149,7 @@ private:
       _tensor_lists;
 
   // For resolving aliases, it's useful to find a TrackedTensor from its id.
-  std::unordered_map<uint64_t, IpuTensorDetails *> _ids_tensors_map;
+  std::unordered_map<IpuTensorId, IpuTensorDetails *> _ids_tensors_map;
   std::unordered_map<poptorch_ir::TensorId, IpuTensorDetails *>
       _mlir_id_tensors_map;
 

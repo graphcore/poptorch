@@ -115,7 +115,7 @@ struct GlobalTracerContext {
   bool moving_outputs{false};
 
   // Each tensor allocated must have a unique id.
-  uint64_t next_tensor_id{1};
+  IpuTensorId next_tensor_id{1};
 
   // We can't make the difference between inputs and constants so for
   // now we ask the user to manually specify the input tensors.

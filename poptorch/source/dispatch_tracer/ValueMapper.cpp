@@ -57,7 +57,7 @@ ValueMapper::TrackedTensor::TrackedTensor(const at::Tensor &tensor)
 
 void ValueMapper::setParameterName(const at::Tensor &t,
                                    const std::string &name) {
-  const uint64_t id = ipuTensorId(t);
+  const IpuTensorId id = ipuTensorId(t);
   if (!isParameter(t) && !t.is_floating_point()) {
     logging::warn("Parameter {}: {} was downgraded to constant because PopART "
                   "doesn't support non floating point parameters",
@@ -193,7 +193,7 @@ void ValueMapper::addCopiedTensor(const at::TensorImpl *dest,
 
 void ValueMapper::aliasTensor(
     const std::shared_ptr<IpuTensorDetails> &dest_details,
-    uint64_t dest_tensor_id,
+    IpuTensorId dest_tensor_id,
     const std::shared_ptr<IpuTensorDetails> &src_details) {
   auto itr = _tensors.find(src_details.get());
   ERROR_ON_MSG(itr == _tensors.end(), "Could not find source tensor");
@@ -290,7 +290,7 @@ void ValueMapper::replaceValue(torch::jit::Value *v_old,
   }
 }
 
-IpuTensorDetails *ValueMapper::getTensorDetailsForId(uint64_t id) const {
+IpuTensorDetails *ValueMapper::getTensorDetailsForId(IpuTensorId id) const {
   auto it = _ids_tensors_map.find(id);
   if (it == _ids_tensors_map.end()) {
     return nullptr;

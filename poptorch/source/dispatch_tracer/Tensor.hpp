@@ -19,6 +19,7 @@ class IIpuSession;
 namespace poptorch {
 
 using Buffer = poptorch_ir::Buffer;
+using IpuTensorId = uint64_t;
 
 struct IpuTensorImpl;
 class ValueMapper;
@@ -45,11 +46,6 @@ struct IpuTensorDetails {
 
   poptorch_ir::TensorType getTensorType() const;
   bool isAlive() const;
-
-  int64_t dim();
-  c10::IntArrayRef sizesArrayref();
-  c10::IntArrayRef stridesArrayref();
-  int64_t numel();
 };
 
 poptorch_ir::Type toCompilerType(const at::ScalarType &elem_type);
@@ -70,10 +66,10 @@ bool isParameter(const at::TensorImpl &tensor);
 uint64_t tensorDataSize(const at::Tensor &tensor);
 
 // Return the tensor ID of the given IPU tensor.
-uint64_t ipuTensorId(const at::Tensor &tensor);
+IpuTensorId ipuTensorId(const at::Tensor &tensor);
 
 // Return the tensor ID of the given IPU tensor implementation.
-uint64_t ipuTensorId(const at::TensorImpl &tensor);
+IpuTensorId ipuTensorId(const at::TensorImpl &tensor);
 
 // Return true if the given at::Tensor is an IPU tensor.
 bool isIpuTensor(const at::Tensor &tensor);
