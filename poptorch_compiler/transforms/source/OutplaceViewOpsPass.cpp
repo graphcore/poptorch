@@ -52,7 +52,9 @@ struct OutplaceOverwriteOfViewOp final
     : public mlir::OpRewritePattern<overwrite> {
   // Note: this patten has priority over OutplaceViewOps
   explicit OutplaceOverwriteOfViewOp(mlir::MLIRContext *context)
-      : mlir::OpRewritePattern<overwrite>(context, 2) {}
+      : mlir::OpRewritePattern<overwrite>(context, 2) {
+    setDebugName("OutplaceOverwriteOfViewOp");
+  }
 
   mlir::LogicalResult
   matchAndRewrite(overwrite op,
@@ -85,7 +87,9 @@ struct OutplaceOverwriteOfViewOp final
 struct OutplaceViewOps final : public mlir::RewritePattern {
   explicit OutplaceViewOps(mlir::MLIRContext *context)
       : mlir::RewritePattern(MatchAnyOpTypeTag(), mlir::PatternBenefit(1),
-                             context) {}
+                             context) {
+    setDebugName("OutplaceViewOps");
+  }
 
   mlir::LogicalResult
   matchAndRewrite(mlir::Operation *op,

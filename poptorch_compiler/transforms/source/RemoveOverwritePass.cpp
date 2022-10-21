@@ -21,7 +21,9 @@ auto isAfter(mlir::Operation *op) {
 
 struct RemoveOverwrite final : public mlir::OpRewritePattern<overwrite> {
   explicit RemoveOverwrite(mlir::MLIRContext *context)
-      : mlir::OpRewritePattern<overwrite>(context) {}
+      : mlir::OpRewritePattern<overwrite>(context) {
+    setDebugName("RemoveOverwrite");
+  }
 
   mlir::LogicalResult
   matchAndRewrite(overwrite op,
@@ -56,7 +58,7 @@ public:
 
   mlir::StringRef getDescription() const override {
     return "Replace any instances of overwrite ops by just swapping out the "
-           "value IDs, in places where that's permissable.";
+           "value IDs, adding casts if-needed.";
   }
 
   void runOnOperation() override {

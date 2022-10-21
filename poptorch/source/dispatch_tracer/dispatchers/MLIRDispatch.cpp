@@ -706,7 +706,7 @@ MLIRDispatch::outputIsInplaceOf(poptorch_ir::OptionalTensorId output_id,
   } else {
     // Instead of replacing all subsequent references to the original input with
     // the tensor we add an overwrite operation (which will cause the input to
-    // be replaced later) this makes implementing the view operations easier
+    // be replaced later). This makes implementing the view operations easier.
     const poptorch_ir::TensorId replaced_id = findTensor(original_input);
     _compiler.overwrite(replaced_id, output_id);
   }
