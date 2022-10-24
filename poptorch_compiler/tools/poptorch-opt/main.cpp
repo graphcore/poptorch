@@ -7,8 +7,9 @@
 #include "dialect/PoptorchDialect.hpp"
 
 int main(int argc, char **argv) {
-  mlir::DialectRegistry registry;
+  mlir::registerCanonicalizerPass();
 
+  mlir::DialectRegistry registry;
   registry.insert<mlir::func::FuncDialect, poptorch_ir::PoptorchDialect>();
 
   return mlir::asMainReturnCode(mlir::MlirOptMain(

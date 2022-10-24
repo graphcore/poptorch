@@ -523,7 +523,7 @@ def Poptorch_select : Poptorch_AbstractOp<"select", [ViewOp]> {
                                                   input_tensor.getShape().end()};
 
     dim = convertToPositiveDim(dim, out_shape.size());
-    
+
     if (idx < 0) {
         idx += out_shape[dim];
     }
@@ -694,7 +694,7 @@ def Poptorch_index_tensor: Poptorch_NotImplementedOp<"index_tensor", []> {
                  "Cannot index outside the tensor (dims " +
                  std::to_string(input_shape.size()) + ") with dim (" +
                  std::to_string(indices.size()) + ")");
-    
+
     auto broadcasted_index_shape = std::accumulate(indices.begin(), indices.end(),
                                                    std::vector<std::int64_t>{},
                                                    [&] (const auto& acc, const auto &index) {
@@ -731,7 +731,7 @@ def Poptorch_index_tensor: Poptorch_NotImplementedOp<"index_tensor", []> {
       mlir::RankedTensorType index_tensor = indices[i].getType().cast<mlir::RankedTensorType>();
       ERROR_ON_MSG(!index_tensor.getElementType().isIntOrIndex(),
                    "index must have integer type");
-      
+
       if (!indices_written) {
         std::copy(broadcasted_index_shape.begin(), broadcasted_index_shape.end(),
                   std::back_inserter(output_shape));
@@ -814,7 +814,7 @@ def Poptorch_index_select : Poptorch_Op<"index_select", []> {
 
     mlir::RankedTensorType tensor = self.getType().cast<mlir::RankedTensorType>();
     const auto input_shape = tensor.getShape();
-    
+
     dim = convertToPositiveDim(dim, input_shape.size());
     $_state.addAttribute("dim", $_builder.getI64IntegerAttr(dim));
 

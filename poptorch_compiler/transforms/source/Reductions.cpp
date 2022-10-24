@@ -5,8 +5,9 @@ namespace poptorch_ir {
 
 template <typename T>
 void canonicaliseMinMax(T &op, ::mlir::PatternRewriter &rewriter) {
-  auto operand_type = op.getOperand().getType();
-  auto size = operand_type.template cast<mlir::RankedTensorType>().getShape();
+  const auto operand_type = op.getOperand().getType();
+  const auto size =
+      operand_type.template cast<mlir::RankedTensorType>().getShape();
   if (size.empty()) {
     auto copy =
         rewriter.create<::poptorch_ir::clone>(op.getLoc(), op.getOperand());
@@ -18,8 +19,8 @@ void canonicaliseMinMax(T &op, ::mlir::PatternRewriter &rewriter) {
     return;
   }
 
-  auto dim = op.dim();
-  auto keepdim = op.keepdim();
+  const auto dim = op.dim();
+  const auto keepdim = op.keepdim();
   auto topk_result = rewriter.create<topk>(op.getLoc(), op.getOperand(), 1, dim,
                                            std::is_same_v<T, max_dim>, false);
   auto values = topk_result.getResult(0);
@@ -49,8 +50,8 @@ void canonicaliseMinMax(T &op, ::mlir::PatternRewriter &rewriter) {
 ::mlir::LogicalResult
 median_dim_values::canonicalize(median_dim_values op,
                                 ::mlir::PatternRewriter &rewriter) {
-  auto operand_type = op.getOperand().getType();
-  auto osize = operand_type.cast<mlir::RankedTensorType>().getShape();
+  const auto operand_type = op.getOperand().getType();
+  const auto osize = operand_type.cast<mlir::RankedTensorType>().getShape();
   if (osize.empty()) {
     auto copy =
         rewriter.create<::poptorch_ir::clone>(op.getLoc(), op.getOperand());
@@ -63,13 +64,13 @@ median_dim_values::canonicalize(median_dim_values op,
   }
 
   const int64_t dim = op.dim();
-  auto keepdim = op.keepdim();
-  auto size = osize[dim < 0 ? dim + osize.size() : dim];
-  auto half_size = ((size + 1) >> 1);
+  const auto keepdim = op.keepdim();
+  const auto size = osize[dim < 0 ? dim + osize.size() : dim];
+  const auto half_size = ((size + 1) >> 1);
   auto topk_op = rewriter.create<topk>(op.getLoc(), op.getOperand(), half_size,
                                        dim, false, true);
-  auto topk_values = topk_op.getResult(0);
-  auto topk_indices = topk_op.getResult(1);
+  const auto topk_values = topk_op.getResult(0);
+  const auto topk_indices = topk_op.getResult(1);
 
   auto values_slice = rewriter.create<slice_Tensor>(
       op.getLoc(), topk_values, dim, half_size - 1, half_size, 1);

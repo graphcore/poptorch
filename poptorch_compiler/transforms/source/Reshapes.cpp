@@ -13,7 +13,7 @@ namespace poptorch_ir {
 
 ::mlir::LogicalResult
 transpose::canonicalize(transpose op, ::mlir::PatternRewriter &rewriter) {
-  auto input_type = op.input().getType();
+  const auto input_type = op.input().getType();
   std::vector<std::int64_t> permutation(
       input_type.cast<mlir::RankedTensorType>().getShape().size());
   std::iota(permutation.begin(), permutation.end(), 0);
@@ -31,7 +31,7 @@ permuteInverse::canonicalize(permuteInverse op,
                              ::mlir::PatternRewriter &rewriter) {
   std::vector<std::int64_t> inverse_permute(op.dims().size());
   for (const auto &ed : llvm::enumerate(op.dims())) {
-    std::size_t const value = static_cast<std::size_t>(
+    const auto value = static_cast<std::size_t>(
         ed.value().cast<mlir::IntegerAttr>().getUInt());
     inverse_permute[value] = ed.index();
   }
@@ -45,8 +45,8 @@ permuteInverse::canonicalize(permuteInverse op,
 
 ::mlir::LogicalResult
 viewInverse::canonicalize(viewInverse op, ::mlir::PatternRewriter &rewriter) {
-  auto result_type = op.result().getType();
-  auto out_shape = result_type.cast<mlir::RankedTensorType>().getShape();
+  const auto result_type = op.result().getType();
+  const auto out_shape = result_type.cast<mlir::RankedTensorType>().getShape();
   rewriter.replaceOpWithNewOp<viewOutplace>(
       op, result_type, op->getOperand(0), rewriter.getI64ArrayAttr(out_shape));
 
@@ -56,8 +56,9 @@ viewInverse::canonicalize(viewInverse op, ::mlir::PatternRewriter &rewriter) {
 #define CANONICALIZE_OP_INTO_VIEW(inputOp)                                     \
   ::mlir::LogicalResult inputOp::canonicalize(                                 \
       inputOp op, ::mlir::PatternRewriter &rewriter) {                         \
-    auto result_type = op.result().getType();                                  \
-    auto out_shape = result_type.cast<mlir::RankedTensorType>().getShape();    \
+    const auto result_type = op.result().getType();                            \
+    const auto out_shape =                                                     \
+        result_type.cast<mlir::RankedTensorType>().getShape();                 \
     rewriter.replaceOpWithNewOp<view>(op, op->getOperand(0), out_shape);       \
                                                                                \
     return ::mlir::success();                                                  \

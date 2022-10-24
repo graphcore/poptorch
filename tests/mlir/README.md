@@ -32,6 +32,9 @@ In general, look to the existing tests for examples.
 One important thing, however, is to make sure your test files end in
 `_test.mlir`, so they're picked up by ctest.
 
+Within this directory, you can create whatever subdirectory structure you want;
+just make sure the filenames are globally unique.
+
 As with the Python tests, cases are generated for ctest by
 [generate_test_file.py](../generate_test_file.py).
 

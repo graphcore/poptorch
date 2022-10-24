@@ -28,15 +28,14 @@ CANONICALIZE_TO_FULL(full_like,
 
 ::mlir::LogicalResult clone::canonicalize(clone op,
                                           ::mlir::PatternRewriter &rewriter) {
-  // If neither the source and destination are written to after this operation,
+  // If neither the source nor destination are written to after this operation,
   // it is safe to remove the clone operation and just replace dest with src.
   const bool src_has_value_semantics =
       !isOperandView(op.src()) &&
-      llvm::none_of(op.src().getUses(), [&](const mlir::OpOperand &operand) {
-        return op->isBeforeInBlock(operand.getOwner()) && isInplace(operand);
+      llvm::none_of(opsThatWriteTo(op.src()), [&op](mlir::Operation *write) {
+        return op->isBeforeInBlock(write);
       });
-  const bool dest_has_value_semantics =
-      llvm::none_of(op.result().getUses(), isInplace);
+  const bool dest_has_value_semantics = !isWrittenTo(op.result());
   if (dest_has_value_semantics && src_has_value_semantics) {
     rewriter.replaceOp(op, op.src());
 
