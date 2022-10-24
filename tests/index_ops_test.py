@@ -4,8 +4,8 @@
 import torch
 import pytest
 
-import poptorch
 import helpers
+import poptorch
 
 
 def index_op0(t, idx, v=None):
@@ -229,6 +229,23 @@ def test_index_put_masked_assign(mask_size, dtype, trace_model):
         # To avoid a size 0 tensor
         v = v.unsqueeze(0)
     index_harness(trace_model, index_op0, mask, True, v=v, is_mask=True)
+
+
+def get_index_fill_fn(dim):
+    def index_fill(t, idx, v):
+        t.index_fill_(dim, idx, v)
+        return t
+
+    return index_fill
+
+
+@pytest.mark.parametrize("value", (-1, torch.tensor(-1)))
+@pytest.mark.parametrize("dim", [1, 2, 3])
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_index_fill(value, dim, trace_model):
+    torch.manual_seed(42)
+    op = get_index_fill_fn(dim)
+    index_harness(trace_model, op, [0, 2], True, value)
 
 
 @pytest.mark.parametrize("dim", range(-3, 3))

@@ -768,6 +768,41 @@ def Poptorch_index_put: Poptorch_NotImplementedOp<"index_put", []> {
   }]>];
 }
 
+def Poptorch_index_fill_Scalar: Poptorch_NotImplementedOp<"index_fill_Scalar", []> {
+  let arguments = (ins Poptorch_tensor:$self,
+                       I64Attr:$dim,
+                       Poptorch_tensor:$index,
+                       F32Attr:$value);
+  let results = (outs Poptorch_tensor:$result);
+
+  let builders = [OpBuilder<(ins "mlir::Value":$self,
+                                 "std::int64_t":$dim,
+                                 "mlir::Value":$index,
+                                 "float":$value),[{
+    $_state.addOperands({self, index});
+    $_state.addAttribute("dim", $_builder.getI64IntegerAttr(dim));
+    $_state.addAttribute("value", $_builder.getF32FloatAttr(value));
+    $_state.addTypes(self.getType());
+  }]>];
+}
+
+def Poptorch_index_fill_Tensor: Poptorch_NotImplementedOp<"index_fill_Tensor", []> {
+  let arguments = (ins Poptorch_tensor:$self,
+                       I64Attr:$dim,
+                       Poptorch_tensor:$index,
+                       Poptorch_tensor:$value);
+  let results = (outs Poptorch_tensor:$result);
+
+  let builders = [OpBuilder<(ins "mlir::Value":$self,
+                                 "std::int64_t":$dim,
+                                 "mlir::Value":$index,
+                                 "mlir::Value":$value),[{
+    $_state.addOperands({self, index, value});
+    $_state.addAttribute("dim", $_builder.getI64IntegerAttr(dim));
+    $_state.addTypes(self.getType());
+  }]>];
+}
+
 def Poptorch_index_select : Poptorch_Op<"index_select", []> {
   let arguments = (ins Poptorch_tensor:$self, I64Attr:$dim, Poptorch_tensor:$index);
   let results = (outs Poptorch_tensor:$result);

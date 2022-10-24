@@ -77,6 +77,7 @@ Tensor methods
 * ``tensor.expand``
 * ``tensor.expand_as``
 * ``tensor.masked_fill``
+* ``tensor.index_fill_``
 
 Random samplers
 '''''''''''''''

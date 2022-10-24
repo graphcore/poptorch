@@ -67,7 +67,7 @@ IndexInfo processIndex(torch::jit::Graph *graph, torch::jit::Value *x,
       indexed = true;
     }
   }
-  std::size_t index_size = index_shape.size();
+  std::size_t const index_size = index_shape.size();
   std::vector<std::int64_t> flat_indices_shape =
       padShape(index_shape, pad, pad_front);
 
@@ -92,7 +92,7 @@ IndexInfo processIndex(torch::jit::Graph *graph, torch::jit::Value *x,
               ->output();
     } else {
       const auto original_shape = shapeFromTensor(indices[i]);
-      std::vector<std::int64_t> new_shape =
+      const std::vector<std::int64_t> new_shape =
           padShape(original_shape, pad, pad_front);
 
       indices[i] = createReshape(graph, indices[i], new_shape)->output();
@@ -131,7 +131,7 @@ torch::jit::Node *indexHandler(torch::jit::Graph *graph,
   std::vector<torch::jit::Value *> indices =
       handleTensorList(node->input(1)->node());
 
-  IndexInfo info = processIndex(graph, x, &indices);
+  const IndexInfo info = processIndex(graph, x, &indices);
   // Gather in first dimension using calculated indices into partially flattened
   // tensor
   return createGather(graph, {info.x_partial_flat, info.indices_partial_flat},
@@ -174,7 +174,7 @@ bool isMaskedAssign(torch::jit::Graph *graph, torch::jit::Value *x,
 std::optional<std::int32_t>
 canVectorizeInDim(std::vector<torch::jit::Value *> &indices) {
   std::optional<std::int32_t> dim;
-  std::int32_t num_indices = static_cast<std::int32_t>(indices.size());
+  std::int32_t const num_indices = static_cast<std::int32_t>(indices.size());
 
   for (std::int32_t i = 0; i < num_indices; i++) {
     if (isNone(indices[i])) {
@@ -245,10 +245,19 @@ torch::jit::Node *indexPutHandler(torch::jit::Graph *graph,
   };
   auto shape = shapeFromTensor(x);
   auto vectorized_dim = canVectorizeInDim(indices);
+  auto v_shape = shapeFromTensor(v);
   if (vectorized_dim) {
     logging::trace(
         "Using vectorized ScatterReduce with none reduction in dim {}",
         *vectorized_dim);
+    // Expand the value tensor to match the input if necessary
+    if (v_shape.size() < shape.size()) {
+      auto new_shape = shape;
+      // In the vectorised case, the index will always be a 1D tensor
+      new_shape[*vectorized_dim] = shapeFromTensor(indices[*vectorized_dim])[0];
+      v = createExpand(graph, {v, intVectorToIrConstant(graph, new_shape)})
+              ->output();
+    }
     auto *out = createScatterreduce(graph, {v, indices[*vectorized_dim], x},
                                     shape[0], *vectorized_dim, 3);
     applyInplaceSlice(node, out);
@@ -263,7 +272,6 @@ torch::jit::Node *indexPutHandler(torch::jit::Graph *graph,
 
   IndexInfo info = processIndex(graph, x, &indices);
 
-  auto v_shape = shapeFromTensor(v);
   auto indices_shape = shapeFromTensor(info.indices_partial_flat);
   auto indices_size =
       std::accumulate(indices_shape.begin(), indices_shape.end(), 1,
@@ -293,11 +301,46 @@ torch::jit::Node *indexPutHandler(torch::jit::Graph *graph,
   return out;
 }
 
+torch::jit::Node *indexFillHandler(torch::jit::Graph *graph,
+                                   torch::jit::Node *node) {
+  // aten::index_fill.int_Scalar(Tensor self, int dim, Tensor index, Scalar
+  // value) -> Tensor aten::index_fill.int_Tensor(Tensor self, int dim, Tensor
+  // index, Tensor value) -> Tensor
+  auto *self = node->input(0);
+  auto dim = constantToLong(node->input(1)->node());
+  auto *index = node->input(2);
+  auto *value = node->input(3);
+  auto self_dtype = getNodeScalarType(self);
+  if (getNodeScalarType(value) != self_dtype) {
+    value = createCast(graph, value, self_dtype)->output();
+  }
+
+  // Create Tensor?[] indices, where indices[dim] = index, and indices[d] =
+  // None, where d < dim
+  std::vector<torch::jit::Value *> indices;
+  auto fn_gen_none = [graph]() {
+    auto *none = graph->createNone();
+    insertNodeInGraph(graph, none);
+    return none->output();
+  };
+  std::generate_n(std::back_inserter(indices), dim, fn_gen_none);
+  indices.push_back(index);
+  auto *list = createAndInsertNode(graph, c10::prim::ListConstruct, indices);
+  auto *accumulate = createConstantInt(graph, {0}, {});
+
+  // Re-use index_put handler
+  auto index_put_handler = getHandler(c10::aten::index_put);
+  return createHandlerOperation(
+      graph, index_put_handler,
+      {self, list->output(), value, accumulate->output()});
+}
+
 } // namespace
 
 __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::index, indexHandler);
   registerHandler(c10::aten::index_put, indexPutHandler);
+  registerHandler(c10::aten::index_fill, indexFillHandler);
 }
 
 } // namespace poptorch

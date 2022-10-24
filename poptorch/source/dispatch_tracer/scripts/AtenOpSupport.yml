@@ -272,6 +272,14 @@
 - func: index_put_
   PopTorchDirect: index_put
 
+# index_fill_.int_Scalar(Tensor(a!) self, int dim, Tensor index, Scalar value) -> Tensor(a!)
+- func: index_fill_.int_Scalar
+  PopTorchDirect: index_fill_Scalar
+
+# index_fill_.int_Tensor(Tensor(a!) self, int dim, Tensor index, Tensor value) -> Tensor(a!)
+- func: index_fill_.int_Tensor
+  PopTorchDirect: index_fill_Tensor
+
 # func: permute(Tensor(a) self, int[] dims) -> Tensor(a)
 - func: permute
   PopTorchDirect: permute
