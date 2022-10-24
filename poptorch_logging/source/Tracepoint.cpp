@@ -13,7 +13,7 @@ namespace detail {
 
 class TracepointImpl : public pvti::Tracepoint {
 public:
-  explicit TracepointImpl(const char *label_)
+  explicit TracepointImpl(const std::string &label_)
       : pvti::Tracepoint(&TracepointImpl::channel, label_), ctx(label_) {}
   ~TracepointImpl() = default;
   static pvti::TraceChannel channel;
@@ -24,7 +24,7 @@ pvti::TraceChannel TracepointImpl::channel = {"poptorch"};
 } // namespace detail
 
 Tracepoint::Tracepoint(const char *label)
-    : _impl(std::make_unique<detail::TracepointImpl>(label)) {}
+    : _impl(std::make_unique<detail::TracepointImpl>(std::string(label))) {}
 
 void Tracepoint::begin(const char *label) {
   pvti::Tracepoint::begin(&detail::TracepointImpl::channel, label);

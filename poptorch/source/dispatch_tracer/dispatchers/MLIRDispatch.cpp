@@ -20,6 +20,7 @@
 #include "poptorch/Utils.hpp"
 #include "poptorch_err/ExceptionHandling.hpp"
 #include "poptorch_logging/Logging.hpp"
+#include "poptorch_logging/Tracepoint.hpp"
 
 #include "pytorch_bridge/CompilerOptions.hpp"
 
@@ -118,6 +119,7 @@ MLIRExecutor::execute(const std::vector<at::Tensor> &inputs) {
 }
 
 void MLIRExecutor::weightsToDevice() {
+  POPTORCH_TRACEPOINT();
   try {
     ERROR_ON(_host_buffers_are_dirty);
     _executor->weightsToDevice();
@@ -130,6 +132,7 @@ void MLIRExecutor::copyWeightsToHostIfNeeded() {
     poptorch::logging::trace("Ignored copyWeightsToHost: not needed");
     return;
   }
+  POPTORCH_TRACEPOINT();
 
   try {
     _executor->weightsToHost();
@@ -152,6 +155,7 @@ MLIRDispatch::MLIRDispatch(const CompilerOptions &options,
 void MLIRDispatch::reset() { *this = MLIRDispatch(_opts, _tensor_store); }
 
 void MLIRDispatch::initCompiler(const CompilerOptions &options) {
+  POPTORCH_TRACEPOINT();
   _opts = options;
   // Init our MLIR compiler.
   if (_opts.eager.eager_mode) {
@@ -256,6 +260,7 @@ void MLIRDispatch::promoteAsInput(const at::Tensor &tensor, bool is_wrapped) {
 
 void MLIRDispatch::addInput(const at::Tensor &cpu_tensor,
                             const at::Tensor &ipu_tensor) {
+  POPTORCH_TRACEPOINT();
   ERROR_ON(!cpu_tensor.unsafeGetTensorImpl()->is_cpu());
   logging::trace("[DISPATCHER] Adding input: {} with cpu ptr {}",
                  static_cast<void *>(cpu_tensor.unsafeGetTensorImpl()),
@@ -266,6 +271,7 @@ void MLIRDispatch::addInput(const at::Tensor &cpu_tensor,
 
 void MLIRDispatch::addParameter(const at::Tensor &cpu_tensor,
                                 const at::Tensor &ipu_tensor) {
+  POPTORCH_TRACEPOINT();
   ERROR_ON(!cpu_tensor.unsafeGetTensorImpl()->is_cpu());
 
   logging::trace("[DISPATCHER] Adding parameter: {} with cpu ptr {}",
@@ -293,6 +299,7 @@ bool MLIRDispatch::isDeferredEmptyTensor(const at::Tensor &tensor) const {
 
 void MLIRDispatch::addOutput(const at::Tensor &ipu_src,
                              const at::Tensor &cpu_dest) {
+  POPTORCH_TRACEPOINT();
   promoteAsOutput(ipu_src);
 
   if (extractOutputImmediately()) {
@@ -303,6 +310,7 @@ void MLIRDispatch::addOutput(const at::Tensor &ipu_src,
 }
 
 void MLIRDispatch::finalizeGraph() {
+  POPTORCH_TRACEPOINT();
   _compiler.addReturn();
   _compiler.endTraceTiming();
 }
@@ -353,6 +361,7 @@ public:
 } // namespace
 
 void MLIRDispatch::markStep() {
+  POPTORCH_TRACEPOINT();
   // Reset the dispatcher after compiling so it can be reused
   const auto cleanup = CallOnExit([&] { reset(); });
 
@@ -397,6 +406,7 @@ void MLIRDispatch::registerEmptyTensor(const at::Tensor &tensor) {
 // aten::detach(Tensor(a) self) -> (Tensor(a))
 void MLIRDispatch::detach(const c10::OperatorHandle &op, c10::Stack *stack,
                           bool /*moving_parameters*/) {
+  POPTORCH_TRACEPOINT();
   const c10::FunctionSchema &schema = op.schema();
   const auto num_arguments = schema.arguments().size();
   const auto arguments = torch::jit::last(stack, num_arguments);
@@ -435,18 +445,21 @@ void MLIRDispatch::setCurrentCodeLocation(
   }
 }
 
-std::string MLIRDispatch::handleOp(const c10::OperatorHandle &op,
-                                   c10::Stack *stack) {
-  const c10::FunctionSchema &schema = op.schema();
-
+std::string getSchemaKey(const c10::FunctionSchema &schema) {
+  std::string schema_key;
   // Unfortunately we can't overload based only on the schema symbol as it does
   // not contain the overload info.
-  std::string schema_key;
   if (schema.overload_name().empty()) {
     schema_key = schema.name();
   } else {
     schema_key = schema.name() + "." + schema.overload_name();
   }
+  return schema_key;
+}
+
+std::string MLIRDispatch::handleOp(const c10::OperatorHandle &op,
+                                   c10::Stack *stack) {
+  auto schema_key = getSchemaKey(op.schema());
 
   // First we check if we have a direct mapping onto MLIR.
   auto mlir_handle = direct_dispatch_lookup.find(schema_key);
@@ -476,6 +489,7 @@ std::string MLIRDispatch::handleOp(const c10::OperatorHandle &op,
 
 void MLIRDispatch::findAndPromoteExternalTensors(c10::Stack *stack) {
 #if POPTORCH_BUILD_MLIR_COMPILER
+  POPTORCH_TRACEPOINT();
   for (auto &value : *stack) {
     if (!value.isTensor()) {
       continue;
@@ -501,6 +515,7 @@ void MLIRDispatch::findAndPromoteExternalTensors(c10::Stack *stack) {
 }
 
 void MLIRDispatch::fallback(const c10::OperatorHandle &op, c10::Stack *stack) {
+  POPTORCH_TRACEPOINT_WITH_DEBUG_INFO(getSchemaKey(op.schema()));
   ERROR_ON(
       !_compiler.allOpsCanBeLoweredToPoplar()); // This shouldn't be possible
 
