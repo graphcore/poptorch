@@ -6,11 +6,6 @@ import torchvision.models as models
 import pytest
 import helpers
 
-pytest.skip(
-    "TODO(T70626): We currently fail to start a device in eager mode: "
-    "Failed to load GraphcoreBinary",
-    allow_module_level=True)
-
 
 def simple_add(capfd):
     import poptorch.eager  # pylint: disable=unused-import, import-outside-toplevel
