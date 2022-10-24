@@ -11,6 +11,7 @@ import os
 import pathlib
 import json
 import sys
+import datetime
 sys.path.insert(0, os.path.abspath('.'))
 
 # -- Project information -----------------------------------------------------
@@ -87,6 +88,69 @@ nitpick_ignore = [
     ('py:data', 'typing.Callable'),
     ('py:class', 'typing.ForwardRef'),
 ]
+
+# Define abbreviations for IPU-PODn names with subscripts
+# These use non-breaking hyphens & spaces, so be careful if editing or adding new definitions
+pod_sizes = [2**i for i in range(2, 14)] + ["N"]
+pod_definitions = [
+    f".. |POD{i}| replace:: IPU‑POD\\ :subscript:`{i}`" for i in pod_sizes
+]
+bow_definitions = [
+    f".. |BOW{i}| replace:: Bow Pod\\ :subscript:`{i}`" for i in pod_sizes
+]
+
+rst_epilog = ("\n".join(pod_definitions) + "\n" + "\n".join(bow_definitions) +
+              r"""
+.. role:: raw-html(raw)
+    :format: html
+
+.. |POD| replace:: IPU‑POD
+.. |BOW| replace:: Bow Pod
+.. |newpage| raw:: latex
+
+  \newpage
+
+.. |LEGAL:EULA| replace::
+    This software is made available under the terms of the `Graphcore End User
+    License Agreement (EULA) <https://docs.graphcore.ai/en/latest/eula.html>`__
+    and the
+    `Graphcore Container License Agreement <https://docs.graphcore.ai/projects/container-license/en/latest/>`__.
+    Please ensure you have read and accept the terms of the corresponding
+    license before using the software. The Graphcore EULA applies unless
+    indicated otherwise.
+
+.. |LEGAL:TRADEMARkS| replace::
+    Graphcloud®, Graphcore® and Poplar® are registered trademarks of Graphcore
+    Ltd.
+    :raw-html:`<br></br>`
+    Bow™,
+    Bow-2000™,
+    Bow Pod™,
+    Colossus™,
+    In-Processor-Memory™,
+    IPU-Core™,
+    IPU-Exchange™,
+    IPU-Fabric™,
+    IPU-Link™,
+    IPU-M2000™,
+    IPU-Machine™,
+    IPU-POD™,
+    IPU-Tile™,
+    PopART™,
+    PopDist™,
+    PopLibs™,
+    PopRun™,
+    PopVision™,
+    PopTorch™,
+    Streaming Memory™
+    and Virtual-IPU™
+    are trademarks of Graphcore Ltd.
+    :raw-html:`<br></br>`
+    All other trademarks are the property of their respective owners.
+
+""" + f".. |YEAR| replace:: {datetime.date.today().year}" + "\n" +
+              f".. |SDK_RELEASE| replace:: {SDK_RELEASE}"
+              "\n")
 
 # -- Options for HTML output -------------------------------------------------
 
