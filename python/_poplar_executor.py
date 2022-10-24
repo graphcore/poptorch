@@ -1533,12 +1533,3 @@ class PoplarExecutor:
         # cause the tracer to fail, yet is none of the above types, or
         # alternatively, it is one of the above but the deepcopy failed.
         raise _impl.createPoptorchError("Unsupported input type or condition.")
-
-
-def hasMLIRSupportOnPlatform():
-    """Return True if the current platform supports MLIR, else False.
-
-    The dispatcher and eager mode cannot be used on platforms that don't
-    support MLIR.
-    """
-    return poptorch_core.mlirIsSupportedOnPlatform()

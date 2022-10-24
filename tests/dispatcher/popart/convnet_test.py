@@ -1,20 +1,18 @@
 #!/usr/bin/env python3
 # Copyright (c) 2021 Graphcore Ltd. All rights reserved.
 import copy
-import pytest
 import torch
 import torch.nn as nn
-from poptorch.experimental import IPUContext
 import helpers
+from poptorch.experimental import IPUContext
 import poptorch
 
 
-@pytest.mark.mlirSupportRequired
 def test_mnist():
     # A helper block to build convolution-pool-relu blocks.
     class Block(nn.Module):
         def __init__(self, in_channels, num_filters, kernel_size, pool_size):
-            super(Block, self).__init__()
+            super().__init__()
             self.conv = nn.Conv2d(in_channels,
                                   num_filters,
                                   kernel_size=kernel_size)

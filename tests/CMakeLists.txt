@@ -18,12 +18,10 @@ endif()
 # necessary binaries.
 set(POPTORCH_OPT_ARG "")
 set(FILECHECK_ARG "")
-if (POPTORCH_BUILD_MLIR_COMPILER)
-  set(POPTORCH_OPT_ARG "--poptorch-opt $<TARGET_FILE:poptorch-opt>")
+set(POPTORCH_OPT_ARG "--poptorch-opt $<TARGET_FILE:poptorch-opt>")
 
-  find_program(FILECHECK_BIN FileCheck REQUIRED)
-  set(FILECHECK_ARG "--filecheck-bin ${FILECHECK_BIN}")
-endif()
+find_program(FILECHECK_BIN FileCheck REQUIRED)
+set(FILECHECK_ARG "--filecheck-bin ${FILECHECK_BIN}")
 
 # Generate tests.
 run_poptorch_install_command(

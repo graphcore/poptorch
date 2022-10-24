@@ -8,9 +8,9 @@ import threading
 import torch
 import torch.nn as nn
 import pytest
+import helpers
 import poptorch
 from poptorch.enums import OutputMode, HalfFloatCastingBehavior, MeanReductionStrategy
-import helpers
 
 
 def test_set_options():
@@ -502,7 +502,6 @@ def test_running_statistics(capfd, dtype, setting, trace_model):
 
 @helpers.printCapfdOnExit
 @helpers.overridePoptorchLogLevel("TRACE")
-@pytest.mark.mlirSupportRequired
 def test_running_statistics_dispatch(capfd):
     x = torch.randn((16, 16), dtype=torch.half)
 

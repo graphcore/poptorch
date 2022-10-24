@@ -11,8 +11,6 @@ logging.basicConfig(level=logging.INFO)
 
 REQUIRES = ['tqdm', '@TORCH_DEPENDENCY@']
 VERSION = "@VERSION@"
-UPDATE_LDSHARED = "@UPDATE_LDSHARED@" == "True"
-DEFINE_MACROS = "@DEFINE_MACROS@"
 
 LONG_DESCRIPTION = (
     "PopTorch is a set of extensions for PyTorch enabling "
@@ -20,33 +18,12 @@ LONG_DESCRIPTION = (
 
 LIBS = ["*.so", "lib/*", "lib/poplar_rt/*", "lib/graphcore/lib/*.a"]
 
-# On CentOS 7 the Conda compiler sets flags that make Conda's libc++ supersed the system one:
-#  gcc -pthread -shared -B /poptorch_view/build/buildenv/compiler_compat -L/poptorch_view/build/buildenv/lib -Wl,-rpath=/poptorch_view/build/buildenv/lib -Wl,--no-as-needed -Wl,--sysroot=/
-# So we remove all the flags that contain "buildenv/lib"
-if UPDATE_LDSHARED:
-    import distutils.sysconfig
-    config = distutils.sysconfig.get_config_vars()
-    ldshared = config["LDSHARED"]
-    ldshared = [
-        opt for opt in ldshared.split(" ") if not "buildenv/lib" in opt
-    ]
-    config["LDSHARED"] = " ".join(ldshared)
-
 
 class BinaryDistribution(Distribution):
     """Distribution which always forces a binary package with platform name"""
 
     def has_ext_modules(self):
         return True
-
-
-def get_define_macros():
-    res = []
-    for m in DEFINE_MACROS.split(":"):
-        key_value = m.split("=")
-        assert len(key_value) == 2, f"Expected key=value, got {m}"
-        res.append(tuple(key_value))
-    return res
 
 
 def get_torch_paths():
@@ -71,7 +48,7 @@ package_data["poptorch"].append("*.inc.cpp")
 
 core_mod = Pybind11Extension(
     "poptorch.poptorch_core", ["src/poptorch.cpp"],
-    define_macros=[("_GLIBCXX_USE_CXX11_ABI", 0)] + get_define_macros(),
+    define_macros=[("_GLIBCXX_USE_CXX11_ABI", 0)],
     include_dirs=["include"] + torch_include_dirs,
     library_dirs=["poptorch/lib"] + torch_lib_dirs,
     extra_link_args=["-Wl,--rpath=$ORIGIN/lib:$ORIGIN"],

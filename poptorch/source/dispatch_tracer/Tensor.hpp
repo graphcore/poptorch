@@ -138,11 +138,7 @@ private:
 
   poptorch_ir::TensorId _next_tensor_id{1};
   std::shared_ptr<poptorch_ir::IIpuSession> _ipu_session =
-#if POPTORCH_BUILD_MLIR_COMPILER
       poptorch_ir::createStaticSession();
-#else
-      nullptr;
-#endif
 };
 
 } // namespace poptorch

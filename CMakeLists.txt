@@ -35,35 +35,6 @@ string(REPLACE "." ";" TORCH_VERSION_AS_LIST ${TORCH_VERSION})
 # Get the minor component. (Versions are Major.Minor.Patch)
 list(GET TORCH_VERSION_AS_LIST 1 TORCH_MINOR_VERSION)
 
-# Build compiler parts by default.
-set(POPTORCH_BUILD_MLIR_COMPILER ON CACHE BOOL "Build the PopTorch compiler")
-
-# Centos is redhat
-file (GLOB IS_REDHAT /etc/redhat-release)
-
-message(STATUS "Is red hat : ${IS_REDHAT}")
-# Only on CENTOS 7.6 do we not build it.
-if (NOT IS_REDHAT STREQUAL "")
-  # Get centos version info.
-  file (READ /etc/redhat-release CENTOS_INFO)
-
-  # If it is in fact centos and not some other redhat.
-  string(FIND ${CENTOS_INFO} "CentOS" IS_CENTOS)
-
-  # Is the version number 7.6
-  string(FIND ${CENTOS_INFO} " 7." IS_SEVEN_POINT)
-
-  message(STATUS "Centos info : ${CENTOS_INFO}")
-
-  # If both centos and 7.6 we turn off the compiler build.
-  if(NOT ${IS_CENTOS} EQUAL -1)
-    if(NOT ${IS_SEVEN_POINT} EQUAL -1)
-      message(STATUS "This is 7.x, compiler is NOT getting built.")
-      set(POPTORCH_BUILD_MLIR_COMPILER OFF)
-    endif()
-  endif()
-endif()
-
 set(CMAKE_CONFIGURATION_TYPES "Release" "Debug" "MinSizeRel" "RelWithDebInfo")
 set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS ${CMAKE_CONFIGURATION_TYPES})
 if(NOT CMAKE_BUILD_TYPE)
@@ -91,15 +62,6 @@ if(USE_PYTORCH_PACKAGE_HEADERS)
     # set it correctly in order to get consistent torch behaviour.
     add_compile_definitions(NDEBUG)
   endif()
-endif()
-
-# Tell the source files if we have built MLIR or not so it can be exposed via python.
-if (POPTORCH_BUILD_MLIR_COMPILER)
-  add_compile_definitions(POPTORCH_BUILD_MLIR_COMPILER=1)
-  set(GENERATE_PYTHON_PACKAGE_FLAGS "")
-else()
-  add_compile_definitions(POPTORCH_BUILD_MLIR_COMPILER=0)
-  set(GENERATE_PYTHON_PACKAGE_FLAGS "--build-without-mlir")
 endif()
 
 if(EXISTS ${SDK_DIR})
@@ -220,14 +182,7 @@ remove_use_distributed_definition(torch_cpu)
 
 add_subdirectory(poptorch_err)
 add_subdirectory(poptorch_logging)
-
-if (POPTORCH_BUILD_MLIR_COMPILER)
-  add_subdirectory(poptorch_compiler)
-else()
-  # We still need some headers from pytorch_bridge
-  add_subdirectory(poptorch_compiler/pytorch_bridge)
-endif()
-
+add_subdirectory(poptorch_compiler)
 add_subdirectory(poptorch/source/dispatch_tracer)
 add_subdirectory(popart_compiler)
 add_subdirectory(poptorch)
@@ -240,24 +195,24 @@ add_subdirectory(docs/user_guide)
 
 add_custom_target(poptorch_standalone_wheel
   WORKING_DIRECTORY ${CMAKE_INSTALL_PREFIX}
-  COMMAND python3 ${PROJECT_SOURCE_DIR}/scripts/generate_python_package.py bdist_wheel ${GENERATE_PYTHON_PACKAGE_FLAGS} --include-dir ${CMAKE_INSTALL_PREFIX}/include --lib-dir ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR} --output-dir ${CMAKE_INSTALL_PREFIX}/dist --python-dir ${INSTALL_PYDIR} --standalone "${popart_LIB_DIR}:${POPLAR_DIR}"
+  COMMAND python3 ${PROJECT_SOURCE_DIR}/scripts/generate_python_package.py bdist_wheel --include-dir ${CMAKE_INSTALL_PREFIX}/include --lib-dir ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR} --output-dir ${CMAKE_INSTALL_PREFIX}/dist --python-dir ${INSTALL_PYDIR} --standalone "${popart_LIB_DIR}:${POPLAR_DIR}"
   DEPENDS poptorch
 )
 add_custom_target(poptorch_standalone_sdist
   WORKING_DIRECTORY ${CMAKE_INSTALL_PREFIX}
-  COMMAND python3 ${PROJECT_SOURCE_DIR}/scripts/generate_python_package.py sdist ${GENERATE_PYTHON_PACKAGE_FLAGS} --include-dir ${CMAKE_INSTALL_PREFIX}/include --lib-dir ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR} --output-dir ${CMAKE_INSTALL_PREFIX}/dist --python-dir ${INSTALL_PYDIR} --standalone "${popart_LIB_DIR}:${POPLAR_DIR}"
+  COMMAND python3 ${PROJECT_SOURCE_DIR}/scripts/generate_python_package.py sdist --include-dir ${CMAKE_INSTALL_PREFIX}/include --lib-dir ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR} --output-dir ${CMAKE_INSTALL_PREFIX}/dist --python-dir ${INSTALL_PYDIR} --standalone "${popart_LIB_DIR}:${POPLAR_DIR}"
   DEPENDS poptorch
 )
 
 add_custom_target(poptorch_wheel
   WORKING_DIRECTORY ${CMAKE_INSTALL_PREFIX}
-  COMMAND python3 ${PROJECT_SOURCE_DIR}/scripts/generate_python_package.py bdist_wheel ${GENERATE_PYTHON_PACKAGE_FLAGS} --include-dir ${CMAKE_INSTALL_PREFIX}/include --lib-dir ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR} --output-dir ${CMAKE_INSTALL_PREFIX}/dist --python-dir ${INSTALL_PYDIR}
+  COMMAND python3 ${PROJECT_SOURCE_DIR}/scripts/generate_python_package.py bdist_wheel --include-dir ${CMAKE_INSTALL_PREFIX}/include --lib-dir ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR} --output-dir ${CMAKE_INSTALL_PREFIX}/dist --python-dir ${INSTALL_PYDIR}
   DEPENDS poptorch
 )
 
 add_custom_target(poptorch_sdist
   WORKING_DIRECTORY ${CMAKE_INSTALL_PREFIX}
-  COMMAND python3 ${PROJECT_SOURCE_DIR}/scripts/generate_python_package.py sdist ${GENERATE_PYTHON_PACKAGE_FLAGS} --include-dir ${CMAKE_INSTALL_PREFIX}/include --lib-dir ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR} --output-dir ${CMAKE_INSTALL_PREFIX}/dist --python-dir ${INSTALL_PYDIR}
+  COMMAND python3 ${PROJECT_SOURCE_DIR}/scripts/generate_python_package.py sdist --include-dir ${CMAKE_INSTALL_PREFIX}/include --lib-dir ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR} --output-dir ${CMAKE_INSTALL_PREFIX}/dist --python-dir ${INSTALL_PYDIR}
   DEPENDS poptorch
 )
 

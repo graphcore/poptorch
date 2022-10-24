@@ -1,12 +1,7 @@
 #!/usr/bin/env python3
 # Copyright (c) 2021 Graphcore Ltd. All rights reserved.
-
-import sys
 import torch
 import poptorch
-
-if not poptorch.hasMLIRSupportOnPlatform():
-    sys.exit(0)
 
 
 class Model(torch.nn.Module):

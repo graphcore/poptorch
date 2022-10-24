@@ -5,16 +5,14 @@ import pytest
 
 import torch
 
+import helpers
 import poptorch
 from poptorch.experimental import IPUContext
-
-import helpers
 
 compilers = [poptorch.Compiler.PopART, poptorch.Compiler.MLIR]
 
 
 @pytest.mark.parametrize("compiler", compilers)
-@pytest.mark.mlirSupportRequired
 def test_ipu_tensor_id(compiler):
     def f(x):
         x_tensor_id = poptorch.getIpuTensorId(x)
@@ -40,7 +38,6 @@ def test_ipu_tensor_id(compiler):
     IPUContext(f, compiler=compiler)(input)
 
 
-@pytest.mark.mlirSupportRequired
 @pytest.mark.parametrize("compiler", compilers)
 @pytest.mark.parametrize("op", [torch.argmin, torch.argmax])
 def test_argminmax_grad(compiler, op):

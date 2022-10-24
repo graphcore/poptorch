@@ -69,7 +69,6 @@ activation_functions = [
 activation_backward_functions = [torch.tanh, torch.sigmoid, F.leaky_relu]
 
 
-@pytest.mark.mlirSupportRequired
 @pytest.mark.parametrize("op", activation_functions)
 def test_activations(op):
     torch.manual_seed(42)
@@ -106,7 +105,6 @@ def test_activations(op):
                                 equal_nan=True)
 
 
-@pytest.mark.mlirSupportRequired
 @pytest.mark.parametrize("dim", [-1, 0, 1, 2])
 def test_softmax(dim):
     torch.manual_seed(42)
@@ -121,7 +119,6 @@ def test_softmax(dim):
                             equal_nan=True)
 
 
-@pytest.mark.mlirSupportRequired
 @pytest.mark.parametrize("dim", [0, 1, 2, 3])
 def test_logsoftmax_forward(dim):
     torch.manual_seed(42)
@@ -135,7 +132,6 @@ def test_logsoftmax_forward(dim):
                             equal_nan=True)
 
 
-@pytest.mark.mlirSupportRequired
 @pytest.mark.parametrize("dim", [0, 1, 2, 3])
 def test_logsoftmax_backward(dim):
     torch.manual_seed(42)
@@ -157,7 +153,6 @@ def test_logsoftmax_backward(dim):
                             equal_nan=True)
 
 
-@pytest.mark.mlirSupportRequired
 def test_prelu():
     torch.manual_seed(42)
 

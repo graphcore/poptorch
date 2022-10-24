@@ -50,7 +50,6 @@ def simple_add(capfd):
 @helpers.printCapfdOnExit
 @helpers.overridePoptorchLogLevel("DEBUG")
 @pytest.mark.parametrize("mode", ["default", "show_all", "hide_all"])
-@pytest.mark.mlirSupportRequired
 @pytest.mark.extendedTestingOnly
 def test_source_location(capfd, mode):
     import poptorch.eager  # pylint: disable=unused-import, import-outside-toplevel
@@ -90,7 +89,6 @@ def test_source_location(capfd, mode):
 
 @helpers.printCapfdOnExit
 @helpers.overridePoptorchLogLevel("DEBUG")
-@pytest.mark.mlirSupportRequired
 @pytest.mark.extendedTestingOnly
 def test_lazy_tensor(capfd):
     import poptorch.eager  # pylint: disable=unused-import, import-outside-toplevel
@@ -115,7 +113,6 @@ def test_lazy_tensor(capfd):
     log.assert_matches("poptorch.add")
 
 
-@pytest.mark.mlirSupportRequired
 @helpers.printCapfdOnExit
 @helpers.overridePoptorchLogLevel("TRACE")
 def test_simple_add(capfd):
@@ -123,7 +120,6 @@ def test_simple_add(capfd):
     simple_add(capfd)
 
 
-@pytest.mark.mlirSupportRequired
 @pytest.mark.ipuHardwareRequired
 @helpers.printCapfdOnExit
 @helpers.overridePoptorchLogLevel("TRACE")
@@ -131,7 +127,6 @@ def test_simple_add_hw(capfd):
     simple_add(capfd)
 
 
-@pytest.mark.mlirSupportRequired
 @pytest.mark.parametrize("lazy", [True, False])
 @pytest.mark.extendedTestingOnly
 def test_backward(lazy):
@@ -147,7 +142,6 @@ def test_backward(lazy):
 
 
 @pytest.mark.ipuHardwareRequired
-@pytest.mark.mlirSupportRequired
 @pytest.mark.extendedTestingOnly
 def test_squeezenet():
     pytest.skip("TODO(T67125): Tensor-likes are not close")
@@ -171,7 +165,6 @@ def test_squeezenet():
 
 
 @pytest.mark.ipuHardwareRequired
-@pytest.mark.mlirSupportRequired
 @pytest.mark.extendedTestingOnly
 def test_resnet18():
     pytest.skip("TODO(T64252): 'std::exception': Trying to allocate a tensor "
@@ -196,7 +189,6 @@ def test_resnet18():
 
 
 @pytest.mark.ipuHardwareRequired
-@pytest.mark.mlirSupportRequired
 @helpers.overridePoptorchLogLevel("TRACE")
 def test_no_unused_empty_tensor(capfd):
     import poptorch.eager  # pylint: disable=unused-import, import-outside-toplevel

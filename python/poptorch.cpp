@@ -1089,10 +1089,8 @@ PYBIND11_MODULE(poptorch_core, m) { // NOLINT
   m.def("isAlreadyRegistered", PTC(poptorch::alreadyRegistered));
   m.def("registerBuffersWithCallback",
         PTC(poptorch::registerBuffersWithCallback));
-  m.def("mlirIsSupportedOnPlatform", PTC(poptorch::mlirIsSupportedOnPlatform));
   m.def("_validateOptions", PTC(poptorch::parseSessionOptionsVoid));
 
-#if POPTORCH_BUILD_MLIR_COMPILER
   py::class_<poptorch::MLIRExecutor, std::shared_ptr<poptorch::MLIRExecutor>>(
       m, "MLIRExecutor")
       .def("execute",
@@ -1105,7 +1103,6 @@ PYBIND11_MODULE(poptorch_core, m) { // NOLINT
       .def("copyWeightsToHostIfNeeded",
            &poptorch::MLIRExecutor::copyWeightsToHostIfNeeded);
   m.def("compileMLIR", PTC(poptorch::compileMLIR));
-#endif
 
   py::enum_<poptorch::TracingMode>(m, "TracingMode")
       .value("PopART", poptorch::TracingMode::POPART)

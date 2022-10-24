@@ -3,10 +3,11 @@ Legacy tracing frontend
 =======================
 
 .. warning::
-    Tracing has been deprecated since PopTorch 3.0. We suggest you use the dispatcher frontend, which is enabled by
-    default on supported platforms and brings many benefits, including greatly simplified handling of ``float16``
-    operations. However, if you need to use tracing for legacy reasons, this section explains the limitations imposed
-    and the workarounds available.
+    Tracing has been deprecated since PopTorch 3.0. We suggest you use the
+    dispatcher frontend, which is enabled by default and brings many benefits,
+    including greatly simplified handling of ``float16`` operations. However,
+    if you need to use tracing for legacy reasons, this section explains the
+    limitations imposed and the workarounds available.
 
 .. _dispatcher-support:
 
@@ -26,10 +27,6 @@ However, this approach suffered from several limitations:
 * Source code location was not supported: most of the instructions pointed at ``torch.nn.module.py`` rather than at user code.
 
 To address these issues the default is now to use the `PyTorch dispatcher <http://blog.ezyang.com/2020/09/lets-talk-about-the-pytorch-dispatcher/>`_ to build the PopTorch graph ourselves.
-
-The dispatcher frontend is supported on most PopTorch platforms (See :py:func:`~poptorch.hasMLIRSupportOnPlatform`) but if
-you run into any issue you can revert back to tracing by using :py:meth:`~poptorch.options._JitOptions.traceModel`.
-The only current PopTorch platform without dispatcher support is CentOS 7.
 
 .. _tracing-constraints:
 

@@ -66,7 +66,6 @@ void processPrecisionOptions(const IPyValue &values_dict, bool dispatcher);
 typedef std::function<std::unique_ptr<IPyValue>(const std::string &)>
     AttributeAccessor;
 
-bool mlirIsSupportedOnPlatform();
 } // namespace poptorch
 
 #endif // INCLUDE_POPTORCH_SESSION_OPTIONS_PARSER_HPP

@@ -17,7 +17,6 @@ def harness(op, **kwargs):
     helpers.assert_allclose(expected=cpu_result, actual=ipu_result)
 
 
-@pytest.mark.mlirSupportRequired
 @helpers.printCapfdOnExit
 @helpers.overridePoptorchLogLevel("DEBUG")
 def test_view(capfd):
@@ -33,7 +32,6 @@ def test_view(capfd):
     checker.assert_contains('poptorch.viewOutplace')
 
 
-@pytest.mark.mlirSupportRequired
 def test_nested_views():
     def f(x):
         y = torch.reshape(x, (2, 5))
@@ -46,7 +44,6 @@ def test_nested_views():
     harness(f)
 
 
-@pytest.mark.mlirSupportRequired
 def test_view_with_outplace():
     def f(x):
         y = torch.reshape(x, (2, 5))
@@ -57,7 +54,6 @@ def test_view_with_outplace():
     harness(f)
 
 
-@pytest.mark.mlirSupportRequired
 @helpers.printCapfdOnExit
 @helpers.overridePoptorchLogLevel("DEBUG")
 def test_squeeze_(capfd):
@@ -72,7 +68,6 @@ def test_squeeze_(capfd):
     checker.assert_contains('poptorch.viewOutplace')
 
 
-@pytest.mark.mlirSupportRequired
 @helpers.printCapfdOnExit
 @helpers.overridePoptorchLogLevel("DEBUG")
 def test_nested_squeeze_(capfd):
@@ -88,7 +83,6 @@ def test_nested_squeeze_(capfd):
     checker.assert_contains('poptorch.viewOutplace')
 
 
-@pytest.mark.mlirSupportRequired
 @helpers.overridePoptorchLogLevel("DEBUG")
 def test_inplace_copy_with_squeeze():
     def h(x):
@@ -126,7 +120,6 @@ view_ops = [(torch.reshape, ((2, 5), )), (torch.transpose, (0, 1)),
 
 @pytest.mark.parametrize("view_op, args", view_ops)
 @pytest.mark.parametrize("inplace", [False, True])
-@pytest.mark.mlirSupportRequired
 def test_all_view_ops(view_op, args, inplace):
     if inplace and view_op in [expand]:
         pytest.skip(
@@ -144,7 +137,6 @@ def test_all_view_ops(view_op, args, inplace):
     harness(f)
 
 
-@pytest.mark.mlirSupportRequired
 def test_chained_view_ops():
     text_len = 81
     b = 3
@@ -166,7 +158,6 @@ def test_chained_view_ops():
     helpers.assert_allequal(actual=ipu_res, expected=cpu_res)
 
 
-@pytest.mark.mlirSupportRequired
 def test_chained_slice_and_index():
     def f(x, y):
         x[:, :, 0] = y
@@ -181,7 +172,6 @@ def test_chained_slice_and_index():
     helpers.assert_allequal(actual=ipu_res, expected=cpu_res)
 
 
-@pytest.mark.mlirSupportRequired
 def test_chained_slice():
     def f(x):
         t = x.reshape(3, 3, 3)

@@ -2,13 +2,10 @@
 # Copyright (c) 2022 Graphcore Ltd. All rights reserved.
 
 import pytest
-
 import torch
-
+import helpers
 import poptorch
 from poptorch.experimental import IPUContext
-
-import helpers
 
 compilers = [poptorch.Compiler.PopART, poptorch.Compiler.MLIR]
 
@@ -21,7 +18,6 @@ compilers = [poptorch.Compiler.PopART, poptorch.Compiler.MLIR]
     torch.int32,
     torch.int64,
 ])
-@pytest.mark.mlirSupportRequired
 def test_tensor_constant_ints(compiler, dtype):
     def f(x):
         x = x.to(helpers.outputDevice())
@@ -40,7 +36,6 @@ def test_tensor_constant_ints(compiler, dtype):
 
 @pytest.mark.parametrize("compiler", compilers)
 @pytest.mark.parametrize("dtype", [torch.half, torch.float, torch.double])
-@pytest.mark.mlirSupportRequired
 def test_tensor_constant_floats(compiler, dtype):
     def f(x):
         x = x.to(helpers.outputDevice())
@@ -62,7 +57,6 @@ def test_tensor_constant_floats(compiler, dtype):
 
 
 @pytest.mark.parametrize("compiler", compilers)
-@pytest.mark.mlirSupportRequired
 def test_tensor_constant_bool(compiler):
     def f(x):
         x = x.to(helpers.outputDevice())

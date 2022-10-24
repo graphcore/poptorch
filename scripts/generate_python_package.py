@@ -36,9 +36,6 @@ parser.add_argument("target",
 parser.add_argument("--output-dir",
                     default="dist",
                     help="Where to create the packages")
-parser.add_argument("--build-without-mlir",
-                    action="store_true",
-                    help="Build the python bindings without MLIR support")
 args = parser.parse_args()
 
 
@@ -64,31 +61,8 @@ def get_poptorch_version():
     return version
 
 
-def get_define_macros():
-    macros = "POPTORCH_BUILD_MLIR_COMPILER="
-    if args.build_without_mlir:
-        macros += "0"
-    else:
-        macros += "1"
-    return macros
-
-
-def update_ldshared():
-    """Only needed on CentOS 7."""
-    try:
-        with open("/etc/redhat-release") as f:
-            content = f.read()
-            if "CentOS" in content and " 7." in content:
-                return "True"
-    except FileNotFoundError:
-        pass
-    return "False"
-
-
 VERSION = get_poptorch_version()
 TORCH_VERSION = utils.get_required_torch_version()
-UPDATE_LDSHARED = update_ldshared()
-DEFINE_MACROS = get_define_macros()
 
 # https://www.python.org/dev/peps/pep-0425/
 # The platform tag is simply distutils.util.get_platform() with all hyphens - and periods . replaced with underscore _.
@@ -123,12 +97,10 @@ def configure(src_filename, dst_filename):
     with open(dst_filename, "w") as f:
         for line in open(src_filename):
             f.write(
-                line.replace("@VERSION@", VERSION).replace(
-                    "@TORCH_DEPENDENCY@",
-                    TORCH_DEPENDENCY).replace("@PLATFORM@", PLATFORM).replace(
-                        "@UPDATE_LDSHARED@",
-                        UPDATE_LDSHARED).replace("@DEFINE_MACROS@",
-                                                 DEFINE_MACROS))
+                line.replace("@VERSION@", VERSION) \
+                    .replace("@TORCH_DEPENDENCY@", TORCH_DEPENDENCY) \
+                    .replace("@PLATFORM@", PLATFORM)
+            )
 
 
 # Create a temporary directory and copy the files to package to it.

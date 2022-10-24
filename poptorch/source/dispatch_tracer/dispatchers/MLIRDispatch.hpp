@@ -10,13 +10,9 @@
 #include <vector>
 
 #include "poptorch/DispatchTracer.hpp"
-#include "pytorch_bridge/CompilerTypes.hpp"
-
-// We don't build this on Centos TODO(T49566)
-#if POPTORCH_BUILD_MLIR_COMPILER
 #include "pytorch_bridge/CompilerOptions.hpp"
+#include "pytorch_bridge/CompilerTypes.hpp"
 #include "pytorch_bridge/PoptorchCompiler.hpp"
-#endif
 
 #include "../ValueMapper.hpp"
 #include "IDispatch.hpp"
@@ -120,11 +116,9 @@ private:
   void reset();
 
   void initCompiler(const CompilerOptions &compilerOptions);
-// We don't build this on Centos TODO(T49566)
-#if POPTORCH_BUILD_MLIR_COMPILER
+
   // The MLIR graph.
   poptorch_ir::PoptorchCompiler _compiler;
-#endif
 
   // These are used to generate unique names
   // for each added input / output / parameter.
@@ -141,9 +135,7 @@ private:
   // operation.
   static const DispatchTable direct_dispatch_lookup;
 
-#if POPTORCH_BUILD_MLIR_COMPILER
   CompilerOptions _opts;
-#endif
 
   std::vector<IpuTensorDetails *> _aliases_to_restore;
   void restoreAliases();

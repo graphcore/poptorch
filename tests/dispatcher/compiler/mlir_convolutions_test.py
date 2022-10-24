@@ -7,7 +7,6 @@ import helpers
 from poptorch.experimental import IPUContext
 
 
-@pytest.mark.mlirSupportRequired
 @pytest.mark.parametrize("num_dims", [1, 2, 3])
 @pytest.mark.parametrize(
     "input_size, out_channels, kernel_size, stride, padding, dilation, "

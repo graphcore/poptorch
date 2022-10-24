@@ -1,13 +1,11 @@
 #!/usr/bin/env python3
 # Copyright (c) 2022 Graphcore Ltd. All rights reserved.
 
-import pytest
 import torch
 import helpers
 from poptorch.experimental import IPUContext
 
 
-@pytest.mark.mlirSupportRequired
 @helpers.printCapfdOnExit
 @helpers.overridePoptorchLogLevel("DEBUG")
 def test_dead_code_elimination(capfd):
@@ -23,7 +21,6 @@ def test_dead_code_elimination(capfd):
     checker.assert_not_contains('poptorch.mul')
 
 
-@pytest.mark.mlirSupportRequired
 @helpers.printCapfdOnExit
 @helpers.overridePoptorchLogLevel("DEBUG")
 def test_dead_code_elimination_with_views(capfd):

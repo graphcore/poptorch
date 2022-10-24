@@ -5,8 +5,8 @@ import enum
 import gc
 import pytest
 import torch
-import poptorch
 import helpers
+import poptorch
 
 
 @pytest.fixture(autouse=True)
@@ -18,7 +18,6 @@ def cleanup():
 
 # Documentation about markers: https://docs.pytest.org/en/6.2.x/example/markers.html
 
-mlir_available = poptorch.hasMLIRSupportOnPlatform()
 hw_available = poptorch.ipuHardwareIsAvailable()
 enable_tracing_tests = False
 
@@ -36,9 +35,6 @@ def pytest_make_parametrize_id(val, argname):
 
 
 def pytest_configure(config):
-    config.addinivalue_line(
-        "markers", ("mlirSupportRequired: require MLIR to be available "
-                    "on the platform"))
     config.addinivalue_line("markers",
                             ("ipuHardwareRequired: require IPU hardware to be "
                              "available on the platform"))
@@ -62,14 +58,8 @@ def pytest_runtest_setup(item):
         # Does it have a trace_model parameter ?
         trace_model = item.callspec.params.get("trace_model")
         if trace_model is not None:
-            if not trace_model and not mlir_available:
-                pytest.skip("No MLIR support on this platform.")
-            if trace_model and mlir_available and not enable_tracing_tests:
+            if trace_model and not enable_tracing_tests:
                 pytest.skip("Tracing is deprecated: not testing.")
-
-    if any(item.iter_markers("mlirSupportRequired")):
-        if not mlir_available:
-            pytest.skip("No MLIR support on this platform.")
 
     if any(item.iter_markers("ipuHardwareRequired")):
         if not hw_available:

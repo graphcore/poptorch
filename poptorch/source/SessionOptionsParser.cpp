@@ -11,7 +11,7 @@ namespace poptorch {
 
 float IPyValue::toFloatWithRangeCheck() const {
   // A python "float" is a double
-  double value = toDouble();
+  const double value = toDouble();
 
   ERROR_ON_MSG(value > std::numeric_limits<float>::max(),
                value << " is too high for a Popart float attribute.");
@@ -35,14 +35,14 @@ popart_compiler::SessionOptions &SessionOptionsParser::options() {
 
 SessionOptionsParser::SessionOptionsParser(const IPyValue &py_opts)
     : _opts(std::make_unique<popart_compiler::SessionOptions>()) {
-  logging::LogContext ctx_func("parseSessionOptions");
+  const logging::LogContext ctx_func("parseSessionOptions");
   // steps, replicationFactor, profile
   auto &options = *_opts;
 
   py_opts.forEachInDict([&options, &py_opts](const IPyValue &name_val,
                                              const IPyValue &value) {
     const auto name = name_val.toString();
-    logging::LogContext ctx("option: " + name);
+    const logging::LogContext ctx("option: " + name);
 
     // Options excluded here:
     //  - patterns_level is handled at the same time as "patterns".
@@ -138,7 +138,5 @@ void processPrecisionOptions(const IPyValue &values_dict, bool dispatcher) {
                "to float at the pytorch level.");
   poptorch::setRunningStatisticsAlwaysFloat(running_statistics_always_float);
 }
-
-bool mlirIsSupportedOnPlatform() { return POPTORCH_BUILD_MLIR_COMPILER == 1; }
 
 } // namespace poptorch

@@ -7,7 +7,6 @@ import pytest
 from poptorch.experimental import IPUContext
 
 
-@pytest.mark.mlirSupportRequired
 def test_dropout_eval():
     # Dropout in eval mode should be an Identity operation
     torch.manual_seed(42)
@@ -23,7 +22,6 @@ def test_dropout_eval():
 
 
 @pytest.mark.ipuHardwareRequired
-@pytest.mark.mlirSupportRequired
 @pytest.mark.parametrize("p", [0.0, 0.1, 0.5, 1.0])
 def test_dropout_train(p):
     torch.manual_seed(42)

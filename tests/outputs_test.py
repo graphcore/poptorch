@@ -4,8 +4,8 @@
 import pytest
 import torch
 import torch.nn as nn
-import poptorch
 import helpers
+import poptorch
 
 
 @pytest.mark.parametrize("trace_model", [True, False])
@@ -130,7 +130,6 @@ def test_same_tensor(trace_model):
     helpers.assert_allclose(actual=ipu, expected=ref)
 
 
-@pytest.mark.mlirSupportRequired
 def test_dict():
     class Network(nn.Module):
         def forward(self, x, y):

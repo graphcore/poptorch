@@ -15,7 +15,6 @@ for d in range(-len(shape), len(shape)):
         select_param_sets.append((d, i))
 
 
-@pytest.mark.mlirSupportRequired
 def test_squeeze():
     t = torch.ones(1, 2, 3, 1, 1, 2, 1, 3)
 
@@ -27,7 +26,6 @@ def test_squeeze():
 
 # torch.select.int
 @pytest.mark.parametrize("dim_idx", select_param_sets)
-@pytest.mark.mlirSupportRequired
 def test_select(dim_idx):
     num_elems = 1
     for d in shape:
@@ -46,7 +44,6 @@ def test_select(dim_idx):
 
 # Test that the result returned from `select.int` is a view, not a copy of the
 # input tensor.
-@pytest.mark.mlirSupportRequired
 def test_select_is_view():
     num_elems = 1
     for d in shape:
@@ -68,7 +65,6 @@ def test_select_is_view():
 
 # torch.unbind
 @pytest.mark.parametrize("dim", range(-len(shape), len(shape)))
-@pytest.mark.mlirSupportRequired
 def test_unbind(dim):
     num_elems = 1
     for d in shape:
@@ -97,7 +93,6 @@ def op_harness(fn, *args, **kwargs):
 
 # torch.index_select
 @pytest.mark.parametrize("dim", range(-len(shape), len(shape)))
-@pytest.mark.mlirSupportRequired
 def test_index_select(dim):
     torch.manual_seed(42)
 
@@ -110,7 +105,6 @@ def test_index_select(dim):
     op_harness(op, t, dim, index)
 
 
-@pytest.mark.mlirSupportRequired
 @pytest.mark.parametrize("dims", [(3, 0), (-1, 1)])
 def test_transpose(dims):
     torch.manual_seed(42)

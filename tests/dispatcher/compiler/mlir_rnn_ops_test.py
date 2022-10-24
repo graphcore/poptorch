@@ -8,7 +8,6 @@ import helpers
 from poptorch.experimental import IPUContext
 
 
-@pytest.mark.mlirSupportRequired
 @pytest.mark.parametrize("lstm_config", [
     {
         'batch_size': 2,

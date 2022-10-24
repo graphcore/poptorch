@@ -2,12 +2,9 @@
 # Copyright (c) 2022 Graphcore Ltd. All rights reserved.
 
 import pytest
-
 import torch
-
-from poptorch.experimental import IPUContext
-
 import helpers
+from poptorch.experimental import IPUContext
 
 # Set PyTorch's RNG seed to this manually.
 rng_seed = 42
@@ -82,7 +79,6 @@ def var(inp):
 
 # torch.randn
 @pytest.mark.parametrize("shape", tensor_shapes)
-@pytest.mark.mlirSupportRequired
 def test_randn(shape):
     def fn(shape):
         return torch.randn(shape, device=helpers.outputDevice())
@@ -92,7 +88,6 @@ def test_randn(shape):
 
 # torch.randn_like
 @pytest.mark.parametrize("shape", tensor_shapes)
-@pytest.mark.mlirSupportRequired
 def test_randn_like(shape):
     torch.manual_seed(rng_seed)
     inp = torch.empty(shape)
@@ -102,7 +97,6 @@ def test_randn_like(shape):
 
 # torch.normal(float, float)
 @pytest.mark.parametrize("shape", tensor_shapes)
-@pytest.mark.mlirSupportRequired
 def test_normal_float(shape):
     def fn(mean_val, std_val, size):
         return torch.normal(mean_val,
@@ -115,7 +109,6 @@ def test_normal_float(shape):
 
 # torch.normal(Tensor, Tensor)
 @pytest.mark.parametrize("shape", tensor_shapes)
-@pytest.mark.mlirSupportRequired
 def test_normal_tensor_tensor(shape):
     torch.manual_seed(rng_seed)
     means = torch.rand(shape) * 10
@@ -126,7 +119,6 @@ def test_normal_tensor_tensor(shape):
 
 # torch.normal(Tensor, float)
 @pytest.mark.parametrize("shape", tensor_shapes)
-@pytest.mark.mlirSupportRequired
 def test_normal_tensor_float(shape):
     torch.manual_seed(rng_seed)
     means = torch.rand(shape) * 10
@@ -137,7 +129,6 @@ def test_normal_tensor_float(shape):
 
 # torch.normal(float, Tensor)
 @pytest.mark.parametrize("shape", tensor_shapes)
-@pytest.mark.mlirSupportRequired
 def test_normal_float_tensor(shape):
     torch.manual_seed(rng_seed)
     desired_mean = 10
@@ -148,7 +139,6 @@ def test_normal_float_tensor(shape):
 
 # torch.normal(Tensor, Tensor, out=Tensor)
 @pytest.mark.parametrize("shape", tensor_shapes)
-@pytest.mark.mlirSupportRequired
 def test_normal_tensor_tensor_out(shape):
     torch.manual_seed(rng_seed)
     means = torch.rand(shape) * 10
@@ -164,7 +154,6 @@ def test_normal_tensor_tensor_out(shape):
 
 # torch.normal(Tensor, float, out=Tensor)
 @pytest.mark.parametrize("shape", tensor_shapes)
-@pytest.mark.mlirSupportRequired
 def test_normal_tensor_float_out(shape):
     torch.manual_seed(rng_seed)
     means = torch.rand(shape) * 10
@@ -180,7 +169,6 @@ def test_normal_tensor_float_out(shape):
 
 # torch.normal(float, Tensor, out=Tensor)
 @pytest.mark.parametrize("shape", tensor_shapes)
-@pytest.mark.mlirSupportRequired
 def test_normal_float_tensor_out(shape):
     torch.manual_seed(rng_seed)
     desired_mean = 10
@@ -196,7 +184,6 @@ def test_normal_float_tensor_out(shape):
 
 # torch.normal_
 @pytest.mark.parametrize("shape", tensor_shapes)
-@pytest.mark.mlirSupportRequired
 def test_normal_(shape):
     def fn():
         return torch.empty(shape, device=helpers.outputDevice()).normal_(5, 10)
@@ -206,7 +193,6 @@ def test_normal_(shape):
 
 # torch.rand
 @pytest.mark.parametrize("shape", tensor_shapes)
-@pytest.mark.mlirSupportRequired
 def test_rand(shape):
     def fn(shape):
         return torch.rand(shape, device=helpers.outputDevice())
@@ -216,7 +202,6 @@ def test_rand(shape):
 
 # torch.rand_like
 @pytest.mark.parametrize("shape", tensor_shapes)
-@pytest.mark.mlirSupportRequired
 def test_rand_like(shape):
     torch.manual_seed(rng_seed)
     inp = torch.empty(shape)
@@ -226,7 +211,6 @@ def test_rand_like(shape):
 
 # torch.uniform_
 @pytest.mark.parametrize("shape", tensor_shapes)
-@pytest.mark.mlirSupportRequired
 def test_uniform_(shape):
     def fn():
         return torch.empty(shape, device=helpers.outputDevice()).uniform_()
@@ -236,7 +220,6 @@ def test_uniform_(shape):
 
 # torch.exponential_
 @pytest.mark.parametrize("shape", tensor_shapes)
-@pytest.mark.mlirSupportRequired
 def test_exponential_(shape):
     def fn():
         return torch.empty(shape, device=helpers.outputDevice()).exponential_()
@@ -245,7 +228,6 @@ def test_exponential_(shape):
 
 
 # torch.exponential_
-@pytest.mark.mlirSupportRequired
 def test_exponential_inf():
     # Hopefully 5e7 is enough to generate the boundaries. There isn't enough
     # tile memory to set this much higher
@@ -262,7 +244,6 @@ def test_exponential_inf():
 @pytest.mark.parametrize("shape", tensor_shapes)
 @pytest.mark.parametrize("dtype",
                          [torch.int, torch.float, torch.half, torch.bool])
-@pytest.mark.mlirSupportRequired
 def test_random_(shape, dtype):
     def fn():
         return torch.empty(shape, dtype=dtype,
@@ -273,7 +254,6 @@ def test_random_(shape, dtype):
 
 # torch.random_(dtype=int8)
 @pytest.mark.parametrize("shape", tensor_shapes)
-@pytest.mark.mlirSupportRequired
 def test_random_int8(shape):
     # This is mainly to test boundaries of generated values.
     def fn():
@@ -288,7 +268,6 @@ def test_random_int8(shape):
 @pytest.mark.parametrize("shape", tensor_shapes)
 @pytest.mark.parametrize("dtype", [torch.int, torch.float, torch.half])
 @pytest.mark.parametrize("limits", [(0, 1), (0, 2), (0, 3), (0, 5), (5, 500)])
-@pytest.mark.mlirSupportRequired
 def test_random_limits(shape, dtype, limits):
     def fn():
         return torch.empty(shape, dtype=dtype,
@@ -302,7 +281,6 @@ def test_random_limits(shape, dtype, limits):
 @pytest.mark.parametrize("shape", tensor_shapes)
 @pytest.mark.parametrize("dtype", [torch.int, torch.float, torch.half])
 @pytest.mark.parametrize("limits", [(0, 2), (0, 5), (5, 500)])
-@pytest.mark.mlirSupportRequired
 def test_randint(shape, dtype, limits):
     def fn(*args, **kwargs):
         return torch.randint(*args, **kwargs, device=helpers.outputDevice())
@@ -315,7 +293,6 @@ def test_randint(shape, dtype, limits):
 @pytest.mark.parametrize("shape", tensor_shapes)
 @pytest.mark.parametrize("dtype", [torch.int, torch.float])
 @pytest.mark.parametrize("limits", [(2, 5)])
-@pytest.mark.mlirSupportRequired
 def test_randint_like(shape, dtype, limits):
     torch.manual_seed(42)
     inp = torch.empty(shape, dtype=dtype)
@@ -327,7 +304,6 @@ def test_randint_like(shape, dtype, limits):
 # torch.bernoulli_(float)
 @pytest.mark.parametrize("shape", tensor_shapes)
 @pytest.mark.parametrize("prob", [0.0, 0.5, 1.0])
-@pytest.mark.mlirSupportRequired
 def test_bernoulli_(shape, prob):
     def fn():
         return torch.empty(shape,
@@ -339,7 +315,6 @@ def test_bernoulli_(shape, prob):
 # torch.bernoulli(Tensor, float)
 @pytest.mark.parametrize("shape", tensor_shapes)
 @pytest.mark.parametrize("prob", [0.0, 0.5, 1.0])
-@pytest.mark.mlirSupportRequired
 def test_bernoulli_float(shape, prob):
     inp = torch.empty(shape)
 
@@ -348,7 +323,6 @@ def test_bernoulli_float(shape, prob):
 
 # torch.bernoulli(Tensor, Tensor)
 @pytest.mark.parametrize("shape", tensor_shapes)
-@pytest.mark.mlirSupportRequired
 def test_bernoulli_tensor(shape):
     torch.manual_seed(rng_seed)
     t = torch.rand(shape)
@@ -358,7 +332,6 @@ def test_bernoulli_tensor(shape):
 
 # torch.bernoulli(Tensor, Tensor, out=Tensor)
 @pytest.mark.parametrize("shape", tensor_shapes)
-@pytest.mark.mlirSupportRequired
 def test_bernoulli_tensor_out(shape):
     torch.manual_seed(rng_seed)
     t = torch.rand(shape)
@@ -401,7 +374,6 @@ def randperm_harness(fn, n, dtype):
     torch.int16, torch.int32, torch.int64, torch.half, torch.float,
     torch.double
 ])
-@pytest.mark.mlirSupportRequired
 def test_randperm(n, dtype):
     torch.manual_seed(rng_seed)
 
@@ -417,7 +389,6 @@ def test_randperm(n, dtype):
     torch.int16, torch.int32, torch.int64, torch.half, torch.float,
     torch.double
 ])
-@pytest.mark.mlirSupportRequired
 def test_randperm_out(n, dtype):
     torch.manual_seed(rng_seed)
 

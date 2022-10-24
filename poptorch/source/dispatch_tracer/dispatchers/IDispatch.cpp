@@ -24,18 +24,12 @@ void IDispatch::setPythonStack(
 }
 
 void *IDispatch::getDataSource(torch::jit::Value *value) {
-#if POPTORCH_BUILD_MLIR_COMPILER
   auto *record = _mapper.rawTensorRecord(value);
   if (record == nullptr) {
     logging::trace("JIT value not tracked {}", reinterpret_cast<void *>(value));
     return nullptr;
   }
   return record->tensor_details->host_buffer.getCpuData()->data();
-#else
-  UNUSED(value);
-  ERROR("PopTorch must be compiled with POPTORCH_BUILD_MLIR_COMPILER=ON to "
-        "use the dispatcher");
-#endif
 }
 
 bool IDispatch::isParameter(torch::jit::Value *value) {

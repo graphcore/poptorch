@@ -6,8 +6,8 @@ import re
 import torch
 import torch.nn as nn
 import pytest
-import poptorch
 import helpers
+import poptorch
 
 
 @pytest.mark.parametrize("use_half", [True, False])
@@ -210,7 +210,6 @@ def test_optional_inputs(use_half, trace_model):
     assert inference_model(t4=t4, t1=t1, t2=t2).float() == 9.0
 
 
-@pytest.mark.mlirSupportRequired
 def test_non_tensor_inputs_dispatch():
     class Model(nn.Module):
         def forward(
@@ -442,7 +441,6 @@ def test_none_input_trace_fail_non_default_kwarg():
         poptorch_model(x, y=None)
 
 
-@pytest.mark.mlirSupportRequired
 def test_none_input_trace_dispatch_non_default_kwarg():
     model = Model()
     options = poptorch.Options()
@@ -487,7 +485,6 @@ def test_none_input_pass_two_arg(trace_model):
         helpers.assert_allclose(expected=native_out, actual=poptorch_out)
 
 
-@pytest.mark.mlirSupportRequired
 @pytest.mark.parametrize("args", [(x, None, None, None), (x, ), (x, None)])
 @pytest.mark.parametrize("fwd_args", [True, False])
 def test_none_input_dispatch_non_default_arg_tuples(args, fwd_args):
@@ -511,7 +508,6 @@ def test_none_input_dispatch_non_default_arg_tuples(args, fwd_args):
         helpers.assert_allclose(expected=native_out, actual=poptorch_out)
 
 
-@pytest.mark.mlirSupportRequired
 @pytest.mark.parametrize("args", [{
     "x": x,
     "t": t
@@ -542,7 +538,6 @@ def test_none_input_dispatch_non_default_arg_dict(args, fwd_args):
         helpers.assert_allclose(expected=native_out, actual=poptorch_out)
 
 
-@pytest.mark.mlirSupportRequired
 @pytest.mark.parametrize("fwd_args", [True, False])
 def test_custom_arg_parser(fwd_args):
     class MyArg:
@@ -604,7 +599,6 @@ def test_custom_arg_parser(fwd_args):
                                     actual=poptorch_out[poptorch_key])
 
 
-@pytest.mark.mlirSupportRequired
 @pytest.mark.parametrize("fwd_args", [True, False])
 def test_none_input_dispatch_args_kwargs(fwd_args):
     class Model(torch.nn.Module):
@@ -845,7 +839,6 @@ def test_scalar_tensor_input(trace_model):
     helpers.assert_allclose(actual=s(x), expected=model(x))
 
 
-@pytest.mark.mlirSupportRequired
 def test_returned_only_inputs():
     class Model(torch.nn.Module):
         def forward(self, x, y):

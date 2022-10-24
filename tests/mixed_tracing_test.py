@@ -1,14 +1,11 @@
 #!/usr/bin/env python3
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
-
-import pytest
 import torch
-import poptorch
 import helpers
+import poptorch
 
 
 # Test that JIT tracing and the dispatcher can be used one after the other.
-@pytest.mark.mlirSupportRequired
 def test_mix_traced_dispatched():
     torch.manual_seed(42)
 
@@ -49,7 +46,6 @@ def test_mix_traced_dispatched():
 
 # Just test that the dispatcher is disabled in the CPU op, and re-enabled
 # afterwards.
-@pytest.mark.mlirSupportRequired
 def test_poptorch_op_in_cpu_op():
     torch.manual_seed(42)
 

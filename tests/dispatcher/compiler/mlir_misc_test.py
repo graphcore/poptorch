@@ -7,7 +7,6 @@ import poptorch
 from poptorch.experimental import IPUContext
 
 
-@pytest.mark.mlirSupportRequired
 def test_ignored_values():
     def to_dtype(x: torch.Tensor):
         return torch.normal(x, x, generator=torch.Generator())
@@ -18,7 +17,6 @@ def test_ignored_values():
         IPUContext(to_dtype)(torch.tensor(1.0))
 
 
-@pytest.mark.mlirSupportRequired
 def test_function_reuse():
     def f(x):
         return x + 1

@@ -9,7 +9,6 @@ from poptorch.experimental import IPUContext
 SUPPORTED_TYPES = (torch.float16, torch.float32, torch.int32)
 
 
-@pytest.mark.mlirSupportRequired
 @pytest.mark.parametrize("cast_from", SUPPORTED_TYPES)
 @pytest.mark.parametrize("cast_to", SUPPORTED_TYPES)
 def test_cast(cast_from, cast_to):
@@ -34,7 +33,6 @@ def cat_stack_harness(op, dim, dtype):
     helpers.assert_allequal(actual=ipu_result, expected=cpu_result)
 
 
-@pytest.mark.mlirSupportRequired
 @pytest.mark.parametrize(
     "params",
     [
@@ -47,7 +45,6 @@ def test_cat(params):
     cat_stack_harness(alias, dim, dtype)
 
 
-@pytest.mark.mlirSupportRequired
 @pytest.mark.parametrize(
     "params",
     [
@@ -60,7 +57,6 @@ def test_stack(params):
     cat_stack_harness(torch.stack, dim, dtype)
 
 
-@pytest.mark.mlirSupportRequired
 def test_where():
     zeros = torch.zeros(3, 3)
     ones = torch.ones(3, 3)
@@ -74,7 +70,6 @@ def test_where():
 
 
 # Check the canonicalizer for copy_ is not too eager with its optimisations
-@pytest.mark.mlirSupportRequired
 def test_copy_optim():
     def fn(input, t2):
         a = torch.empty([3, 3], device=helpers.outputDevice())
@@ -92,7 +87,6 @@ def test_copy_optim():
         helpers.assert_allclose(actual=ipu_out, expected=cpu_out)
 
 
-@pytest.mark.mlirSupportRequired
 def test_as_strided():
     def op_harness(op, *args):
         t = torch.tensor([[1, 2, 3], [4, 5, 6], [6, 7, 8]])
@@ -143,7 +137,6 @@ def expand_reshape_view_harness(in_shape, new_shape, op):
     helpers.assert_allequal(actual=ipu_result[1], expected=t)
 
 
-@pytest.mark.mlirSupportRequired
 @pytest.mark.parametrize("op", ["reshape", "view"])
 def test_reshape_view(op):
     # Ordinary reshape/view
@@ -167,7 +160,6 @@ def test_reshape_view(op):
         expand_reshape_view_harness((3, 4), (-1, -1, 2), op)
 
 
-@pytest.mark.mlirSupportRequired
 def test_reshape_sparse():
     s = torch.sparse_coo_tensor([(0, 1), (2, 2), (2, 3)], [1.0, 2.0],
                                 (2, 3, 4))
@@ -181,7 +173,6 @@ def test_reshape_sparse():
         IPUContext(reshape_sparse)(s)
 
 
-@pytest.mark.mlirSupportRequired
 @pytest.mark.parametrize(
     "shape",
     [
@@ -195,13 +186,11 @@ def test_expand(shape, op):
     expand_reshape_view_harness((2, 1, 4), shape, op)
 
 
-@pytest.mark.mlirSupportRequired
 @pytest.mark.parametrize("shape", [(5), (1, 2, 3)])
 def test_expand_scalar(shape):
     expand_reshape_view_harness([], shape, "expand")
 
 
-@pytest.mark.mlirSupportRequired
 @pytest.mark.parametrize("op", [torch.argmin, torch.argmax])
 @pytest.mark.parametrize(
     "input",
@@ -222,7 +211,6 @@ def test_argminmax(op, input):
     helpers.assert_allequal(actual=ipu_result, expected=cpu_result)
 
 
-@pytest.mark.mlirSupportRequired
 @pytest.mark.parametrize(
     "case",
     [((2, 4), r"should have at least as many dimensions"),
@@ -261,7 +249,6 @@ def is_view_harness(in_shape, fn, *args, **kwargs):
     helpers.assert_allequal(actual=ipu_res, expected=cpu_res)
 
 
-@pytest.mark.mlirSupportRequired
 def test_view_is_view():
     shape = (3, 4, 5)
     view_shape = shape[::-1]
@@ -271,7 +258,6 @@ def test_view_is_view():
     is_view_harness(shape, fn, view_shape)
 
 
-@pytest.mark.mlirSupportRequired
 def test_expand_is_view():
     shape = (3, 1, 5)
     expanded_shape = (3, 4, 5)

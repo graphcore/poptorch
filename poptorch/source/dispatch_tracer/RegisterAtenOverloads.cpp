@@ -31,10 +31,8 @@
 #include "dispatchers/IDispatch.hpp"
 #include "pytorch_bridge/IpuSession.hpp"
 
-#if POPTORCH_BUILD_MLIR_COMPILER
 #include "dispatchers/JitDispatch.hpp"
 #include "dispatchers/MLIRDispatch.hpp"
-#endif
 
 #include "pytorch_bridge/CompilerOptions.hpp"
 
@@ -126,11 +124,9 @@ struct GlobalTracerContext {
   // exist.
   std::set<void *> graph_inputs;
 
-#if POPTORCH_BUILD_MLIR_COMPILER
   // Store a weak pointer to the MLIRExecutor which was last run. This allows us
   // to move associated tensors off the device when we load a new executor.
   std::weak_ptr<MLIRExecutor> last_mlir_executor;
-#endif
 
   // Create and store Tensors...
   TensorStore tensor_store;
@@ -158,8 +154,6 @@ at::Tensor downCastIfNeeded(const at::Tensor &t) {
   return t;
 }
 
-#if POPTORCH_BUILD_MLIR_COMPILER
-
 // NOLINTNEXTLINE
 void hostSideCast(void *dest, c10::ScalarType dest_scalar_type, void *src,
                   const void *src_end, c10::ScalarType src_scalar_type) {
@@ -186,8 +180,6 @@ void hostSideCast(void *dest, c10::ScalarType dest_scalar_type, void *src,
       });
 }
 
-#endif
-
 // copy_(Tensor(a!) self, Tensor src, bool non_blocking=False) -> Tensor(a!)
 void copyInplace(const c10::OperatorHandle &op, c10::Stack *stack) {
   const c10::FunctionSchema &schema = op.schema();
@@ -206,7 +198,6 @@ void copyInplace(const c10::OperatorHandle &op, c10::Stack *stack) {
   logging::trace("[Input] self {}", str(self));
   logging::trace("[Input] src {}", str(src));
 
-#if POPTORCH_BUILD_MLIR_COMPILER
   // In eager mode the dispatcher is always active so this will only be true
   // when working with static graphs
   if (!getContext().hasActiveDispatch()) {
@@ -264,7 +255,6 @@ void copyInplace(const c10::OperatorHandle &op, c10::Stack *stack) {
     torch::jit::push(stack, self);
     return;
   }
-#endif
 
   getContext().activeDispatch()->setPythonStack(
       torch::jit::tracer::pythonCallstack());
@@ -341,19 +331,16 @@ void startDispatch() { getContext().dispatch_on = true; }
 
 bool eagerModeEnabled() {
   bool result = false;
-#if POPTORCH_BUILD_MLIR_COMPILER
   if (getContext().hasActiveDispatch()) {
     auto *mlir = dynamic_cast<MLIRDispatch *>(getContext().activeDispatch());
     if (mlir != nullptr) {
       result = mlir->isEagerMode();
     }
   }
-#endif
   return result;
 }
 
 CompilerOptions &enableEagerMode() {
-#if POPTORCH_BUILD_MLIR_COMPILER
   auto dispatcher = std::make_unique<MLIRDispatch>(
       CompilerOptions::eagerOptions(), &getContext().tensor_store);
 
@@ -363,10 +350,6 @@ CompilerOptions &enableEagerMode() {
   getContext().tensor_store.enableEagerMode();
 
   return options;
-#else
-  ERROR("PopTorch must be compiled with POPTORCH_BUILD_MLIR_COMPILER=ON to "
-        "use eager mode.");
-#endif
 }
 
 void markStep() { getContext().activeDispatch()->markStep(); }
@@ -383,22 +366,17 @@ void endDispatch(bool error_occurred) {
 
 // Cleanup on exit callback to avoid global destructor ordering issues
 void poptorchAtExit() {
-#if POPTORCH_BUILD_MLIR_COMPILER
   // Ensure that the context is deleted before globals are destroyed to avoid
   // issues with global destructor ordering
   context.reset();
-#endif
 }
 
 // Destroys the dispatcher after we have finished compiling
 void destroyDispatcher() {
-// TODO(T49566) We don't build this on Centos
-#if POPTORCH_BUILD_MLIR_COMPILER
   if (getContext().isDispatchOn()) {
     endDispatch();
   }
   getContext().resetActiveDispatch(nullptr);
-#endif
 }
 
 void setParameterName(const at::Tensor &tensor, const std::string &name) {
@@ -424,25 +402,12 @@ bool getParameterPerReplica(torch::jit::Value *value,
 //
 // This is needed because in some cases, we don't want calls to be dispatched to
 // us, but still want to maintain information about the dispatcher.
-bool isCompilingWithDispatcher() {
-#if POPTORCH_BUILD_MLIR_COMPILER
-  return getContext().hasActiveDispatch();
-#else
-  return false;
-#endif
-}
+bool isCompilingWithDispatcher() { return getContext().hasActiveDispatch(); }
 
 // Returns true if the dispatcher is currently 'on', and should intercept calls
 // to us.
-bool isDispatcherOn() {
-#if POPTORCH_BUILD_MLIR_COMPILER
-  return getContext().isDispatchOn();
-#else
-  return false;
-#endif
-}
+bool isDispatcherOn() { return getContext().isDispatchOn(); }
 
-#if POPTORCH_BUILD_MLIR_COMPILER
 void swapLastMLIRExecutor(const std::shared_ptr<MLIRExecutor> &mlir_executor) {
   if (const std::shared_ptr<MLIRExecutor> replaced_mlir_executor =
           getContext().last_mlir_executor.lock()) {
@@ -451,7 +416,6 @@ void swapLastMLIRExecutor(const std::shared_ptr<MLIRExecutor> &mlir_executor) {
   getContext().last_mlir_executor = mlir_executor;
   mlir_executor->weightsToDevice();
 }
-#endif
 
 CompilerOptions
 createMLIROptions(const std::vector<std::string> &source_location_excludes) {
@@ -470,25 +434,11 @@ createMLIROptions(const std::vector<std::string> &source_location_excludes) {
 void createGraph(TracingMode mode, const std::vector<at::Tensor> &inputs,
                  const CompilerOptions &options) {
   if (mode == TracingMode::POPART) {
-// TODO(T49566) We don't build this on Centos
-#if POPTORCH_BUILD_MLIR_COMPILER
     getContext().resetActiveDispatch(
         std::make_unique<JITDispatch>(options, &getContext().tensor_store));
-#else
-    UNUSED(options);
-    ERROR("PopTorch must be compiled with POPTORCH_BUILD_MLIR_COMPILER=ON to "
-          "use the dispatcher");
-#endif
   } else if (mode == TracingMode::MLIR) {
-// TODO(T49566) We don't build this on Centos
-#if POPTORCH_BUILD_MLIR_COMPILER
     getContext().resetActiveDispatch(
         std::make_unique<MLIRDispatch>(options, &getContext().tensor_store));
-#else
-    UNUSED(options);
-    ERROR("PopTorch must be compiled with POPTORCH_BUILD_MLIR_COMPILER=ON to "
-          "use the dispatcher");
-#endif
   } else {
     ERROR("Unsupported target");
   }
@@ -526,9 +476,6 @@ void fallback(const c10::OperatorHandle &op, c10::Stack *stack) {
   }
 }
 
-// TODO(T49566) We don't build this on Centos
-#if POPTORCH_BUILD_MLIR_COMPILER
-
 std::shared_ptr<MLIRExecutor> compileMLIR() {
   auto *mlir = dynamic_cast<MLIRDispatch *>(getContext().activeDispatch());
   ERROR_ON(mlir == nullptr);
@@ -537,23 +484,14 @@ std::shared_ptr<MLIRExecutor> compileMLIR() {
   return executor;
 }
 
-#endif
-
 InplaceGraphInfo getInplaceGraphInfo(size_t num_anchors,
                                      bool replicas_needing_broadcast) {
-#if POPTORCH_BUILD_MLIR_COMPILER
   auto *jit = dynamic_cast<JITDispatch *>(getContext().activeDispatch());
   ERROR_ON_MSG(jit == nullptr, "[User Unreachable] Tracer context is null.");
   return jit->finalizeInplaceGraphInfo(num_anchors, replicas_needing_broadcast);
-#else
-  UNUSED(num_anchors);
-  UNUSED(replicas_needing_broadcast);
-  ERROR("PopTorch must be compiled with -DPOPTORCH_BUILD_MLIR_COMPILER=ON");
-#endif
 }
 
 std::shared_ptr<torch::jit::Graph> getTracedGraph() {
-#if POPTORCH_BUILD_MLIR_COMPILER
   auto *jit = dynamic_cast<JITDispatch *>(getContext().activeDispatch());
   ERROR_ON_MSG(jit == nullptr, "[User Unreachable] Tracer context is null.");
 
@@ -572,29 +510,16 @@ std::shared_ptr<torch::jit::Graph> getTracedGraph() {
   // getDataSourceForValue() on some of these nodes and if we
   // clone the graph we won't be able to find the mappings.
   return jit->graph;
-#else
-  ERROR("PopTorch must be compiled with -DPOPTORCH_BUILD_MLIR_COMPILER=ON");
-#endif
 }
 
 void finalizeGraph() { getContext().activeDispatch()->finalizeGraph(); }
 
 void *getDataSource(const at::Tensor &tensor) {
-#if POPTORCH_BUILD_MLIR_COMPILER
   return getHostBuffer(tensor).getCpuData()->data();
-#else
-  UNUSED(tensor);
-  ERROR("PopTorch must be compiled with -DPOPTORCH_BUILD_MLIR_COMPILER=ON");
-#endif
 }
 
 void *getDataSourceForValue(torch::jit::Value *value) {
-#if POPTORCH_BUILD_MLIR_COMPILER
   return getContext().activeDispatch()->getDataSource(value);
-#else
-  UNUSED(value);
-  ERROR("PopTorch must be compiled with -DPOPTORCH_BUILD_MLIR_COMPILER=ON");
-#endif
 }
 
 bool isParameter(torch::jit::Value *value) {
@@ -729,31 +654,21 @@ std::uint64_t getIpuTensorId(const at::Tensor &tensor) {
 }
 
 void promoteArgsAsInputs(const std::vector<at::Tensor> &args) {
-#if POPTORCH_BUILD_MLIR_COMPILER
   auto *mlir = dynamic_cast<MLIRDispatch *>(getContext().activeDispatch());
   ERROR_ON(mlir == nullptr);
 
   for (const at::Tensor &arg : args) {
     mlir->promoteAsInput(arg, true);
   }
-#else
-  UNUSED(args);
-  ERROR("Attempted to use the MLIR compiler on an unsupported platform.");
-#endif
 }
 
 void promoteOutputs(const std::vector<at::Tensor> &outputs) {
-#if POPTORCH_BUILD_MLIR_COMPILER
   auto *mlir = dynamic_cast<MLIRDispatch *>(getContext().activeDispatch());
   ERROR_ON(mlir == nullptr);
 
   for (const at::Tensor &out : outputs) {
     mlir->promoteAsOutput(out);
   }
-#else
-  UNUSED(outputs);
-  ERROR("Attempted to use the MLIR compiler on an unsupported platform.");
-#endif
 }
 
 bool movingParameters() { return getContext().moving_parameters; }

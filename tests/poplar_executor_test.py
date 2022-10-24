@@ -379,12 +379,11 @@ def test_nondeterministic_warning_filter():
     ]
 
     for r in remainder:
-        assert any([
+        assert any(
             f in r for f in expected_filtered_warnings
-        ]), f"Compilation generated unexpected warning.\nActual warning: {r}"
+        ), f"Compilation generated unexpected warning.\nActual warning: {r}"
 
 
-@pytest.mark.mlirSupportRequired
 def test_dispatcher_cpu_output():
     const1 = torch.tensor([1, 2])
     const2 = torch.tensor([3, 4])

@@ -93,9 +93,7 @@ std::shared_ptr<torch::jit::Graph> getTracedGraph();
 // binary at the end, wrapped by `MLIRExecutor`.
 std::shared_ptr<MLIRExecutor> compileMLIR();
 
-#if POPTORCH_BUILD_MLIR_COMPILER
 void swapLastMLIRExecutor(const std::shared_ptr<MLIRExecutor> &mlir_executor);
-#endif
 
 // Get a pointer to the data source for an IPU input / parameter tensor.
 // If the value is not a parameter or an input, return nullptr.

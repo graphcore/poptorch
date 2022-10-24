@@ -42,8 +42,6 @@ Helpers
 .. autoclass:: poptorch.profiling.Channel
    :members:
 
-.. autoclass:: poptorch.hasMLIRSupportOnPlatform
-
 PopTorch Ops
 ============
 

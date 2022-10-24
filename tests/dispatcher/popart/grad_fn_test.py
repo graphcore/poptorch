@@ -145,7 +145,6 @@ class Model(torch.nn.Module):
         return x
 
 
-@pytest.mark.mlirSupportRequired
 @pytest.mark.parametrize("fn", poptorch_fns)
 def test_poptorch_op(fn):
     model = Model()
@@ -163,7 +162,6 @@ def test_poptorch_op(fn):
 
 # for poptorch.set_overlap_for_input, its argument must be a direct graph input
 # so we can't use the more general handler.
-@pytest.mark.mlirSupportRequired
 def test_overlap():
     class Model(torch.nn.Module):
         def forward(self, x):

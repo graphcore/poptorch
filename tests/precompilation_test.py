@@ -12,8 +12,8 @@ import unittest.mock
 
 import pytest
 import torch
-import poptorch
 import helpers
+import poptorch
 
 
 class ExampleModelWithLoss(torch.nn.Module):

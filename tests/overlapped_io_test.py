@@ -321,7 +321,6 @@ def test_overlap_both_non_output_marked(trace_model):
         inference_model(torch.tensor([1.0]))
 
 
-@pytest.mark.mlirSupportRequired
 @pytest.mark.ipuHardwareRequired
 def test_overlap_tuple():
     class Model(torch.nn.Module):

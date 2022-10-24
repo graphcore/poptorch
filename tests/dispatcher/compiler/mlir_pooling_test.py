@@ -19,7 +19,6 @@ spatial_dim_map = {
 }
 
 
-@pytest.mark.mlirSupportRequired
 @pytest.mark.parametrize(
     "kernel_size, stride, padding, ceil_mode, count_include_pad",
     [
@@ -68,7 +67,6 @@ def test_pool(op, kernel_size, stride, padding, ceil_mode, count_include_pad):
     helpers.assert_allclose(actual=ipu_result, expected=cpu_result)
 
 
-@pytest.mark.mlirSupportRequired
 @pytest.mark.parametrize(
     "op", [nn.AdaptiveAvgPool1d, nn.AdaptiveAvgPool2d, nn.AdaptiveAvgPool3d])
 def test_adaptive_avg_pool(op):

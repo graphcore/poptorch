@@ -427,11 +427,7 @@ void MLIRDispatch::detach(const c10::OperatorHandle &op, c10::Stack *stack,
 
 const std::vector<std::vector<char>> &
 MLIRDispatch::getSourceLocationExcludes() const {
-#if POPTORCH_BUILD_MLIR_COMPILER
   return _opts.dispatcher.source_location_excludes;
-#else
-  return {};
-#endif
 }
 
 void MLIRDispatch::setCurrentCodeLocation(
@@ -488,7 +484,6 @@ std::string MLIRDispatch::handleOp(const c10::OperatorHandle &op,
 }
 
 void MLIRDispatch::findAndPromoteExternalTensors(c10::Stack *stack) {
-#if POPTORCH_BUILD_MLIR_COMPILER
   POPTORCH_TRACEPOINT();
   for (auto &value : *stack) {
     if (!value.isTensor()) {
@@ -511,7 +506,6 @@ void MLIRDispatch::findAndPromoteExternalTensors(c10::Stack *stack) {
       promoteAsParameter(tensor);
     }
   }
-#endif
 }
 
 void MLIRDispatch::fallback(const c10::OperatorHandle &op, c10::Stack *stack) {
@@ -805,13 +799,7 @@ bool MLIRDispatch::extractOutputImmediately() const {
   return _opts.eager.eager_mode;
 }
 
-CompilerOptions &MLIRDispatch::getMutableCompilerOptions() {
-#if POPTORCH_BUILD_MLIR_COMPILER
-  return _opts;
-#else
-  ERROR("PopTorch must be compiled with POPTORCH_BUILD_MLIR_COMPILER=ON");
-#endif
-}
+CompilerOptions &MLIRDispatch::getMutableCompilerOptions() { return _opts; }
 
 poptorch_ir::OptionalTensorId MLIRDispatch::getSingleOptionalTensorId(
     const std::vector<poptorch_ir::OptionalTensorId> &tensor_vec) {

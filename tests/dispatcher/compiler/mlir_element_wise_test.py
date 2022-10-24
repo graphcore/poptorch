@@ -97,7 +97,6 @@ binary_test_cases = [
 ]
 
 
-@pytest.mark.mlirSupportRequired
 @pytest.mark.filterwarnings("ignore:floor_divide is deprecated")
 @pytest.mark.parametrize("op", binary_ops)
 @pytest.mark.parametrize("input",
@@ -113,7 +112,6 @@ broadcast_test_shapes = [
 ]
 
 
-@pytest.mark.mlirSupportRequired
 @pytest.mark.filterwarnings("ignore:floor_divide is deprecated")
 @pytest.mark.parametrize("shapes", broadcast_test_shapes)
 @pytest.mark.parametrize("op", binary_ops)
@@ -122,7 +120,6 @@ def test_binary_broadcast(op, shapes):
     op_harness(op, *input)
 
 
-@pytest.mark.mlirSupportRequired
 @pytest.mark.filterwarnings("ignore:floor_divide is deprecated")
 @pytest.mark.parametrize("op", binary_ops)
 def test_binary_nan_support(monkeypatch, op):
@@ -200,7 +197,6 @@ unary_test_cases = [
 ]
 
 
-@pytest.mark.mlirSupportRequired
 @pytest.mark.filterwarnings("ignore:floor_divide is deprecated")
 @pytest.mark.parametrize("op", unary_ops)
 @pytest.mark.parametrize("input", helpers.onlyFirstIfReduced(unary_test_cases))
@@ -252,7 +248,6 @@ inplace_unary_ops = [
 ]
 
 
-@pytest.mark.mlirSupportRequired
 @pytest.mark.parametrize("op", inplace_unary_ops)
 @pytest.mark.parametrize("input", helpers.onlyFirstIfReduced(unary_test_cases))
 def test_inplace_unary(op, input):
@@ -263,7 +258,6 @@ def test_inplace_unary(op, input):
     op_harness(op, input)
 
 
-@pytest.mark.mlirSupportRequired
 @pytest.mark.parametrize("input", helpers.onlyFirstIfReduced(unary_test_cases))
 @pytest.mark.parametrize("threshold", [0., 1000., -50])
 @pytest.mark.parametrize("value", [0., 1000, -50])
@@ -279,7 +273,6 @@ addc_test_cases = (
 )
 
 
-@pytest.mark.mlirSupportRequired
 @pytest.mark.parametrize("input_shapes",
                          helpers.onlyFirstIfReduced(addc_test_cases))
 @pytest.mark.parametrize("op", (torch.addcmul, torch.addcdiv))
@@ -310,7 +303,6 @@ clamp_test_cases = [
 ]
 
 
-@pytest.mark.mlirSupportRequired
 @pytest.mark.parametrize("input", helpers.onlyFirstIfReduced(clamp_test_cases))
 def test_clamp(input):
     op_harness(torch.clamp, *input)
@@ -323,7 +315,6 @@ clamp_broadcast_tests = (
 )
 
 
-@pytest.mark.mlirSupportRequired
 @pytest.mark.parametrize("input_shapes",
                          helpers.onlyFirstIfReduced(clamp_broadcast_tests))
 def test_clamp_broadcast(input_shapes):
@@ -334,7 +325,6 @@ def test_clamp_broadcast(input_shapes):
 MANY_TYPES = (torch.float16, torch.float32, torch.int32)
 
 
-@pytest.mark.mlirSupportRequired
 @pytest.mark.parametrize("input_1_type", MANY_TYPES)
 @pytest.mark.parametrize("input_2_type", MANY_TYPES)
 def test_many_implicit_casting(input_1_type, input_2_type):
@@ -355,7 +345,6 @@ def test_many_implicit_casting(input_1_type, input_2_type):
     helpers.assert_allequal(actual=ipu_result, expected=cpu_result)
 
 
-@pytest.mark.mlirSupportRequired
 @pytest.mark.excludeFromReducedTesting
 @pytest.mark.parametrize("input_1_type", MANY_TYPES)
 @pytest.mark.parametrize("input_2_type", MANY_TYPES)

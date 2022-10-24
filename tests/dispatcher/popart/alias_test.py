@@ -1,13 +1,11 @@
 #!/usr/bin/env python3
 # Copyright (c) 2022 Graphcore Ltd. All rights reserved.
-import pytest
 import torch
 import torch.nn as nn
-import poptorch
 import helpers
+import poptorch
 
 
-@pytest.mark.mlirSupportRequired
 def test_alias():
     class Model(nn.Module):
         def __init__(self):
@@ -36,7 +34,6 @@ def test_alias():
                             expected=model.layer_two.bias)
 
 
-@pytest.mark.mlirSupportRequired
 def test_alias_rewrap():
     class Model(nn.Module):
         def __init__(self):

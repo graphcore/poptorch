@@ -1,11 +1,7 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 # pragma pylint: disable=function-redefined
-import sys
 import torch
 import poptorch
-
-if not poptorch.hasMLIRSupportOnPlatform():
-    sys.exit(0)
 
 
 # Cases in which casting resolves to the correct type

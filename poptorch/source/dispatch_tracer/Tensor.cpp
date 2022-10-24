@@ -446,12 +446,7 @@ TensorStore::getIpuSession() const {
   return _ipu_session;
 }
 void TensorStore::enableEagerMode() {
-#if POPTORCH_BUILD_MLIR_COMPILER
   _ipu_session = poptorch_ir::createEagerSession();
-#else
-  ERROR("PopTorch must be compiled with POPTORCH_BUILD_MLIR_COMPILER=ON to "
-        "use eager mode.");
-#endif
 }
 void TensorStore::reset() { _ipu_session = nullptr; }
 } // namespace poptorch

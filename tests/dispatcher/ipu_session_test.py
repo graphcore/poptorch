@@ -6,9 +6,9 @@ import pytest
 
 import torch
 from torch import nn
+import helpers
 import poptorch
 from poptorch.experimental import ipu_wrapper
-import helpers
 
 
 class SimpleModel(torch.nn.Module):
@@ -22,7 +22,6 @@ class SimpleModelTwo(torch.nn.Module):
 
 
 @helpers.overridePoptorchLogLevel("TRACE")
-@pytest.mark.mlirSupportRequired
 def test_host_buffers_no_dispatcher(capfd):
     """Test to ensure we can copy in to IPU tensors, even when the dispatcher is
     not active. When this happens, we store a copy of the tensor in a host
@@ -49,7 +48,6 @@ def test_host_buffers_no_dispatcher(capfd):
     lc.assert_contains("copy_ IPU -> CPU, outside dispatch")
 
 
-@pytest.mark.mlirSupportRequired
 def test_cast_no_dispatcher():
     """Test to ensure we can cast IPU tensors outside the dispatcher."""
     torch.manual_seed(42)
@@ -78,7 +76,6 @@ def test_cast_no_dispatcher():
 
 
 @helpers.overridePoptorchLogLevel("TRACE")
-@pytest.mark.mlirSupportRequired
 def test_weights_to_host(capfd):
     """Test we can bring individual weights off the device whilst the dispatcher
     is still active."""
@@ -110,7 +107,6 @@ def test_weights_to_host(capfd):
                             expected=y)
 
 
-@pytest.mark.mlirSupportRequired
 def test_weights_to_device():
     param = torch.tensor(1, dtype=torch.int, device='xla')
     x = torch.tensor(3, dtype=torch.int, device='xla')
@@ -127,7 +123,6 @@ def test_weights_to_device():
     assert param.to('cpu').item() == 2
 
 
-@pytest.mark.mlirSupportRequired
 def test_changing_parameters_on_host():
     pytest.skip("TODO(T69899): Parameters currently aren't reuploaded to the "
                 "device if they have been changed on the host")
@@ -148,7 +143,6 @@ def test_changing_parameters_on_host():
     assert param.to('cpu').item() == 6
 
 
-@pytest.mark.mlirSupportRequired
 def test_changing_parameters_on_device():
     pytest.skip("TODO(T69899): RegisterAtenOverloads.cpp:211: "
                 "'poptorch_cpp_error': !getHostBuffer(*impl)")
@@ -179,7 +173,6 @@ def test_changing_parameters_on_device():
 
 
 @helpers.overridePoptorchLogLevel("TRACE")
-@pytest.mark.mlirSupportRequired
 def test_weights_to_host_after_switch(capfd):
     """Test we bring the weights off the device before we switch executable."""
     torch.manual_seed(42)
@@ -228,7 +221,6 @@ def test_weights_to_host_after_switch(capfd):
     helpers.assert_allclose(actual=bias, expected=m.bias)
 
 
-@pytest.mark.mlirSupportRequired
 def test_copy_tensor():
     """Ensure we can copy tensors outside of the session and still use them."""
 
@@ -246,7 +238,6 @@ def test_copy_tensor():
     helpers.assert_allclose(actual=ipu_y.to("cpu"), expected=y)
 
 
-@pytest.mark.mlirSupportRequired
 def test_detach():
     """Ensure we can detach tensors outside of the IPUSession and use either
     tensor. When PyTorch does `to.device`, it also causes a detach so this is
@@ -268,7 +259,6 @@ def test_detach():
     helpers.assert_allclose(actual=ipu_func(x2, x3).to("cpu"), expected=y)
 
 
-@pytest.mark.mlirSupportRequired
 def test_args_and_kwargs():
     """Ensure both args and keyword arguments are passed to the executable
     correctly."""
@@ -309,7 +299,7 @@ def test_args_and_kwargs():
 
 class MNISTBlock(nn.Module):
     def __init__(self, in_channels, num_filters, kernel_size, pool_size):
-        super(MNISTBlock, self).__init__()
+        super().__init__()
         self.conv = nn.Conv2d(in_channels,
                               num_filters,
                               kernel_size=kernel_size)
@@ -348,7 +338,6 @@ class MNISTNetwork(nn.Module):
         return x
 
 
-@pytest.mark.mlirSupportRequired
 def test_mnist():
     model = MNISTNetwork()
     input = torch.ones([1, 1, 28, 28])
@@ -367,7 +356,6 @@ def test_mnist():
                             equal_nan=True)
 
 
-@pytest.mark.mlirSupportRequired
 def test_compiler_options():
     """Test passing in the CompilerOptions."""
 
@@ -385,7 +373,6 @@ def test_compiler_options():
     _ = ipu_func(x)
 
 
-@pytest.mark.mlirSupportRequired
 def test_no_tensor_arguments():
     """Ensure calling an ipu_wrapper-wrapped function fails when no tensor
     arguments are provided: otherwise, this will fail later on with a strange
@@ -408,7 +395,6 @@ def test_no_tensor_arguments():
         ipu_func2(42)
 
 
-@pytest.mark.mlirSupportRequired
 def test_function_reuse():
     @ipu_wrapper
     def f(x):

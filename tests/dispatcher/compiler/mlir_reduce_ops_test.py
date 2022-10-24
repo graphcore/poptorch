@@ -76,7 +76,6 @@ mixed_test_cases = (int_test_cases[0], uint8_test_cases[0], bool_test_cases[0],
 
 
 # TODO(T62262): Test with int64 dtypes
-@pytest.mark.mlirSupportRequired
 @pytest.mark.parametrize("func", [torch.sum, torch.prod])
 @pytest.mark.parametrize("input",
                          helpers.selectIfReduced(mixed_test_cases,
@@ -86,7 +85,6 @@ def test_sum_prod(func, input, dtype):
     reduce_harness(func, input, dtype=dtype)
 
 
-@pytest.mark.mlirSupportRequired
 @pytest.mark.parametrize("func", [torch.sum, torch.prod])
 @pytest.mark.parametrize("keepdim", [True, False])
 @pytest.mark.parametrize("input",
@@ -98,14 +96,12 @@ def test_sum_prod_dim(func, input, dim, keepdim, dtype):
     reduce_harness(func, input, dim, keepdim, dtype=dtype)
 
 
-@pytest.mark.mlirSupportRequired
 @pytest.mark.parametrize("input", helpers.onlyFirstIfReduced(float_test_cases))
 @pytest.mark.parametrize("dtype", [None, torch.float16, torch.float32])
 def test_mean(input, dtype):
     reduce_harness(torch.mean, input, dtype=dtype)
 
 
-@pytest.mark.mlirSupportRequired
 @pytest.mark.parametrize("input", helpers.onlyFirstIfReduced(float_test_cases))
 @pytest.mark.parametrize("dim", [0, -1])
 @pytest.mark.parametrize("keepdim", [True, False])
@@ -114,7 +110,6 @@ def test_mean_dim(input, dim, keepdim, dtype):
     reduce_harness(torch.mean, input, dim, keepdim, dtype=dtype)
 
 
-@pytest.mark.mlirSupportRequired
 @pytest.mark.parametrize(
     "func", [torch.std, torch.var, torch.std_mean, torch.var_mean])
 @pytest.mark.parametrize("input", helpers.onlyFirstIfReduced(float_test_cases))
@@ -123,7 +118,6 @@ def test_stats(func, input, unbiased):
     reduce_harness(func, input, unbiased)
 
 
-@pytest.mark.mlirSupportRequired
 @pytest.mark.parametrize(
     "func", [torch.std, torch.var, torch.std_mean, torch.var_mean])
 @pytest.mark.parametrize("input", helpers.onlyFirstIfReduced(float_test_cases))
@@ -134,7 +128,6 @@ def test_stats_dim(func, input, dim, unbiased, keepdim):
     reduce_harness(func, input, dim, unbiased, keepdim)
 
 
-@pytest.mark.mlirSupportRequired
 @pytest.mark.parametrize("func", [torch.all, torch.any])
 @pytest.mark.parametrize("input",
                          helpers.selectIfReduced(mixed_test_cases,
@@ -143,7 +136,6 @@ def test_any_all(func, input):
     reduce_harness(func, input)
 
 
-@pytest.mark.mlirSupportRequired
 @pytest.mark.parametrize("func", [torch.all, torch.any])
 @pytest.mark.parametrize("input",
                          helpers.selectIfReduced(mixed_test_cases,
@@ -154,7 +146,6 @@ def test_any_all_dim(func, input, dim, keepdim):
     reduce_harness(func, input, dim, keepdim)
 
 
-@pytest.mark.mlirSupportRequired
 @pytest.mark.parametrize("func", [torch.max, torch.min, torch.median])
 @pytest.mark.parametrize("input",
                          helpers.selectIfReduced(mixed_test_cases,
@@ -171,7 +162,6 @@ def test_max_min_median_dim(func, input, dim, keepdim):
     reduce_harness(func, input, dim, keepdim)
 
 
-@pytest.mark.mlirSupportRequired
 @pytest.mark.parametrize("input",
                          helpers.selectIfReduced(mixed_test_cases,
                                                  all_test_cases))

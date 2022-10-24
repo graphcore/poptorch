@@ -24,7 +24,6 @@ to_test = [
 
 
 @pytest.mark.parametrize("size", to_test)
-@pytest.mark.mlirSupportRequired
 def test_matmul(size):
     torch.manual_seed(42)
 
@@ -46,7 +45,6 @@ def test_matmul(size):
                             equal_nan=True)
 
 
-@pytest.mark.mlirSupportRequired
 @pytest.mark.parametrize(
     "params",
     [

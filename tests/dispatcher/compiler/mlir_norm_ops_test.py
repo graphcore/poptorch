@@ -8,7 +8,6 @@ import helpers
 from poptorch.experimental import IPUContext
 
 
-@pytest.mark.mlirSupportRequired
 @pytest.mark.parametrize("batch_norm, affine, track_running_stats, training", [
     (nn.BatchNorm1d, True, False, False),
     (nn.BatchNorm2d, True, False, True),
@@ -56,7 +55,6 @@ def test_batch_norm(batch_norm, affine, track_running_stats, training):
         helpers.assert_allclose(actual=ipu, expected=cpu)
 
 
-@pytest.mark.mlirSupportRequired
 @pytest.mark.parametrize("num_dims", (2, 3, 4))
 @pytest.mark.parametrize("affine", (True, False))
 def test_group_norm(num_dims, affine):
@@ -104,7 +102,6 @@ def test_group_norm(num_dims, affine):
         helpers.assert_allclose(actual=ipu, expected=cpu, rtol=1e-3, atol=1e-3)
 
 
-@pytest.mark.mlirSupportRequired
 def test_group_norm_train():
     torch.manual_seed(42)
     kernel_size = 3
@@ -163,7 +160,6 @@ def test_group_norm_train():
         helpers.assert_allclose(actual=ipu_result[idx], expected=cpu_out_exp)
 
 
-@pytest.mark.mlirSupportRequired
 @pytest.mark.parametrize(
     "instance_norm, affine, track_running_stats, training", [
         (nn.InstanceNorm1d, True, False, False),
@@ -230,7 +226,6 @@ def test_instance_norm(instance_norm, affine, track_running_stats, training):
         helpers.assert_allclose(actual=ipu, expected=cpu)
 
 
-@pytest.mark.mlirSupportRequired
 @pytest.mark.parametrize("num_dims_normalize_start", [(2, 0), (2, 1), (3, 0),
                                                       (3, 1), (3, 2), (4, 0),
                                                       (4, 1), (4, 2), (4, 3)])

@@ -8,7 +8,6 @@ import poptorch
 from poptorch.experimental import IPUContext
 
 
-@pytest.mark.mlirSupportRequired
 @pytest.mark.parametrize("reduction", ["none", "mean", "sum"])
 @pytest.mark.parametrize("num_dims", [1, 2, 4])
 def test_mse_loss_forward(reduction, num_dims):
@@ -39,7 +38,6 @@ def test_mse_loss_forward(reduction, num_dims):
                             equal_nan=True)
 
 
-@pytest.mark.mlirSupportRequired
 @pytest.mark.parametrize("reduction", ["none", "mean", "sum"])
 @pytest.mark.parametrize("num_dims", [1, 2, 4])
 def test_mse_loss_backward(reduction, num_dims):
@@ -77,7 +75,6 @@ def test_mse_loss_backward(reduction, num_dims):
                             equal_nan=False)
 
 
-@pytest.mark.mlirSupportRequired
 @pytest.mark.parametrize("reduction", ["none", "mean", "sum"])
 @pytest.mark.parametrize("num_dims", [1, 2, 4])
 def test_nll_loss_forward(reduction, num_dims):
@@ -113,7 +110,6 @@ def test_nll_loss_forward(reduction, num_dims):
                             equal_nan=True)
 
 
-@pytest.mark.mlirSupportRequired
 @pytest.mark.parametrize("reduction", ["mean"])
 @pytest.mark.parametrize("num_dims", [1, 2, 4])
 def test_nll_loss_backward(reduction, num_dims):
@@ -152,7 +148,6 @@ def test_nll_loss_backward(reduction, num_dims):
                             equal_nan=True)
 
 
-@pytest.mark.mlirSupportRequired
 @pytest.mark.parametrize("reduction", ["none", "mean", "sum"])
 @pytest.mark.parametrize("ignore_index", [2, -100])
 def test_nll_loss_forward_ignore(reduction, ignore_index):
@@ -174,7 +169,6 @@ def test_nll_loss_forward_ignore(reduction, ignore_index):
                             equal_nan=True)
 
 
-@pytest.mark.mlirSupportRequired
 @pytest.mark.parametrize("reduction", ["none", "mean", "sum"])
 def test_nll_loss_forward_ignore_all(reduction):
     torch.manual_seed(42)
@@ -192,7 +186,6 @@ def test_nll_loss_forward_ignore_all(reduction):
                             equal_nan=True)
 
 
-@pytest.mark.mlirSupportRequired
 @pytest.mark.parametrize("reduction", ["none", "mean", "sum"])
 @pytest.mark.parametrize("ignore_index", [2, -100])
 def test_nll_loss_backward_ignore(reduction, ignore_index):
@@ -221,7 +214,6 @@ def test_nll_loss_backward_ignore(reduction, ignore_index):
                             equal_nan=True)
 
 
-@pytest.mark.mlirSupportRequired
 @pytest.mark.parametrize("reduction", ["none", "mean", "sum"])
 def test_nll_loss_backward_ignore_all(reduction):
     torch.manual_seed(42)
@@ -246,7 +238,6 @@ def test_nll_loss_backward_ignore_all(reduction):
                             equal_nan=True)
 
 
-@pytest.mark.mlirSupportRequired
 @pytest.mark.parametrize("reduction", ["none", "mean", "sum"])
 @pytest.mark.parametrize("num_dims", [1, 2])
 @pytest.mark.parametrize("weight", [None, "batch", "bigger"])
@@ -286,7 +277,6 @@ def test_binary_cross_entropy_forward(reduction, num_dims, weight):
                             equal_nan=True)
 
 
-@pytest.mark.mlirSupportRequired
 @pytest.mark.parametrize("num_dims", [1, 2])
 @pytest.mark.parametrize("reduction", ["none", "mean", "sum"])
 @pytest.mark.parametrize("weight", [None, "batch", "bigger"])
@@ -333,7 +323,6 @@ def test_binary_cross_entropy_backward(reduction, num_dims, weight):
                             equal_nan=True)
 
 
-@pytest.mark.mlirSupportRequired
 @pytest.mark.parametrize("num_dims", [1, 2])
 @pytest.mark.parametrize("reduction", ["none", "mean", "sum"])
 def test_binary_cross_entropy_with_logits_forward(num_dims, reduction):
@@ -358,7 +347,6 @@ def test_binary_cross_entropy_with_logits_forward(num_dims, reduction):
                             equal_nan=True)
 
 
-@pytest.mark.mlirSupportRequired
 @pytest.mark.parametrize("num_dims", [1, 2])
 @pytest.mark.parametrize("reduction", ["none", "mean", "sum"])
 def test_binary_cross_entropy_with_logits_backward(reduction, num_dims):
@@ -388,7 +376,6 @@ def test_binary_cross_entropy_with_logits_backward(reduction, num_dims):
                             equal_nan=True)
 
 
-@pytest.mark.mlirSupportRequired
 @pytest.mark.parametrize("reduction", ["none", "mean", "sum"])
 @pytest.mark.parametrize("num_dims", [1, 2])
 @pytest.mark.parametrize("beta", [0.5, 1.0, 1.5])
@@ -409,7 +396,6 @@ def test_smooth_l1_loss_forward(reduction, num_dims, beta):
         IPUContext(smooth_l1_loss)(input1, input2)
 
 
-@pytest.mark.mlirSupportRequired
 @pytest.mark.parametrize("reduction", ["none", "mean", "sum"])
 @pytest.mark.parametrize("num_dims", [1, 2])
 def test_l1_loss_forward(reduction, num_dims):

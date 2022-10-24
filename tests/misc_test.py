@@ -6,8 +6,8 @@ import re
 import pytest
 import torch
 import torch.nn as nn
-import poptorch
 import helpers
+import poptorch
 
 
 @helpers.overridePoptorchLogLevel()
@@ -336,7 +336,6 @@ def test_compile_without_ipu():
     inference_model.compile(t1, t2)
 
 
-@pytest.mark.mlirSupportRequired
 def test_error_on_cpu_tensor():
     class Model(nn.Module):
         def forward(self, x):

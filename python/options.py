@@ -10,7 +10,6 @@ from ._logging import logger
 from . import _options_config
 from . import _options_impl
 from . import ops
-from . import poptorch_core
 
 
 class Attribute():
@@ -57,10 +56,7 @@ class _JitOptions(_options_impl.OptionsDict):
     """
 
     def __init__(self) -> None:
-        # The dispatcher requires MLIR support, so only change the default
-        # value if MLIR is available.
-        trace_model_default = not poptorch_core.mlirIsSupportedOnPlatform()
-        super().__init__(trace_model=trace_model_default)
+        super().__init__(trace_model=False)
 
     def traceModel(self, trace_model: bool) -> "poptorch.options._JitOptions":
         """
@@ -863,13 +859,12 @@ class Phase:
         >>> p = Phase(poptorch.Stage("A").ipu(0), poptorch.Stage("B").ipu(1))
         >>> p = Phase("A","B") # One Stage made of 2 blocks
         """
-        if all([isinstance(elt, Stage) for elt in arg]):
+        if all(isinstance(elt, Stage) for elt in arg):
             self.stages = arg
         else:
-            assert all([isinstance(elt, str) for elt in arg
-                        ]), ("All arguments must either "
-                             "be block IDs (strings) or Stages: " +
-                             str([type(elt) for elt in arg]))
+            assert all(isinstance(elt, str) for elt in arg), \
+                "All arguments must either be block IDs (strings) or " \
+                "Stages: " + str([type(elt) for elt in arg])
             self.stages = [Stage(*arg)]
 
     def stage(self, idx):
@@ -969,7 +964,7 @@ class PipelinedExecution(_IExecutionStrategy):
                 elif isinstance(arg, str):
                     stage = Stage(arg)
                 else:
-                    assert all([isinstance(elt, str) for elt in arg])
+                    assert all(isinstance(elt, str) for elt in arg)
                     stage = Stage(*arg)
                 stage._setStage(stage_id)  # pylint: disable=protected-access
                 for block in stage.blocks:
