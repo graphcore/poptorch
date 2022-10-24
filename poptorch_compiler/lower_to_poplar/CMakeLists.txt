@@ -25,6 +25,7 @@ add_library(lower_to_poplar STATIC
 target_include_directories(lower_to_poplar PUBLIC include)
 
 find_package(model_runtime REQUIRED)
+find_package(poplar REQUIRED)
 find_package(popef REQUIRED)
 find_package(popit REQUIRED)
 find_package(popdist REQUIRED)

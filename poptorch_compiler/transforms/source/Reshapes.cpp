@@ -9,8 +9,6 @@
 #include "dialect/Poptorch.hpp"
 #include "dialect/PoptorchDialect.hpp"
 
-#include "../CompilerHelpers.hpp"
-
 namespace poptorch_ir {
 
 ::mlir::LogicalResult
@@ -33,7 +31,7 @@ permuteInverse::canonicalize(permuteInverse op,
                              ::mlir::PatternRewriter &rewriter) {
   std::vector<std::int64_t> inverse_permute(op.dims().size());
   for (const auto &ed : llvm::enumerate(op.dims())) {
-    std::size_t value = static_cast<std::size_t>(
+    std::size_t const value = static_cast<std::size_t>(
         ed.value().cast<mlir::IntegerAttr>().getUInt());
     inverse_permute[value] = ed.index();
   }
