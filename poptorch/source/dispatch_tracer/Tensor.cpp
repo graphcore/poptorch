@@ -264,11 +264,6 @@ poptorch_ir::TensorType IpuTensorDetails::getTensorType() const {
   return type;
 }
 
-bool IpuTensorDetails::isAlive() const {
-  // TODO(T64272): Actually detect whether this is alive in python
-  return parent != nullptr;
-}
-
 uint64_t ipuTensorId(const at::Tensor &tensor) {
   return getTensorDetails(tensor)->tensor_id;
 }

@@ -47,7 +47,7 @@ private:
   };
 
 public:
-  ValueMapper() = default;
+  ValueMapper(bool is_owning);
 
   ValueMapper(ValueMapper &&) noexcept;
   ValueMapper &operator=(ValueMapper &&) noexcept;
@@ -59,14 +59,14 @@ public:
   // Each tensor we are tracking has a short record containing a pointer to the
   // tensor and its corresponding values in the two IRs.
   struct TrackedTensor {
-    explicit TrackedTensor(std::shared_ptr<IpuTensorDetails> details);
+    explicit TrackedTensor(std::weak_ptr<IpuTensorDetails> details);
     explicit TrackedTensor(const at::Tensor &tensor);
 
     // The PyTorch tensor impl. Most of the time it is "the tensor" on the
     // PyTorch side. However the autograd can create non-view aliases so
     // sometimes we have to check if we are an alias with the same stride,
     // shape, and storage offset.
-    std::shared_ptr<IpuTensorDetails> tensor_details;
+    std::weak_ptr<IpuTensorDetails> tensor_details;
 
     // The value in JIT IR
     torch::jit::Value *jit = nullptr;
@@ -81,18 +81,14 @@ public:
 
   torch::jit::Value *getValueForTensor(const at::Tensor &t);
 
-  poptorch_ir::TensorId getMLIRForTensor(const IpuTensorDetails *t);
   poptorch_ir::TensorId getMLIRForTensor(const at::Tensor &t);
 
-  // There are cases where pytorch creates tensors of the wrong type (for
-  // example when copying data to the ipu from an tensor of integers). In this
-  // case we want to add the tensor anyway without running the type checks
   void addTensorUnchecked(const at::Tensor &t, torch::jit::Value *val);
   void addTensor(const at::Tensor &t, torch::jit::Value *val);
 
-  void addTensor(std::shared_ptr<IpuTensorDetails> details,
-                 poptorch_ir::TensorId id);
-  void addTensor(const at::Tensor &t, poptorch_ir::TensorId id);
+  void addTensor(const std::shared_ptr<IpuTensorDetails> &details,
+                 poptorch_ir::TensorId mlir_id);
+  void addTensor(const at::Tensor &t, poptorch_ir::TensorId mlir_id);
 
   void addTensorList(const TensorList &list, torch::jit::Value *val);
 
@@ -111,8 +107,9 @@ public:
 
   void replaceValue(torch::jit::Value *v_old, torch::jit::Value *v_new);
 
-  IpuTensorDetails *getTensorDetailsForId(IpuTensorId id) const;
-  IpuTensorDetails *getTensorDetailsForMlirId(poptorch_ir::TensorId id) const;
+  std::shared_ptr<IpuTensorDetails> getTensorDetailsForId(IpuTensorId id) const;
+  std::shared_ptr<IpuTensorDetails>
+  getTensorDetailsForMlirId(poptorch_ir::TensorId mlir_id) const;
 
   // Create an alias from the `src_details` tensor details to the tensor
   // described by `dest_details` and `dest_tensor_id`. The source tensor must
@@ -121,18 +118,16 @@ public:
   void aliasTensor(const std::shared_ptr<IpuTensorDetails> &dest_details,
                    const std::shared_ptr<IpuTensorDetails> &src_details);
 
-  // Creating an alias from src to dest as above, but locating the original
-  // tensor's shared pointer and id in this ValueMapper given just the raw
-  // pointer to both tensor details.
-  void aliasTensor(IpuTensorDetails *dest_details,
-                   IpuTensorDetails *src_details);
-
   bool hasMapping(const at::Tensor &t) const;
 
 private:
+  // TODO(T70722): Remove the owning version of this class
+  const bool _is_owning;
+  std::set<std::shared_ptr<IpuTensorDetails>> _owning_ptrs;
+
   // We map each PyTorch tensor to a record of all the metadata we are tracking
   // about that tensor in the tensor map.
-  std::unordered_map<IpuTensorDetails *, TrackedTensor> _tensors;
+  std::unordered_map<IpuTensorId, TrackedTensor> _tensors;
 
   // Mapping between parameter / buffer names and tensor IDs
   std::unordered_map<std::string, IpuTensorId> _name_ids_map;
@@ -142,16 +137,14 @@ private:
 
   // We also need to map the values to the mlir so we can query the mlir for a
   // given value.
-  std::unordered_map<torch::jit::Value *, TrackedTensor *> _values_map;
+  std::unordered_map<torch::jit::Value *, IpuTensorId> _values_map;
 
   // Map each prim::ListConstruct to a corresponding jit output value.
   std::unordered_map<TensorList, torch::jit::Value *, TensorListHash>
       _tensor_lists;
 
   // For resolving aliases, it's useful to find a TrackedTensor from its id.
-  std::unordered_map<IpuTensorId, IpuTensorDetails *> _ids_tensors_map;
-  std::unordered_map<poptorch_ir::TensorId, IpuTensorDetails *>
-      _mlir_id_tensors_map;
+  std::unordered_map<poptorch_ir::TensorId, IpuTensorId> _mlir_id_tensors_map;
 
   void removeMapperFromDetails();
 };

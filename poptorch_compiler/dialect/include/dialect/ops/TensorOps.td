@@ -36,6 +36,8 @@ def Poptorch_cast : Poptorch_Op<"cast", []> {
         $_state.addTypes(mlir::RankedTensorType::get(
             self.getType().cast<mlir::RankedTensorType>().getShape(), dtype));
   }]>];
+
+  let hasCanonicalizeMethod = 1;
 }
 
 def Poptorch_overwrite: Poptorch_BasicOp<"overwrite"> {

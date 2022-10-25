@@ -145,7 +145,7 @@ void MLIRExecutor::copyWeightsToHostIfNeeded() {
 
 MLIRDispatch::MLIRDispatch(const CompilerOptions &options,
                            TensorStore *tensor_store)
-    : IDispatch(tensor_store) {
+    : IDispatch(tensor_store, false) {
   initCompiler(options);
 
   // Start timing how long it takes us to build the graph.
@@ -322,13 +322,13 @@ public:
       : _mapper(&mapper), _session(&session) {}
 
   popit::Mem_t *getAllocation(poptorch_ir::TensorId id) const override {
-    auto *details = _mapper->getTensorDetailsForMlirId(id);
+    const auto &details = _mapper->getTensorDetailsForMlirId(id);
     ERROR_ON(!details);
     ERROR_ON(!details->host_buffer.hasData());
     return details->host_buffer.getPopitData().get();
   }
   popit::Mem_t *getOrAllocate(poptorch_ir::TensorId id) override {
-    auto *details = _mapper->getTensorDetailsForMlirId(id);
+    const auto &details = _mapper->getTensorDetailsForMlirId(id);
     ERROR_ON(!details);
     if (!details->host_buffer.hasData()) {
       details->host_buffer = _session->allocate(details->getTensorType());
@@ -345,8 +345,10 @@ class LivenessMap : public poptorch_ir::ILivenessMap {
 public:
   explicit LivenessMap(ValueMapper &mapper) : _mapper{&mapper} {}
   bool isAlive(poptorch_ir::TensorId id) const override {
-    auto *details = _mapper->getTensorDetailsForMlirId(id);
-    return details != nullptr && details->isAlive();
+    // A tensor is alive when it can be accessed from pytorch. This exactly
+    // corresponds to the lifetime of the tensor details
+    const auto &details = _mapper->getTensorDetailsForMlirId(id);
+    return details != nullptr;
   }
 
 private:
@@ -503,7 +505,7 @@ void MLIRDispatch::findAndPromoteExternalTensors(c10::Stack *stack) {
     if (isIpuTensor(tensor) && !_mapper.hasMapping(tensor) &&
         getHostBuffer(tensor).hasData()) {
       if (const auto original = getTensorDetails(tensor)->alias_of) {
-        _aliases_to_restore.push_back(getTensorDetails(tensor).get());
+        _aliases_to_restore.push_back(getTensorDetails(tensor));
       }
       logging::trace("[DISPATCHER] Adding parameter {} from tensor store",
                      str(tensor));
@@ -534,10 +536,10 @@ void MLIRDispatch::fallback(const c10::OperatorHandle &op, c10::Stack *stack) {
 }
 
 void MLIRDispatch::restoreAliases() {
-  for (auto *details : _aliases_to_restore) {
+  for (const auto &details : _aliases_to_restore) {
     const auto &alias_of = details->alias_of;
     ERROR_ON(!alias_of);
-    auto *orig_details = _mapper.getTensorDetailsForId(*alias_of);
+    const auto &orig_details = _mapper.getTensorDetailsForId(*alias_of);
 
     _mapper.aliasTensor(details, orig_details);
   }
@@ -677,6 +679,16 @@ MLIRDispatch::outputIsInplaceOf(poptorch_ir::OptionalTensorId output_id,
 
   // NOLINTNEXTLINE
   if (isDeferredEmptyTensor(original_input)) {
+    // Casting the result of an outplace ops is represented by providing an
+    // empty tensor return value with a different dtype to the inputs. Always
+    // insert an casts to the output dtype to account for this case. Note that
+    // unnecessary casts will be removed by canonicalization
+    const auto tensor_type = getTensorDetails(original_input)->getTensorType();
+    const auto mlir_output = _compiler.cast(output_id, tensor_type.element_type);
+    const auto t_ids = mlir_output.at(0).tensor_ids;
+    requires_grad = requiresGrad(mlir_output.at(0).requires_grad_types, requires_grad).at(0);
+    output_id = getSingleOptionalTensorId(t_ids);
+
     // If we haven't added the empty_tensor to the graph, then we need to map
     // this false empty_tensor result to the actual output id for this op.
     _mapper.addTensor(original_input, output_id);

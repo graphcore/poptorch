@@ -145,7 +145,7 @@ private:
   CompilerOptions _opts;
 #endif
 
-  std::vector<IpuTensorDetails *> _aliases_to_restore;
+  std::vector<std::shared_ptr<IpuTensorDetails>> _aliases_to_restore;
   void restoreAliases();
 
   bool isDeferredEmptyTensor(const at::Tensor &tensor) const;

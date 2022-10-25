@@ -61,7 +61,8 @@ std::string truncateGraphString(torch::jit::Graph &graph) {
 
 JITDispatch::JITDispatch(const CompilerOptions &options,
                          TensorStore *tensor_store)
-    : IDispatch(tensor_store), graph(std::make_shared<torch::jit::Graph>()),
+    : IDispatch(tensor_store, true),
+      graph(std::make_shared<torch::jit::Graph>()),
       _mlir_dispatch(options, tensor_store) {}
 
 void JITDispatch::addConstant(const at::Tensor &cpu_tensor,

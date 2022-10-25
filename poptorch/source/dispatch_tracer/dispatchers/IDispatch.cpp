@@ -13,7 +13,8 @@
 
 namespace poptorch {
 
-IDispatch::IDispatch(TensorStore *tensor_store) {
+IDispatch::IDispatch(TensorStore *tensor_store, bool is_owning)
+    : _mapper(is_owning) {
   ERROR_ON(tensor_store == nullptr);
   _tensor_store = tensor_store;
 }
@@ -30,7 +31,10 @@ void *IDispatch::getDataSource(torch::jit::Value *value) {
     logging::trace("JIT value not tracked {}", reinterpret_cast<void *>(value));
     return nullptr;
   }
-  return record->tensor_details->host_buffer.getCpuData()->data();
+  if (auto td = record->tensor_details.lock()) {
+    return td->host_buffer.getCpuData()->data();
+  }
+  return nullptr;
 #else
   UNUSED(value);
   ERROR("PopTorch must be compiled with POPTORCH_BUILD_MLIR_COMPILER=ON to "
@@ -42,7 +46,10 @@ bool IDispatch::isParameter(torch::jit::Value *value) {
   auto *record = _mapper.rawTensorRecord(value);
   ERROR_ON_MSG(record == nullptr,
                "JIT value not tracked " << reinterpret_cast<void *>(value));
-  return record->tensor_details->is_parameter;
+  if (auto td = record->tensor_details.lock()) {
+    return td->is_parameter;
+  }
+  return false;
 }
 
 void IDispatch::setParameterName(const at::Tensor &tensor,
