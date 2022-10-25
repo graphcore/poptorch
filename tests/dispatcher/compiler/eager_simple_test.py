@@ -127,6 +127,20 @@ def test_simple_add_hw(capfd):
     simple_add(capfd)
 
 
+@pytest.mark.mlirSupportRequired
+@pytest.mark.ipuHardwareRequired
+@pytest.mark.extendedTestingOnly
+def test_casting():
+    import poptorch.eager  # pylint: disable=unused-import, import-outside-toplevel
+
+    t = torch.tensor([1], dtype=torch.int32, device='xla')
+    s = t.float().to('cpu')
+
+    assert s.dtype is torch.float
+    assert s.item() == 1.0
+
+
+@pytest.mark.mlirSupportRequired
 @pytest.mark.parametrize("lazy", [True, False])
 @pytest.mark.extendedTestingOnly
 def test_backward(lazy):

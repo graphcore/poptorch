@@ -2,6 +2,7 @@
 
 #include <llvm/ADT/STLExtras.h>
 #include <llvm/ADT/STLForwardCompat.h>
+#include <mlir/IR/BuiltinTypes.h>
 #include <mlir/IR/PatternMatch.h>
 #include <mlir/Support/LLVM.h>
 #include <mlir/Support/LogicalResult.h>
@@ -63,6 +64,23 @@ overwrite::canonicalize(overwrite op, ::mlir::PatternRewriter &rewriter) {
   }
 
   return mlir::success();
+}
+
+::mlir::LogicalResult cast::canonicalize(cast op,
+                                         ::mlir::PatternRewriter &rewriter) {
+  const auto self_dtype =
+      op.self().getType().cast<::mlir::RankedTensorType>().getElementType();
+  const auto result_dtype =
+      op.result().getType().cast<::mlir::RankedTensorType>().getElementType();
+
+  // If the dtype of self and result are the same the cast is equivalent to a
+  // clone
+  if (self_dtype == result_dtype) {
+    rewriter.replaceOpWithNewOp<poptorch_ir::clone>(op, op->getResultTypes(),
+                                                    op->getOperands());
+    return ::mlir::success();
+  }
+  return ::mlir::failure();
 }
 
 } // namespace poptorch_ir

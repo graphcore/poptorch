@@ -671,6 +671,19 @@ MLIRDispatch::outputIsInplaceOf(poptorch_ir::OptionalTensorId output_id,
 
   // NOLINTNEXTLINE
   if (isDeferredEmptyTensor(original_input)) {
+    // Casting the result of an outplace op is represented by providing an
+    // empty tensor return value with a different dtype to the inputs. Always
+    // insert a cast to the output dtype to account for this case. Note that
+    // unnecessary casts will be removed by canonicalization
+    const auto tensor_type = getTensorDetails(original_input)->getTensorType();
+    const auto mlir_output =
+        _compiler.cast(output_id, tensor_type.element_type);
+    const auto t_ids = mlir_output.at(0).tensor_ids;
+    requires_grad =
+        requiresGrad(mlir_output.at(0).requires_grad_types, requires_grad)
+            .at(0);
+    output_id = getSingleOptionalTensorId(t_ids);
+
     // If we haven't added the empty_tensor to the graph, then we need to map
     // this false empty_tensor result to the actual output id for this op.
     _mapper.addTensor(original_input, output_id);
