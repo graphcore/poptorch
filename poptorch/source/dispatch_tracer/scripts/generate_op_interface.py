@@ -65,8 +65,7 @@ for function_name, op_target in ops_to_generate_dict.items():
     signature, outputs = op_target['native_func'].split(' -> ')
 
     # Some operations return multiple outputs, e.g: (Tensor(a!) values, Tensor(b!) indices)
-    # pylint: disable=literal-comparison
-    is_multiple_outputs = outputs[0] is '('
+    is_multiple_outputs = outputs.startswith('(')
 
     # If so convert into a list.
     if is_multiple_outputs:
