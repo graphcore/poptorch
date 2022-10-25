@@ -47,6 +47,7 @@ struct IpuTensorDetails {
   std::optional<std::uint64_t> alias_of;
 
   poptorch_ir::TensorType getTensorType() const;
+  bool isAlive() const;
 };
 
 poptorch_ir::Type toCompilerType(const at::ScalarType &elem_type);

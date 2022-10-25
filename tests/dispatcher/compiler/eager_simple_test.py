@@ -6,6 +6,7 @@ import torchvision.models as models
 import pytest
 import helpers
 
+
 def simple_add(capfd):
     import poptorch.eager  # pylint: disable=unused-import, import-outside-toplevel
 
@@ -128,18 +129,6 @@ def test_simple_add(capfd):
 @helpers.overridePoptorchLogLevel("TRACE")
 def test_simple_add_hw(capfd):
     simple_add(capfd)
-
-
-@pytest.mark.mlirSupportRequired
-@pytest.mark.ipuHardwareRequired
-def test_casting():
-    import poptorch.eager  # pylint: disable=unused-import, import-outside-toplevel
-
-    t = torch.tensor([1], dtype=torch.int32, device='xla')
-    s = t.float().to('cpu')
-
-    assert s.dtype is torch.float, f'Expected s to have type float got {s.dtype}'
-    assert s.item() == 1.0
 
 
 @pytest.mark.mlirSupportRequired

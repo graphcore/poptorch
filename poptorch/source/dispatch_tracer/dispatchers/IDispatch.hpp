@@ -18,7 +18,7 @@ namespace poptorch {
 
 class IDispatch {
 public:
-  explicit IDispatch(TensorStore *tensor_store, bool is_owning);
+  explicit IDispatch(TensorStore *tensor_store);
 
   IDispatch(IDispatch &&other) noexcept = default;
   IDispatch &operator=(IDispatch &&other) noexcept = default;
