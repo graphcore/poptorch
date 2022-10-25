@@ -497,9 +497,6 @@ void MLIRDispatch::findAndPromoteExternalTensors(c10::Stack *stack) {
     // should have data
     if (isIpuTensor(tensor) && !_mapper.hasMapping(tensor) &&
         getHostBuffer(tensor).hasData()) {
-      if (const auto original = getTensorDetails(tensor)->alias_of) {
-        _aliases_to_restore.push_back(getTensorDetails(tensor).get());
-      }
       logging::trace("[DISPATCHER] Adding parameter {} from tensor store",
                      str(tensor));
 
@@ -527,23 +524,7 @@ void MLIRDispatch::fallback(const c10::OperatorHandle &op, c10::Stack *stack) {
   }
 }
 
-void MLIRDispatch::restoreAliases() {
-  for (auto *details : _aliases_to_restore) {
-    const auto &alias_of = details->alias_of;
-    ERROR_ON(!alias_of);
-    auto *orig_details = _mapper.getTensorDetailsForId(*alias_of);
-
-    _mapper.aliasTensor(details, orig_details);
-  }
-
-  _aliases_to_restore.clear();
-}
-
 std::shared_ptr<MLIRExecutor> MLIRDispatch::compile() {
-  // Restore any aliases we found when promoting tensors which have not already
-  // been tied together in the ValueMapper.
-  restoreAliases();
-
   // Get the binary from MLIR.
   auto executor = _compiler.compileAndLoad();
 

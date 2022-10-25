@@ -121,10 +121,9 @@ struct IpuTensorImpl : public at::TensorImpl {
         /*allow_tensor_metadata_change=*/allow_tensor_metadata_change);
     impl->refresh_numel();
 
-    details->alias_of = this->details->tensor_id;
-    if (details->mapper != nullptr) {
-      details->mapper->addCopiedTensor(impl.get(), this);
-    }
+    getTensorDetails(*impl)->alias_of = this->details->alias_of == nullptr
+                                            ? this->details
+                                            : this->details->alias_of;
     return impl;
   }
 
@@ -139,10 +138,9 @@ struct IpuTensorImpl : public at::TensorImpl {
         /*allow_tensor_metadata_change=*/allow_tensor_metadata_change);
     impl->refresh_numel();
 
-    details->alias_of = this->details->tensor_id;
-    if (details->mapper != nullptr) {
-      details->mapper->addCopiedTensor(impl.get(), this);
-    }
+    getTensorDetails(*impl)->alias_of = this->details->alias_of == nullptr
+                                            ? this->details
+                                            : this->details->alias_of;
     return impl;
   }
 

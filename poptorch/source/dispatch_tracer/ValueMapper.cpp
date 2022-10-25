@@ -12,51 +12,13 @@
 
 namespace poptorch {
 
-ValueMapper::ValueMapper(ValueMapper &&other) noexcept {
-  _tensors = std::move(other._tensors);
-  for (auto &[_, tracked_tensor] : _tensors) {
-    UNUSED(_);
-    tracked_tensor.tensor_details->mapper = this;
-  }
-
-  _name_ids_map = std::move(other._name_ids_map);
-  _ids_name_map = std::move(other._ids_name_map);
-  _per_replica_map = std::move(other._per_replica_map);
-  _values_map = std::move(other._values_map);
-  _tensor_lists = std::move(other._tensor_lists);
-  _ids_tensors_map = std::move(other._ids_tensors_map);
-  _mlir_id_tensors_map = std::move(other._mlir_id_tensors_map);
-}
-ValueMapper &ValueMapper::operator=(ValueMapper &&other) noexcept {
-  removeMapperFromDetails();
-
-  _tensors = std::move(other._tensors);
-  for (auto &[_, tracked_tensor] : _tensors) {
-    UNUSED(_);
-    tracked_tensor.tensor_details->mapper = this;
-  }
-  // Ensure that the destructor of other can't remove this mapper
-  other._tensors.clear();
-
-  _name_ids_map = std::move(other._name_ids_map);
-  _ids_name_map = std::move(other._ids_name_map);
-  _per_replica_map = std::move(other._per_replica_map);
-  _values_map = std::move(other._values_map);
-  _tensor_lists = std::move(other._tensor_lists);
-  _ids_tensors_map = std::move(other._ids_tensors_map);
-  _mlir_id_tensors_map = std::move(other._mlir_id_tensors_map);
-
-  return *this;
-}
-
-ValueMapper::~ValueMapper() { removeMapperFromDetails(); }
+ValueMapper::ValueMapper(ValueMapper &&other) noexcept = default;
+ValueMapper &ValueMapper::operator=(ValueMapper &&other) noexcept = default;
+ValueMapper::~ValueMapper() = default;
 
 ValueMapper::TrackedTensor::TrackedTensor(
     std::shared_ptr<IpuTensorDetails> details)
     : tensor_details(std::move(details)) {}
-
-ValueMapper::TrackedTensor::TrackedTensor(const at::Tensor &tensor)
-    : TrackedTensor(getTensorDetails(tensor)) {}
 
 void ValueMapper::setParameterName(const at::Tensor &t,
                                    const std::string &name) {
@@ -140,26 +102,26 @@ ValueMapper::getParameterPerReplica(torch::jit::Value *value) const {
 
 // Add a tensor to the IR.
 void ValueMapper::addTensor(std::shared_ptr<IpuTensorDetails> details,
-                            poptorch_ir::TensorId id) {
+                            poptorch_ir::TensorId mlir_id) {
   logging::trace("Adding {} to value mapper {}, MLIR id: {}",
-                 details->tensor_id, static_cast<void *>(this), id);
+                 details->tensor_id, static_cast<void *>(this), mlir_id);
 
-  if (details->mapper == nullptr) {
-    // If this tensor was created by the JIT dispatcher we want the details
-    // to point at the JIT's mapper not the MLIR one, so don't overwrite.
-    details->mapper = this;
-  }
-  auto itr =
-      _tensors.insert({details.get(), TrackedTensor{std::move(details)}}).first;
-  itr->second.mlir = id;
+  auto alias_details =
+      details->alias_of == nullptr ? std::move(details) : details->alias_of;
+  auto itr = _tensors
+                 .insert({alias_details.get(),
+                          TrackedTensor{std::move(alias_details)}})
+                 .first;
+  itr->second.mlir = mlir_id;
 
   auto *details_ptr = itr->second.tensor_details.get();
   _ids_tensors_map.insert({itr->first->tensor_id, details_ptr});
-  _mlir_id_tensors_map.emplace(id, details_ptr);
+  _mlir_id_tensors_map.emplace(mlir_id, details_ptr);
 }
 
-void ValueMapper::addTensor(const at::Tensor &t, poptorch_ir::TensorId id) {
-  addTensor(getTensorDetails(*t.unsafeGetTensorImpl()), id);
+void ValueMapper::addTensor(const at::Tensor &t,
+                            poptorch_ir::TensorId mlir_id) {
+  addTensor(getTensorDetails(t), mlir_id);
 }
 
 void ValueMapper::addTensorUnchecked(const at::Tensor &t,
@@ -171,10 +133,14 @@ void ValueMapper::addTensorUnchecked(const at::Tensor &t,
   // If the tensor is already being tracked then we will update the JIT
   // value being tracked. Otherwise we insert and add the jit value.
   auto new_details = getTensorDetails(t);
-  new_details->mapper = this;
-  auto itr = _tensors.insert({new_details.get(), TrackedTensor{t}}).first;
+
+  auto alias_details =
+      new_details->alias_of == nullptr ? new_details : new_details->alias_of;
+  auto itr = _tensors
+                 .insert({alias_details.get(),
+                          TrackedTensor{std::move(alias_details)}})
+                 .first;
   itr->second.jit = val;
-  ERROR_ON(itr->second.tensor_details != new_details);
 
   // Ensure we maintain a lookup of torch::jit to pytorch tensor.
   _values_map.insert({val, &itr->second});
@@ -188,44 +154,8 @@ void ValueMapper::addTensor(const at::Tensor &t, torch::jit::Value *val) {
   addTensorUnchecked(t, val);
 }
 
-void ValueMapper::addCopiedTensor(const at::TensorImpl *dest,
-                                  const at::TensorImpl *src) {
-  auto src_details = getTensorDetails(*src);
-  auto dest_details = getTensorDetails(*dest);
-  dest_details->mapper = this;
-
-  aliasTensor(dest_details, src_details);
-}
-
-void ValueMapper::aliasTensor(
-    const std::shared_ptr<IpuTensorDetails> &dest_details,
-    const std::shared_ptr<IpuTensorDetails> &src_details) {
-  auto itr = _tensors.find(src_details.get());
-  ERROR_ON_MSG(itr == _tensors.end(), "Could not find source tensor");
-  auto itr_new =
-      _tensors.insert_or_assign(dest_details.get(), itr->second).first;
-  itr_new->second.tensor_details = dest_details;
-}
-
-void ValueMapper::aliasTensor(IpuTensorDetails *dest_details,
-                              IpuTensorDetails *src_details) {
-  auto dest_it = _tensors.find(dest_details);
-  auto src_it = _tensors.find(src_details);
-
-  ERROR_ON(dest_it == _tensors.end());
-  ERROR_ON(src_it == _tensors.end());
-
-  aliasTensor(dest_it->second.tensor_details, src_it->second.tensor_details);
-}
-
 ValueMapper::TrackedTensor *ValueMapper::rawTensorRecord(const at::Tensor &t) {
-  auto itr = _tensors.find(getTensorDetails(t).get());
-
-  if (itr != _tensors.end()) {
-    return &itr->second;
-  }
-
-  return nullptr;
+  return find(t);
 }
 
 ValueMapper::TrackedTensor *
@@ -243,20 +173,17 @@ torch::jit::Value *ValueMapper::getValueForTensor(const at::Tensor &t) {
   if (!isIpuTensor(t)) {
     return nullptr;
   }
-  auto itr = _tensors.find(getTensorDetails(t).get());
 
-  if (itr != _tensors.end()) {
-    return itr->second.jit;
+  if (auto *tracked_tensor = find(t)) {
+    return tracked_tensor->jit;
   }
 
   return nullptr;
 }
 
 poptorch_ir::TensorId ValueMapper::getMLIRForTensor(const IpuTensorDetails *t) {
-  auto itr = _tensors.find(const_cast<IpuTensorDetails *>(t));
-
-  if (itr != _tensors.end()) {
-    return itr->second.mlir;
+  if (auto *tracked_tensor = find(*t)) {
+    return tracked_tensor->mlir;
   }
 
   return poptorch_ir::tensor_error_id;
@@ -270,7 +197,7 @@ poptorch_ir::TensorId ValueMapper::getMLIRForTensor(const at::Tensor &t) {
 }
 
 bool ValueMapper::hasMapping(const at::Tensor &t) const {
-  return _tensors.find(getTensorDetails(t).get()) != _tensors.end();
+  return find(t) != nullptr;
 }
 
 void ValueMapper::addTensorList(const TensorList &list,
@@ -316,10 +243,24 @@ ValueMapper::getTensorDetailsForMlirId(poptorch_ir::TensorId id) const {
   return it->second;
 }
 
-void ValueMapper::removeMapperFromDetails() {
-  for (auto &[_, tracked_tensor] : _tensors) {
-    UNUSED(_);
-    tracked_tensor.tensor_details->mapper = nullptr;
+ValueMapper::TrackedTensor *ValueMapper::find(const IpuTensorDetails &details) {
+  const auto *details_alias =
+      details.alias_of == nullptr ? &details : details.alias_of.get();
+  auto itr = _tensors.find(const_cast<IpuTensorDetails *>(details_alias));
+  if (itr == _tensors.end()) {
+    return nullptr;
   }
+  return &itr->second;
+}
+const ValueMapper::TrackedTensor *
+ValueMapper::find(const IpuTensorDetails &details) const {
+  return const_cast<ValueMapper *>(this)->find(details);
+}
+
+ValueMapper::TrackedTensor *ValueMapper::find(const at::Tensor &t) {
+  return find(*getTensorDetails(t));
+}
+const ValueMapper::TrackedTensor *ValueMapper::find(const at::Tensor &t) const {
+  return find(*getTensorDetails(t));
 }
 } // namespace poptorch

@@ -60,7 +60,6 @@ public:
   // tensor and its corresponding values in the two IRs.
   struct TrackedTensor {
     explicit TrackedTensor(std::shared_ptr<IpuTensorDetails> details);
-    explicit TrackedTensor(const at::Tensor &tensor);
 
     // The PyTorch tensor impl. Most of the time it is "the tensor" on the
     // PyTorch side. However the autograd can create non-view aliases so
@@ -91,12 +90,10 @@ public:
   void addTensor(const at::Tensor &t, torch::jit::Value *val);
 
   void addTensor(std::shared_ptr<IpuTensorDetails> details,
-                 poptorch_ir::TensorId id);
-  void addTensor(const at::Tensor &t, poptorch_ir::TensorId id);
+                 poptorch_ir::TensorId mlir_id);
+  void addTensor(const at::Tensor &t, poptorch_ir::TensorId mlir_id);
 
   void addTensorList(const TensorList &list, torch::jit::Value *val);
-
-  void addCopiedTensor(const at::TensorImpl *dest, const at::TensorImpl *src);
 
   torch::jit::Value *getValueForTensorList(const TensorList &list);
 
@@ -113,19 +110,6 @@ public:
 
   IpuTensorDetails *getTensorDetailsForId(IpuTensorId id) const;
   IpuTensorDetails *getTensorDetailsForMlirId(poptorch_ir::TensorId id) const;
-
-  // Create an alias from the `src_details` tensor details to the tensor
-  // described by `dest_details` and `dest_tensor_id`. The source tensor must
-  // already be added to this mapper. The MLIR or JIT value will now map to the
-  // same tensor details and PopTorch tensor id as the destination tensor.
-  void aliasTensor(const std::shared_ptr<IpuTensorDetails> &dest_details,
-                   const std::shared_ptr<IpuTensorDetails> &src_details);
-
-  // Creating an alias from src to dest as above, but locating the original
-  // tensor's shared pointer and id in this ValueMapper given just the raw
-  // pointer to both tensor details.
-  void aliasTensor(IpuTensorDetails *dest_details,
-                   IpuTensorDetails *src_details);
 
   bool hasMapping(const at::Tensor &t) const;
 
@@ -153,7 +137,11 @@ private:
   std::unordered_map<poptorch_ir::TensorId, IpuTensorDetails *>
       _mlir_id_tensors_map;
 
-  void removeMapperFromDetails();
+  TrackedTensor *find(const IpuTensorDetails &details);
+  const TrackedTensor *find(const IpuTensorDetails &details) const;
+
+  TrackedTensor *find(const at::Tensor &t);
+  const TrackedTensor *find(const at::Tensor &t) const;
 };
 
 } // namespace poptorch

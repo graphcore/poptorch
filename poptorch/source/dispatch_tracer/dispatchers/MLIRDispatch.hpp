@@ -137,9 +137,6 @@ private:
 
   CompilerOptions _opts;
 
-  std::vector<IpuTensorDetails *> _aliases_to_restore;
-  void restoreAliases();
-
   bool isDeferredEmptyTensor(const at::Tensor &tensor) const;
 };
 

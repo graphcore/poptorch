@@ -36,7 +36,6 @@ struct IpuTensorDetails {
   // the details of the tensor will be copied into this structure so they can
   // still be accessed through the ValueMapper.
   IpuTensorImpl *parent;
-  ValueMapper *mapper = nullptr;
   IpuTensorId tensor_id;
 
   poptorch_ir::TensorType type;
@@ -44,7 +43,7 @@ struct IpuTensorDetails {
   std::string name;
   bool is_parameter = false;
   Buffer host_buffer;
-  std::optional<std::uint64_t> alias_of;
+  std::shared_ptr<IpuTensorDetails> alias_of;
 
   poptorch_ir::TensorType getTensorType() const;
   bool isAlive() const;
