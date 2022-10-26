@@ -636,6 +636,12 @@ poptorch_ir::TensorId MLIRDispatch::findTensor(const at::Tensor &tensor) {
                  "via cpu_tensor.to(ipu_tensor.device).");
       }
 
+      if (isEagerMode()) {
+        logging::trace("Adding deferred empty_tensor op for tensor {}",
+                       reinterpret_cast<void *>(tensor.unsafeGetTensorImpl()));
+        return addEmptyTensorOp(tensor);
+      }
+
       ERROR("Could not find tensor " << str(tensor));
     }
   }

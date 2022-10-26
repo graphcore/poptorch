@@ -48,7 +48,7 @@ def simple_add(capfd):
 
 
 @helpers.printCapfdOnExit
-@helpers.overridePoptorchLogLevel("DEBUG")
+@helpers.overridePoptorchLogLevel("TRACE")
 @pytest.mark.parametrize("mode", ["default", "show_all", "hide_all"])
 @pytest.mark.extendedTestingOnly
 def test_source_location(capfd, mode):
@@ -78,7 +78,7 @@ def test_source_location(capfd, mode):
         log.assert_matches("site-packages/torch/nn/functional.py")
         log.assert_no_matches(f"{expected_filename}:{expected_line}")
     elif mode == "hide_all":
-        log.assert_matches(r"\[unknown\]")  # no filename
+        log.assert_matches(r"\<unknown\>")  # no filename
         log.assert_no_matches("site-packages/torch/nn/functional.py")
         log.assert_no_matches(f"{expected_filename}:{expected_line}")
     else:
