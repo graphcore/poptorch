@@ -162,6 +162,7 @@ Reduction ops
 * ``torch.any``
 * ``torch.argmax``
 * ``torch.argmin``
+* ``torch.count_nonzero``
 * ``torch.mean``
 * ``torch.median``
 * ``torch.prod``

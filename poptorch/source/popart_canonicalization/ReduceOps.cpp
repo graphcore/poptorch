@@ -24,7 +24,7 @@ torch::jit::Node *reduceHandler(torch::jit::Graph *graph,
   // The third is for boolean reductions
   // aten::all(Tensor self) -> tensor
 
-  torch::jit::Symbol kind = node->kind();
+  torch::jit::Symbol const kind = node->kind();
   torch::jit::Value *input = node->input(0);
 
   // sum and prod works even for bool types in PyTorch
@@ -38,7 +38,8 @@ torch::jit::Node *reduceHandler(torch::jit::Graph *graph,
   std::int64_t keepdim = 0;
 
   // Case 2/3 or case 1 with no dimension specified.
-  size_t case_2_3 = (kind == c10::aten::any || kind == c10::aten::all) ? 1 : 2;
+  const size_t case_2_3 =
+      (kind == c10::aten::any || kind == c10::aten::all) ? 1 : 2;
   bool flatten = node->inputs().size() == case_2_3;
   if (!flatten) {
     // Case 1.
@@ -143,7 +144,7 @@ torch::jit::Node *argMinMaxHandler(torch::jit::Graph *graph,
   // dim (int) - the dimension to reduce. If None, the argmax
   //             of the flattened input is returned.
 
-  torch::jit::Symbol kind = node->kind();
+  torch::jit::Symbol const kind = node->kind();
   torch::jit::Value *input = node->input(0);
 
   std::optional<std::int64_t> dim;
@@ -151,7 +152,7 @@ torch::jit::Node *argMinMaxHandler(torch::jit::Graph *graph,
     dim = constantToLong(node->input(1)->node());
   }
 
-  std::int64_t keep_dim = constantToLong(node->input(2)->node());
+  std::int64_t const keep_dim = constantToLong(node->input(2)->node());
 
   // If dim is not provided we will flatten input so just use 0 in that
   // case.
@@ -197,7 +198,7 @@ torch::jit::Node *argsortHandler(torch::jit::Graph *graph,
     return indices->node();
   }
 
-  std::vector<int64_t> dims{dim};
+  const std::vector<int64_t> dims{dim};
   return createReverse(graph, {indices}, dims);
 }
 
@@ -205,7 +206,7 @@ torch::jit::Node *minMaxWithIndicesHandler(torch::jit::Graph *graph,
                                            torch::jit::Node *node) {
   auto *x = node->input(0);
   auto t0 = x->type()->expect<c10::TensorType>();
-  std::vector<std::int64_t> shape = shapeFromTensor(x);
+  const std::vector<std::int64_t> shape = shapeFromTensor(x);
   torch::jit::Value *values;
   torch::jit::Value *indices;
   if (shape.empty()) {
@@ -214,7 +215,7 @@ torch::jit::Node *minMaxWithIndicesHandler(torch::jit::Graph *graph,
   } else {
     auto dim = handleDimensionParam(node->input(1), t0);
     auto keepdim = constantToBool(node->input(2)->node());
-    bool negate = node->kind() == c10::aten::min;
+    const bool negate = node->kind() == c10::aten::min;
 
     if (negate) {
       x = createNeg(graph, {x})->output();
@@ -310,7 +311,7 @@ torch::jit::Node *tensorNormHandler(torch::jit::Graph *graph,
 
   constexpr float pos_inf = std::numeric_limits<float>::infinity();
   constexpr float neg_inf = -std::numeric_limits<float>::infinity();
-  float p = constantToFloat(node->input(1)->node());
+  const float p = constantToFloat(node->input(1)->node());
 
   if (p == 1.0) {
     return createReducel1(graph, {input}, axes, keepdim);
@@ -336,7 +337,7 @@ torch::jit::Node *tensorNormHandler(torch::jit::Graph *graph,
   torch::jit::Node *sum =
       createReducesum(graph, {pow->output()}, axes, keepdim);
 
-  at::ScalarType p_type = getNodeScalarType(p_val);
+  at::ScalarType const p_type = getNodeScalarType(p_val);
 
   if (p_type == c10::ScalarType::Int || p_type == c10::ScalarType::Long) {
     // Cast int to float before reciprocal
@@ -382,6 +383,26 @@ torch::jit::Node *frobeniusnormHandler(torch::jit::Graph *graph,
   return nullptr;
 }
 
+// count_nonzero.dim_IntList(Tensor self, int[] dim) -> Tensor
+torch::jit::Node *countNonzeroHandler(torch::jit::Graph *graph,
+                                      torch::jit::Node *node) {
+  auto *self = node->input(0);
+  auto dim = constantToLongVec(node->input(1)->node());
+  if (dim.empty()) {
+    dim = shapeFromTensor(self);
+    std::iota(dim.begin(), dim.end(), 0);
+  }
+
+  auto *self_bool = self;
+  if (getNodeScalarType(self) != c10::ScalarType::Bool) {
+    self_bool = createCast(graph, self, c10::ScalarType::Bool)->output();
+  }
+  auto *where = createWhere(graph, {self_bool, wrapInConstant1D(graph, 1),
+                                    wrapInConstant1D(graph, 0)});
+
+  return createReducesum(graph, {where->output()}, dim, /*keepdims=*/0);
+}
+
 } // namespace
 
 __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
@@ -403,5 +424,6 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::maximum, maxHandler);
   registerHandler(c10::aten::any, reduceHandler);
   registerHandler(c10::aten::all, reduceHandler);
+  registerHandler(c10::aten::count_nonzero, countNonzeroHandler);
 }
 } // namespace poptorch

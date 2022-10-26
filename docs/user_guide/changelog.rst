@@ -9,6 +9,8 @@ New features
 ------------
 
 - Ability to send different values for a weight tensor to different replica groups (see :numref:`grouping_tensor_weights`)
+- Support for ``tensor.index_fill_``
+- Support for ``torch.count_nonzero``
 
 API changes
 -----------

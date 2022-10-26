@@ -853,6 +853,10 @@
   PopTorchDirect: tan
   UnusedOutputArguments: {out}
 
+# count_nonzero.dim_IntList(Tensor self, int[] dim) -> Tensor
+- func: count_nonzero.dim_IntList
+  PopTorchDirect: count_nonzero
+
 ##########
 # Linalg
 ##########

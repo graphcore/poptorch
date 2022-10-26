@@ -574,3 +574,34 @@ class Poptorch_scatter_minmax<string name, list<Trait> traits = []> : Poptorch_N
 
 def Poptorch_scatter_max : Poptorch_scatter_minmax<"scatter_max"> {}
 def Poptorch_scatter_min : Poptorch_scatter_minmax<"scatter_min"> {}
+
+// count_nonzero.dim_IntList(Tensor self, int[] dim) -> Tensor
+def Poptorch_count_nonzero : Poptorch_NotImplementedOp<"count_nonzero", []> {
+  let arguments = (ins Poptorch_tensor:$self,
+                       I64ArrayAttr:$dim);
+
+  let results = (outs Poptorch_tensor:$result);
+  let builders = [OpBuilder<(ins "mlir::Value":$self,
+                                 "std::vector<std::int64_t>":$dim),[{
+      $_state.addOperands({self});
+      auto self_shape = getShape(self);
+      for (auto &d : dim) {
+        d = convertToPositiveDim(d, self_shape.size());
+      }
+      $_state.addAttribute("dim", $_builder.getI64ArrayAttr(dim));
+
+      std::vector<std::int64_t> out_shape = {1};
+      if (dim.size() > 0) {
+        out_shape = self_shape;
+        auto sorted_dims = dim;
+        std::sort(sorted_dims.begin(), sorted_dims.end(), [] (int64_t d1, int64_t d2) { return d1 > d2; });
+
+        for (auto d : sorted_dims) {
+          out_shape.erase(out_shape.begin() + d);
+        }
+      }
+
+      $_state.addTypes(mlir::RankedTensorType::get(out_shape, getElementType(self)));
+    }]>
+  ];
+}
