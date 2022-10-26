@@ -9,6 +9,12 @@ from ._logging import logger
 
 _begin_ipu_block = torch.ops.poptorch.begin_ipu_block
 
+# Disable tqdm locks: this might cause some visual artifacts
+# in the console but this will prevent dead locks in multiprocessing
+# applications.
+# https://github.com/tqdm/tqdm/issues/461#issuecomment-334343230
+tqdm.tqdm.get_lock().locks = []
+
 
 class ProgressBar:
     def __init__(self):
