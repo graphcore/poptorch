@@ -32,36 +32,24 @@ class ValueMapper;
 // care about in this structure, which is referenced by a shared_ptr from
 // IpuTensorImpl and also from the ValueMapper.
 struct IpuTensorDetails {
-  // Raw pointer to the parent IpuTensorImpl. If the parent is destroyed,
-  // the details of the tensor will be copied into this structure so they can
-  // still be accessed through the ValueMapper.
-  IpuTensorImpl *parent;
-  IpuTensorId tensor_id;
+  IpuTensorDetails(IpuTensorId tensor_id_, poptorch_ir::TensorType type_)
+      : tensor_id(tensor_id_), type(std::move(type_)) {}
 
-  poptorch_ir::TensorType type;
-  std::vector<int64_t> strides;
-  std::string name;
-  bool is_parameter = false;
-  Buffer host_buffer;
-  std::shared_ptr<IpuTensorDetails> alias_of;
+  const IpuTensorId tensor_id;
+  const poptorch_ir::TensorType type;
 
-  poptorch_ir::TensorType getTensorType() const;
-  bool isAlive() const;
+  // For inputs that are temporaries we need the buffer to live until the
+  // function is ran and we don't want to extend the lifetime of the
+  // IpuTensorDetails unnecessarily. This means we need to share ownership of
+  // the buffer
+  std::shared_ptr<Buffer> buffer = std::make_shared<Buffer>();
 };
 
 poptorch_ir::Type toCompilerType(const at::ScalarType &elem_type);
-poptorch_ir::Type toCompilerType(const at::Tensor &tensor);
+poptorch_ir::Type toCompilerElementType(const at::Tensor &tensor);
+poptorch_ir::TensorType getTensorType(const at::Tensor &tensor);
 
 uint64_t tensorImplDataSize(const at::TensorImpl &impl);
-
-// Mark an IPU tensor as being a parameter or not.
-void setIsParameter(const at::Tensor &tensor, bool is_parameter);
-
-// Return true if the given IPU tensor is a parameter.
-bool isParameter(const at::Tensor &tensor);
-
-// Return true if the given IPU tensor implementation is a parameter.
-bool isParameter(const at::TensorImpl &tensor);
 
 // Return the data size in bytes of the given at::Tensor.
 uint64_t tensorDataSize(const at::Tensor &tensor);
@@ -85,12 +73,7 @@ Buffer &getHostBuffer(const at::Tensor &ipu_tensor);
 Buffer &getHostBuffer(const at::TensorImpl &ipu_tensor);
 
 std::shared_ptr<IpuTensorDetails>
-getTensorDetails(const at::TensorImpl &ipu_tensor_impl);
-
-inline std::shared_ptr<IpuTensorDetails>
-getTensorDetails(const at::Tensor &ipu_tensor) {
-  return getTensorDetails(*ipu_tensor.unsafeGetTensorImpl());
-}
+getTensorDetails(const at::Tensor &ipu_tensor);
 
 void errorOnZeroSizedTensor(const at::Tensor &tensor);
 

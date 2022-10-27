@@ -9,7 +9,6 @@
 #include <torch/csrc/jit/ir/ir.h>
 
 #include <string>
-#include <unordered_map>
 #include <vector>
 
 #include "../ValueMapper.hpp"
@@ -55,8 +54,9 @@ public:
   // Rather than have each empty overload requring a specialised kernel we
   // simply ask the dispatchers to acknowledge the created empty tensor and we
   // create it manually in the base function registration.
-  virtual void registerEmptyTensor(const at::Tensor &empty) = 0;
+  virtual void registerEmptyTensor(const at::Tensor &empty, bool is_param) = 0;
 
+  bool isParameter(const at::Tensor &t) const;
   void *getDataSource(torch::jit::Value *val);
   bool isParameter(torch::jit::Value *val);
 

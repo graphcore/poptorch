@@ -37,7 +37,10 @@ class ILivenessMap {
 public:
   virtual ~ILivenessMap() = default;
 
-  virtual bool isAlive(TensorId id) const = 0;
+  // Check if the tensor is currently alive and extend it's lifetime if it is.
+  // We need to extend the lifetime to ensure that the tensor doesn't get
+  // destroyed between it being marked as an output and the graph being ran
+  virtual bool extendLifetime(TensorId id) = 0;
 };
 
 class PoptorchCompiler {
@@ -70,7 +73,7 @@ public:
   bool isTrivialGraph() const;
   // Only if ExecutionType::EagerMode is used.
   PopitDeviceFunctionWrapper compile(IIpuSession &session,
-                                     const ILivenessMap &liveness);
+                                     ILivenessMap &liveness);
 
   // Only if ExecutionType::StaticGraph is used
   std::unique_ptr<PoplarExecutorWrapper> compileAndLoad();

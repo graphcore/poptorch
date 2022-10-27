@@ -39,7 +39,7 @@ public:
   void detach(const c10::OperatorHandle &op, c10::Stack *stack,
               bool moving_parameters) final;
 
-  void registerEmptyTensor(const at::Tensor &tensor) final;
+  void registerEmptyTensor(const at::Tensor &tensor, bool is_param) final;
 
   // Node will be updated to the new target post canonicalisation.
   void fixOutput(c10::Stack &stack, torch::jit::Node *node);

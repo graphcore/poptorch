@@ -180,6 +180,12 @@ void hostSideCast(void *dest, c10::ScalarType dest_scalar_type, void *src,
       });
 }
 
+// Return true if the given IPU tensor is a parameter.
+inline bool isParameter(const at::Tensor &tensor) {
+  ERROR_ON(!getContext().hasActiveDispatch());
+  return getContext().activeDispatch()->isParameter(tensor);
+}
+
 // copy_(Tensor(a!) self, Tensor src, bool non_blocking=False) -> Tensor(a!)
 void copyInplace(const c10::OperatorHandle &op, c10::Stack *stack) {
   const c10::FunctionSchema &schema = op.schema();
@@ -563,12 +569,11 @@ emptyBase(at::IntArrayRef size,
     at::Tensor output = getContext().tensor_store.allocateTensor(
         size, dtype, deviceOrDefaultIpu({}), layout, pin_memory, memory_format);
     // TODO(T61576) Find a better way to identify parameters and buffers.
-    setIsParameter(output, getContext().moving_parameters);
-
     if (getContext().hasActiveDispatch()) {
       getContext().activeDispatch()->setPythonStack(
           torch::jit::tracer::pythonCallstack());
-      getContext().activeDispatch()->registerEmptyTensor(output);
+      getContext().activeDispatch()->registerEmptyTensor(
+          output, getContext().moving_parameters);
     }
 
     return output;

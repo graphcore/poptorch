@@ -12,6 +12,8 @@
 
 namespace poptorch_ir {
 
+PopitMemPtr::PopitMemPtr(std::nullptr_t)
+    : std::shared_ptr<popit::Mem_t>(nullptr) {}
 PopitMemPtr::PopitMemPtr(std::shared_ptr<popit::Mem_t> ptr)
     : std::shared_ptr<popit::Mem_t>(std::move(ptr)) {}
 

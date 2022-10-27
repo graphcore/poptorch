@@ -28,11 +28,11 @@ public:
   TensorId addValue(const mlir::Value &value) override;
 
   PopitDeviceFunctionWrapper compile(EagerIpuSession &session,
-                                     const ILivenessMap &liveness);
+                                     ILivenessMap &liveness);
 
 private:
   void markOutputs(const llvm::DenseMap<mlir::Value, TensorId> &mappings,
-                   const ILivenessMap &liveness);
+                   ILivenessMap &liveness);
 };
 
 } // namespace detail

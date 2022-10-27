@@ -76,8 +76,7 @@ void JITDispatch::addConstant(const at::Tensor &cpu_tensor,
   logging::trace("[DISPATCHER] Adding constant: Value {} with cpu ptr {}",
                  static_cast<void *>(value), cpu_tensor.data_ptr());
 
-  _mapper.addTensor(ipu_tensor, value);
-  setIsParameter(ipu_tensor, false);
+  _mapper.addTensor(ipu_tensor, value, false);
 }
 
 void JITDispatch::addTensorToParamNode(const at::Tensor &cpu_tensor) {
@@ -112,8 +111,7 @@ void JITDispatch::addTensor(const at::Tensor &cpu_tensor,
                  static_cast<void *>(value), src.data_ptr());
   _inplace_tracker.addTensor(value);
 
-  _mapper.addTensor(ipu_tensor, value);
-  setIsParameter(ipu_tensor, is_parameter);
+  _mapper.addTensor(ipu_tensor, value, is_parameter);
 }
 
 void JITDispatch::addInput(const at::Tensor &cpu_tensor,
@@ -162,7 +160,7 @@ void JITDispatch::finalizeGraph() {
   setCurrentPythonCodeLocation({});
 }
 
-void JITDispatch::registerEmptyTensor(const at::Tensor &tensor) {
+void JITDispatch::registerEmptyTensor(const at::Tensor &tensor, bool is_param) {
   const WithMetadata metadata("empty");
   // Do not call copyAndCoerceType from this method:
   // the source tensor hasn't been added to the mapper yet.
@@ -190,7 +188,7 @@ void JITDispatch::registerEmptyTensor(const at::Tensor &tensor) {
        pin_memory->output(), memory_format->output()});
   n->output()->inferTypeFrom(tensor);
   setSourceRangeToCurrentLocation(n);
-  _mapper.addTensor(tensor, n->output());
+  _mapper.addTensor(tensor, n->output(), is_param);
 }
 
 // aten::detach(Tensor(a) self) -> (Tensor(a))
@@ -216,7 +214,7 @@ void JITDispatch::detach(const c10::OperatorHandle &op, c10::Stack *stack,
       /*allow_tensor_metadata_change=*/true));
 
   // The new tensor points at the same mlir tensor as the source.
-  _mapper.addTensor(out, _mapper.getValueForTensor(in));
+  _mapper.addTensor(out, _mapper.getValueForTensor(in), true);
 
   torch::jit::drop(stack, num_arguments);
   torch::jit::push(stack, out);
@@ -249,7 +247,7 @@ void JITDispatch::fixOutput(c10::Stack &stack, torch::jit::Node *node) {
       at::Tensor const tensor = value.toTensor();
 
       val->inferTypeFrom(copyAndCoerceType(tensor));
-      _mapper.addTensor(tensor, val);
+      _mapper.addTensor(tensor, val, false);
 
       logging::trace(
           "[DISPATCHER][JIT] Output: Tensor ptr {}, jit ir %{} (scalar type "
@@ -271,7 +269,7 @@ void JITDispatch::fixOutput(c10::Stack &stack, torch::jit::Node *node) {
         at::Tensor const tensor = tensor_list.at(i);
         val = unpack->output(i);
         val->inferTypeFrom(copyAndCoerceType(tensor));
-        _mapper.addTensor(tensor, val);
+        _mapper.addTensor(tensor, val, false);
         logging::trace("[DISPATCHER][JIT] Output tensor list element: Tensor "
                        "ptr {}, jit ir %{} {}",
                        reinterpret_cast<void *>(tensor.unsafeGetTensorImpl()),
@@ -366,7 +364,7 @@ void JITDispatch::fallback(const c10::OperatorHandle &op, c10::Stack *stack) {
           // If the tensor is not tracked by JIT then don't track it in MLIR.
           // (It's probably a CPU constant)
           if (_mapper.getValueForTensor(tensor) != nullptr) {
-            _mlir_dispatch.registerEmptyTensor(tensor);
+            _mlir_dispatch.registerEmptyTensor(tensor, true);
           }
         } else {
           // If this assertion is hit then we need to add support for this kind

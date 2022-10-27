@@ -195,7 +195,7 @@ void MLIRDispatch::addConstant(const at::Tensor &cpu_tensor,
   }
 
   // Create the IPU tensor constant.
-  const auto compiler_type = getTensorDetails(ipu_tensor)->getTensorType();
+  const auto compiler_type = getTensorDetails(ipu_tensor)->type;
 
   const auto &shape = compiler_type.shape;
 
@@ -229,17 +229,16 @@ void MLIRDispatch::addConstant(const at::Tensor &cpu_tensor,
                  static_cast<void *>(cpu_tensor.unsafeGetTensorImpl()),
                  cpu_tensor.data_ptr());
 
-  _mapper.addTensor(ipu_tensor, val);
+  _mapper.addTensor(ipu_tensor, val, false);
 }
 
 void MLIRDispatch::promoteAsParameter(const at::Tensor &tensor) {
   ERROR_ON(!isIpuTensor(tensor));
   const std::string str = "Parameter/" + std::to_string(_next_parameter_idx++);
-  const auto compiler_type = getTensorDetails(tensor)->getTensorType();
+  const auto compiler_type = getTensorDetails(tensor)->type;
   const poptorch_ir::TensorId value = _compiler.addParameter(
       poptorch::getHostBuffer(tensor), compiler_type, str.c_str());
-  _mapper.addTensor(tensor, value);
-  setIsParameter(tensor, true);
+  _mapper.addTensor(tensor, value, true);
 }
 
 void MLIRDispatch::promoteAsInput(const at::Tensor &tensor, bool is_wrapped) {
@@ -251,11 +250,10 @@ void MLIRDispatch::promoteAsInput(const at::Tensor &tensor, bool is_wrapped) {
     ERROR("Attempted to promote a CPU tensor as an input to an IPU model.");
   }
   const std::string str = "Input/" + std::to_string(_next_input_idx++);
-  const auto compiler_type = getTensorDetails(tensor)->getTensorType();
+  const auto compiler_type = getTensorDetails(tensor)->type;
   const poptorch_ir::TensorId value =
       _compiler.addInput(compiler_type, str.c_str());
-  _mapper.addTensor(tensor, value);
-  setIsParameter(tensor, false);
+  _mapper.addTensor(tensor, value, false);
 }
 
 void MLIRDispatch::addInput(const at::Tensor &cpu_tensor,
@@ -322,18 +320,17 @@ public:
       : _mapper(&mapper), _session(&session) {}
 
   popit::Mem_t *getAllocation(poptorch_ir::TensorId id) const override {
-    auto *details = _mapper->getTensorDetailsForMlirId(id);
-    ERROR_ON(!details);
-    ERROR_ON(!details->host_buffer.hasData());
-    return details->host_buffer.getPopitData().get();
+    const auto &host_buffer = _mapper->getBufferForMlirId(id);
+    ERROR_ON(!host_buffer);
+    return host_buffer.get();
   }
   popit::Mem_t *getOrAllocate(poptorch_ir::TensorId id) override {
-    auto *details = _mapper->getTensorDetailsForMlirId(id);
+    auto details = _mapper->getTensorDetailsForMlirId(id);
     ERROR_ON(!details);
-    if (!details->host_buffer.hasData()) {
-      details->host_buffer = _session->allocate(details->getTensorType());
+    if (!details->buffer->hasData()) {
+      *details->buffer = _session->allocate(details->type);
     }
-    return details->host_buffer.getPopitData().get();
+    return details->buffer->getPopitData().get();
   }
 
 private:
@@ -344,13 +341,18 @@ private:
 class LivenessMap : public poptorch_ir::ILivenessMap {
 public:
   explicit LivenessMap(ValueMapper &mapper) : _mapper{&mapper} {}
-  bool isAlive(poptorch_ir::TensorId id) const override {
-    auto *details = _mapper->getTensorDetailsForMlirId(id);
-    return details != nullptr && details->isAlive();
+  bool extendLifetime(poptorch_ir::TensorId id) override {
+    if (auto tensor_details = _mapper->getTensorDetailsForMlirId(id)) {
+      _outputs.emplace(std::move(tensor_details));
+      return true;
+    }
+    return false;
   }
 
 private:
   ValueMapper *_mapper;
+  // Extend the lifetime of any outputs
+  std::set<std::shared_ptr<IpuTensorDetails>> _outputs;
 };
 
 template <typename Func> class CallOnExit : Func {
@@ -370,7 +372,7 @@ void MLIRDispatch::markStep() {
     return;
   }
 
-  const LivenessMap liveness_map{_mapper};
+  LivenessMap liveness_map{_mapper};
   auto device_func =
       _compiler.compile(*_tensor_store->getIpuSession(), liveness_map);
   AllocationMap alloc_map{_mapper, *_tensor_store->getIpuSession()};
@@ -386,21 +388,24 @@ void packStack(c10::Stack &stack, T &arg, Args... args) {
   packStack(stack, args...);
 }
 
-poptorch_ir::TensorId MLIRDispatch::addEmptyTensorOp(const at::Tensor &tensor) {
+poptorch_ir::TensorId MLIRDispatch::addEmptyTensorOp(const at::Tensor &tensor,
+                                                     bool is_param) {
   const poptorch_ir::TensorId id =
-      _compiler.empty_tensor(tensor.sizes().vec(), toCompilerType(tensor))
+      _compiler
+          .empty_tensor(tensor.sizes().vec(), toCompilerElementType(tensor))
           .at(0)
           .tensor_ids.at(0);
-  _mapper.addTensor(tensor, id);
+  _mapper.addTensor(tensor, id, is_param);
   return id;
 }
 
-void MLIRDispatch::registerEmptyTensor(const at::Tensor &tensor) {
+void MLIRDispatch::registerEmptyTensor(const at::Tensor &tensor,
+                                       bool is_param) {
   if (isEagerMode()) {
     return;
   }
 
-  std::ignore = addEmptyTensorOp(tensor);
+  std::ignore = addEmptyTensorOp(tensor, is_param);
 }
 
 // aten::detach(Tensor(a) self) -> (Tensor(a))
@@ -419,7 +424,7 @@ void MLIRDispatch::detach(const c10::OperatorHandle &op, c10::Stack *stack,
       /*allow_tensor_metadata_change=*/true));
 
   // The new tensor points at the same mlir tensor as the source.
-  _mapper.addTensor(out, findTensor(in));
+  _mapper.addTensor(out, findTensor(in), false);
 
   torch::jit::drop(stack, num_arguments);
   torch::jit::push(stack, out);
@@ -620,7 +625,7 @@ poptorch_ir::TensorId MLIRDispatch::findTensor(const at::Tensor &tensor) {
       if (isEagerMode()) {
         logging::trace("Adding deferred empty_tensor op for tensor {}",
                        reinterpret_cast<void *>(tensor.unsafeGetTensorImpl()));
-        return addEmptyTensorOp(tensor);
+        return addEmptyTensorOp(tensor, false);
       }
 
       ERROR("Could not find tensor " << str(tensor));
@@ -662,7 +667,7 @@ MLIRDispatch::outputIsInplaceOf(poptorch_ir::OptionalTensorId output_id,
     // empty tensor return value with a different dtype to the inputs. Always
     // insert a cast to the output dtype to account for this case. Note that
     // unnecessary casts will be removed by canonicalization
-    const auto tensor_type = getTensorDetails(original_input)->getTensorType();
+    const auto tensor_type = getTensorDetails(original_input)->type;
     const auto mlir_output =
         _compiler.cast(output_id, tensor_type.element_type);
     const auto t_ids = mlir_output.at(0).tensor_ids;
@@ -673,7 +678,7 @@ MLIRDispatch::outputIsInplaceOf(poptorch_ir::OptionalTensorId output_id,
 
     // If we haven't added the empty_tensor to the graph, then we need to map
     // this false empty_tensor result to the actual output id for this op.
-    _mapper.addTensor(original_input, output_id);
+    _mapper.addTensor(original_input, output_id, false);
   } else if (original_shape != new_shape) {
     // There are two situations where the original and new shapes may not match.
     // This will cause issue with mismatched shapes if the mlir::Value for the
@@ -711,7 +716,7 @@ MLIRDispatch::outputIsInplaceOf(poptorch_ir::OptionalTensorId output_id,
     // Replacing the original tensor isn't an issue when handling view
     // operations since the original view of x cannot be referenced after the
     // inplace operation.
-    _mapper.addTensor(original_input, output_id);
+    _mapper.addTensor(original_input, output_id, true);
   } else {
     // Instead of replacing all subsequent references to the original input with
     // the tensor we add an overwrite operation (which will cause the input to
@@ -772,7 +777,7 @@ at::Tensor MLIRDispatch::makeEmptyOutputTensor(poptorch_ir::TensorId output_id,
   if (requires_grad) {
     setRequiresGradIfFloat(new_output);
   }
-  _mapper.addTensor(new_output, output_id);
+  _mapper.addTensor(new_output, output_id, false);
 
   return new_output;
 }

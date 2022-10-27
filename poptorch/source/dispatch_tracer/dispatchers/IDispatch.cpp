@@ -24,19 +24,22 @@ void IDispatch::setPythonStack(
 }
 
 void *IDispatch::getDataSource(torch::jit::Value *value) {
-  auto *record = _mapper.rawTensorRecord(value);
-  if (record == nullptr) {
+  auto buf = _mapper.getBufferForValue(value);
+  if (buf == nullptr) {
     logging::trace("JIT value not tracked {}", reinterpret_cast<void *>(value));
     return nullptr;
   }
-  return record->tensor_details->host_buffer.getCpuData()->data();
+  return buf->data();
 }
 
+bool IDispatch::isParameter(const at::Tensor &t) const {
+  return _mapper.isParameter(t);
+}
 bool IDispatch::isParameter(torch::jit::Value *value) {
   auto *record = _mapper.rawTensorRecord(value);
   ERROR_ON_MSG(record == nullptr,
                "JIT value not tracked " << reinterpret_cast<void *>(value));
-  return record->tensor_details->is_parameter;
+  return record->is_parameter;
 }
 
 void IDispatch::setParameterName(const at::Tensor &tensor,

@@ -27,6 +27,9 @@ namespace poptorch {
 
 namespace {
 
+std::shared_ptr<IpuTensorDetails>
+getTensorDetails(const at::TensorImpl &ipu_tensor);
+
 // This is just a useful helper since sometimes we need to pass both keys in.
 // TODO(T59880): replace XLA -> IPU
 c10::DispatchKeySet dispatch_key_set{c10::DispatchKey::XLA,
@@ -57,7 +60,7 @@ poptorch_ir::Type toCompilerType(const at::ScalarType &elem_type) {
   }
 }
 
-poptorch_ir::Type toCompilerType(const at::Tensor &tensor) {
+poptorch_ir::Type toCompilerElementType(const at::Tensor &tensor) {
   auto dtype = tensor.dtype();
   return toCompilerType(dtype.toScalarType());
 }
@@ -82,21 +85,14 @@ struct IpuTensorImpl : public at::TensorImpl {
   IpuTensorImpl(const IpuTensorImpl &src)
       : IpuTensorImpl(src.dtype(), src.device(),
                       src.sizes_and_strides_.sizes_arrayref(),
-                      src.sizes_and_strides_.strides_arrayref(),
-                      std::make_shared<IpuTensorDetails>(*src.details)) {}
+                      src.sizes_and_strides_.strides_arrayref(), src.details) {}
 
-  void release_resources() override {
-    details->type = details->getTensorType();
-    details->strides = sizes_and_strides_.strides_arrayref().vec();
-    details->parent = nullptr;
-    details.reset();
-  }
+  void release_resources() override { details.reset(); }
 
   IpuTensorImpl(const caffe2::TypeMeta data_type, c10::Device device,
                 c10::IntArrayRef sizes, c10::IntArrayRef strides,
                 const std::shared_ptr<IpuTensorDetails> &details_)
       : at::TensorImpl(dispatch_key_set, data_type, device), details(details_) {
-    details->parent = this;
     // set_sizes must be called before stride_at because it resizes the
     // array that stores both sizes and strides.
     sizes_and_strides_.set_sizes(sizes);
@@ -122,9 +118,6 @@ struct IpuTensorImpl : public at::TensorImpl {
         /*allow_tensor_metadata_change=*/allow_tensor_metadata_change);
     impl->refresh_numel();
 
-    getTensorDetails(*impl)->alias_of = this->details->alias_of == nullptr
-                                            ? this->details
-                                            : this->details->alias_of;
     return impl;
   }
 
@@ -139,9 +132,6 @@ struct IpuTensorImpl : public at::TensorImpl {
         /*allow_tensor_metadata_change=*/allow_tensor_metadata_change);
     impl->refresh_numel();
 
-    getTensorDetails(*impl)->alias_of = this->details->alias_of == nullptr
-                                            ? this->details
-                                            : this->details->alias_of;
     return impl;
   }
 
@@ -196,6 +186,11 @@ const IpuTensorImpl *toIpuTensorImpl(const at::TensorImpl &tensor) {
   return impl;
 }
 
+std::shared_ptr<IpuTensorDetails>
+getTensorDetails(const at::TensorImpl &ipu_tensor) {
+  return toIpuTensorImpl(ipu_tensor)->details;
+}
+
 // TODO(T61601) Create a proper implementation of GuardImpl
 struct GuardImpl : public c10::impl::DeviceGuardImplInterface {
   // TODO(T59880): replace XLA -> IPU
@@ -248,28 +243,22 @@ private:
 
 // TODO(T59880): replace XLA -> IPU
 C10_REGISTER_GUARD_IMPL(XLA, GuardImpl)
-} // namespace
 
-poptorch_ir::TensorType IpuTensorDetails::getTensorType() const {
-  if (parent != nullptr) {
-    poptorch_ir::TensorType local_type;
-    auto dtype = parent->dtype();
-    local_type.element_type = toCompilerType(dtype.toScalarType());
-    local_type.shape = parent->sizes().vec();
-
-    return local_type;
-  }
-
+poptorch_ir::TensorType getTensorType(const at::ScalarType &scalar_type,
+                                      std::vector<std::int64_t> sizes) {
+  poptorch_ir::TensorType type;
+  type.element_type = toCompilerType(scalar_type);
+  type.shape = std::move(sizes);
   return type;
 }
+} // namespace
 
-bool IpuTensorDetails::isAlive() const {
-  // TODO(T64272): Actually detect whether this is alive in python
-  return parent != nullptr;
+poptorch_ir::TensorType getTensorType(const at::Tensor &tensor) {
+  return getTensorType(tensor.scalar_type(), tensor.sizes().vec());
 }
 
 uint64_t ipuTensorId(const at::Tensor &tensor) {
-  return getTensorDetails(tensor)->tensor_id;
+  return getTensorDetails(*tensor.unsafeGetTensorImpl())->tensor_id;
 }
 
 uint64_t ipuTensorId(const at::TensorImpl &tensor) {
@@ -278,18 +267,6 @@ uint64_t ipuTensorId(const at::TensorImpl &tensor) {
 
 bool isIpuTensor(const at::Tensor &tensor) {
   return tryIpuTensorImpl(tensor) != nullptr;
-}
-
-void setIsParameter(const at::Tensor &tensor, bool is_parameter) {
-  toIpuTensorImpl(tensor)->details->is_parameter = is_parameter;
-}
-
-bool isParameter(const at::Tensor &tensor) {
-  return toIpuTensorImpl(tensor)->details->is_parameter;
-}
-
-bool isParameter(const at::TensorImpl &tensor) {
-  return toIpuTensorImpl(tensor)->details->is_parameter;
 }
 
 std::string str(const at::Tensor &tensor) {
@@ -303,9 +280,6 @@ std::string str(const at::Tensor &tensor) {
     if (device_type == at::DeviceType::XLA) {
       auto *ipu_tensor = toIpuTensorImpl(tensor);
       ss << " ID " << ipu_tensor->details->tensor_id;
-      if (ipu_tensor->details->is_parameter) {
-        ss << " is_parameter";
-      }
     }
     ss << " sizes " << tensor.unsafeGetTensorImpl()->sizes();
     ss << " dtype " << tensor.unsafeGetTensorImpl()->dtype();
@@ -323,12 +297,7 @@ Buffer &getHostBuffer(const at::Tensor &ipu_tensor) {
 
 Buffer &getHostBuffer(const at::TensorImpl &ipu_tensor) {
   auto details = toIpuTensorImpl(ipu_tensor)->details;
-  return details->host_buffer;
-}
-
-std::shared_ptr<IpuTensorDetails>
-getTensorDetails(const at::TensorImpl &ipu_tensor) {
-  return toIpuTensorImpl(ipu_tensor)->details;
+  return *details->buffer;
 }
 
 void errorOnZeroSizedTensor(const at::Tensor &tensor) {
@@ -356,8 +325,8 @@ at::Tensor TensorStore::allocateTensor(
   auto coerced_scalar_type = coerceToSupportedType(scalar_type);
   auto strides = at::detail::defaultStrides(size);
 
-  auto details = std::make_shared<IpuTensorDetails>();
-  details->tensor_id = _next_tensor_id++;
+  auto details = std::make_shared<IpuTensorDetails>(
+      _next_tensor_id++, getTensorType(coerced_scalar_type, size.vec()));
 
   at::Tensor output = at::detail::make_tensor<IpuTensorImpl>(
       c10::scalarTypeToTypeMeta(coerced_scalar_type),
@@ -387,7 +356,7 @@ at::Tensor TensorStore::allocateTensor(
 }
 
 void TensorStore::allocateBuffer(IpuTensorDetails &details) {
-  details.host_buffer = _ipu_session->allocate(details.getTensorType());
+  *details.buffer = _ipu_session->allocate(details.type);
 }
 
 void TensorStore::allocateBuffer(const at::Tensor &ipu_tensor) {
@@ -403,8 +372,7 @@ void TensorStore::copyOnIpu(const at::Tensor &ipu_dest,
 
   const auto &dest_details = getTensorDetails(ipu_dest);
   allocateBuffer(*dest_details);
-  _ipu_session->copyDataOnDevice(dest_details->host_buffer,
-                                 src_details->host_buffer);
+  _ipu_session->copyDataOnDevice(*dest_details->buffer, *src_details->buffer);
 
   ipu_dest.set_requires_grad(ipu_src.requires_grad());
 }
@@ -422,7 +390,7 @@ void TensorStore::copyFromCpu(const at::Tensor &ipu_dest,
 
   allocateBuffer(*details);
   _ipu_session->copyDataFromCpuSource(
-      details->host_buffer, static_cast<const char *>(cpu_src.data_ptr()));
+      *details->buffer, static_cast<const char *>(cpu_src.data_ptr()));
 
   ipu_dest.set_requires_grad(cpu_src.requires_grad());
 }
@@ -439,7 +407,7 @@ void TensorStore::copyToCpu(const at::Tensor &cpu_dest,
   const auto &details = getTensorDetails(ipu_src);
 
   _ipu_session->copyDataToCpu(static_cast<char *>(cpu_dest.data_ptr()),
-                              details->host_buffer);
+                              *details->buffer);
 }
 
 const std::shared_ptr<poptorch_ir::IIpuSession> &
@@ -452,5 +420,10 @@ void TensorStore::enableEagerMode() {
 }
 
 void TensorStore::reset() { _ipu_session = nullptr; }
+std::shared_ptr<IpuTensorDetails>
+
+getTensorDetails(const at::Tensor &ipu_tensor) {
+  return getTensorDetails(*ipu_tensor.unsafeGetTensorImpl());
+}
 
 } // namespace poptorch

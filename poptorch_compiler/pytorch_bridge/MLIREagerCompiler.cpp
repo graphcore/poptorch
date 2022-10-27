@@ -26,7 +26,7 @@ TensorId MLIREagerCompiler::addValue(const mlir::Value &value) {
 
 void MLIREagerCompiler::markOutputs(
     const llvm::DenseMap<mlir::Value, TensorId> &mappings,
-    const ILivenessMap &liveness) {
+    ILivenessMap &liveness) {
   std::vector<mlir::Value> output_ids;
 
   // Handle overwriting of inputs
@@ -54,7 +54,7 @@ void MLIREagerCompiler::markOutputs(
       poptorch::logging::trace(
           "No tensor ID mapping for {}: not marking as output",
           mlirToStr(output));
-    } else if (!liveness.isAlive(it->second)) {
+    } else if (!liveness.extendLifetime(it->second)) {
       poptorch::logging::trace(
           "Tensor {} is not alive in python: not marking as output",
           mlirToStr(output));
@@ -64,9 +64,8 @@ void MLIREagerCompiler::markOutputs(
   }
 }
 
-PopitDeviceFunctionWrapper
-MLIREagerCompiler::compile(EagerIpuSession &session,
-                           const ILivenessMap &liveness) {
+PopitDeviceFunctionWrapper MLIREagerCompiler::compile(EagerIpuSession &session,
+                                                      ILivenessMap &liveness) {
   root_timer.start();
 
   auto mappings = getValueMappings();

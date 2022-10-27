@@ -45,9 +45,10 @@ public:
 
   void promoteAsOutput(const at::Tensor &tensor);
 
-  poptorch_ir::TensorId addEmptyTensorOp(const at::Tensor &tensor);
+  poptorch_ir::TensorId addEmptyTensorOp(const at::Tensor &tensor,
+                                         bool is_param);
 
-  void registerEmptyTensor(const at::Tensor &tensor) final;
+  void registerEmptyTensor(const at::Tensor &tensor, bool is_param) final;
 
   std::shared_ptr<MLIRExecutor> compile();
 

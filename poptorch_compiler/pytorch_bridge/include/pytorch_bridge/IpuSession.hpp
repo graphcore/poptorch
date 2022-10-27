@@ -19,6 +19,9 @@ namespace poptorch_ir {
 class EagerIpuSession;
 
 class PopitMemPtr : public std::shared_ptr<popit::Mem_t> {
+public:
+  PopitMemPtr(std::nullptr_t);
+
 private:
   // Only constructible from the eager ipu session
   friend class EagerIpuSession;
@@ -26,6 +29,9 @@ private:
 };
 
 class Buffer {
+  // TODO(T70841): since Buffer is stored as a shared pointer it should be
+  // possible at least stop CpuBuffer being a shared pointer and it might be
+  // possible to tidy up PopitMemPtr at the same time
   std::variant<std::monostate, CpuBuffer, PopitMemPtr> _store =
       std::monostate{};
 
