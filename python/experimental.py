@@ -507,6 +507,7 @@ class _IPUSession:
                 flattened = flattenTensorStructure(out)
                 poptorch_core.promoteOutputs(flattened)
 
+            poptorch_core.finalizeGraph()
             _impl.setIpuContext(False)
             _impl.setDispatchTracing(False)
             poptorch_core.endDispatch(excepted)
