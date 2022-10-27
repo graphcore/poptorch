@@ -30,10 +30,10 @@ Programs getProgramType(std::string_view name) {
   if (name == "MainGraph") {
     return Programs::MainGraph;
   }
-  if (name == "WeightsToDevice") {
+  if (name == "WeightsToDeviceGraph") {
     return Programs::WeightsToDevice;
   }
-  if (name == "WeightsToHost") {
+  if (name == "WeightsToHostGraph") {
     return Programs::WeightsToHost;
   }
   ERROR("Unexpected program name " + std::string(name));
@@ -69,7 +69,7 @@ private:
 void LowerToPoplar::runOnOperation() {
   mlir::ModuleOp module = this->getOperation();
 
-  poptorch::logging::info("Graph lowered to poplar:\n{}", mlirOpToStr(module));
+  poptorch::logging::info("Graph lowered to Poplar:\n{}", mlirOpToStr(module));
 
   // Compile all the programs in the module
   for (mlir::func::FuncOp function : module.getOps<mlir::func::FuncOp>()) {
@@ -79,12 +79,30 @@ void LowerToPoplar::runOnOperation() {
     verifyOperations(function);
     _context->seq = poplar::program::Sequence();
 
-    // Walk over all functions with a poplar impl.
-    function.walk(
-        [&](PoplarImplInterface impl) { impl.lowerToPoplar(*_context); });
+    poptorch::logging::trace("Lowering {} to Poplar", function.getName());
 
+    // Walk over all functions with a poplar impl.
+    auto lower_callback = [this](PoplarImplInterface impl) {
+      impl.lowerToPoplar(*(this->_context));
+    };
+    function.walk([&lower_callback](mlir::Operation *op) {
+      if (mlir::isa<mlir::func::FuncOp>(op) ||
+          mlir::isa<mlir::func::ReturnOp>(op)) {
+        // This is the outer "func.func"
+      } else if (auto impl = mlir::dyn_cast_or_null<PoplarImplInterface>(op)) {
+        poptorch::logging::trace("Lowering to Poplar: {}", mlirOpToStr(*op));
+        lower_callback(impl);
+      } else {
+        ERROR("Internal error: PopTorch found an operation which cannot be "
+              "lowered to Poplar directly. The operation may require a pass "
+              "to remove it. The following operation could not be lowered: "
+              << mlirOpToStr(*op));
+      }
+    });
     _context->programs[program] = _context->seq;
   }
+
+  poptorch::logging::trace("Successfully lowered graph to Poplar");
 }
 
 void LowerToPoplar::verifyOperations(const mlir::func::FuncOp &function) {

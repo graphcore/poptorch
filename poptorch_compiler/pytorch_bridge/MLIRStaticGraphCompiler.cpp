@@ -26,8 +26,8 @@ namespace detail {
 MLIRStaticGraphCompiler::MLIRStaticGraphCompiler(
     const poptorch::CompilerOptions &options)
     : IMLIRCompiler(options) {
-  _write_weights_graph = createSubGraph("WeightsToDevice");
-  _read_weights_graph = createSubGraph("WeightsToHost");
+  _write_weights_graph = createSubGraph("WeightsToDeviceGraph");
+  _read_weights_graph = createSubGraph("WeightsToHostGraph");
 }
 
 // Compile graph by running both PopTorch compiler passes and poplar
