@@ -29,7 +29,7 @@ namespace popart_compiler {
 
 bool ipuModelEnvironmentVariableIsEnabled() {
   if (const char *env_use_model = std::getenv("POPTORCH_IPU_MODEL")) {
-    bool model_enabled = std::stoi(env_use_model) != 0;
+    const bool model_enabled = std::stoi(env_use_model) != 0;
     logging::info("From POPTORCH_IPU_MODEL environment variable: Ipu model: {}",
                   model_enabled ? "Enabled" : "Disabled");
     return model_enabled;
@@ -43,7 +43,7 @@ bool ipuSmallModelEnvironmentVariableIsEnabled() {
     return false;
   }
   if (const char *env_use_model = std::getenv("POPTORCH_SMALL_IPU_MODEL")) {
-    bool model_enabled = std::stoi(env_use_model) != 0;
+    const bool model_enabled = std::stoi(env_use_model) != 0;
     logging::info("From POPTORCH_SMALL_IPU_MODEL environment variable: small "
                   "Ipu model: {}",
                   model_enabled ? "Enabled" : "Disabled");
@@ -70,6 +70,9 @@ int getNumTilesPerIpu(const std::string &ipu_model_version) {
   if (ipu_model_version == "ipu2") {
     num_tiles_per_ipu = 1472; // MK2
   }
+  if (ipu_model_version == "ipu21") {
+    num_tiles_per_ipu = 1472; // C600
+  }
 
   if (ipuSmallModelEnvironmentVariableIsEnabled()) {
     num_tiles_per_ipu = 4;
@@ -77,7 +80,7 @@ int getNumTilesPerIpu(const std::string &ipu_model_version) {
 
   ERROR_ON_MSG((ipu_model_version.find("ipu:") == std::string::npos) &&
                    (num_tiles_per_ipu == 0),
-               "Invalid IPU model version. Valid versions: ipu1, ipu2.");
+               "Invalid IPU model version. Valid versions: ipu1, ipu2, ipu21.");
   return num_tiles_per_ipu;
 }
 
@@ -122,14 +125,21 @@ std::int64_t ipuHardwareVersion(std::uint64_t num_ipus) {
     return 0;
   }
   const std::string arch = devices.front()->getTarget().getTargetArchString();
-  if (arch.size() != 4 || arch.rfind("ipu", 0) != 0 || arch[3] < '1' ||
-      arch[3] > '9') {
-    logging::warn("Unknown IPU version: {} (Expected 4 characters string "
-                  "'ipuX' where X is a digit > 0)",
+
+  // The architecture string must be 'ipu' followed by one or more non-zero
+  // digits.
+  bool is_valid = arch.size() > 3 && arch.find("ipu", 0) == 0;
+  for (size_t i = 3; is_valid && i < arch.size(); ++i) {
+    is_valid = arch[i] > '0' && arch[i] <= '9';
+  }
+
+  if (!is_valid) {
+    logging::warn("Unknown IPU version: {} (Expected 'ipuX' "
+                  " where X is one or more strictly positive digits)",
                   arch);
     return -1;
   }
-  return arch[3] - '0';
+  return std::atoi(arch.substr(3).c_str());
 }
 
 std::unique_ptr<char[]> stringToUniquePtr(const std::string &str) {

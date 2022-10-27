@@ -11,11 +11,15 @@ New features
 - Ability to send different values for a weight tensor to different replica groups (see :numref:`grouping_tensor_weights`)
 - Support for ``tensor.index_fill_``
 - Support for ``torch.count_nonzero``
+- Support for Mk2x.
+
 
 API changes
 -----------
 
 - In addition to tensors, :py:func:`~poptorch.set_overlap_for_input` and :py:func:`~poptorch.set_overlap_for_output` can now be applied to tuples, lists, and dicts of tensors.
+- `poptorch.Options.useOfflineIpuTarget` accepts ``ipu_version = 21`` (Mk2x ipu).
+- ``POPTORCH_IPU_MODEL_VERSION`` accepts ``ipu21`` (Mk2x ipu).
 
 
 Bug Fixes

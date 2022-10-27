@@ -1693,8 +1693,8 @@ class Options(_options_impl.OptionsDict):
         .. note:: the offline IPU target cannot be used if the IPU model is
             enabled.
 
-        :param ipu_version: IPU version to target (1 for Mk1, 2 for Mk2).
-            Default: 2.
+        :param ipu_version: IPU version to target (1 for Mk1, 2 for Mk2,
+                            21 for Mk2x). Default: 2.
         """
         self.connectionType(enums.ConnectionType.Never)
         self.createOrSet(ipu_version=ipu_version)
