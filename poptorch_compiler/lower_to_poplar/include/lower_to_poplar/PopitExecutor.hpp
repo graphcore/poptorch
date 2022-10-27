@@ -11,7 +11,11 @@
 #include "pytorch_bridge/CompilerTypes.hpp"
 #include "pytorch_bridge/IpuSession.hpp"
 
-#include "popit/popit.hpp"
+namespace popit {
+struct MemRef;
+using Mem_t = MemRef;
+using FunctionId_t = unsigned;
+} // namespace popit
 
 namespace mlir {
 class ModuleOp;

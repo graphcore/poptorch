@@ -25,8 +25,8 @@
 #include <poprand/RandomGen.hpp>
 
 #include "dialect/PoptorchDialect.hpp"
+#include "lower_to_poplar/EagerIpuSession.hpp"
 #include "lower_to_poplar/PopitExecutor.hpp"
-#include "lower_to_poplar/PopitSession.hpp"
 #include "poptorch_logging/Error.hpp"
 #include "poptorch_logging/Logging.hpp"
 

@@ -8,7 +8,7 @@
 #include <memory>
 #include <utility>
 
-#include "lower_to_poplar/PopitSession.hpp"
+#include "lower_to_poplar/EagerIpuSession.hpp"
 #include "lower_to_poplar/PoplarDeviceAndTarget.hpp"
 #include "pytorch_bridge/CompilerOptions.hpp"
 #include "pytorch_bridge/PytorchBridgeUtils.hpp"

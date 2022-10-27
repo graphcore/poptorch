@@ -5,7 +5,8 @@ add_library(lower_to_poplar STATIC
         PoplarDeviceAndTarget.cpp
         PoplarExecutor.cpp
         PopitExecutor.cpp
-        PopitSession.cpp
+        EagerIpuSession.cpp
+        StaticIpuSession.cpp
         ops/Activations.cpp
         ops/ElementWise.cpp
         ops/Linalg.cpp

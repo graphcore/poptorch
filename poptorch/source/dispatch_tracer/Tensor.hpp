@@ -106,7 +106,7 @@ void errorOnZeroSizedTensor(const at::Tensor &tensor);
  */
 class TensorStore {
 public:
-  TensorStore() = default;
+  TensorStore();
   TensorStore(const TensorStore &) = delete;
   TensorStore(TensorStore &&) = delete;
   TensorStore &operator=(TensorStore &) = delete;

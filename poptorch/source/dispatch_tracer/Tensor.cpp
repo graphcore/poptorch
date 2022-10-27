@@ -21,6 +21,7 @@
 #include "poptorch_logging/Error.hpp"
 #include "poptorch_logging/Logging.hpp"
 #include "pytorch_bridge/CompilerTypes.hpp"
+#include "pytorch_bridge/IpuSession.hpp"
 
 namespace poptorch {
 
@@ -344,6 +345,8 @@ void errorOnZeroSizedTensor(const at::Tensor &tensor) {
   }
 }
 
+TensorStore::TensorStore() : _ipu_session(poptorch_ir::createStaticSession()) {}
+
 at::Tensor TensorStore::allocateTensor(
     c10::IntArrayRef size, c10::optional<at::ScalarType> dtype,
     c10::optional<at::Device> device, c10::optional<at::Layout> /*layout*/,
@@ -443,8 +446,11 @@ const std::shared_ptr<poptorch_ir::IIpuSession> &
 TensorStore::getIpuSession() const {
   return _ipu_session;
 }
+
 void TensorStore::enableEagerMode() {
   _ipu_session = poptorch_ir::createEagerSession();
 }
+
 void TensorStore::reset() { _ipu_session = nullptr; }
+
 } // namespace poptorch

@@ -1,6 +1,6 @@
 # This compiles a shared object file for the cube operator.
 # Run make in the custom_ops folder to build.
-cmake_minimum_required(VERSION 3.4)
+cmake_minimum_required(VERSION 3.14 FATAL_ERROR)
 project(custom_cube_op)
 
 set(CMAKE_BUILD_TYPE Debug)

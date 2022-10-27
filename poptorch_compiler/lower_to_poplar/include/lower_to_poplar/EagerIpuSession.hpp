@@ -6,12 +6,15 @@
 
 #include "pytorch_bridge/IpuSession.hpp"
 
-#include <popit/Device.hpp>
-#include <popit/popit.hpp>
+namespace popit {
+class Device;
+struct Session;
+using Session_t = Session;
+} // namespace popit
 
 namespace poptorch_ir {
 
-class EagerIpuSession : public IIpuSession {
+class EagerIpuSession final : public IIpuSession {
 public:
   EagerIpuSession();
   ~EagerIpuSession();
@@ -22,8 +25,8 @@ public:
   void copyDataOnDevice(Buffer &dest, const Buffer &src) override;
 
   // The popit session references the device. So the device needs to outlive the
-  // session
-  popit::Device device;
+  // session.
+  std::unique_ptr<popit::Device> device;
   std::shared_ptr<popit::Session_t> session;
 };
 

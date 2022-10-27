@@ -19,11 +19,12 @@
 #include <poplar/Target.hpp>
 
 #include <popit/Device.hpp>
+#include <popit/popit.hpp>
 
 #include "CompilerHelpers.hpp"
+#include "lower_to_poplar/EagerIpuSession.hpp"
 #include "lower_to_poplar/IMLIRGraphConverter.hpp"
 #include "lower_to_poplar/NonRestartingMLIRTimer.hpp"
-#include "lower_to_poplar/PopitSession.hpp"
 #include "passes/LowerToPopit.hpp"
 #include "poptorch_logging/Error.hpp"
 #include "poptorch_logging/Logging.hpp"

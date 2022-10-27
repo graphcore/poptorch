@@ -1,7 +1,8 @@
 // Copyright (c) 2022 Graphcore Ltd. All rights reserved.
-#include "lower_to_poplar/PopitSession.hpp"
+#include "lower_to_poplar/EagerIpuSession.hpp"
 
 #include <chrono>
+#include <memory>
 #include <thread>
 
 #include <popit/Device.hpp>
@@ -70,7 +71,7 @@ bool shouldWaitIfIpuIsUnavailable() {
   return wait;
 }
 
-popit::Device getPopitDevice() {
+std::unique_ptr<popit::Device> getPopitDevice() {
   bool model_enabled = false;
   if (const char *env_use_model = std::getenv("POPTORCH_IPU_MODEL")) {
     model_enabled = std::stoi(env_use_model) != 0;
@@ -92,7 +93,7 @@ popit::Device getPopitDevice() {
   do {
     for (auto &device : devices) {
       if (device.attach()) {
-        return std::move(device);
+        return std::make_unique<popit::Device>(std::move(device));
       }
     }
     if (wait_for_ipu) {
@@ -100,7 +101,7 @@ popit::Device getPopitDevice() {
     }
   } while (wait_for_ipu);
   ERROR("Failed to attach to any of the IPU devices.");
-  return popit::Device();
+  return nullptr;
 }
 
 auto createSession(popit::Device &device) {
@@ -117,7 +118,7 @@ auto createSession(popit::Device &device) {
 } // namespace
 
 EagerIpuSession::EagerIpuSession()
-    : device(getPopitDevice()), session(createSession(device)) {}
+    : device(getPopitDevice()), session(createSession(*device)) {}
 
 EagerIpuSession::~EagerIpuSession() {
   // Ensure that the device outlives the session

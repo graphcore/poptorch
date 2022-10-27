@@ -9,7 +9,6 @@
 #include <memory>
 
 #include "lower_to_poplar/PopitExecutor.hpp"
-#include "lower_to_poplar/PopitSession.hpp"
 #include "poptorch_logging/Error.hpp"
 #include "poptorch_logging/Logging.hpp"
 #include "pytorch_bridge/PoptorchCompiler.hpp"
