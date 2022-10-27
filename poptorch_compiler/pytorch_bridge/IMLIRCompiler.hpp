@@ -277,7 +277,6 @@ public:
                                 const mlir::RankedTensorType &parameter,
                                 const char *name) = 0;
   virtual void addOutput(TensorId id, const char *name) = 0;
-  virtual void addReturn() = 0;
 
   // Print module to stderr
   void dump() { _the_module->dump(); }

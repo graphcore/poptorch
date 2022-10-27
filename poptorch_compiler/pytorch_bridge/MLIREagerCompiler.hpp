@@ -24,7 +24,6 @@ public:
   TensorId addParameter(Buffer &ptr, const mlir::RankedTensorType &parameter,
                         const char *name) override;
   void addOutput(TensorId id, const char *name) override;
-  void addReturn() override;
   TensorId addValue(const mlir::Value &value) override;
 
   PopitDeviceFunctionWrapper compile(EagerIpuSession &session,

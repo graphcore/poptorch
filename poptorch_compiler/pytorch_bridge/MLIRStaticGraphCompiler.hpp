@@ -28,7 +28,6 @@ public:
   TensorId addParameter(Buffer &ptr, const mlir::RankedTensorType &parameter,
                         const char *name) override;
   void addOutput(TensorId id, const char *name) override;
-  void addReturn() override;
 
 private:
   // Program to write weights onto the chip.

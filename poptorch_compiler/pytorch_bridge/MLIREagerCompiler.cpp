@@ -97,9 +97,6 @@ void MLIREagerCompiler::addOutput(TensorId id, const char *name) {
   UNUSED(name);
 }
 
-void MLIREagerCompiler::addReturn() {
-  ERROR("Only static graphs have a return");
-}
 } // namespace detail
 
 } // namespace poptorch_ir

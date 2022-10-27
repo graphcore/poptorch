@@ -112,11 +112,6 @@ PoptorchCompiler::getRankedTensorType(TensorId id) const {
   return t1.cast<mlir::RankedTensorType>();
 }
 
-void PoptorchCompiler::addReturn() {
-  // Add returns to each of the graphs.
-  _impl->addReturn();
-}
-
 bool PoptorchCompiler::allOpsCanBeLoweredToPoplar() const {
   return _impl->allOpsCanBeLoweredToPoplar();
 }

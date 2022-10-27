@@ -81,9 +81,6 @@ public:
   std::vector<std::int64_t> getSize(TensorId id) const;
   Type getType(TensorId id) const;
 
-  // Non popart.
-  void addReturn();
-
   bool isView(TensorId id) const;
 
   // Return true if all the ops in the graph can be lowered to

@@ -108,12 +108,6 @@ void MLIRStaticGraphCompiler::addOutput(TensorId id, const char *name) {
       mlirTypeToCompilerType(output.getType().cast<mlir::RankedTensorType>())});
 }
 
-void MLIRStaticGraphCompiler::addReturn() {
-  createOpInEpilogue<poptorch_ir::end_graph>(_main_graph);
-  createOpInEpilogue<poptorch_ir::end_graph>(_write_weights_graph);
-  createOpInEpilogue<poptorch_ir::end_graph>(_read_weights_graph);
-}
-
 } // namespace detail
 
 } // namespace poptorch_ir

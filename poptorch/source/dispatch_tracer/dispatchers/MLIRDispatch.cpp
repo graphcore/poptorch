@@ -309,7 +309,6 @@ void MLIRDispatch::addOutput(const at::Tensor &ipu_src,
 
 void MLIRDispatch::finalizeGraph() {
   POPTORCH_TRACEPOINT();
-  _compiler.addReturn();
   _compiler.endTraceTiming();
 }
 
