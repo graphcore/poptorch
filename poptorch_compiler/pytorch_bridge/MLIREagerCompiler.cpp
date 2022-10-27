@@ -43,9 +43,6 @@ void MLIREagerCompiler::markOutputs(
 
   // Find all the outputs of all the ops as graph outputs
   _main_graph.graph.walk([&](mlir::Operation *op) {
-    if (!op->hasTrait<PoplarImplInterface::Trait>()) {
-      return;
-    }
     for (auto result : op->getResults()) {
       output_ids.push_back(result);
     }
