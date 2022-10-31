@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "pytorch_bridge/CompilerTypes.hpp"
+#include "pytorch_bridge/DebugInfo.hpp"
 #include "pytorch_bridge/IpuSession.hpp"
 
 namespace poptorch_ir {
@@ -55,6 +56,8 @@ struct IpuTensorDetails {
   const poptorch_ir::TensorType type;
 
   Data data;
+
+  poptorch_ir::TensorDebugInfo debug_info;
 
   Buffer &getBuffer();
   std::shared_ptr<Buffer> getOwningBuffer() const;

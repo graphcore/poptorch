@@ -18,6 +18,7 @@
 #include "lower_to_poplar/PopitExecutor.hpp"
 #include "poptorch_logging/Error.hpp"
 #include "poptorch_logging/Logging.hpp"
+#include "pytorch_bridge/DebugInfo.hpp"
 #include "pytorch_bridge/IpuSession.hpp"
 #include "pytorch_bridge/PoptorchCompiler.hpp"
 
@@ -66,6 +67,16 @@ auto extractInputsAndOutputs(
   }
 
   return std::pair(inputs, outputs);
+}
+
+std::shared_ptr<std::vector<char>>
+moduleToSharedStr(const mlir::ModuleOp &module) {
+  std::string str;
+  llvm::raw_string_ostream ostream(str);
+  auto printing_flags = mlir::OpPrintingFlags();
+  printing_flags.enableDebugInfo();
+  module->print(ostream, printing_flags);
+  return std::make_shared<std::vector<char>>(str.begin(), str.end());
 }
 
 } // namespace
@@ -148,11 +159,22 @@ PopitDeviceFunctionWrapper MLIREagerCompiler::compile(EagerIpuSession &session,
   // op in the graph has value semantics any output that is also an input can
   // just be removed.
 
+  GraphDebugInfo debug_info;
+
+  if (poptorch::logging::shouldLog(poptorch::logging::Level::Trace)) {
+    debug_info.initial_graph = moduleToSharedStr(_the_module);
+  }
+
   // Run all the graph passes up to lowering.
   runGraphPasses(_the_module, root_timer);
 
+  if (poptorch::logging::shouldLog(poptorch::logging::Level::Debug)) {
+    debug_info.cached_graph = moduleToSharedStr(_the_module);
+  }
+
   return session.func_cache.emplaceWrapped(_the_module, session, input_ids,
-                                           output_ids, root_timer);
+                                           output_ids, std::move(debug_info),
+                                           root_timer);
 }
 
 TensorId MLIREagerCompiler::addInput(const mlir::RankedTensorType &input,

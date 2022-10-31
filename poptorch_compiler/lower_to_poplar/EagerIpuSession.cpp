@@ -234,7 +234,8 @@ void EagerIpuSession::copyDataOnDevice(Buffer &dest, const Buffer &src) {
 PopitDeviceFunctionWrapper PopitFunctionCache::emplaceWrapped(
     const mlir::ModuleOp &graph, EagerIpuSession &session,
     const std::vector<TensorId> &input_ids,
-    const std::vector<TensorId> &output_ids, NonRestartingMLIRTimer &timer) {
+    const std::vector<TensorId> &output_ids, GraphDebugInfo debug_info,
+    NonRestartingMLIRTimer &timer) {
   auto hash = hashGraph(graph);
 
   if (auto it = _cache.find(hash); it != _cache.end()) {
@@ -244,7 +245,7 @@ PopitDeviceFunctionWrapper PopitFunctionCache::emplaceWrapped(
 
   poptorch::logging::trace("Graph not cached: compiling new PopIT function");
   auto new_func = std::make_shared<PopitDeviceFunction>(
-      session, graph, input_ids, output_ids, timer);
+      session, graph, input_ids, output_ids, std::move(debug_info), timer);
   _cache.insert({hash, new_func});
   return PopitDeviceFunctionWrapper(new_func);
 }

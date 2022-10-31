@@ -40,6 +40,10 @@ namespace poptorch {
 
 namespace {
 
+std::string toStdString(const std::shared_ptr<std::vector<char>> &str) {
+  return std::string(str->begin(), str->end());
+}
+
 std::string valueToString(const c10::IValue &ivalue) {
   if (ivalue.isTensor()) {
     return str(ivalue.toTensor());
@@ -677,6 +681,25 @@ void promoteOutputs(const std::vector<at::Tensor> &outputs) {
 }
 
 bool movingParameters() { return getContext().moving_parameters; }
+
+std::string getInitialGraph(const at::Tensor &tensor) {
+  ERROR_ON_MSG(!isIpuTensor(tensor),
+               "You may only call getInitialGraph on an IPU tensor");
+  const auto &debug_info = getTensorDetails(tensor)->debug_info;
+  return toStdString(debug_info.debug_info.initial_graph);
+}
+
+std::string getCachedGraph(const at::Tensor &tensor) {
+  ERROR_ON_MSG(!isIpuTensor(tensor),
+               "You may only call getCachedGraph on an IPU tensor");
+  const auto &debug_info = getTensorDetails(tensor)->debug_info;
+  auto out = toStdString(debug_info.debug_info.cached_graph);
+  if (!out.empty()) {
+    return out +
+           "\nWith output index: " + std::to_string(debug_info.output_idx);
+  }
+  return out;
+}
 
 } // namespace poptorch
 

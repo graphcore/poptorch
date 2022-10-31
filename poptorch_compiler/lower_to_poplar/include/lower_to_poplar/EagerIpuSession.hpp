@@ -4,6 +4,7 @@
 
 #include <memory>
 
+#include "pytorch_bridge/DebugInfo.hpp"
 #include "pytorch_bridge/IpuSession.hpp"
 
 #include <llvm/ADT/DenseMap.h>
@@ -29,7 +30,7 @@ public:
   emplaceWrapped(const mlir::ModuleOp &graph, EagerIpuSession &session,
                  const std::vector<TensorId> &input_ids,
                  const std::vector<TensorId> &output_ids,
-                 NonRestartingMLIRTimer &timer);
+                 GraphDebugInfo debug_info, NonRestartingMLIRTimer &timer);
 
 private:
   llvm::DenseMap<llvm::hash_code, std::shared_ptr<PopitDeviceFunction>> _cache;

@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "pytorch_bridge/CompilerTypes.hpp"
+#include "pytorch_bridge/DebugInfo.hpp"
 #include <poptorch_logging/Error.hpp>
 
 namespace popit {
@@ -72,7 +73,8 @@ public:
   virtual ~IAllocationMap() = default;
 
   virtual popit::Mem_t *getAllocation(TensorId id) const = 0;
-  virtual popit::Mem_t *getOrAllocate(TensorId id) = 0;
+  virtual popit::Mem_t *getOrAllocate(TensorId id,
+                                      const TensorDebugInfo &info) = 0;
 };
 
 class PopitDeviceFunctionWrapper {

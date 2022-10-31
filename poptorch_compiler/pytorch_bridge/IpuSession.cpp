@@ -11,6 +11,7 @@
 #include "lower_to_poplar/EagerIpuSession.hpp"
 #include "lower_to_poplar/PopitExecutor.hpp"
 #include "lower_to_poplar/StaticIpuSession.hpp"
+#include "pytorch_bridge/DebugInfo.hpp"
 
 namespace poptorch_ir {
 
@@ -68,11 +69,16 @@ void PopitDeviceFunctionWrapper::run(IAllocationMap &alloc_map) const {
       _func->getInputs(), std::back_inserter(inputs),
       [&](TensorId input) { return alloc_map.getAllocation(input); });
 
+  auto graph_debug_info = _func->getDebugInfo();
+
   std::vector<popit::Mem_t *> outputs;
   outputs.reserve(_func->getOutputs().size());
   llvm::transform(
-      _func->getOutputs(), std::back_inserter(outputs),
-      [&](TensorId output) { return alloc_map.getOrAllocate(output); });
+      llvm::enumerate(_func->getOutputs()), std::back_inserter(outputs),
+      [&](auto output) {
+        const TensorDebugInfo debug_info{graph_debug_info, output.index()};
+        return alloc_map.getOrAllocate(output.value(), debug_info);
+      });
 
   _func->run(inputs, outputs);
 }

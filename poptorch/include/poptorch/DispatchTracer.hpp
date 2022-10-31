@@ -172,6 +172,10 @@ void promoteOutputs(const std::vector<at::Tensor> &outputs);
 
 bool movingParameters();
 
+std::string getInitialGraph(const at::Tensor &tensor);
+
+std::string getCachedGraph(const at::Tensor &tensor);
+
 } // namespace poptorch
 
 #endif // INCLUDE_POPTORCH_DISPATCH_TRACER_HPP_

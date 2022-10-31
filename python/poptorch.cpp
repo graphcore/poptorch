@@ -1139,6 +1139,13 @@ PYBIND11_MODULE(poptorch_core, m) { // NOLINT
   m.def("promoteArgsAsInputs", PTC(poptorch::promoteArgsAsInputs));
   m.def("promoteOutputs", PTC(poptorch::promoteOutputs));
 
+  m.def("getInitialGraph", PTC(poptorch::getInitialGraph),
+        "Get the last graph that assigned to this tensor before any passes "
+        "have been ran");
+  m.def("getCachedGraph", PTC(poptorch::getCachedGraph),
+        "Get the last graph that assigned to this tensor after "
+        "all canonicalization passes have been applied");
+
   poptorch::initialiseExceptionHandling(m);
 
   py::enum_<poptorch::popart_compiler::TestErrorType>(m, "TestErrorType")

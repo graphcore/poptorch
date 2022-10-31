@@ -58,11 +58,10 @@ def simple_add(capfd):
     log.assert_contains("IPU -> CPU")
 
 
-@helpers.printCapfdOnExit
-@helpers.overridePoptorchLogLevel("TRACE")
+@pytest.mark.ipuHardwareRequired
+@helpers.overridePoptorchLogLevel("DEBUG")
 @pytest.mark.parametrize("mode", ["default", "show_all", "hide_all"])
-@pytest.mark.extendedTestingOnly
-def test_source_location(capfd, mode):
+def test_source_location(mode):
     import poptorch.eager  # pylint: disable=unused-import, import-outside-toplevel
 
     layer = torch.nn.Linear(1, 2).to('xla')
@@ -81,21 +80,25 @@ def test_source_location(capfd, mode):
         poptorch.eager.eager_options.source_location_excludes += ['/']
 
     input = torch.Tensor([[1.], [-1.]]).to('xla')
-    f(input)
+    res = f(input)
 
-    log = helpers.LogChecker(capfd)
+    log = helpers.LogChecker(poptorch.poptorch_core.getCachedGraph(res))
+
+    # By default: we point at the user code
+    default_loc = r'loc\("' + f'{expected_filename}":{expected_line}'
+    # If we clear the list of exclusions we will point at Torch's internals
+    torch_internal_loc = "site-packages/torch/nn/functional.py"
+    unknown_loc = r"\#loc = loc\(unknown\)"
     if mode == "show_all":
-        # If we clear the list of exclusions we will point at Torch's internals
-        log.assert_matches("site-packages/torch/nn/functional.py")
-        log.assert_no_matches(f"{expected_filename}:{expected_line}")
+        log.assert_matches(torch_internal_loc)
+        log.assert_no_matches(default_loc)
     elif mode == "hide_all":
-        log.assert_matches(r"\<unknown\>")  # no filename
-        log.assert_no_matches("site-packages/torch/nn/functional.py")
-        log.assert_no_matches(f"{expected_filename}:{expected_line}")
+        log.assert_matches(unknown_loc)
+        log.assert_no_matches(torch_internal_loc)
+        log.assert_no_matches(default_loc)
     else:
-        # By default: we point at the user code
-        log.assert_no_matches("site-packages/torch/nn/functional.py")
-        log.assert_matches(f"{expected_filename}:{expected_line}")
+        log.assert_no_matches(torch_internal_loc)
+        log.assert_matches(default_loc)
 
 
 @helpers.printCapfdOnExit

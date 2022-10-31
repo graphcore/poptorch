@@ -5,6 +5,7 @@
 #include <mlir/IR/BuiltinOps.h>
 #include <mlir/IR/BuiltinTypes.h>
 #include <mlir/IR/MLIRContext.h>
+#include <mlir/IR/OperationSupport.h>
 #include <mlir/Pass/Pass.h>
 #include <mlir/Pass/PassManager.h>
 #include <mlir/Support/Timing.h>
@@ -29,6 +30,7 @@
 #include "passes/LowerToPopit.hpp"
 #include "poptorch_logging/Error.hpp"
 #include "poptorch_logging/Logging.hpp"
+#include "poptorch_logging/LoggingLight.hpp"
 #include "pytorch_bridge/CompilerTypes.hpp"
 #include "pytorch_bridge/IpuSession.hpp"
 
@@ -53,13 +55,16 @@ private:
 PopitDeviceFunction::PopitDeviceFunction(
     EagerIpuSession &context, mlir::ModuleOp module,
     const std::vector<TensorId> &input_ids,
-    const std::vector<TensorId> &output_ids, NonRestartingMLIRTimer &timer)
-    : _input_ids(input_ids), _output_ids(output_ids), _context(&context) {
+    const std::vector<TensorId> &output_ids, GraphDebugInfo debug_info,
+    NonRestartingMLIRTimer &timer)
+    : _input_ids(input_ids), _output_ids(output_ids),
+      _debug_info(std::move(debug_info)), _context(&context) {
 
   auto compile_popit = timer.nestAndScope("Compiling popit");
 
   MLIRToPopitConverter converter{*this};
   converter.convertGraph(module, timer);
+
   compile_popit.stop();
 }
 
@@ -76,6 +81,10 @@ const std::vector<TensorId> &PopitDeviceFunction::getOutputs() const {
 
 const std::vector<TensorId> &PopitDeviceFunction::getInputs() const {
   return _input_ids;
+}
+
+const GraphDebugInfo &PopitDeviceFunction::getDebugInfo() const {
+  return _debug_info;
 }
 
 } // namespace poptorch_ir
