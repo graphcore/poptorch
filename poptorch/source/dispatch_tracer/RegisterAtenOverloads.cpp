@@ -270,7 +270,7 @@ void copyInplace(const c10::OperatorHandle &op, c10::Stack *stack) {
     if (src.is_cpu()) {
       std::stringstream ss;
       ss << "copy_ CPU -> IPU ";
-      if (isParameter(self)) {
+      if (isParameter(self) || getContext().moving_parameters) {
         getContext().activeDispatch()->addParameter(downCastIfNeeded(src),
                                                     self);
         // Make sure the parameter flag is preserved.
@@ -567,7 +567,7 @@ emptyBase(at::IntArrayRef size,
     // (device 1) or not (device 0) but in reality all the tensors
     // currently live on the same IPU so always use the default IPU.
     at::Tensor output = getContext().tensor_store.allocateTensor(
-        size, dtype, deviceOrDefaultIpu({}), layout, pin_memory, memory_format);
+        size, dtype, nullptr, deviceOrDefaultIpu({}));
     // TODO(T61576) Find a better way to identify parameters and buffers.
     if (getContext().hasActiveDispatch()) {
       getContext().activeDispatch()->setPythonStack(

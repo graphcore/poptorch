@@ -139,6 +139,16 @@ def test_casting():
     assert s.item() == 1.0
 
 
+@pytest.mark.ipuHardwareRequired
+def test_view_output():
+    import poptorch.eager  # pylint: disable=unused-import, import-outside-toplevel
+
+    t = torch.arange(6)
+    s = t.to('xla').reshape(2, 3).to('cpu')
+
+    helpers.assert_allequal(expected=t.reshape(2, 3), actual=s)
+
+
 @pytest.mark.parametrize("lazy", [True, False])
 @pytest.mark.extendedTestingOnly
 def test_backward(lazy):
@@ -156,7 +166,7 @@ def test_backward(lazy):
 @pytest.mark.ipuHardwareRequired
 @pytest.mark.extendedTestingOnly
 def test_squeezenet():
-    pytest.skip("TODO(T67125): Tensor-likes are not close")
+    pytest.skip("TODO(T67125): Allocation error: out of memory")
 
     import poptorch.eager  # pylint: disable=unused-import, import-outside-toplevel
 
@@ -179,8 +189,7 @@ def test_squeezenet():
 @pytest.mark.ipuHardwareRequired
 @pytest.mark.extendedTestingOnly
 def test_resnet18():
-    pytest.skip("TODO(T64252): 'std::exception': Trying to allocate a tensor "
-                "to an allocated region")
+    pytest.skip("TODO(T67125): Allocation error: out of memory")
 
     import poptorch.eager  # pylint: disable=unused-import, import-outside-toplevel
 

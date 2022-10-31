@@ -31,21 +31,28 @@ void MLIREagerCompiler::markOutputs(
 
   // Handle overwriting of inputs
   for (const auto &argument : _main_graph.graph.getArguments()) {
-    const auto is_overwritten = [&](const mlir::OpOperand &operand) {
-      auto overwrite_op = mlir::dyn_cast_or_null<overwrite>(operand.getOwner());
-      return overwrite_op && argument == overwrite_op.dest();
-    };
-    if (llvm::any_of(argument.getUses(), is_overwritten)) {
-      output_ids.push_back(argument);
-    }
+    // Add every input as an output. It will be easier to filter these out later
+    // when the graph has value semantics
+    output_ids.push_back(argument);
   }
 
   // Find all the outputs of all the ops as graph outputs
   _main_graph.graph.walk([&](mlir::Operation *op) {
+    // Don't add outputs for view tensors there will already be an output for
+    // the viewed tensor
+    if (op->hasTrait<::mlir::OpTrait::ViewOp>()) {
+      return;
+    }
+
     for (auto result : op->getResults()) {
       output_ids.push_back(result);
     }
   });
+
+  // TODO(T69660): filter out unchanged outputs. This will be easier to do after
+  // the passes getting rid of reference semantics have been applied. If every
+  // op in the graph has value semantics any output that is also an input can
+  // just be removed
 
   // Add them all as graph outputs
   for (auto &output : output_ids) {

@@ -89,7 +89,9 @@ public:
 
   torch::jit::Value *getValueForTensor(const at::Tensor &t);
 
-  poptorch_ir::TensorId getMLIRForTensor(const at::Tensor &t);
+  poptorch_ir::TensorId getMLIRForTensorId(IpuTensorId tensor_id) const;
+  poptorch_ir::TensorId getMLIRForTensor(const IpuTensorDetails &details) const;
+  poptorch_ir::TensorId getMLIRForTensor(const at::Tensor &t) const;
 
   void addTensorUnchecked(const at::Tensor &t, torch::jit::Value *val,
                           bool is_param);

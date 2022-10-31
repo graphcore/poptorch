@@ -52,6 +52,11 @@ public:
 
   std::shared_ptr<MLIRExecutor> compile();
 
+  poptorch_ir::TensorId
+  ensureInDispatch(const std::shared_ptr<IpuTensorDetails> &details);
+  std::vector<poptorch_ir::TensorId> ensureInDispatch(
+      const std::vector<std::shared_ptr<IpuTensorDetails>> &tensors);
+
   poptorch_ir::TensorId findTensor(const at::Tensor &tensor);
   std::vector<poptorch_ir::TensorId>
   findTensor(const std::vector<at::Tensor> &tensors);
@@ -59,9 +64,10 @@ public:
   // Some times pytorch specifies the output of an operation as an argument
   // without that operation being inplace, i.e matmul. In these cases we copy
   // and let the compiler eliminate it.
-  at::Tensor outputIsInplaceOf(poptorch_ir::OptionalTensorId output_id,
-                               const at::Tensor &original_input,
-                               bool requires_grad);
+  at::Tensor
+  outputIsInplaceOf(poptorch_ir::OptionalTensorId output_id,
+                    const at::Tensor &original_input, bool requires_grad,
+                    std::shared_ptr<ITensorView> view_info = nullptr);
 
   // Some times pytorch specifies the output of an operation as an argument
   // without that operation being inplace, i.e matmul. In these cases we copy
@@ -79,8 +85,10 @@ public:
       const std::vector<poptorch_ir::RequiresGradType> &requires_grad_types,
       bool requires_grad_or);
 
-  at::Tensor makeEmptyOutputTensor(poptorch_ir::OptionalTensorId output_id,
-                                   bool requires_grad);
+  at::Tensor
+  makeEmptyOutputTensor(poptorch_ir::OptionalTensorId output_id,
+                        bool requires_grad,
+                        std::shared_ptr<ITensorView> view_info = nullptr);
 
   std::vector<at::Tensor> makeEmptyOutputTensorList(
       const std::vector<poptorch_ir::OptionalTensorId> &output_id,

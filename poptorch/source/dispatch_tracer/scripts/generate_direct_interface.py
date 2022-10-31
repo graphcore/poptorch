@@ -37,6 +37,41 @@ schemaToCpp = {
     'Tensor?[]': "toTensorVector",
 }
 
+schemaToCppType = {
+    "int[]": "std::vector<std::int64_t>",
+    "int[1]": "std::vector<std::int64_t>",
+    "int[2]": "std::vector<std::int64_t>",
+    "int[3]": "std::vector<std::int64_t>",
+    "int[4]": "std::vector<std::int64_t>",
+    "int[6]": "std::vector<std::int64_t>",
+    "int[]?": "std::optional<std::vector<std::int64_t>>",
+    "int[1]?": "std::optional<std::vector<std::int64_t>>",
+    "int": "std::int64_t",
+    "int?": "std::optional<std::int64_t>",
+    "bool[]": "std::vector<std::int64_t>",
+    "bool[1]": "std::vector<std::int64_t>",
+    "bool[2]": "std::vector<std::int64_t>",
+    "bool[3]": "std::vector<std::int64_t>",
+    "bool": "bool",
+    "float": "double",
+    "float[]": "std::vector<float>",
+    "float[]?": "std::optional<std::vector<float>>",
+    "float?": "std::optional<double>",
+    # Note: strings aren't supported for now it's too tricky to store them on
+    # the api boundary
+    # "str": "std::vector<char>",
+    # "str?": "std::optional<std::vector<char>>",
+    # We treat all scalars as double for now.
+    "Scalar": "double",
+    "Scalar?": "std::optional<double>",
+    "ScalarType": "poptorch_ir::Type",
+    "ScalarType?": "std::optional<poptorch_ir::Type>",
+    'Tensor': "std::shared_ptr<IpuTensorDetails>",
+    'Tensor?': "std::shared_ptr<IpuTensorDetails>",
+    'Tensor[]': "std::vector<std::shared_ptr<IpuTensorDetails>>",
+    'Tensor?[]': "std::vector<std::shared_ptr<IpuTensorDetails>>",
+}
+
 
 def addScope(string, scope='    '):
     return '\n'.join(s if s == '' else scope + s for s in string.split('\n'))
@@ -85,7 +120,7 @@ class TensorInfo:
             assert self.tensor_id[-1] == '!'
             self.tensor_id = self.tensor_id[:-1]
 
-    def add_output(self, index, named_tensors):
+    def add_output(self, index, named_tensors, output_view, aten_name):
         # We will get a list of tensor IDs, which could be zero for optional
         # one ore more.
         outputs_code = f"""const auto &t_ids = mlir_output.at({str(index)}).tensor_ids;
@@ -93,6 +128,16 @@ auto requires_grad = requiresGrad(mlir_output.at({str(index)}).requires_grad_typ
 """
         if not self.is_list:
             outputs_code += "auto t_id = getSingleOptionalTensorId(t_ids);\n"
+
+        output_view_var = 'nullptr'
+        # If the output is a view we need to add the view information
+        if output_view != '':
+            outputs_code += output_view
+            output_view_var = 'output_view'
+
+        if output_view != '' and self.is_list:
+            print(f"In {aten_name} tensor lists cannot be views")
+            sys.exit(1)
 
         # For each output tensor return it to pytorch in a different way
         # depending on what the schema tells us.
@@ -102,22 +147,23 @@ auto requires_grad = requiresGrad(mlir_output.at({str(index)}).requires_grad_typ
                 outputs_code += (
                     "stack.push_back(outputIsInplaceOfList(t_ids, "
                     f"{named_tensors[self.tensor_id]}_pytorch, "
-                    "requires_grad));\n")
+                    f"requires_grad));\n")
             else:
-                outputs_code += ("stack.push_back(outputIsInplaceOf(t_id, "
-                                 f"{named_tensors[self.tensor_id]}_pytorch, "
-                                 "requires_grad.at(0)));\n")
+                outputs_code += (
+                    "stack.push_back(outputIsInplaceOf(t_id, "
+                    f"{named_tensors[self.tensor_id]}_pytorch, "
+                    f"requires_grad.at(0), {output_view_var}));\n")
         else:
             # Otherwise we are returning a new tensor or tensor list.
             if self.is_list:
                 outputs_code += ("stack.push_back(makeEmptyOutputTensorList("
                                  "t_ids, requires_grad));\n")
             else:
-                outputs_code += """if (t_id == poptorch_ir::none_id) {
-    stack.push_back(makeEmptyOutputTensor(poptorch_ir::none_id, false));
-} else {
-    stack.push_back(makeEmptyOutputTensor(t_id, requires_grad.at(0)));
-}
+                outputs_code += f"""if (t_id == poptorch_ir::none_id) {{
+    stack.push_back(makeEmptyOutputTensor(poptorch_ir::none_id, false, {output_view_var}));
+}} else {{
+    stack.push_back(makeEmptyOutputTensor(t_id, requires_grad.at(0), {output_view_var}));
+}}
 """
         outputs_code = f'{{\n{addScope(outputs_code)}}}\n'
         return outputs_code
@@ -155,6 +201,16 @@ class ValueInfo:
         if self.is_tensor and '(' in self.type:
             self.tensor_info = TensorInfo(self.type)
             self.type = 'Tensor[]' if self.tensor_info.is_list else "Tensor"
+
+    def getMemberType(self, aten_name):
+        if self.type not in schemaToCppType:
+            print(
+                f"There is no c++ schema type for {self.type} in {aten_name} "
+                f"from {__file__}.")
+            print("You need to add one to schemaToCppType for compilation " +
+                  "to succeed.")
+            sys.exit(1)
+        return schemaToCppType[self.type]
 
     def assert_value_is_default(self,
                                 stack_at_index,
@@ -220,7 +276,7 @@ class ValueInfo:
         return ''
 
 
-def add_op(function, parameters, outputs, named_tensors):
+def add_op(function, parameters, outputs, named_tensors, output_view):
     return_type = "poptorch_ir::ODSTensorResults mlir_output =\n"
     return_type += "    "
 
@@ -239,14 +295,31 @@ def add_op(function, parameters, outputs, named_tensors):
         # Capture all metadata related to each of the output tensors.
         output_info = TensorInfo(output)
 
-        function_decl += output_info.add_output(index, named_tensors)
+        # Note we are passing the same output view information to all the
+        # outputs. This information is non-empty only when there is a single
+        # output
+        function_decl += output_info.add_output(index, named_tensors,
+                                                output_view, function)
 
     return function_decl
 
 
+def filter_ignored_args(op_target, args):
+    args_to_ignore = {} if "IgnoreArgs" not in op_target else op_target[
+        "IgnoreArgs"]
+    key = "UnusedOutputArguments"
+    unused_inplace_arg = {} if key not in op_target else op_target[key]
+
+    def is_ignored(arg):
+        return (arg.name not in args_to_ignore
+                and arg.name not in unused_inplace_arg)
+
+    return list(filter(is_ignored, args))
+
+
 # Generate the c++ function which handles this operation.
 def generate_cpp(op_target, canonicalised_args, outputs, named_tensors,
-                 aten_name):
+                 aten_name, output_view):
     # Some arguments we just completely ignore.
     args_to_ignore = {} if "IgnoreArgs" not in op_target else op_target[
         "IgnoreArgs"]
@@ -295,13 +368,77 @@ def generate_cpp(op_target, canonicalised_args, outputs, named_tensors,
     if "PopTorchDirect" in op_target:
         # We are dealing with a vanilla function.
         function_decl += add_op(op_target["PopTorchDirect"], parameters,
-                                outputs, named_tensors)
+                                outputs, named_tensors, output_view)
     else:
         raise KeyError("Couldn't find a valid PopTorch direct mapping "
                        "(eg. PopTorchDirect)"
                        f" for {op_target}")
 
     return function_decl
+
+
+def generate_view(args, outputs, function_name):
+    if len(args) == 0:
+        print(function_name + ": Views cannot have no arguments")
+        sys.exit(1)
+
+    class_name = function_name + 'TensorView'
+    members = map(lambda x: f'{x.getMemberType(function_name)} _{x.name}',
+                  args)
+    constructor_args = list(
+        map(lambda x: f'{x.getMemberType(function_name)} {x.name}', args))
+    initializers = map(lambda x: f'_{x.name}{{std::move({x.name})}}', args)
+
+    def get_tensors_from_dispatch(arg):
+        if arg.is_tensor:
+            return f'auto {arg.name} = dispatch.ensureInDispatch(_{arg.name})'
+        return f'auto &{arg.name} = _{arg.name};'
+
+    find_tensors = map(get_tensors_from_dispatch, args)
+    params = map(lambda x: x.name, args)
+    tensor_details_params = map(
+        lambda x: f'getTensorDetails({x.name}_pytorch)'
+        if 'Tensor' in x.type else x.name, args)
+
+    if len(outputs) != 1:
+        print("Views with multiple outputs aren't handled")
+        sys.exit(1)
+    if 'Tensor(' not in outputs[0]:
+        print(f"Views of {outputs[0]} aren't handled")
+        sys.exit(1)
+
+    header = (f"friend class {class_name};\n"
+              f"class {class_name} final : public ITensorView {{\n" +
+              addScope(';\n'.join(members)) + f""";
+
+public:
+    explicit {class_name}({', '.join(constructor_args)});
+
+    poptorch_ir::TensorId addViewToGraph(IDispatch &complier) override;
+}};
+""")
+
+    cpp = (
+        f"""MLIRDispatch::{class_name}::{class_name}({', '.join(constructor_args)})
+    : {', '.join(initializers)} {{}}
+
+poptorch_ir::TensorId MLIRDispatch::{class_name}::addViewToGraph(
+    IDispatch &idispatch) {{
+    auto& dispatch = reinterpret_cast<MLIRDispatch&>(idispatch);
+
+""" + addScope(';\n'.join(find_tensors)) + f""";
+    auto mlir_output = dispatch._compiler.{function_name}(
+        {', '.join(params)});
+
+    return mlir_output.at(0).tensor_ids.at(0);
+}}
+""")
+
+    view_construct = f'auto output_view = std::make_shared<{class_name}>('
+    view_construct += (
+        ',\n' + ' ' * len(view_construct)).join(tensor_details_params) + ");\n"
+
+    return header, cpp, view_construct
 
 
 class DirectMLIRGenerator:
@@ -339,24 +476,35 @@ class DirectMLIRGenerator:
 
             canonicalised_args.append(value)
 
+        header = ''
+        cpp = ''
+        output_view = ''
+
         aten_name = function_name
         function_name = function_name.replace('.', '_')
         function_name = "{}_{}".format(self.namespace, function_name)
 
+        if is_view:
+            non_ignored_args = filter_ignored_args(op_target,
+                                                   canonicalised_args)
+            header, cpp, output_view = generate_view(
+                non_ignored_args, outputs, op_target["PopTorchDirect"])
+
+        header += f'void {function_name}(c10::Stack& stack);\n'
+
         # Generate the C++ impl.
-        function_decl = "void MLIRDispatch::" + function_name
-        function_decl += "(c10::Stack& stack) {\n"
-        function_decl += addScope(
+        cpp += "void MLIRDispatch::" + function_name
+        cpp += "(c10::Stack& stack) {\n"
+        cpp += addScope(
             generate_cpp(op_target, canonicalised_args, outputs, named_tensors,
-                         aten_name))
-        function_decl += "}\n"
+                         aten_name, output_view))
+        cpp += "}\n"
 
         # Print the C++ impl.
-        print(function_decl, file=self.cpp)
+        print(cpp, file=self.cpp)
 
         # Generate the C++ header.
-        print("void " + function_name + "(c10::Stack& stack);\n",
-              file=self.header)
+        print(header, file=self.header)
 
         # Generate the Aten Op to the C++ function map.
         print(

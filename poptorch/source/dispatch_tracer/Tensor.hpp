@@ -4,6 +4,8 @@
 
 #include <torch/csrc/jit/ir/ir.h>
 
+#include <algorithm>
+#include <iterator>
 #include <memory>
 #include <string>
 #include <variant>
@@ -21,28 +23,44 @@ namespace poptorch {
 using Buffer = poptorch_ir::Buffer;
 using IpuTensorId = uint64_t;
 
+class IDispatch;
 struct IpuTensorImpl;
 class ValueMapper;
 
-// We cannot reliably store references to TensorImpls, as they may be deleted
-// without notice if the tensor goes out of scope. We can't hold an
-// intrusive_ptr or weak_intrusive_ptr to them either, as they may be
-// ExclusivelyOwned, which will trigger an assert if an intrusive_ptr
-// exists at the time of destruction. So instead, we store the details we
-// care about in this structure, which is referenced by a shared_ptr from
-// IpuTensorImpl and also from the ValueMapper.
+class ITensorView {
+public:
+  virtual poptorch_ir::TensorId addViewToGraph(IDispatch &dispatcher) = 0;
+};
+
+// The ipu tensor details tracks the data and meta information associated with
+// the IpuTensorImpl. This information cannot be directly stored in the ipu
+// tensor impl because the lifetime of that is too short when views are
+// involved. We need to the lifetime of the data to outlive any views of the
+// data.
 struct IpuTensorDetails {
-  IpuTensorDetails(IpuTensorId tensor_id_, poptorch_ir::TensorType type_)
-      : tensor_id(tensor_id_), type(std::move(type_)) {}
+  IpuTensorDetails(IpuTensorId tensor_id_, poptorch_ir::TensorType type_,
+                   std::shared_ptr<ITensorView> view_info);
+
+  // The tensor details either owns its own storage or is a view of other tensor
+  // details.
+  //
+  // For inputs that are temporaries we need the buffer to live until the
+  // function is ran and we don't want to extend the lifetime of the
+  // IpuTensorDetails unnecessarily. This means we need to share ownership of
+  // the buffer.
+  using Data =
+      std::variant<std::shared_ptr<Buffer>, std::shared_ptr<ITensorView>>;
 
   const IpuTensorId tensor_id;
   const poptorch_ir::TensorType type;
 
-  // For inputs that are temporaries we need the buffer to live until the
-  // function is ran and we don't want to extend the lifetime of the
-  // IpuTensorDetails unnecessarily. This means we need to share ownership of
-  // the buffer
-  std::shared_ptr<Buffer> buffer = std::make_shared<Buffer>();
+  Data data;
+
+  Buffer &getBuffer();
+  std::shared_ptr<Buffer> getOwningBuffer() const;
+
+  bool hasData() const;
+  bool isView() const;
 };
 
 poptorch_ir::Type toCompilerType(const at::ScalarType &elem_type);
@@ -72,8 +90,16 @@ Buffer &getHostBuffer(const at::Tensor &ipu_tensor);
 // Returns a reference to the CPU buffer of the given IPU tensor implementation.
 Buffer &getHostBuffer(const at::TensorImpl &ipu_tensor);
 
+bool hasData(const at::Tensor &ipu_tensor);
+
 std::shared_ptr<IpuTensorDetails>
 getTensorDetails(const at::Tensor &ipu_tensor);
+
+std::vector<std::shared_ptr<IpuTensorDetails>>
+getTensorDetails(const std::vector<at::Tensor> &ipu_tensors);
+
+void setTensorDetails(const at::Tensor &ipu_tensor,
+                      std::shared_ptr<IpuTensorDetails> details);
 
 void errorOnZeroSizedTensor(const at::Tensor &tensor);
 
@@ -95,14 +121,15 @@ public:
   TensorStore &operator=(TensorStore &) = delete;
   TensorStore &operator=(TensorStore &&) = delete;
 
+  std::shared_ptr<IpuTensorDetails>
+  allocateTensorDetails(c10::IntArrayRef size,
+                        at::ScalarType coerced_scalar_type,
+                        std::shared_ptr<ITensorView> view_info);
   // Create a new IPU tensor.
-  at::Tensor
-  allocateTensor(c10::IntArrayRef sizes,
-                 c10::optional<at::ScalarType> dtype = c10::nullopt,
-                 c10::optional<at::Device> device = c10::nullopt,
-                 c10::optional<at::Layout> layout = c10::nullopt,
-                 c10::optional<bool> pin_memory = c10::nullopt,
-                 c10::optional<at::MemoryFormat> memory_format = c10::nullopt);
+  at::Tensor allocateTensor(c10::IntArrayRef sizes,
+                            c10::optional<at::ScalarType> dtype = c10::nullopt,
+                            std::shared_ptr<ITensorView> view_info = nullptr,
+                            c10::optional<at::Device> device = c10::nullopt);
 
   void allocateBuffer(const at::Tensor &ipu_tensor);
 
@@ -116,7 +143,7 @@ public:
   void reset();
 
 private:
-  void allocateBuffer(IpuTensorDetails &details);
+  Buffer &allocateBuffer(IpuTensorDetails &details);
 
   poptorch_ir::TensorId _next_tensor_id{1};
   std::shared_ptr<poptorch_ir::IIpuSession> _ipu_session =

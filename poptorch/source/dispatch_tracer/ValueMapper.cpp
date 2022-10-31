@@ -20,7 +20,7 @@ ValueMapper::~ValueMapper() = default;
 
 ValueMapper::TrackedTensor::TrackedTensor(
     const std::shared_ptr<IpuTensorDetails> &details)
-    : tensor_details(details), buffer(details->buffer) {}
+    : tensor_details(details), buffer(details->getOwningBuffer()) {}
 
 bool ValueMapper::isParameter(const at::Tensor &t) const {
   if (const auto *record = find(t)) {
@@ -192,16 +192,29 @@ torch::jit::Value *ValueMapper::getValueForTensor(const at::Tensor &t) {
   return nullptr;
 }
 
-poptorch_ir::TensorId ValueMapper::getMLIRForTensor(const at::Tensor &t) {
-  if (!isIpuTensor(t)) {
-    return poptorch_ir::tensor_error_id;
+poptorch_ir::TensorId
+ValueMapper::getMLIRForTensorId(IpuTensorId tensor_id) const {
+  if (const auto itr = _tensors.find(tensor_id); itr != _tensors.end()) {
+    return itr->second.mlir;
   }
 
-  if (auto *tracked_tensor = find(*getTensorDetails(t))) {
+  return poptorch_ir::tensor_error_id;
+}
+poptorch_ir::TensorId
+ValueMapper::getMLIRForTensor(const IpuTensorDetails &details) const {
+  if (const auto *tracked_tensor = find(details)) {
     return tracked_tensor->mlir;
   }
 
   return poptorch_ir::tensor_error_id;
+}
+
+poptorch_ir::TensorId ValueMapper::getMLIRForTensor(const at::Tensor &t) const {
+  if (!isIpuTensor(t)) {
+    return poptorch_ir::tensor_error_id;
+  }
+
+  return getMLIRForTensor(*getTensorDetails(t));
 }
 
 bool ValueMapper::hasMapping(const at::Tensor &t) const {
