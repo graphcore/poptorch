@@ -24,9 +24,8 @@ from . import optim
 from . import profiling
 from . import poptorch_core  # type: ignore
 from . import _poptorch_data
-from ._utils import accessAttributes, reconstructTensorStructure, isOnIpu
+from ._utils import accessAttributes, flattenTensorStructure, reconstructTensorStructure, isOnIpu
 from ._logging import logger
-from .experimental import IPUContext
 from .options import Options, PipelinedExecution, ShardedExecution
 from .optim import Optimizer
 
@@ -607,26 +606,270 @@ class PoplarExecutor:
             self._update_optimizer_if_needed()
             self._write_optim_state_dict_if_needed()
 
+    def _get_module_and_name(self, n):
+        """
+        Given a nested attribute path, return `(module, name)` such that
+        `module` is the object which contains the attribute `name`, relative to
+        `self._model`.
+
+        This makes it easy to access nested attributes with
+        `getattr` and `setattr`, using the argument splat `*a` operator, i.e.:
+
+        ```
+        getattr(*self._get_module_and_name("some_module.layer_one.weight"))
+        ```
+
+        gets the attribute `self._model.some_module.layer_one.weight`.
+        """
+        m = self._model
+        name = n
+        sn = n.rpartition(".")
+        if sn[1] == ".":
+            m = m.get_submodule(sn[0])
+            name = sn[2]
+        return m, name
+
+    @_impl.destroyDispatcherOnExit
     def _compileWithDispatch(self, in_tensors, executable_filename=None):
         with _SetDefaultDeviceType():
-            # The IPUContext is going to move the model to the IPU so create a copy
-            # to make sure we don't modify the user's model.
-            ctx = IPUContext(self._model,
-                             compiler=enums.Compiler.PopART,
-                             model=self._model,
-                             options=self._options,
-                             training=self._training,
-                             optimizer=self._optimizer,
-                             dict_optimizer=self._dict_optimizer,
-                             per_replica_params=self.per_replica_params)
-            if executable_filename is not None:
-                ctx.loadExecutable(executable_filename, *in_tensors.args,
-                                   **in_tensors.kwargs)
-            else:
-                ctx.compile(*in_tensors.args, **in_tensors.kwargs)
-            self._outputs_structure = ctx.ipu._outputs_structure  # pylint: disable=protected-access
+            module_namescope = None
+            if self.options._module_namescope_enabled:  # pylint: disable=protected-access
+                module_namescope = _impl.NameScopeHook(self._model)
 
-        return ctx.ipu._executable  # pylint: disable=protected-access
+            tensor_args = flattenTensorStructure(
+                (in_tensors.args, in_tensors.kwargs))
+            mlir_compiler_options = poptorch_core.CompilerOptions()
+            mlir_compiler_options.source_location_excludes = self._options._source_location_excludes  # pylint: disable=line-too-long, protected-access
+
+            dispatch_failed = False
+            try:  # pylint: disable=too-many-nested-blocks
+                # Create the graph. Future captured calls will be written into this
+                # graph behind the scenes.
+                poptorch_core.createGraph(
+                    poptorch_core.TracingMode(
+                        poptorch_core.TracingMode.PopART), tensor_args,
+                    mlir_compiler_options)
+
+                # Move the model parameters to the ipu and take a copy to load the
+                # originals back once this has finished
+                cpu_params = dict(self._model.named_parameters())
+                cpu_buffers = dict(self._model.named_buffers())
+                cpu_state = self._model.state_dict(keep_vars=True)
+
+                # We need to remove the PoptorchBuffer and PoptorchParam annotations
+                # before compiling the model. In addition, we must unwrap the whole
+                # model to prevent IPU to CPU copies when accessing the state_dict.
+                _impl.unwrapModelIfNecessary(self._model)
+                if self.per_replica_params is not None:
+                    for name, param in cpu_params.items():
+                        if name in self.per_replica_params:
+                            if param.shape == torch.Size([]):
+                                raise _impl.createPoptorchError(
+                                    "Scalars cannot be passed as per-replica "
+                                    "weight tensor values")
+                            param_tensor = param.narrow(0, 0, 1).squeeze(dim=0)
+                            setattr(*self._get_module_and_name(name),
+                                    torch.nn.Parameter(param_tensor))
+                d = torch.device("xla:0")
+                poptorch_core.startParametersMove()
+                self._model.to(d)
+                poptorch_core.endParametersMove()
+
+                # If there were any parameters and buffers (tensors), which were
+                # aliases on the CPU (shared the same Python ID), these will have
+                # become separate IPU tensors during the copy to IPU
+                #
+                # Find all such tensors, and then
+                # 1. Keep a map from them to the earliest cpu tensor in the
+                #    cpu_state dict.
+                # 2. Replace IPU tensors which are not but should be aliases with
+                #    that matching the earliest.
+                # NB the "original" name is based on order of addition of the
+                # tensors/modules and may not be a name of the parmeter which
+                # replaced another, e.g. the case of "weight tying", but the
+                # name of the "replaced". However, no names will be lost but the
+                # aliases simply harmonised to be matching tensors on CPU and IPU.
+                state = self._model.state_dict(keep_vars=True)
+                tensors = collections.defaultdict(list)
+                for name, tensor in cpu_state.items():
+                    tensors[id(tensor)].append(name)
+                # A map of parameters and buffers (tensors) on the CPU which share
+                # the same python id, to the earliest tensor.
+                cpu_aliases = {}
+
+                aliases = [v for v in tensors.values() if len(v) > 1]
+                for a in aliases:
+                    # NB original matches that in model.named_x() as both this as
+                    # model.state_dict() loop he same  OrderedDicts in same order
+                    # and the named versions return only the first instances
+                    original = a[0]
+
+                    for other in a[1:]:
+                        setattr(*self._get_module_and_name(other),
+                                state[original])
+                        cpu_aliases[other] = original
+
+                # Map named unique parameters and buffers on the IPU.
+                params = dict(self._model.named_parameters())
+
+                poptorch_core.mapParamsToNames(tuple(params.keys()),
+                                               tuple(params.values()))
+
+                buffers = dict(self._model.named_buffers())
+
+                poptorch_core.mapParamsToNames(tuple(buffers.keys()),
+                                               tuple(buffers.values()))
+
+                old_addresses = _impl.getBufferAndParameterAddresses(
+                    self._model)
+
+                if self.per_replica_params is not None:
+                    for name, param in cpu_params.items():
+                        if name in self.per_replica_params:
+                            poptorch_core.setPerReplica(
+                                name, param, *self.per_replica_params[name])
+
+                poptorch_core.startDispatch()
+                _impl.setDispatchTracing(True)
+                _impl.setIpuContext(True)
+                self._options._execution_strategy.onStartTracing()  # pylint: disable=protected-access
+
+                # The optimizer was created using the CPU model, therefore it points
+                # at CPU tensors.  We need to remap those to IPU tensors.
+                # We just moved '_model' to the IPU, therefore we need to join the
+                # two maps and then remap the parameters from the optimizer.
+                # From:
+                #
+                # cpu_tensors[name] = cpu_data_ptr
+                # ipu_tensors[name] = ipu_tensor
+                #
+                # we build:
+                #
+                # cpu_to_ipu[cpu_data_ptr] = ipu_tensor
+                #
+                # And then remap all the tensors from group["params"]
+                if self._training:
+                    cpu_tensors = {
+                        **cpu_buffers,
+                        **cpu_params,
+                    }
+                    ipu_tensors = _impl.getBufferAndParameterTensors(
+                        self._model)
+                    cpu_to_ipu = {
+                        cpu_tensors[n].data_ptr(): ipu
+                        for n, ipu in ipu_tensors.items()
+                    }
+                    for index, group in enumerate(
+                            self._optimizer.param_groups):
+                        torch.ops.poptorch.optimizer_group(
+                            index, [
+                                cpu_to_ipu[cpu.data_ptr()]
+                                for cpu in group["params"]
+                            ])
+
+                for idx, t in enumerate(tensor_args):
+                    if t.requires_grad:
+                        raise _impl.createPoptorchError(
+                            "An input tensor to an IPU model can not have "
+                            f"requires_grad set to True, however input {idx} "
+                            f"does: {t}\nYou can set requires_grad=True from "
+                            "within the model as an alternative, and return "
+                            "gradients as outputs to your model, if required.")
+
+                d = torch.device("xla:0")
+                # Move all the inputs to the IPU
+                tensor_args = [t.to(d) for t in tensor_args]
+                # Re-inject moved tensors in args and kwargs:
+                args, kwargs = reconstructTensorStructure(
+                    (in_tensors.args, in_tensors.kwargs), tensor_args)
+
+                result = self._model(*args, **kwargs)
+                if result is not None:
+                    self._outputs_structure = result
+                    output = flattenTensorStructure(result)
+
+                    for x in output:
+                        if not isOnIpu(x):
+                            warnings.warn(
+                                "Output expected to be on the IPU but is on %s"
+                                % x.device.type)
+
+                    output = [
+                        out.int()
+                        if out.dtype == torch.long and isOnIpu(out) else out
+                        for out in output
+                    ]
+                    output = [
+                        out.float()
+                        if out.dtype == torch.double and isOnIpu(out) else out
+                        for out in output
+                    ]
+                    poptorch_core.startOutputsMove()
+                    output = [out.cpu() for out in output]
+                    poptorch_core.endOutputsMove()
+
+                poptorch_core.finalizeGraph()
+            except:
+                dispatch_failed = True
+                raise
+            finally:
+                self._options._execution_strategy.onEndTracing()  # pylint: disable=protected-access
+                _impl.setIpuContext(False)
+                _impl.setDispatchTracing(False)
+                # Turn off the dispatcher.
+                poptorch_core.endDispatch(dispatch_failed)
+
+                # Reload the cpu model state
+                # Get the buffer and parameter addresses after the model has ran
+                # but before resetting the model back to the cpu
+                new_addresses = _impl.getBufferAndParameterAddresses(
+                    self._model)
+
+                def _set_param(k, v):
+                    setattr(*self._get_module_and_name(k), cpu_params[v])
+
+                for k in cpu_params:
+                    cpu_params[k].__class__ = torch.nn.Parameter
+                    _set_param(k, k)
+
+                # Restore aliased parameters/buffers which will not be represented
+                # in cpu_params or cpu_buffers
+                for k, v in cpu_aliases.items():
+                    _set_param(k, v)
+
+                for k in cpu_buffers:
+                    setattr(*self._get_module_and_name(k), cpu_buffers[k])
+
+                # Re-install the Poptorch annotations for buffers and parameters
+                _impl.rewrapModelIfNecessary(self._model)
+
+                # Check that the buffer and parameter addresses haven't been changed
+                # in the model
+                # Note: this is done after resetting the model back to the cpu so
+                # that errors thrown by this don't stop the model being in a valid
+                # state
+                _impl.errorOnBufferOrParameterAddressChanges(
+                    old_addresses, new_addresses)
+
+                if module_namescope is not None:
+                    module_namescope.remove()
+
+            # We only reach this point if dispatch didn't fail
+            if executable_filename is not None:
+                # Compile the captured graph using PopART.
+                executable = poptorch_core.processDispatchAndImportExecutable(
+                    self._options.toDict(), accessAttributes, self._training,
+                    self._dict_optimizer,
+                    list(self._options.anchored_tensors.values()),
+                    executable_filename)
+            else:
+                # Compile the captured graph using PopART.
+                executable = poptorch_core.compileWithManualTracing(
+                    self._options.toDict(), accessAttributes, self._training,
+                    self._dict_optimizer,
+                    list(self._options.anchored_tensors.values()))
+
+        return executable
 
     @_impl.traceMethod("modelCompilation")
     def _compile(self, in_tensors):
