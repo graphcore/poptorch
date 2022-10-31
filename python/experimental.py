@@ -5,7 +5,7 @@ import warnings
 from typing import Callable, List, Optional
 
 import torch
-from . import enums, poptorch_core, _impl, accessAttributes, CompilerOptions
+from . import enums, poptorch_core, _impl, CompilerOptions
 from ._args_parser import ArgsParser
 from ._utils import flattenTensorStructure, reconstructTensorStructure, isOnIpu
 from .options import Options
@@ -19,10 +19,7 @@ class IPUScope:
                  options: Optional['poptorch.Options'] = None,
                  training: bool = False,
                  dict_optimizer: Optional[dict] = None,
-                 optimizer: Optimizer = None,
-                 compile_using=enums.Compiler.PopART,
-                 skip_compilation=False,
-                 per_replica_params: Optional[dict] = None):
+                 optimizer: Optimizer = None):
 
         if not isinstance(inputs, (list, tuple)):
             raise ValueError("You can only pass a list or tuple as the "
@@ -50,8 +47,6 @@ class IPUScope:
         self._optimizer = optimizer
         self._dict_optimizer = {} if dict_optimizer is None else dict_optimizer
 
-        self._compile_using = compile_using
-
         self._model = model
         self._cpu_params = {}
         self._cpu_buffers = {}
@@ -62,8 +57,6 @@ class IPUScope:
 
         self._outputs_structure = None
         self._upload_weights = True
-        self._skip_compilation = skip_compilation
-        self._per_replica_params = per_replica_params
 
         mlir_compiler_options = CompilerOptions()
         mlir_compiler_options.source_location_excludes = self._options._source_location_excludes  # pylint: disable=line-too-long
@@ -71,7 +64,7 @@ class IPUScope:
         # Create the graph. Future captured calls will be written into this
         # graph behind the scenes.
         poptorch_core.createGraph(
-            poptorch_core.TracingMode(self._compile_using), inputs,
+            poptorch_core.TracingMode(poptorch_core.TracingMode.MLIR), inputs,
             mlir_compiler_options)
 
         self._old_addresses = {}
@@ -138,21 +131,6 @@ class IPUScope:
             self._cpu_buffers = dict(self._model.named_buffers())
             cpu_state = self._model.state_dict(keep_vars=True)
 
-            # We need to remove the PoptorchBuffer and PoptorchParam annotations
-            # before compiling the model. In addition, we must unwrap the whole
-            # model to prevent IPU to CPU copies when accessing the state_dict.
-            _impl.unwrapModelIfNecessary(self._model)
-
-            if self._per_replica_params is not None:
-                for name, param in self._cpu_params.items():
-                    if name in self._per_replica_params:
-                        if param.shape == torch.Size([]):
-                            raise _impl.createPoptorchError(
-                                "Scalars cannot be passed as per-replica "
-                                "weight tensor values")
-                        param_tensor = param.narrow(0, 0, 1).squeeze(dim=0)
-                        setattr(*self._get_module_and_name(name),
-                                torch.nn.Parameter(param_tensor))
             # TODO(T61576) We currently use a state machine to determine if
             # tensors are inputs or parameters.
             # We need to find a better solution.
@@ -204,12 +182,6 @@ class IPUScope:
             self._old_addresses = _impl.getBufferAndParameterAddresses(
                 self._model)
 
-            if self._per_replica_params is not None:
-                for name, param in self._cpu_params.items():
-                    if name in self._per_replica_params:
-                        poptorch_core.setPerReplica(
-                            name, param, *self._per_replica_params[name])
-
         poptorch_core.startDispatch()
         _impl.setDispatchTracing(True)
         _impl.setIpuContext(True)
@@ -248,9 +220,6 @@ class IPUScope:
             for k in self._cpu_buffers:
                 setattr(*self._get_module_and_name(k), self._cpu_buffers[k])
 
-            # Re-install the Poptorch annotations for buffers and parameters
-            _impl.rewrapModelIfNecessary(self._model)
-
             # Check that the buffer and parameter addresses haven't been changed
             # in the model
             # Note: this is done after resetting the model back to the cpu so
@@ -264,51 +233,18 @@ class IPUScope:
         if exc_type is not None:
             return False
 
-        if self._skip_compilation:
-            return True
-
-        # Compile for IPU.
-        if self._compile_using == enums.Compiler.PopART:
-            # Compile the captured graph using PopART.
-            self._executable = poptorch_core.compileWithManualTracing(
-                self._options.toDict(), accessAttributes, self._training,
-                self._dict_optimizer,
-                list(self._options.anchored_tensors.values()))
-        else:
-            # Compile the captured graph using MLIR.
-            self._executable = poptorch_core.compileMLIR()
+        # Compile the captured graph using MLIR.
+        self._executable = poptorch_core.compileMLIR()
         return True
-
-    def loadExecutable(self, filename):
-        if self._compile_using == enums.Compiler.PopART:
-            # Compile the captured graph using PopART.
-            self._executable = poptorch_core.processDispatchAndImportExecutable(
-                self._options.toDict(), accessAttributes, self._training,
-                self._dict_optimizer,
-                list(self._options.anchored_tensors.values()), filename)
-        else:
-            raise _impl.createPoptorchError("Not supported: can't deserialize "
-                                            "MLIR executables")
 
     def __call__(self, *args):
         if self._upload_weights:
-            if self._compile_using == enums.Compiler.PopART:
-                state = {**self._cpu_params, **self._cpu_buffers}
-                poptorch_core.copyWeightsToDevice_impl(self._executable,
-                                                       tuple(state.keys()),
-                                                       tuple(state.values()))
-            else:
-                self._executable.weightsToDevice()
+            self._executable.weightsToDevice()
             self._upload_weights = False
 
-        # Otherwise run popart.
-        if self._compile_using == enums.Compiler.PopART:
-            # Run via PopART.
-            output = poptorch_core.execute(self._executable, args)
-        elif self._compile_using == enums.Compiler.MLIR:
-            # Run via the MLIR compiled binary.
-            output = self._executable.execute(args)
-            self._executable.copyWeightsToHostIfNeeded()
+        # Run via the MLIR compiled binary.
+        output = self._executable.execute(args)
+        self._executable.copyWeightsToHostIfNeeded()
 
         if self._outputs_structure is not None:
             output = reconstructTensorStructure(self._outputs_structure,
@@ -343,45 +279,26 @@ class IPUScope:
 #               call after compilation so that changes to wrapped values
 #               can be picked up
 class _IPUContext:
-    def __init__(self, func, compiler, options, training, optimizer,
-                 dict_optimizer, model, per_replica_params):
+    def __init__(self, func, options, training, optimizer, dict_optimizer,
+                 model):
         functools.update_wrapper(self, func)
         self.func = func
         self.ipu = None
-        self.compiler = compiler
         self.options = options or Options()
         self.training = training
         self.optimizer = optimizer
         self.dict_optimizer = dict_optimizer
         self.model = model
-        self.per_replica_params = per_replica_params
-
-    def compile(self, *args, **kwargs):
-        return self._compileOrLoadExecutable(args, kwargs)
-
-    def loadExecutable(self, filename, *args, **kwargs):
-        return self._compileOrLoadExecutable(args, kwargs, filename)
 
     @_impl.destroyDispatcherOnExit
-    def _compileOrLoadExecutable(self, args, kwargs, filename=None):
-        module_namescope = None
-        # TODO(T66133) Add support for name scopes in MLIR backend.
-        # pylint: disable=protected-access
-        if self.model is not None and \
-                self.compiler == enums.Compiler.PopART and \
-                self.options._module_namescope_enabled:
-            module_namescope = _impl.NameScopeHook(self.model)
-
+    def compile(self, *args, **kwargs):
         tensor_args = flattenTensorStructure((args, kwargs))
         with IPUScope(tensor_args,
                       model=self.model,
                       options=self.options,
                       training=self.training,
                       optimizer=self.optimizer,
-                      dict_optimizer=self.dict_optimizer,
-                      compile_using=self.compiler,
-                      skip_compilation=filename is not None,
-                      per_replica_params=self.per_replica_params) as ipu:
+                      dict_optimizer=self.dict_optimizer) as ipu:
 
             for idx, t in enumerate(tensor_args):
                 if t.requires_grad:
@@ -402,12 +319,6 @@ class _IPUContext:
             result = self.func(*args, **kwargs)
             if result is not None:
                 ipu.outputs(result)
-
-        if filename is not None:
-            ipu.loadExecutable(filename)
-
-        if module_namescope:
-            module_namescope.remove()
 
         self.ipu = ipu
         return tensor_args
@@ -447,13 +358,11 @@ class _IPUContext:
 # only
 def IPUContext(func=None,
                *,
-               compiler=enums.Compiler.MLIR,
                options: Optional['poptorch.Options'] = None,
                training: bool = False,
                optimizer: Optimizer = None,
                dict_optimizer: Optional[dict] = None,
-               model: Optional['torch.nn.Module'] = None,
-               per_replica_params: Optional[dict] = None):
+               model: Optional['torch.nn.Module'] = None):
     if dict_optimizer is None:
         dict_optimizer = {}
 
@@ -463,14 +372,14 @@ def IPUContext(func=None,
     if func is None:
 
         def wrapper(f):
-            return _IPUContext(f, compiler, options, training, optimizer,
-                               dict_optimizer, model, per_replica_params)
+            return _IPUContext(f, options, training, optimizer, dict_optimizer,
+                               model)
 
         return wrapper
     # Otherwise the decorator has no extra args: just pass the
     # default arguments
-    return _IPUContext(func, compiler, options, training, optimizer,
-                       dict_optimizer, model, per_replica_params)
+    return _IPUContext(func, options, training, optimizer, dict_optimizer,
+                       model)
 
 
 class _IPUSession:
@@ -486,7 +395,7 @@ class _IPUSession:
         # Create the graph. Future captured calls will be written into this
         # graph behind the scenes.
         poptorch_core.createGraph(
-            poptorch_core.TracingMode(enums.Compiler.MLIR), [],
+            poptorch_core.TracingMode(poptorch_core.TracingMode.MLIR), [],
             self._compiler_options)
 
     def run(self, func: Callable, args: ArgsParser.Args):

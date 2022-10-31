@@ -199,9 +199,6 @@ Enumerations
 .. autoclass:: poptorch.SharingStrategy
    :members:
 
-.. autoclass:: poptorch.Compiler
-   :members:
-
 .. autoclass:: poptorch.OverlapMode
    :members:
 

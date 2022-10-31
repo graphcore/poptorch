@@ -9,11 +9,8 @@ import helpers
 import poptorch
 from poptorch.experimental import IPUContext
 
-compilers = [poptorch.Compiler.PopART, poptorch.Compiler.MLIR]
 
-
-@pytest.mark.parametrize("compiler", compilers)
-def test_ipu_tensor_id(compiler):
+def test_ipu_tensor_id():
     def f(x):
         x_tensor_id = poptorch.getIpuTensorId(x)
         assert x_tensor_id == poptorch.getIpuTensorId(
@@ -35,12 +32,11 @@ def test_ipu_tensor_id(compiler):
 
     input = torch.rand(3, dtype=torch.half)
 
-    IPUContext(f, compiler=compiler)(input)
+    IPUContext(f)(input)
 
 
-@pytest.mark.parametrize("compiler", compilers)
 @pytest.mark.parametrize("op", [torch.argmin, torch.argmax])
-def test_argminmax_grad(compiler, op):
+def test_argminmax_grad(op):
     torch.manual_seed(42)
     input = torch.randn([3, 4])
 
@@ -48,7 +44,7 @@ def test_argminmax_grad(compiler, op):
         x = op(x)
         return x, x.backward()
 
-    ipu_op = IPUContext(operation, compiler=compiler)
+    ipu_op = IPUContext(operation)
 
     with pytest.raises(RuntimeError,
                        match="element 0 of tensors does not "
