@@ -5,6 +5,7 @@ import re
 import torch
 import poptorch
 import poptorch.poptorch_core as poptorch_core  # type: ignore
+from poptorch.experimental import ipu_wrapper
 
 # Will be changed by conftest.py if pytest is only collecting tests
 is_running_tests = True
@@ -268,7 +269,7 @@ class LogIterator:
         while self._current < self._num_lines:
             line = self._lines[self._current]
             self._current += 1
-            if all([re.search(e, line) for e in exprs]):
+            if all(re.search(e, line) for e in exprs):
                 return line
         return None
 
@@ -317,11 +318,11 @@ class LogChecker:
                                              "\ndoes not contain "
                                              f"'{strings[0]}'")
         else:
-            assert any([
-                all([s in line for s in strings]) for line in self._lines
-            ]), (f"{self._log}"
-                 "\n No line in the above log contains all of the strings "
-                 f"{strings}")
+            assert any(
+                all(s in line for s in strings) for line in self._lines), (
+                    f"{self._log}"
+                    "\n No line in the above log contains all of the strings "
+                    f"{strings}")
 
     def assert_contains_after(self, string, after):
         """Assert there is a line in the log matching the string provided, at
@@ -345,7 +346,7 @@ class LogChecker:
                                                  f"'{strings[0]}'")
         else:
             for line in self._lines:
-                if all([s in line for s in strings]):
+                if all(s in line for s in strings):
                     # Found a line matching all the strings
                     raise ValueError(
                         f"{line}"
@@ -353,17 +354,16 @@ class LogChecker:
                         f"{strings}")
 
     def _string_matches_exprs(self, s, exprs):
-        return all([re.search(e, s) for e in exprs])
+        return all(re.search(e, s) for e in exprs)
 
     def assert_matches(self, *exprs, per_line=True):
         """Assert the log matches all the regular expressions provided
         """
         if per_line:
             # Found a line matching all the exprs
-            if any([
+            if any(
                     self._string_matches_exprs(line, exprs)
-                    for line in self._lines
-            ]):
+                    for line in self._lines):
                 return
         else:
             # Search the entire log at once
@@ -403,3 +403,18 @@ def outputDevice():
         # TODO(T59880) rename "xla" -> "ipu"
         return "xla"
     return None
+
+
+def runFunctionOnIpu(fn, *inputs):
+    """Helper function to automatically move the inputs to the IPU, run the
+    function on the IPU and move the outputs back to CPU."""
+    inputs = [
+        i.to("xla") if isinstance(i, torch.Tensor) else i for i in inputs
+    ]
+
+    output = ipu_wrapper(fn)(*inputs)
+    if isinstance(output, torch.Tensor):
+        return output.to("cpu")
+    assert isinstance(output, (tuple, list))
+    return type(output)(o.to("cpu") if isinstance(o, torch.Tensor) else o
+                        for o in output)

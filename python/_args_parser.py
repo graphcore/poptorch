@@ -187,13 +187,13 @@ class ArgsParser:
             # known in the IValue, so convert them to tuples.
             def convert(input):
                 if isinstance(input, (tuple, list)):
-                    return tuple([convert(d) for d in input])
+                    return tuple(convert(d) for d in input)
                 return input
 
             # Unreachable: asTuple() is only used by the tracer and
             # kwargs are not compatible with tracing.
             assert not self._kwargs
-            return tuple([convert(a) for a in self._args])
+            return tuple(convert(a) for a in self._args)
 
         def asPackedFlatTuple(self):
             # Remove all the non torch.tensor types and flatten
@@ -209,22 +209,35 @@ class ArgsParser:
         elif isinstance(model, torch.nn.Module):
             sig = inspect.signature(model.forward)
         elif callable(model):
-            sig = inspect.signature(model)
+            try:
+                sig = inspect.signature(model)
+            except ValueError:
+                # ValueError: no signature found for builtin ...
+                # If the callable is a Cython function then its signature
+                # might not be available (E.g torch.nn.functional.logsigmoid)
+                sig = None
         else:
             raise TypeError("Expected a torch.nn.Module or a callable")
-
-        self._var_kinds = [p.kind for p in sig.parameters.values()]
-        self._has_variadic_arguments = any([
-            kind in [
+        if sig is None:
+            # If we couldn't extract the function's signature: be flexible
+            # and default to "*args, **kwargs"
+            self._varnames = ["args", "kwargs"]
+            self._var_kinds = [
                 inspect.Parameter.VAR_POSITIONAL, inspect.Parameter.VAR_KEYWORD
-            ] for kind in self._var_kinds
-        ])
-        self._varnames = list(sig.parameters.keys())
-        self._defaults = {
-            name: p.default
-            for name, p in sig.parameters.items()
-            if p.default != inspect.Parameter.empty
-        }
+            ]
+            self._defaults = {}
+            self._has_variadic_arguments = True
+        else:
+            self._var_kinds = [p.kind for p in sig.parameters.values()]
+            self._has_variadic_arguments = any(kind in [
+                inspect.Parameter.VAR_POSITIONAL, inspect.Parameter.VAR_KEYWORD
+            ] for kind in self._var_kinds)
+            self._varnames = list(sig.parameters.keys())
+            self._defaults = {
+                name: p.default
+                for name, p in sig.parameters.items()
+                if p.default != inspect.Parameter.empty
+            }
 
         self._warned_not_contiguous_input = False
         self._tracing = tracing

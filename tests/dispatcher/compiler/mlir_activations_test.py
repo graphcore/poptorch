@@ -4,7 +4,6 @@ import torch
 import torch.nn.functional as F
 import pytest
 import helpers
-from poptorch.experimental import IPUContext
 
 
 # It's a bit of a pain to express these in the list without a python func inbetween.
@@ -90,7 +89,7 @@ def test_activations(op):
     else:
         cpu_step = op
 
-    ipu_result = IPUContext(cpu_step)(input)
+    ipu_result = helpers.runFunctionOnIpu(cpu_step, input)
     input.grad = None
 
     cpu_result = cpu_step(input)
@@ -112,7 +111,7 @@ def test_softmax(dim):
     input1 = torch.randn([2, 2, 4, 5])
 
     cpu_result = F.softmax(input1, dim)
-    ipu_result = IPUContext(F.softmax)(input1, dim)
+    ipu_result = helpers.runFunctionOnIpu(F.softmax, input1, dim)
 
     helpers.assert_allclose(expected=cpu_result,
                             actual=ipu_result,
@@ -125,7 +124,7 @@ def test_logsoftmax_forward(dim):
     input1 = torch.randn([2, 2, 4, 5])
 
     cpu_result = F.log_softmax(input1, dim)
-    ipu_result = IPUContext(F.log_softmax)(input1, dim)
+    ipu_result = helpers.runFunctionOnIpu(F.log_softmax, input1, dim)
 
     helpers.assert_allclose(expected=cpu_result,
                             actual=ipu_result,
@@ -145,7 +144,7 @@ def test_logsoftmax_backward(dim):
         loss.backward()
         return t.grad
 
-    ipu_result = IPUContext(log_softmax_backward)(input1)
+    ipu_result = helpers.runFunctionOnIpu(log_softmax_backward, input1)
     cpu_result = log_softmax_backward(input1)
 
     helpers.assert_allclose(expected=cpu_result,
@@ -160,7 +159,7 @@ def test_prelu():
     weight = torch.zeros(2)
 
     cpu_result = F.prelu(inp, weight)
-    ipu_result = IPUContext(F.prelu)(inp, weight)
+    ipu_result = helpers.runFunctionOnIpu(F.prelu, inp, weight)
 
     helpers.assert_allclose(expected=cpu_result,
                             actual=ipu_result,

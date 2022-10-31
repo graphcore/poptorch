@@ -4,7 +4,7 @@ import math
 import torch
 import torch.nn.functional as F
 import pytest
-from poptorch.experimental import IPUContext
+import helpers
 
 
 def test_dropout_eval():
@@ -13,11 +13,10 @@ def test_dropout_eval():
 
     t1 = torch.randn(10)
 
-    @IPUContext
     def ipu_dropout(t):
         return F.dropout(t, p=0.5, training=False)
 
-    t2 = ipu_dropout(t1)
+    t2 = helpers.runFunctionOnIpu(ipu_dropout, t1)
     assert (t1 == t2).all()
 
 
@@ -29,11 +28,10 @@ def test_dropout_train(p):
     n = 1000
     t1 = torch.randn(n)
 
-    @IPUContext
     def ipu_dropout(t):
         return F.dropout(t, p=p, training=True)
 
-    t2 = ipu_dropout(t1)
+    t2 = helpers.runFunctionOnIpu(ipu_dropout, t1)
     num_zeros = n - torch.count_nonzero(t2).item()
 
     if p > 0.0:
