@@ -384,7 +384,7 @@ void MLIRDispatch::markStep() {
   const auto cleanup = CallOnExit([&] { reset(); });
 
   if (_compiler.isTrivialGraph()) {
-    poptorch::logging::trace("MLIR graph empty: skipping compilation()");
+    poptorch::logging::trace("MLIR graph empty: skipping compile()");
     return;
   }
 

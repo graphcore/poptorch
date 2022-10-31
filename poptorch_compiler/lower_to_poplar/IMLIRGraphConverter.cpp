@@ -51,12 +51,11 @@ private:
 };
 } // namespace
 
-void IMLIRGraphConverter::convertGraph(mlir::ModuleOp &module,
-                                       NonRestartingMLIRTimer &timer) {
+void runGraphPasses(mlir::ModuleOp &module, NonRestartingMLIRTimer &timer) {
   mlir::PassManager manager{module.getContext()};
 
-  auto graph_construction = timer.nestAndScope("Poplar graph construction");
-  manager.enableTiming(graph_construction);
+  auto graph_passes = timer.nestAndScope("MLIR graph passes");
+  manager.enableTiming(graph_passes);
   // Disable MLIR pass verification as we have our own definition of
   // valid IR state
   manager.enableVerifier(false);
@@ -96,10 +95,23 @@ void IMLIRGraphConverter::convertGraph(mlir::ModuleOp &module,
   addOverwriteHandlingPasses(manager);
   manager.addPass(mlir::createCanonicalizerPass());
   manager.addPass(mlir::createCSEPass());
-  addCustomPasses(manager);
 
   ERROR_ON_MSG(!mlir::succeeded(manager.run(module)),
                "One or more passes failed.");
+  graph_passes.stop();
+}
+
+void IMLIRGraphConverter::convertGraph(mlir::ModuleOp &module,
+                                       NonRestartingMLIRTimer &timer) {
+  mlir::PassManager manager{module.getContext()};
+  auto graph_construction = timer.nestAndScope("Poplar graph construction");
+
+  manager.enableTiming(graph_construction);
+  addCustomPasses(manager);
+
+  ERROR_ON_MSG(!mlir::succeeded(manager.run(module)),
+               "Converting the graph failed.");
+
   graph_construction.stop();
 }
 

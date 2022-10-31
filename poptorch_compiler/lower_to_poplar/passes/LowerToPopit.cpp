@@ -1,6 +1,7 @@
 // Copyright (c) 2021 Graphcore Ltd. All rights reserved.
 #include "LowerToPopit.hpp"
 
+#include <algorithm>
 #include <iterator>
 #include <string>
 #include <utility>
@@ -96,10 +97,13 @@ void LowerToPopit::runOnOperation() {
 
       // All the tensors that were written to are outputs.
       std::vector<poplar::Tensor> outputs;
-      function.walk([&](poptorch_ir::output_tensor output) {
-        outputs.push_back(context.fromSsa(output.tensor()));
+      function.walk([&](mlir::func::ReturnOp ret) {
+        const auto result_range = ret.getOperands();
+        outputs.reserve(result_range.size());
+        llvm::transform(
+            result_range, std::back_inserter(outputs),
+            [&](const mlir::Value &result) { return context.fromSsa(result); });
       });
-
       return outputs;
     };
 

@@ -1,6 +1,7 @@
 // Copyright (c) 2021 Graphcore Ltd. All rights reserved.
 #include "MLIRStaticGraphCompiler.hpp"
 
+#include <mlir/Dialect/Func/IR/FuncOps.h>
 #include <mlir/IR/BuiltinTypes.h>
 
 #include <string>
@@ -36,6 +37,11 @@ MLIRStaticGraphCompiler::compile(const PoplarTarget &target) {
   // Start the timer if it has not been started already
   timing_manager.setEnabled(true);
   root_timer.start();
+
+  // Each block needs a terminator.
+  createOpInEpilogue<mlir::func::ReturnOp>(_main_graph);
+  createOpInEpilogue<mlir::func::ReturnOp>(_write_weights_graph);
+  createOpInEpilogue<mlir::func::ReturnOp>(_read_weights_graph);
 
   poptorch_ir::PoplarExecutor exe =
       compileExecutable(_the_module, target, root_timer);

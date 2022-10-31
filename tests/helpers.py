@@ -394,6 +394,9 @@ class LogChecker:
                     "\n The log above matches all of the expressions "
                     f"{exprs}")
 
+    def findall(self, pattern: str) -> list:
+        return re.findall(pattern, self._log)
+
 
 # When we're running on the CPU we don't need to specify a device
 # but for IPU devices we need to make sure the output buffers are

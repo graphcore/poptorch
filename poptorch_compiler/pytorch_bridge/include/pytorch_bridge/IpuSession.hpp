@@ -12,7 +12,7 @@
 
 namespace popit {
 using Mem_t = struct MemRef;
-}
+} // namespace popit
 
 namespace poptorch_ir {
 
@@ -78,7 +78,7 @@ public:
 class PopitDeviceFunctionWrapper {
 public:
   explicit PopitDeviceFunctionWrapper(
-      std::unique_ptr<PopitDeviceFunction> func);
+      std::shared_ptr<PopitDeviceFunction> func);
   PopitDeviceFunctionWrapper(PopitDeviceFunctionWrapper &&) noexcept = default;
   PopitDeviceFunctionWrapper &
   operator=(PopitDeviceFunctionWrapper &&) noexcept = default;
@@ -91,8 +91,9 @@ public:
   void run(IAllocationMap &alloc_map) const;
 
 private:
-  std::unique_ptr<PopitDeviceFunction> _func;
+  std::shared_ptr<PopitDeviceFunction> _func;
 };
+
 } // namespace poptorch_ir
 
 #endif // POPTORCH_COMPILER_PYTORCH_BRIDGE_IPU_SESSION_HPP_

@@ -5,11 +5,18 @@
 #include <memory>
 #include <thread>
 
+#include <mlir/Dialect/Func/IR/FuncOps.h>
+#include <mlir/IR/BuiltinOps.h>
+
 #include <popit/Device.hpp>
 #include <popit/popit.hpp>
 
+#include "dialect/Helpers.hpp"
+#include "lower_to_poplar/NonRestartingMLIRTimer.hpp"
+#include "lower_to_poplar/PopitExecutor.hpp"
 #include "poptorch_logging/Error.hpp"
 #include "poptorch_logging/Logging.hpp"
+#include "pytorch_bridge/IpuSession.hpp"
 
 namespace poptorch_ir {
 
@@ -115,6 +122,88 @@ auto createSession(popit::Device &device) {
   return session;
 }
 
+llvm::hash_code
+hashOp(mlir::Operation *op,
+       const llvm::DenseMap<mlir::Value, llvm::hash_code> &tensor_hash_map) {
+  auto hash = llvm::hash_value(op->getName().getStringRef());
+
+  // Hash attributes.
+  const auto &dict = op->getAttrDictionary();
+  for (const auto *it = dict.begin(); it != dict.end(); it++) {
+    hash = llvm::hash_combine(hash, it->getName().strref(),
+                              mlirToStr(it->getValue()));
+  }
+
+  // Combine the pre-computed hash of the op's inputs.
+  for (const auto &operand : op->getOperands()) {
+    auto it = tensor_hash_map.find(operand);
+    ERROR_ON(it == tensor_hash_map.end());
+    hash = llvm::hash_combine(hash, it->second);
+  }
+
+  // Hash the op's output types.
+  for (const auto &type : op->getResultTypes()) {
+    hash = llvm::hash_combine(hash, mlirToStr(type));
+  }
+
+  return hash;
+}
+
+llvm::hash_code hashGraph(mlir::ModuleOp module) {
+  llvm::hash_code hash{0};
+
+  // Build up hashes for each of the values as they are traced through the
+  // parent function.
+  llvm::DenseMap<mlir::Value, llvm::hash_code> tensor_hash_map;
+
+  for (mlir::func::FuncOp func : module.getOps<mlir::func::FuncOp>()) {
+    tensor_hash_map.clear();
+    for (const auto &argument : func.getArguments()) {
+      tensor_hash_map.insert(
+          {argument, llvm::hash_value(argument.getArgNumber())});
+    }
+
+    func->walk([&](mlir::Operation *op) {
+      if (op == func) {
+        return;
+      }
+
+      if (mlir::dyn_cast_or_null<mlir::func::ReturnOp>(op) != nullptr) {
+        for (const auto &operand : op->getOperands()) {
+          auto it = tensor_hash_map.find(operand);
+          ERROR_ON(it == tensor_hash_map.end());
+          hash = llvm::hash_combine(hash, it->second);
+        }
+
+        return;
+      }
+
+      auto meoi = mlir::dyn_cast_or_null<mlir::MemoryEffectOpInterface>(op);
+      // All ops must have their memory side effects captured by a MemoryEffect
+      // trait, otherwise, we will not be able to identify any side effects.
+      ERROR_ON(meoi == nullptr);
+      // Memory read side effects are not yet supported.
+      ERROR_ON(meoi.hasEffect<mlir::MemoryEffects::Read>());
+      auto op_hash = hashOp(op, tensor_hash_map);
+      if (meoi.hasEffect<mlir::MemoryEffects::Write>()) {
+        // If there is a write side effect, update the global hash right away.
+        hash = llvm::hash_combine(hash, op_hash);
+      }
+
+      // Update the tensor map by creating a hash for every result based on the
+      // op's hash and the index of the result.
+      for (const auto &result : op->getResults()) {
+        tensor_hash_map.insert(
+            {result, llvm::hash_combine(
+                         op_hash, llvm::hash_value(result.getResultNumber()))});
+      }
+    });
+  }
+
+  poptorch::logging::trace("Graph hash is {}", hash);
+  return hash;
+}
+
 } // namespace
 
 EagerIpuSession::EagerIpuSession()
@@ -140,6 +229,24 @@ void EagerIpuSession::copyDataToCpu(char *cpu_dest, Buffer &ipu_src) {
 
 void EagerIpuSession::copyDataOnDevice(Buffer &dest, const Buffer &src) {
   popit::copy(src.getPopitData().get(), dest.getPopitData().get());
+}
+
+PopitDeviceFunctionWrapper PopitFunctionCache::emplaceWrapped(
+    const mlir::ModuleOp &graph, EagerIpuSession &session,
+    const std::vector<TensorId> &input_ids,
+    const std::vector<TensorId> &output_ids, NonRestartingMLIRTimer &timer) {
+  auto hash = hashGraph(graph);
+
+  if (auto it = _cache.find(hash); it != _cache.end()) {
+    poptorch::logging::trace("Found graph in cache: reusing PopIT function");
+    return PopitDeviceFunctionWrapper(it->second);
+  }
+
+  poptorch::logging::trace("Graph not cached: compiling new PopIT function");
+  auto new_func = std::make_shared<PopitDeviceFunction>(
+      session, graph, input_ids, output_ids, timer);
+  _cache.insert({hash, new_func});
+  return PopitDeviceFunctionWrapper(new_func);
 }
 
 } // namespace poptorch_ir

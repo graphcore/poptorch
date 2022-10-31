@@ -12,14 +12,18 @@ def simple_add(capfd):
 
     capfd.readouterr()  # Clear the log
 
-    def fn(input, check_log=False):
+    def fn(input, check_log=False, first_compile=False):
         x = input + 5
         if check_log:
             # Check the add was lowered and executed.
             log = helpers.LogChecker(capfd)
             log.assert_not_contains("CPU -> IPU")
             log.assert_not_contains("IPU -> CPU")
-            log.assert_contains("Graph lowered to popit")
+            if first_compile:
+                log.assert_contains("Graph lowered to popit")
+            else:
+                log.assert_contains("reusing PopIT function")
+
         return x * 3
 
     input = torch.ones([10])
@@ -29,12 +33,19 @@ def simple_add(capfd):
     input = input.to("xla")
     log = helpers.LogChecker(capfd)
     log.assert_contains("CPU -> IPU")
-    ipu = fn(input, check_log=True)
+    ipu = fn(input, check_log=True, first_compile=True)
     # Check the multiplication was also lowered and executed.
     log = helpers.LogChecker(capfd)
     log.assert_not_contains("CPU -> IPU")
     log.assert_not_contains("IPU -> CPU")
     log.assert_contains("Graph lowered to popit")
+    ipu = fn(input, check_log=True)
+    # Check that we cached the PopIT function created on the last run and reused
+    # it on this run.
+    log = helpers.LogChecker(capfd)
+    log.assert_not_contains("CPU -> IPU")
+    log.assert_not_contains("IPU -> CPU")
+    log.assert_contains("Found graph in cache")
     print(f"Result cpu: {cpu} ipu: {ipu}")
     # Check the print triggered a copy to host
     log = helpers.LogChecker(capfd)

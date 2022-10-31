@@ -119,6 +119,7 @@ bool PoptorchCompiler::allOpsCanBeLoweredToPoplar() const {
 bool PoptorchCompiler::isTrivialGraph() const {
   return _impl->isTrivialGraph();
 }
+
 PopitDeviceFunctionWrapper PoptorchCompiler::compile(IIpuSession &session,
                                                      ILivenessMap &liveness) {
   auto *compiler = dynamic_cast<detail::MLIREagerCompiler *>(_impl.get());

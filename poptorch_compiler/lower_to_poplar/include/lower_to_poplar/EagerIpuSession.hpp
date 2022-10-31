@@ -6,6 +6,13 @@
 
 #include "pytorch_bridge/IpuSession.hpp"
 
+#include <llvm/ADT/DenseMap.h>
+#include <llvm/ADT/Hashing.h>
+
+namespace mlir {
+class ModuleOp;
+}
+
 namespace popit {
 class Device;
 struct Session;
@@ -13,6 +20,20 @@ using Session_t = Session;
 } // namespace popit
 
 namespace poptorch_ir {
+
+class NonRestartingMLIRTimer;
+
+class PopitFunctionCache final {
+public:
+  PopitDeviceFunctionWrapper
+  emplaceWrapped(const mlir::ModuleOp &graph, EagerIpuSession &session,
+                 const std::vector<TensorId> &input_ids,
+                 const std::vector<TensorId> &output_ids,
+                 NonRestartingMLIRTimer &timer);
+
+private:
+  llvm::DenseMap<llvm::hash_code, std::shared_ptr<PopitDeviceFunction>> _cache;
+};
 
 class EagerIpuSession final : public IIpuSession {
 public:
@@ -28,6 +49,7 @@ public:
   // session.
   std::unique_ptr<popit::Device> device;
   std::shared_ptr<popit::Session_t> session;
+  PopitFunctionCache func_cache;
 };
 
 } // namespace poptorch_ir

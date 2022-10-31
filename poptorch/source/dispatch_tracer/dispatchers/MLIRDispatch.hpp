@@ -39,6 +39,8 @@ public:
   void detach(const c10::OperatorHandle &op, c10::Stack *stack,
               bool moving_parameters) final;
 
+  void cast(const c10::OperatorHandle &op, c10::Stack *stack);
+
   void promoteAsParameter(const at::Tensor &tensor);
 
   void promoteAsInput(const at::Tensor &tensor, bool is_wrapped = false);

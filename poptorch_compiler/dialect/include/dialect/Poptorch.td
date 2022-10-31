@@ -93,11 +93,4 @@ def Poptorch_copy_to_global_state
   }];
 }
 
-
-def Poptorch_output_tensor: Poptorch_AbstractOp<"output_tensor", [], MemoryEffects<[MemWrite]>> {
-    let arguments = (ins Poptorch_tensor:$tensor, I64Attr:$tensorId);
-    let assemblyFormat = [{`(` $tensor `,` $tensorId`)` `(`type($tensor)`)` attr-dict }];
-    let summary = "Mark a tensor as being an output.";
-}
-
 #endif // POPTORCH_OPS

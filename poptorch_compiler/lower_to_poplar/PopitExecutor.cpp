@@ -1,6 +1,7 @@
 // Copyright (c) 2022 Graphcore Ltd. All rights reserved.
 #include "lower_to_poplar/PopitExecutor.hpp"
 
+#include <mlir/Dialect/Func/IR/FuncOps.h>
 #include <mlir/IR/BuiltinOps.h>
 #include <mlir/IR/BuiltinTypes.h>
 #include <mlir/IR/MLIRContext.h>
@@ -29,6 +30,7 @@
 #include "poptorch_logging/Error.hpp"
 #include "poptorch_logging/Logging.hpp"
 #include "pytorch_bridge/CompilerTypes.hpp"
+#include "pytorch_bridge/IpuSession.hpp"
 
 namespace poptorch_ir {
 
@@ -46,54 +48,15 @@ private:
   PopitDeviceFunction &_func;
 };
 
-auto extractInputsAndOutputs(
-    mlir::ModuleOp module,
-    const llvm::DenseMap<mlir::Value, TensorId> &mappings) {
-  std::vector<TensorId> inputs;
-  std::vector<TensorId> outputs;
-
-  for (mlir::func::FuncOp function : module.getOps<mlir::func::FuncOp>()) {
-    inputs.clear();
-    outputs.clear();
-    inputs.reserve(function.getArguments().size());
-    llvm::transform(function.getArguments(), std::back_inserter(inputs),
-                    [&](const mlir::Value &argument) {
-                      auto it = mappings.find(argument);
-                      // This can only happen if a pass in MLIRToPopitConverter
-                      // replaces one of the graph inputs. We can't support this
-                      // because we've got no way to map the new graph input to
-                      // a Torch tensor.
-                      ERROR_ON_MSG(
-                          it == mappings.end(),
-                          "[Internal] Input Value not found in tensor map");
-                      return it->second;
-                    });
-    function.walk([&](poptorch_ir::output_tensor output) {
-      const auto it = mappings.find(output.tensor());
-      // This can only happen if a pass in MLIRToPopitConverter
-      // replaces one of the graph inputs. We can't support this
-      // because we've got no way to map the new graph input to
-      // a Torch tensor.
-      ERROR_ON_MSG(it == mappings.end(),
-                   "[Internal] Output Value not found in tensor map");
-
-      outputs.emplace_back(it->second);
-    });
-  }
-
-  return std::pair(inputs, outputs);
-}
 } // namespace
 
 PopitDeviceFunction::PopitDeviceFunction(
     EagerIpuSession &context, mlir::ModuleOp module,
-    NonRestartingMLIRTimer &timer,
-    const llvm::DenseMap<mlir::Value, TensorId> &mappings)
-    : _context(&context) {
+    const std::vector<TensorId> &input_ids,
+    const std::vector<TensorId> &output_ids, NonRestartingMLIRTimer &timer)
+    : _input_ids(input_ids), _output_ids(output_ids), _context(&context) {
 
   auto compile_popit = timer.nestAndScope("Compiling popit");
-
-  std::tie(_input_ids, _output_ids) = extractInputsAndOutputs(module, mappings);
 
   MLIRToPopitConverter converter{*this};
   converter.convertGraph(module, timer);
@@ -110,7 +73,9 @@ void PopitDeviceFunction::run(const std::vector<popit::Mem_t *> &inputs,
 const std::vector<TensorId> &PopitDeviceFunction::getOutputs() const {
   return _output_ids;
 }
+
 const std::vector<TensorId> &PopitDeviceFunction::getInputs() const {
   return _input_ids;
 }
+
 } // namespace poptorch_ir

@@ -120,6 +120,8 @@ PoplarExecutor compileExecutable(mlir::ModuleOp module,
   poplar::program::Sequence seq;
   CompilerContext context(graph, seq);
 
+  runGraphPasses(module, timer);
+
   MLIRToPoplarConverter converter(context);
   converter.convertGraph(module, timer);
 
@@ -129,4 +131,5 @@ PoplarExecutor compileExecutable(mlir::ModuleOp module,
   compile_poplar.stop();
   return PoplarExecutor(std::move(engine));
 }
+
 } // namespace poptorch_ir

@@ -4,7 +4,9 @@
 #include <llvm/ADT/STLExtras.h>
 
 #include <chrono>
+#include <memory>
 #include <thread>
+#include <utility>
 
 #include "lower_to_poplar/EagerIpuSession.hpp"
 #include "lower_to_poplar/PopitExecutor.hpp"
@@ -55,7 +57,7 @@ std::shared_ptr<IIpuSession> createEagerSession() {
 }
 
 PopitDeviceFunctionWrapper::PopitDeviceFunctionWrapper(
-    std::unique_ptr<PopitDeviceFunction> func)
+    std::shared_ptr<PopitDeviceFunction> func)
     : _func(std::move(func)) {}
 PopitDeviceFunctionWrapper::~PopitDeviceFunctionWrapper() = default;
 

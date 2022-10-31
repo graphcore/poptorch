@@ -2,6 +2,11 @@
 #ifndef POPTORCH_COMPILER_PYTORCH_BRIDGE_MLIR_EAGER_COMPILER_HPP_
 #define POPTORCH_COMPILER_PYTORCH_BRIDGE_MLIR_EAGER_COMPILER_HPP_
 
+#include <llvm/ADT/DenseMap.h>
+#include <mlir/IR/BuiltinOps.h>
+
+#include <memory>
+#include <utility>
 #include <vector>
 
 #include "IMLIRCompiler.hpp"

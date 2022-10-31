@@ -2,8 +2,6 @@
 #ifndef POPTORCH_LOWER_TO_POPLAR_POPIT_EXECUTOR_HPP_
 #define POPTORCH_LOWER_TO_POPLAR_POPIT_EXECUTOR_HPP_
 
-#include <llvm/ADT/DenseMap.h>
-
 #include <memory>
 #include <string>
 #include <vector>
@@ -32,8 +30,9 @@ class NonRestartingMLIRTimer;
 class PopitDeviceFunction {
 public:
   PopitDeviceFunction(EagerIpuSession &context, mlir::ModuleOp module,
-                      NonRestartingMLIRTimer &timer,
-                      const llvm::DenseMap<mlir::Value, TensorId> &mappings);
+                      const std::vector<TensorId> &input_ids,
+                      const std::vector<TensorId> &output_ids,
+                      NonRestartingMLIRTimer &timer);
 
   void run(const std::vector<popit::Mem_t *> &inputs,
            const std::vector<popit::Mem_t *> &outputs);
