@@ -13,6 +13,8 @@
 #include "lower_to_poplar/StaticIpuSession.hpp"
 #include "pytorch_bridge/DebugInfo.hpp"
 
+#include <poptorch_logging/Logging.hpp>
+
 namespace poptorch_ir {
 
 PopitMemPtr::PopitMemPtr(std::nullptr_t)
@@ -81,6 +83,8 @@ void PopitDeviceFunctionWrapper::run(IAllocationMap &alloc_map) const {
       });
 
   _func->run(inputs, outputs);
+
+  poptorch::logging::info("Executed PopIT function");
 }
 
 } // namespace poptorch_ir

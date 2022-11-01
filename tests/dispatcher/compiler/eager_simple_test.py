@@ -102,7 +102,7 @@ def test_source_location(mode):
 
 
 @helpers.printCapfdOnExit
-@helpers.overridePoptorchLogLevel("DEBUG")
+@helpers.overridePoptorchLogLevel("INFO")
 @pytest.mark.extendedTestingOnly
 def test_lazy_tensor(capfd):
     import poptorch.eager  # pylint: disable=unused-import, import-outside-toplevel
@@ -113,18 +113,18 @@ def test_lazy_tensor(capfd):
     s = t + t
 
     log = helpers.LogChecker(capfd)
-    log.assert_no_matches("poptorch.add")
+    log.assert_no_matches("Executed PopIT function")
 
     s.cpu()
 
     log = helpers.LogChecker(capfd)
-    log.assert_matches("poptorch.add")
+    log.assert_matches("Executed PopIT function")
 
     s = t + t
     poptorch.eager.markStep()
 
     log = helpers.LogChecker(capfd)
-    log.assert_matches("poptorch.add")
+    log.assert_matches("Executed PopIT function")
 
 
 @helpers.printCapfdOnExit
