@@ -11,8 +11,8 @@
 #include "pytorch_bridge/IpuSession.hpp"
 
 namespace popit {
-struct MemRef;
-using Mem_t = MemRef;
+struct Mem;
+using Mem_t = Mem;
 using FunctionId_t = unsigned;
 } // namespace popit
 

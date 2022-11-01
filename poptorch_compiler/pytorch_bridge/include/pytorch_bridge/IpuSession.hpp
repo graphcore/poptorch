@@ -12,7 +12,7 @@
 #include <poptorch_logging/Error.hpp>
 
 namespace popit {
-using Mem_t = struct MemRef;
+using Mem_t = struct Mem;
 } // namespace popit
 
 namespace poptorch_ir {
