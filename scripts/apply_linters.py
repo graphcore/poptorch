@@ -28,6 +28,7 @@ cpp_lint_disabled = [
 
 
 class GitStrategy(enum.Enum):
+    ArcconfigBase = "arcconfig"  # against the git:<branch> in .arcconfig
     Master = "master"  # Files modified / added between HEAD and origin/master
     Head = "head"  # Files modified / added in the last commit
     Diff = "diff"  # Files modified / added but not commited
@@ -67,8 +68,7 @@ class ILinterFamily:
         if self.first_lint:
             # Check all the linters are correctly installed
             self.first_lint = False
-            all_valid = all(
-                [linter.check_version() for linter in self._linters])
+            all_valid = all(linter.check_version() for linter in self._linters)
             if not all_valid:
                 print("\nERROR: You need a valid PopTorch buildenv to run "
                       "the linters:")
@@ -672,8 +672,7 @@ class ClangTidy(ILinter):
                 "NamespaceHungarianPrefix"
             ]
             config = [
-                line for line in config
-                if not any([e in line for e in excludes])
+                line for line in config if not any(e in line for e in excludes)
             ]
             return output, returncode
 
@@ -844,11 +843,26 @@ class Linters:
                     self.files.append(line.split()[-1])
                 return output, returncode
 
+        def arcconfig_base():
+            try:
+                with open(".arcconfig", "r") as f:
+                    conf = json.load(f)
+                    # We expect something like:
+                    # "base": "git:origin/master"
+                    return conf["base"].split(":")[-1]
+            except:  #pylint: disable=bare-except
+                logger.warning(
+                    "Failed to parse 'base' option from .arconfig, defaulting "
+                    "to 'origin/master'")
+                return "origin/master"
+
         assert isinstance(strategy, GitStrategy)
         git_cmd = ""
         filter_cmd = "| grep \"^[AMRT]\" "
         if strategy == GitStrategy.Master:
             git_cmd = "git diff --name-status -r origin/master "
+        if strategy == GitStrategy.ArcconfigBase:
+            git_cmd = "git diff --name-status -r " + arcconfig_base()
         elif strategy == GitStrategy.Head:
             git_cmd = "git diff --name-status -r HEAD^ "
         elif strategy == GitStrategy.Diff:
@@ -920,7 +934,7 @@ if __name__ == "__main__":
         "-s",
         type=str,
         choices=[v.value for _, v in GitStrategy.__members__.items()],
-        default=GitStrategy.Master.value,
+        default=GitStrategy.ArcconfigBase.value,
         help="Strategy to use when no files are passed")
     parser.add_argument("--jobs",
                         "-j",
