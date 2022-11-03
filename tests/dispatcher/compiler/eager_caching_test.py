@@ -159,3 +159,27 @@ def test_lazy_tensor(capfd):
     assert graph_hash_3 == graph_hash_1
     # but not the second, which has a different shape.
     assert graph_hash_3 != graph_hash_2
+
+
+@pytest.mark.ipuHardwareRequired
+def test_argument_lookup():
+    import poptorch.eager as poptorch  # pylint: disable=unused-import, import-outside-toplevel
+    poptorch.eager_options.use_lazy_tensor = True
+
+    input = (torch.zeros(2, 3, 5).to('xla'), torch.zeros(2, 3, 5).to('xla'))
+    poptorch.markStep()
+
+    res = torch.add(*input)
+    poptorch.markStep()
+
+    out = torch.ones_like(res)
+    poptorch.markStep()
+
+    # Note this will be removed by dead code elimination leaving making the
+    # compiled graph the same as for the original torch.add op
+    out.clone()
+    res2 = torch.add(*input)
+
+    poptorch.markStep()
+
+    helpers.assert_allequal(expected=res.cpu(), actual=res2.cpu())

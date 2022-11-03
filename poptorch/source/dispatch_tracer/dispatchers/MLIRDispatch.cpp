@@ -340,16 +340,15 @@ public:
     ERROR_ON(!host_buffer);
     return host_buffer.get();
   }
-  popit::Mem_t *
-  getOrAllocate(poptorch_ir::TensorId id,
-                const poptorch_ir::TensorDebugInfo &info) override {
+  popit::Mem_t *getOrAllocate(poptorch_ir::TensorId id,
+                              poptorch_ir::TensorDebugInfo info) override {
     auto details = _mapper->getTensorDetailsForMlirId(id);
     ERROR_ON(!details);
     auto &buff = details->getBuffer();
     if (!buff.hasData()) {
       buff = _session->allocate(details->type);
     }
-    details->debug_info = info;
+    details->debug_info = std::move(info);
     return buff.getPopitData().get();
   }
 

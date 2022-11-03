@@ -60,27 +60,27 @@ std::shared_ptr<IIpuSession> createEagerSession() {
 }
 
 PopitDeviceFunctionWrapper::PopitDeviceFunctionWrapper(
-    std::shared_ptr<PopitDeviceFunction> func)
-    : _func(std::move(func)) {}
+    std::shared_ptr<PopitDeviceFunction> func, FunctionIO io,
+    GraphDebugInfo debug_info)
+    : _func(std::move(func)), _io(std::move(io)),
+      _debug_info(std::move(debug_info)) {}
 PopitDeviceFunctionWrapper::~PopitDeviceFunctionWrapper() = default;
 
 void PopitDeviceFunctionWrapper::run(IAllocationMap &alloc_map) const {
   std::vector<popit::Mem_t *> inputs;
-  inputs.reserve(_func->getInputs().size());
-  llvm::transform(
-      _func->getInputs(), std::back_inserter(inputs),
-      [&](TensorId input) { return alloc_map.getAllocation(input); });
-
-  auto graph_debug_info = _func->getDebugInfo();
+  inputs.reserve(_io.inputs.size());
+  llvm::transform(_io.inputs, std::back_inserter(inputs), [&](TensorId input) {
+    return alloc_map.getAllocation(input);
+  });
 
   std::vector<popit::Mem_t *> outputs;
-  outputs.reserve(_func->getOutputs().size());
-  llvm::transform(
-      llvm::enumerate(_func->getOutputs()), std::back_inserter(outputs),
-      [&](auto output) {
-        const TensorDebugInfo debug_info{graph_debug_info, output.index()};
-        return alloc_map.getOrAllocate(output.value(), debug_info);
-      });
+  outputs.reserve(_io.outputs.size());
+  llvm::transform(llvm::enumerate(_io.outputs), std::back_inserter(outputs),
+                  [&](auto output) {
+                    return alloc_map.getOrAllocate(
+                        output.value(),
+                        TensorDebugInfo{_debug_info, output.index()});
+                  });
 
   _func->run(inputs, outputs);
 

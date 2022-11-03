@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "pytorch_bridge/CompilerTypes.hpp"
+#include "pytorch_bridge/IpuSession.hpp"
 
 namespace mlir {
 template <typename T> class OperationPass;
@@ -21,11 +22,6 @@ class Target;
 
 namespace poptorch_ir {
 class NonRestartingMLIRTimer;
-
-struct FunctionIO {
-  std::vector<TensorId> inputs;
-  std::vector<TensorId> outputs;
-};
 
 using ExternalFunctionIO = std::unordered_map<std::string, FunctionIO>;
 

@@ -52,13 +52,10 @@ private:
 
 } // namespace
 
-PopitDeviceFunction::PopitDeviceFunction(
-    EagerIpuSession &context, mlir::ModuleOp module,
-    const std::vector<TensorId> &input_ids,
-    const std::vector<TensorId> &output_ids, GraphDebugInfo debug_info,
-    NonRestartingMLIRTimer &timer)
-    : _input_ids(input_ids), _output_ids(output_ids),
-      _debug_info(std::move(debug_info)), _context(&context) {
+PopitDeviceFunction::PopitDeviceFunction(EagerIpuSession &context,
+                                         mlir::ModuleOp module,
+                                         NonRestartingMLIRTimer &timer)
+    : _context(&context) {
 
   auto compile_popit = timer.nestAndScope("Compiling popit");
 
@@ -73,18 +70,6 @@ void PopitDeviceFunction::run(const std::vector<popit::Mem_t *> &inputs,
   // Execute the function
   popit::call(_context->session.get(), _popit_fn,
               /* ipuIndex=*/0, inputs, outputs);
-}
-
-const std::vector<TensorId> &PopitDeviceFunction::getOutputs() const {
-  return _output_ids;
-}
-
-const std::vector<TensorId> &PopitDeviceFunction::getInputs() const {
-  return _input_ids;
-}
-
-const GraphDebugInfo &PopitDeviceFunction::getDebugInfo() const {
-  return _debug_info;
 }
 
 } // namespace poptorch_ir

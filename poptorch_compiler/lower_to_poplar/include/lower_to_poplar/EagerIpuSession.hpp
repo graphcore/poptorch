@@ -26,13 +26,16 @@ class NonRestartingMLIRTimer;
 
 class PopitFunctionCache final {
 public:
-  PopitDeviceFunctionWrapper
-  emplaceWrapped(const mlir::ModuleOp &graph, EagerIpuSession &session,
-                 const std::vector<TensorId> &input_ids,
-                 const std::vector<TensorId> &output_ids,
-                 GraphDebugInfo debug_info, NonRestartingMLIRTimer &timer);
+  PopitDeviceFunctionWrapper emplaceWrapped(const mlir::ModuleOp &graph,
+                                            EagerIpuSession &session,
+                                            FunctionIO io,
+                                            GraphDebugInfo debug_info,
+                                            NonRestartingMLIRTimer &timer);
 
 private:
+  std::shared_ptr<PopitDeviceFunction> emplace(const mlir::ModuleOp &graph,
+                                               EagerIpuSession &session,
+                                               NonRestartingMLIRTimer &timer);
   llvm::DenseMap<llvm::hash_code, std::shared_ptr<PopitDeviceFunction>> _cache;
 };
 

@@ -231,23 +231,27 @@ void EagerIpuSession::copyDataOnDevice(Buffer &dest, const Buffer &src) {
   popit::copy(src.getPopitData().get(), dest.getPopitData().get());
 }
 
-PopitDeviceFunctionWrapper PopitFunctionCache::emplaceWrapped(
-    const mlir::ModuleOp &graph, EagerIpuSession &session,
-    const std::vector<TensorId> &input_ids,
-    const std::vector<TensorId> &output_ids, GraphDebugInfo debug_info,
-    NonRestartingMLIRTimer &timer) {
+std::shared_ptr<PopitDeviceFunction>
+PopitFunctionCache::emplace(const mlir::ModuleOp &graph,
+                            EagerIpuSession &session,
+                            NonRestartingMLIRTimer &timer) {
   auto hash = hashGraph(graph);
 
   if (auto it = _cache.find(hash); it != _cache.end()) {
     poptorch::logging::trace("Found graph in cache: reusing PopIT function");
-    return PopitDeviceFunctionWrapper(it->second);
+    return it->second;
   }
-
   poptorch::logging::trace("Graph not cached: compiling new PopIT function");
-  auto new_func = std::make_shared<PopitDeviceFunction>(
-      session, graph, input_ids, output_ids, std::move(debug_info), timer);
-  _cache.insert({hash, new_func});
-  return PopitDeviceFunctionWrapper(new_func);
+  auto func = std::make_shared<PopitDeviceFunction>(session, graph, timer);
+  _cache.insert({hash, func});
+  return func;
+}
+
+PopitDeviceFunctionWrapper PopitFunctionCache::emplaceWrapped(
+    const mlir::ModuleOp &graph, EagerIpuSession &session, FunctionIO io,
+    GraphDebugInfo debug_info, NonRestartingMLIRTimer &timer) {
+  return PopitDeviceFunctionWrapper(emplace(graph, session, timer),
+                                    std::move(io), std::move(debug_info));
 }
 
 } // namespace poptorch_ir

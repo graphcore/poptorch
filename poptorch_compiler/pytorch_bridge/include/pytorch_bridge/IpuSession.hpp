@@ -17,6 +17,11 @@ using Mem_t = struct MemRef;
 
 namespace poptorch_ir {
 
+struct FunctionIO {
+  std::vector<TensorId> inputs;
+  std::vector<TensorId> outputs;
+};
+
 class EagerIpuSession;
 
 class PopitMemPtr : public std::shared_ptr<popit::Mem_t> {
@@ -73,14 +78,13 @@ public:
   virtual ~IAllocationMap() = default;
 
   virtual popit::Mem_t *getAllocation(TensorId id) const = 0;
-  virtual popit::Mem_t *getOrAllocate(TensorId id,
-                                      const TensorDebugInfo &info) = 0;
+  virtual popit::Mem_t *getOrAllocate(TensorId id, TensorDebugInfo info) = 0;
 };
 
 class PopitDeviceFunctionWrapper {
 public:
-  explicit PopitDeviceFunctionWrapper(
-      std::shared_ptr<PopitDeviceFunction> func);
+  PopitDeviceFunctionWrapper(std::shared_ptr<PopitDeviceFunction> func,
+                             FunctionIO io, GraphDebugInfo debug_info);
   PopitDeviceFunctionWrapper(PopitDeviceFunctionWrapper &&) noexcept = default;
   PopitDeviceFunctionWrapper &
   operator=(PopitDeviceFunctionWrapper &&) noexcept = default;
@@ -94,6 +98,8 @@ public:
 
 private:
   std::shared_ptr<PopitDeviceFunction> _func;
+  FunctionIO _io;
+  GraphDebugInfo _debug_info;
 };
 
 } // namespace poptorch_ir

@@ -176,12 +176,10 @@ PopitDeviceFunctionWrapper MLIREagerCompiler::compile(EagerIpuSession &session,
     debug_info.cached_graph = moduleToSharedStr(_the_module);
   }
 
-  auto &[input_ids, output_ids] =
-      external_function_io.at(std::string(entry_point_name));
-
-  return session.func_cache.emplaceWrapped(_the_module, session, input_ids,
-                                           output_ids, std::move(debug_info),
-                                           root_timer);
+  return session.func_cache.emplaceWrapped(
+      _the_module, session,
+      std::move(external_function_io.at(std::string(entry_point_name))),
+      std::move(debug_info), root_timer);
 }
 
 TensorId MLIREagerCompiler::addInput(const mlir::RankedTensorType &input,
