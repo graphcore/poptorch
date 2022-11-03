@@ -2,6 +2,12 @@
 #ifndef POPTORCH_LOWER_TO_POPLAR_GRAPH_CONVERTER_HPP_
 #define POPTORCH_LOWER_TO_POPLAR_GRAPH_CONVERTER_HPP_
 
+#include <string>
+#include <unordered_map>
+#include <vector>
+
+#include "pytorch_bridge/CompilerTypes.hpp"
+
 namespace mlir {
 template <typename T> class OperationPass;
 class ModuleOp;
@@ -16,9 +22,17 @@ class Target;
 namespace poptorch_ir {
 class NonRestartingMLIRTimer;
 
+struct FunctionIO {
+  std::vector<TensorId> inputs;
+  std::vector<TensorId> outputs;
+};
+
+using ExternalFunctionIO = std::unordered_map<std::string, FunctionIO>;
+
 // Run the general, high-level optimisation and simplification passes on the
 // MLIR graph.
-void runGraphPasses(mlir::ModuleOp &module, NonRestartingMLIRTimer &timer);
+void runGraphPasses(mlir::ModuleOp &module, ExternalFunctionIO &io,
+                    NonRestartingMLIRTimer &timer);
 
 class IMLIRGraphConverter {
 public:

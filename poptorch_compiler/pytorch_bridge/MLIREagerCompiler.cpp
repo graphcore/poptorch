@@ -12,6 +12,7 @@
 #include <iterator>
 #include <memory>
 
+#include "IMLIRCompiler.hpp"
 #include "dialect/Helpers.hpp"
 #include "lower_to_poplar/EagerIpuSession.hpp"
 #include "lower_to_poplar/IMLIRGraphConverter.hpp"
@@ -32,9 +33,9 @@ namespace {
 // if run after graph conversion and a pass in MLIRToPopitConverter replaces one
 // of the graph inputs or outputs. We can't support this because we've got no
 // way to map the new graph input to a Torch tensor.
-auto extractInputsAndOutputs(
-    mlir::ModuleOp module,
-    const llvm::DenseMap<mlir::Value, TensorId> &mappings) {
+FunctionIO
+extractInputsAndOutputs(mlir::ModuleOp module,
+                        const llvm::DenseMap<mlir::Value, TensorId> &mappings) {
   std::vector<TensorId> inputs;
   std::vector<TensorId> outputs;
 
@@ -66,7 +67,7 @@ auto extractInputsAndOutputs(
     });
   }
 
-  return std::pair(inputs, outputs);
+  return {inputs, outputs};
 }
 
 std::shared_ptr<std::vector<char>>
@@ -152,7 +153,7 @@ PopitDeviceFunctionWrapper MLIREagerCompiler::compile(EagerIpuSession &session,
   auto mappings = getValueMappings();
   markOutputs(mappings, liveness);
 
-  auto [input_ids, output_ids] = extractInputsAndOutputs(_the_module, mappings);
+  auto io = extractInputsAndOutputs(_the_module, mappings);
 
   // TODO(T69660): filter out unchanged outputs. This will be easier to do after
   // the passes getting rid of reference semantics have been applied. If every
@@ -165,12 +166,18 @@ PopitDeviceFunctionWrapper MLIREagerCompiler::compile(EagerIpuSession &session,
     debug_info.initial_graph = moduleToSharedStr(_the_module);
   }
 
+  ExternalFunctionIO external_function_io{
+      {std::string(entry_point_name), std::move(io)}};
+
   // Run all the graph passes up to lowering.
-  runGraphPasses(_the_module, root_timer);
+  runGraphPasses(_the_module, external_function_io, root_timer);
 
   if (poptorch::logging::shouldLog(poptorch::logging::Level::Debug)) {
     debug_info.cached_graph = moduleToSharedStr(_the_module);
   }
+
+  auto &[input_ids, output_ids] =
+      external_function_io.at(std::string(entry_point_name));
 
   return session.func_cache.emplaceWrapped(_the_module, session, input_ids,
                                            output_ids, std::move(debug_info),

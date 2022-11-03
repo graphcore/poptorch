@@ -170,7 +170,7 @@ void IMLIRCompiler::updateTensor(TensorId id, mlir::Value new_value) {
 
 void IMLIRCompiler::resetMainGraph() {
   _the_module = mlir::ModuleOp::create(_builder.getLoc());
-  _main_graph = createSubGraph("MainGraph");
+  _main_graph = createSubGraph(entry_point_name);
 
   // Invalidate all the values but do not clear the map:
   // the tensor IDs are still valid
@@ -195,7 +195,7 @@ bool IMLIRCompiler::allOpsCanBeLoweredToPoplar() const {
   return _main_graph.all_ops_can_be_lowered;
 }
 
-IMLIRCompiler::Graph IMLIRCompiler::createSubGraph(const std::string &name) {
+IMLIRCompiler::Graph IMLIRCompiler::createSubGraph(std::string_view name) {
   auto func_type = _builder.getFunctionType({}, llvm::None);
 
   _builder.setInsertionPointToEnd(&_the_module->getRegion(0).front());

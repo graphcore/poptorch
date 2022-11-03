@@ -101,6 +101,36 @@ def test_source_location(mode):
         log.assert_matches(default_loc)
 
 
+@pytest.mark.ipuHardwareRequired
+@helpers.overridePoptorchLogLevel("TRACE")
+def test_unchanged_output_removal():
+    import poptorch.eager  # pylint: disable=unused-import, import-outside-toplevel
+
+    t = torch.arange(6).to('xla')
+    s = t.reshape(2, 3).clone()
+
+    log = helpers.LogChecker(poptorch.poptorch_core.getCachedGraph(s))
+    log.assert_no_matches(r'return .*\%arg\d')
+
+
+@pytest.mark.ipuHardwareRequired
+@helpers.overridePoptorchLogLevel("TRACE")
+def test_unused_input_removal():
+    import poptorch.eager  # pylint: disable=unused-import, import-outside-toplevel
+
+    poptorch.eager.eager_options.use_lazy_tensor = True
+
+    t = torch.arange(6).to('xla')
+    v = torch.tensor(1).to('xla')
+
+    t.reshape(2, 3)
+    u = v + v
+    poptorch.eager.markStep()
+
+    log = helpers.LogChecker(poptorch.poptorch_core.getCachedGraph(u))
+    log.assert_no_matches(r'func.func @MainGraph.*tensor<6xsi32>')
+
+
 @helpers.printCapfdOnExit
 @helpers.overridePoptorchLogLevel("INFO")
 @pytest.mark.extendedTestingOnly

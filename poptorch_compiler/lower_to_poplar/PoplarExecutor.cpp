@@ -120,7 +120,10 @@ PoplarExecutor compileExecutable(mlir::ModuleOp module,
   poplar::program::Sequence seq;
   CompilerContext context(graph, seq);
 
-  runGraphPasses(module, timer);
+  // The static graphs have no inputs and outputs
+  ExternalFunctionIO function_io;
+
+  runGraphPasses(module, function_io, timer);
 
   MLIRToPoplarConverter converter(context);
   converter.convertGraph(module, timer);

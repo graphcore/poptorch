@@ -11,6 +11,7 @@
 
 #include <algorithm>
 #include <string>
+#include <string_view>
 #include <tuple>
 #include <utility>
 #include <vector>
@@ -337,7 +338,7 @@ protected:
   // will now return an empty Value.
   void resetMainGraph();
 
-  Graph createSubGraph(const std::string &name);
+  Graph createSubGraph(std::string_view name);
 
   // Create a new op of class OpTy, possibly casting operands specified by args.
   template <typename OpTy, typename... Args>
@@ -379,6 +380,8 @@ protected:
   llvm::DenseMap<mlir::Value, TensorId> getValueMappings() const;
 
 public:
+  constexpr static std::string_view entry_point_name = "MainGraph";
+
   // We need to maintain some MLIR state.
   // The global context.
   mlir::MLIRContext context;

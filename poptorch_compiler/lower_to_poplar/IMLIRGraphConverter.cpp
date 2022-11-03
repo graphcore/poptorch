@@ -1,25 +1,31 @@
 // Copyright (c) 2022 Graphcore Ltd. All rights reserved.
 #include "lower_to_poplar/IMLIRGraphConverter.hpp"
 
+#include <llvm/ADT/STLExtras.h>
 #include <mlir/IR/BuiltinOps.h>
 #include <mlir/IR/MLIRContext.h>
+#include <mlir/IR/Verifier.h>
 #include <mlir/Pass/Pass.h>
 #include <mlir/Pass/PassManager.h>
+#include <mlir/Support/LLVM.h>
 #include <mlir/Support/Timing.h>
 #include <mlir/Transforms/Passes.h>
 #include <mlir/Transforms/ViewOpGraph.h>
 
 #include <poplar/Graph.hpp>
 #include <poplar/Target.hpp>
+#include <poptorch_logging/Error.hpp>
 
 #include "CompilerHelpers.hpp"
 #include "lower_to_poplar/NonRestartingMLIRTimer.hpp"
 #include "passes/CommonPasses.hpp"
 #include "poptorch_logging/Logging.hpp"
+#include "pytorch_bridge/CompilerTypes.hpp"
 
 namespace poptorch_ir {
 
 namespace {
+
 // Implementation of LLVM's ostream which prints
 // to poptorch::logging::trace
 class LLVMStreamToTrace : public llvm::raw_ostream {
@@ -49,9 +55,83 @@ private:
   uint64_t _pos;
   std::string _buf;
 };
+
+template <typename Range>
+void filter(const mlir::BitVector &bit_vector, Range &rng) {
+  auto to_remove_from = rng.end();
+
+  // Loop backwards through the range moving removed elements to the end so
+  // removals don't mess up the indexing
+  for (auto itr = rng.rbegin(); itr != rng.rend(); ++itr) {
+    auto index = std::distance(itr, rng.rend()) - 1;
+    if (bit_vector[index]) {
+      to_remove_from =
+          std::rotate(std::prev(itr.base()), itr.base(), to_remove_from);
+    }
+  }
+
+  rng.erase(to_remove_from, rng.end());
+}
+
+void optimizeOutputs(mlir::func::FuncOp &func,
+                     const std::vector<TensorId> &inputs,
+                     std::vector<TensorId> &outputs) {
+
+  ERROR_ON_MSG(!func.getBody().hasOneBlock(),
+               "We currently don't handle functions with multiple blocks");
+
+  auto *terminator = func.getBody().getBlocks().front().getTerminator();
+  auto return_op = mlir::dyn_cast_or_null<mlir::func::ReturnOp>(terminator);
+  ERROR_ON(!return_op);
+
+  mlir::BitVector unchanged_outputs(outputs.size());
+  auto func_arguments = func.getArguments();
+  for (const auto &result : llvm::enumerate(return_op.getOperands())) {
+    if (const auto *arg = llvm::find(func_arguments, result.value());
+        arg != func_arguments.end()) {
+      // Only remove the output if it is being written back to the same place it
+      // was read from (otherwise it's a copy which we want to preserve)
+      // TODO(T71081): convert these to on device copies and remove them from
+      // the outputs
+      if (inputs[arg->getArgNumber()] == outputs[result.index()]) {
+        unchanged_outputs.set(result.index());
+      }
+    }
+  }
+
+  filter(unchanged_outputs, outputs);
+  return_op->eraseOperands(unchanged_outputs);
+  func.eraseResults(unchanged_outputs);
+}
+
+void optimizeInputs(mlir::func::FuncOp &func, std::vector<TensorId> &inputs) {
+  mlir::BitVector unused_inputs(inputs.size());
+  for (const auto &argument : func.getArguments()) {
+    if (argument.getUses().empty()) {
+      unused_inputs.set(argument.getArgNumber());
+    }
+  }
+
+  filter(unused_inputs, inputs);
+  func.eraseArguments(unused_inputs);
+}
+
+void optimizeInputAndOutputs(mlir::func::FuncOp &func,
+                             std::vector<TensorId> &inputs,
+                             std::vector<TensorId> &outputs) {
+  ERROR_ON(func.getNumArguments() != inputs.size());
+  ERROR_ON(func.getNumResults() != outputs.size());
+
+  optimizeOutputs(func, inputs, outputs);
+  optimizeInputs(func, inputs);
+}
+
 } // namespace
 
-void runGraphPasses(mlir::ModuleOp &module, NonRestartingMLIRTimer &timer) {
+void runGraphPasses(mlir::ModuleOp &module, ExternalFunctionIO &io,
+                    NonRestartingMLIRTimer &timer) {
+  ERROR_ON(mlir::verify(module).failed());
+
   mlir::PassManager manager{module.getContext()};
 
   auto graph_passes = timer.nestAndScope("MLIR graph passes");
@@ -98,7 +178,15 @@ void runGraphPasses(mlir::ModuleOp &module, NonRestartingMLIRTimer &timer) {
 
   ERROR_ON_MSG(!mlir::succeeded(manager.run(module)),
                "One or more passes failed.");
-  graph_passes.stop();
+
+  for (auto &[symbol_name, function_io] : io) {
+    auto func = mlir::dyn_cast_or_null<mlir::func::FuncOp>(
+        module.lookupSymbol(symbol_name));
+    ERROR_ON(!func);
+    optimizeInputAndOutputs(func, function_io.inputs, function_io.outputs);
+  }
+
+  ERROR_ON(mlir::verify(module).failed());
 }
 
 void IMLIRGraphConverter::convertGraph(mlir::ModuleOp &module,
