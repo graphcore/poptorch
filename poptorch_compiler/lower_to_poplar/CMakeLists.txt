@@ -29,6 +29,7 @@ find_package(model_runtime REQUIRED)
 find_package(poplar REQUIRED)
 find_package(popef REQUIRED)
 find_package(popit REQUIRED)
+find_package(popir REQUIRED)
 find_package(popdist REQUIRED)
 
 # Poplar requires exceptions and LLVM disables them for efficiency so we can't
@@ -41,6 +42,7 @@ target_link_libraries(lower_to_poplar PRIVATE
         model_runtime
         popef
         popit::popit
+        popir
         poplar
         popops
         poprand
