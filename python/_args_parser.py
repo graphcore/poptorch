@@ -195,12 +195,14 @@ class ArgsParser:
             assert not self._kwargs
             return tuple(convert(a) for a in self._args)
 
-        def asPackedFlatTuple(self):
+        def asPackedFlatTuple(self, canonical_args=None):
             # Remove all the non torch.tensor types and flatten
             # any data structure.
+            cargs = None if canonical_args is None else canonical_args.args
+            ckwargs = None if canonical_args is None else canonical_args.kwargs
             return tuple(
-                _utils.flattenTensorStructure(self._args) +
-                _utils.flattenTensorStructure(self._kwargs))
+                _utils.flattenTensorStructure(self._args, cargs) +
+                _utils.flattenTensorStructure(self._kwargs, ckwargs))
 
     def __init__(self, model: Any, tracing: bool = True):
         # Combine args and kwargs:
@@ -294,15 +296,9 @@ class ArgsParser:
                     else:
                         arg_name = name
 
-                    has_list = self._errorOnDictReturnTrueIfList(arg, name, [])
                     # Non fast path for compilation, fast path for executing.
                     if not fast_path:
-                        if has_list:
-                            logger.warning(
-                                "Lists as inputs only have partial support, "
-                                "they can be accessed but full Python "
-                                "functionality is not enabled. Consider "
-                                "changing input to tuple.")
+                        self._dictCheck(arg)
 
                     in_tensors.appendArg(arg, arg_name)
 
@@ -313,16 +309,10 @@ class ArgsParser:
                     "Torch doesn't support passing tensors (%s)"
                     " after the following parameters have defaulted to None."
                     " %s") % (name, ", ".join(none_passed))
-                has_list = self._errorOnDictReturnTrueIfList(
-                    kwargs[name], name, [])
-
                 # Non fast path for compilation, fast path for executing.
                 if not fast_path:
-                    if has_list:
-                        logger.warning(
-                            "Lists as inputs only have partial support, they "
-                            "can be accessed but full Python functionality is "
-                            "not enabled. Consider changing input to tuple.")
+                    self._dictCheck(kwargs[name])
+
                 # Everything after a variadic positional argument must be named
                 if variadic_pos_set:
                     in_tensors.setNamedArg(name, kwargs[name])
@@ -385,26 +375,15 @@ class ArgsParser:
 
         return in_tensors
 
-    def _errorOnDictReturnTrueIfList(self, data, arg_name, stack_list):
-        has_list = False
-        if isinstance(data, (tuple, list)):
-            for idx, d in enumerate(data):
-                stack_list.append(idx)
-                has_list &= self._errorOnDictReturnTrueIfList(
-                    d, arg_name, stack_list)
-                stack_list.pop()
-
-            if isinstance(data, list):
-                has_list = True
-
-        if isinstance(data, dict):
-            stack_list = [str(s) for s in stack_list]
-            end_msg = arg_name
-            if stack_list:
-                end_msg += "[" + "][".join(stack_list) + "]"
-            end_msg += " = " + str(data)
-
-            raise TypeError(
-                "Dictionaries are not supported as input arguments,"
-                " including when nested in tuples.\nReceived dict " + end_msg)
-        return has_list
+    def _dictCheck(self, data):
+        work = [data]
+        while len(work) > 0:
+            d = work.pop()
+            if isinstance(d, (tuple, list)):
+                work.extend(d)
+            elif isinstance(d, dict):
+                logger.warning("Dicts as inputs only have partial support, "
+                               "they can be accessed using literal keys, but "
+                               "full Python functionality is not enabled. "
+                               "Consider changing dict inputs to tuple.")
+                return

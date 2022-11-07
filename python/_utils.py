@@ -3,6 +3,7 @@
 import ctypes
 import functools
 import inspect
+import itertools
 import json
 
 import torch
@@ -72,14 +73,16 @@ custom_arg_parsers = dict()
 
 
 # Returns the structure `tensors` as a list of its torch.Tensor contents.
-def flattenTensorStructure(tensors):
-    def flatten(x):
+def flattenTensorStructure(tensors, canonical_structure=None):
+    def flatten(x, c):
         if isinstance(x, dict):
-            for k in x.keys():
-                yield from flatten(x[k])
+            keys = x.keys() if c is None else c.keys()
+            for k in keys:
+                yield from flatten(x[k], None if c is None else c[k])
         elif isinstance(x, (list, tuple)):
-            for t in x:
-                yield from flatten(t)
+            cl = itertools.repeat(None, len(x)) if c is None else c
+            for t, ct in zip(x, cl):
+                yield from flatten(t, ct)
         elif isinstance(x, torch.Tensor):
             yield x
         for custom_type, parser in custom_arg_parsers.items():
@@ -87,7 +90,7 @@ def flattenTensorStructure(tensors):
                 yield from parser.yieldTensors(x)
         # If it's not a dict/list/tuple or tensor, just ignore it
 
-    return list(flatten(tensors))
+    return list(flatten(tensors, canonical_structure))
 
 
 # Turns a flat `values` into the same structure as `structure`.

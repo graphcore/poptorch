@@ -479,7 +479,8 @@ def ipu_wrapper(_func: Optional[Callable] = None,
             if compiled_args:
                 try:
                     compiled_args.validateInputs(current_args)
-                    out = cache.execute(flat_args)
+                    cflat_args = current_args.asPackedFlatTuple(compiled_args)
+                    out = cache.execute(cflat_args)
                     return reconstructTensorStructure(output_structure, out)
                 except poptorch_core.Error:
                     pass

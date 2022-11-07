@@ -1216,13 +1216,13 @@ class PoplarExecutor:
                             self._user_model._host_weights_version
 
         self._executable_inputs.validateInputs(in_tensors)
+        in_tensors_flat = in_tensors.asPackedFlatTuple(self._executable_inputs)
 
         # Update the optimizer state on the IPU if needed.
         self._write_optim_state_dict_if_needed()
         # Execute the poplar executable with the full size (batch * device interations)
         with self._profiling.tracepoint("modelExecution"):
-            output = poptorch_core.execute(self._executable,
-                                           in_tensors.asPackedFlatTuple())
+            output = poptorch_core.execute(self._executable, in_tensors_flat)
 
         # Any anchored tensors will be returned at the end of the list
         # Pop them out and populate the anchor memory

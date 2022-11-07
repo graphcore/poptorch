@@ -302,64 +302,68 @@ def test_unused_tuple(trace_model):
 
 
 @pytest.mark.parametrize("trace_model", [True, False])
-def test_input_plain_dict(trace_model):
-    model = torch.nn.ReLU()
+def test_dict_input(trace_model):
+    class DictDivider(nn.Module):
+        def forward(self, d):  # pylint: disable=unused-argument
+            return d['x'] / d['y']
+
+    model = DictDivider()
+    z = {'x': torch.tensor([1.]), 'y': torch.tensor([2.])}
+    native_out = model(z)
     options = poptorch.Options()
     options.Jit.traceModel(trace_model)
     inference_model = poptorch.inferenceModel(model, options)
 
-    with pytest.raises(TypeError) as excinfo:
-        inference_model({'a': torch.tensor([1])})
-
-    assert (str(
-        excinfo.value) == "Dictionaries are not supported as input arguments, "
-            "including when nested in tuples.\n"
-            "Received dict input = {'a': tensor([1])}")
+    # Run more than once
+    for i in range(4):
+        # Reorder the dict to check order doesn't matter
+        if i == 1:
+            z = {'y': torch.tensor([2.]), 'x': torch.tensor([1.])}
+        # Missing argument
+        elif i == 2:
+            z = {'y': torch.tensor([2.])}
+            with pytest.raises(poptorch.Error, match="Missing arguments: x."):
+                inference_model(z)
+            continue
+        # Extra argument
+        elif i == 3:
+            z = {
+                'x': torch.tensor([1.]),
+                'y': torch.tensor([2.]),
+                'z': torch.tensor([3.])
+            }
+            with pytest.raises(poptorch.Error,
+                               match="Unexpected arguments: z."):
+                inference_model(z)
+            continue
+        poptorch_out = inference_model(z)
+        helpers.assert_allclose(expected=native_out, actual=poptorch_out)
 
 
 @pytest.mark.parametrize("trace_model", [True, False])
-def test_input_nested_dict(trace_model):
-    model = torch.nn.ReLU()
+def test_nested_dict_input(trace_model):
+    class DictAdder(nn.Module):
+        def forward(self, d):  # pylint: disable=unused-argument
+            return d[0]['d']['x'] + d[0]['d']['y'] + d[1]
+
+    model = DictAdder()
+    z = [{
+        'd': {
+            'x': torch.tensor([1.]),
+            'y': torch.tensor([2.])
+        }
+    },
+         torch.tensor([3.])]
+    native_out = model(z)
     options = poptorch.Options()
     options.Jit.traceModel(trace_model)
     inference_model = poptorch.inferenceModel(model, options)
 
-    with pytest.raises(TypeError) as excinfo:
-        inference_model(
-            (torch.tensor([1]), torch.tensor([2]), (torch.tensor([3]), {
-                'b': torch.tensor([4])
-            }, torch.tensor([5])), torch.tensor([6])))
-
-    assert (str(excinfo.value) == "Dictionaries are not supported as input "
-            "arguments, including when nested in tuples."
-            "\nReceived dict input[2][1] = "
-            "{'b': tensor([4])}")
-
-
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_input_three_agg_nested_dict(trace_model):
-    class ThreeIdentity(nn.Module):
-        def forward(self, x, y, z):
-            return x, y, z
-
-    model = ThreeIdentity()
-
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
-    inference_model = poptorch.inferenceModel(model, options)
-
-    with pytest.raises(TypeError) as excinfo:
-        inference_model(torch.tensor([0]),
-                        (torch.tensor([1]), torch.tensor([2]),
-                         (torch.tensor([3]), {
-                             'c': torch.tensor([4])
-                         }, torch.tensor([5])), torch.tensor([6])),
-                        torch.tensor([7]))
-
-    assert (str(excinfo.value) == "Dictionaries are not supported as input "
-            "arguments, including when nested in tuples."
-            "\nReceived dict y[2][1] = "
-            "{'c': tensor([4])}")
+    # Run more than once
+    for i in range(2):
+        print(f"Run {i}")
+        poptorch_out = inference_model(z)
+        helpers.assert_allclose(expected=native_out, actual=poptorch_out)
 
 
 torch.manual_seed(42)
