@@ -22,14 +22,14 @@ namespace poptorch_ir {
 
 // Outplace versions.
 void swish::lowerToPoplar(CompilerContext &context) {
-  poplar::Tensor input1 = context.fromSsa(this->in1());
-  poplar::Tensor out = popnn::nonLinearity(
+  poplar::Tensor const input1 = context.fromSsa(this->in1());
+  poplar::Tensor const out = popnn::nonLinearity(
       context.graph, popnn::NonLinearityType::SWISH, input1, context.seq);
   context.addTensor(this->result(), out);
 }
 
 void elu::lowerToPoplar(CompilerContext &context) {
-  poplar::Tensor input1 = context.fromSsa(this->in1());
+  poplar::Tensor const input1 = context.fromSsa(this->in1());
   const auto alpha = this->alpha().convertToFloat();
   std::vector<std::unique_ptr<popops::expr::Expr>> exprs;
 
@@ -45,7 +45,7 @@ void elu::lowerToPoplar(CompilerContext &context) {
 }
 
 void hardshrink::lowerToPoplar(CompilerContext &context) {
-  poplar::Tensor input1 = context.fromSsa(this->in1());
+  poplar::Tensor const input1 = context.fromSsa(this->in1());
   const float lambd = this->lambd().convertToFloat();
   const poplar::Tensor output =
       popops::map(context.graph,
@@ -57,7 +57,7 @@ void hardshrink::lowerToPoplar(CompilerContext &context) {
 }
 
 void softshrink_out::lowerToPoplar(CompilerContext &context) {
-  poplar::Tensor input1 = context.fromSsa(this->in1());
+  poplar::Tensor const input1 = context.fromSsa(this->in1());
   const float lambd = this->lambd().convertToFloat();
   const poplar::Tensor output = popops::map(
       context.graph,
@@ -70,18 +70,18 @@ void softshrink_out::lowerToPoplar(CompilerContext &context) {
 }
 
 void rrelu_with_noise::lowerToPoplar(CompilerContext &context) {
-  poplar::Tensor self = context.fromSsa(this->self());
+  poplar::Tensor const self = context.fromSsa(this->self());
   const float lower = this->lower().convertToFloat();
   const float upper = this->upper().convertToFloat();
 
   emitWarning("`noise' argument to RReLU is currently ignored");
 
-  poplar::Tensor val =
+  poplar::Tensor const val =
       this->training()
           ? poprand::uniform(context.graph, nullptr, 0,
-                             context.graph.addConstant(poplar::FLOAT, {}, 0.0f),
+                             createConstant(context, poplar::FLOAT, {}, 0.0f),
                              poplar::FLOAT, upper, lower, context.seq)
-          : context.graph.addConstant(poplar::FLOAT, {}, (lower + upper) / 2);
+          : createConstant(context, poplar::FLOAT, {}, (lower + upper) / 2);
 
   const poplar::Tensor output =
       popops::map(context.graph,
@@ -92,8 +92,8 @@ void rrelu_with_noise::lowerToPoplar(CompilerContext &context) {
 }
 
 void prelu::lowerToPoplar(CompilerContext &context) {
-  poplar::Tensor self = context.fromSsa(this->self());
-  poplar::Tensor weight = context.fromSsa(this->weight());
+  poplar::Tensor const self = context.fromSsa(this->self());
+  poplar::Tensor const weight = context.fromSsa(this->weight());
   const poplar::Tensor output =
       popops::map(context.graph,
                   pe::Select(pe::Mul(pe::_1, pe::_2), pe::_1,
@@ -103,14 +103,14 @@ void prelu::lowerToPoplar(CompilerContext &context) {
 }
 
 void log_sigmoid_forward::lowerToPoplar(CompilerContext &context) {
-  poplar::Tensor in1 = context.fromSsa(this->in1());
+  poplar::Tensor const in1 = context.fromSsa(this->in1());
   const poplar::Tensor output = popops::map(
       context.graph, pe::Log(pe::Sigmoid(pe::_1)), {in1}, context.seq);
   context.addTensor(this->output(), output);
 }
 
 void softplus::lowerToPoplar(CompilerContext &context) {
-  poplar::Tensor input = context.fromSsa(this->input());
+  poplar::Tensor const input = context.fromSsa(this->input());
   const float beta = this->beta().convertToFloat();
   const float threshold = this->threshold().convertToFloat();
 
@@ -144,29 +144,29 @@ void softplus::lowerToPoplar(CompilerContext &context) {
 }
 
 void relu::lowerToPoplar(CompilerContext &context) {
-  poplar::Tensor input1 = context.fromSsa(this->in1());
-  poplar::Tensor out = popnn::nonLinearity(
+  poplar::Tensor const input1 = context.fromSsa(this->in1());
+  poplar::Tensor const out = popnn::nonLinearity(
       context.graph, popnn::NonLinearityType::RELU, input1, context.seq);
   context.addTensor(this->result(), out);
 }
 
 void leaky_relu::lowerToPoplar(CompilerContext &context) {
-  poplar::Tensor input1 = context.fromSsa(this->in1());
-  float negative_slope = this->negative_slope().convertToFloat();
+  poplar::Tensor const input1 = context.fromSsa(this->in1());
+  const float negative_slope = this->negative_slope().convertToFloat();
 
   auto expression = pe::Select(pe::Mul(pe::Const(negative_slope), pe::_1),
                                pe::_1, pe::Lt(pe::_1, pe::Const(0.0f)));
 
-  poplar::Tensor out =
+  poplar::Tensor const out =
       popops::map(context.graph, expression, {input1}, context.seq);
   context.addTensor(this->result(), out);
 }
 
 void leaky_relu_backward::lowerToPoplar(CompilerContext &context) {
-  poplar::Tensor grad_output = context.fromSsa(this->grad_output());
-  poplar::Tensor self = context.fromSsa(this->self());
-  float negative_slope = this->negative_slope().convertToFloat();
-  bool self_is_result = this->self_is_result();
+  poplar::Tensor const grad_output = context.fromSsa(this->grad_output());
+  poplar::Tensor const self = context.fromSsa(this->self());
+  const float negative_slope = this->negative_slope().convertToFloat();
+  const bool self_is_result = this->self_is_result();
 
   // This error message is normally raised by PyTorch at the
   // dispatch function level so we need to raise it ourselves
@@ -189,14 +189,14 @@ void leaky_relu_backward::lowerToPoplar(CompilerContext &context) {
 }
 
 void gelu::lowerToPoplar(CompilerContext &context) {
-  poplar::Tensor input1 = context.fromSsa(this->in1());
-  poplar::Tensor out = popnn::nonLinearity(
+  poplar::Tensor const input1 = context.fromSsa(this->in1());
+  poplar::Tensor const out = popnn::nonLinearity(
       context.graph, popnn::NonLinearityType::GELU, input1, context.seq);
   context.addTensor(this->result(), out);
 }
 
 void hardsigmoid::lowerToPoplar(CompilerContext &context) {
-  poplar::Tensor input = context.fromSsa(this->in1());
+  poplar::Tensor const input = context.fromSsa(this->in1());
   // PyTorch formula is:
   // if x > 3 : return 1
   // if x < -3: return 0
@@ -207,13 +207,13 @@ void hardsigmoid::lowerToPoplar(CompilerContext &context) {
 
   auto clamped = pe::Clamp(scaled_add, pe::Const(0.0f), pe::Const(1.0f));
 
-  poplar::Tensor out =
+  poplar::Tensor const out =
       popops::map(context.graph, clamped, {input}, context.seq);
   context.addTensor(this->result(), out);
 }
 
 void hardswish::lowerToPoplar(CompilerContext &context) {
-  poplar::Tensor input = context.fromSsa(this->in1());
+  poplar::Tensor const input = context.fromSsa(this->in1());
   // PyTorch formula is:
   // if x > 3 : return x
   // if x < -3: return 0
@@ -231,7 +231,7 @@ void hardswish::lowerToPoplar(CompilerContext &context) {
   // select( x > 3, 1.0, out)
   auto clamp_upper = pe::Select(pe::_1, clamp_lower, more_than_three);
 
-  poplar::Tensor out =
+  poplar::Tensor const out =
       popops::map(context.graph, clamp_upper, {input}, context.seq);
   context.addTensor(this->result(), out);
 }
@@ -304,11 +304,12 @@ void logsoftmax_backward::lowerToPoplar(CompilerContext &context) {
   std::iota(red_dims.begin(), red_dims.end(), 1);
   std::vector<size_t> up_ranked(input.rank(), 1);
   up_ranked[0] = input.dim(0);
-  poplar::Tensor sum_g = popops::reduce(context.graph, grad_output, red_dims,
-                                        {popops::Operation::ADD}, context.seq)
-                             .reshape(up_ranked);
+  poplar::Tensor const sum_g =
+      popops::reduce(context.graph, grad_output, red_dims,
+                     {popops::Operation::ADD}, context.seq)
+          .reshape(up_ranked);
   // softmax(x) = exp(log_softmax(x))
-  poplar::Tensor prob = popops::exp(context.graph, input, context.seq);
+  poplar::Tensor const prob = popops::exp(context.graph, input, context.seq);
   // g_i - softmax(x_i) * sum_j (g_j)
   auto dv = popops::map(context.graph, pe::Sub(pe::_1, pe::Mul(pe::_2, pe::_3)),
                         {grad_output, prob, sum_g}, context.seq);
