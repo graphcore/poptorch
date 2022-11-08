@@ -206,8 +206,9 @@ poptorch::LowerToPopart lowerToPopartFromTrace(
   logGraph("Graph after output type changes:", *graph, has_converted_any_half,
            input_tensors);
 
+  std::vector<std::size_t> input_index_map;
   poptorch::type_and_constant_canonicalization::canonicaliseConstants(
-      graph.get());
+      graph.get(), input_index_map);
   logGraph("Graph after constant canonicalisation:", *graph,
            has_converted_any_half, input_tensors);
 
@@ -266,7 +267,8 @@ poptorch::LowerToPopart lowerToPopartFromTrace(
   poptorch::LowerToPopart lower(
       graph.get(), traced_parameter_tensors, parameters,
       std::move(inplace_info), training, std::move(optimizers), parsed_options,
-      attribute_accessor, callbacks, std::move(anchors_list));
+      attribute_accessor, callbacks, std::move(anchors_list),
+      std::move(input_index_map));
   lower.lower(&input_tensors);
 
   poptorch::setAvailableMemoryOnGraphFinalized();
@@ -302,8 +304,9 @@ poptorch::LowerToPopart lowerToPopartFromDispatch(
   poptorch::type_and_constant_canonicalization::evaluateConstexprs(graph.get());
   logging::trace("Graph after evaluating constant expressions:\n{}", *graph);
 
+  std::vector<std::size_t> input_index_map;
   poptorch::type_and_constant_canonicalization::canonicaliseConstants(
-      graph.get());
+      graph.get(), input_index_map);
   logging::trace("Graph after constant canonicalisation:\n{}", *graph);
 
   poptorch::removeScatterAddIndexExpansion(graph.get());
@@ -349,7 +352,8 @@ poptorch::LowerToPopart lowerToPopartFromDispatch(
   logging::trace("Graph before lowering to PopART:\n{}", *graph);
   poptorch::LowerToPopart lower(
       graph.get(), std::move(inplace_info), training, std::move(optimizers),
-      parsed_options, attribute_accessor, callbacks, std::move(anchors_list));
+      parsed_options, attribute_accessor, callbacks, std::move(anchors_list),
+      std::move(input_index_map));
 
   lower.lower(nullptr);
 

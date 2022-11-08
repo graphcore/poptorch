@@ -32,7 +32,7 @@ float areaPixelComputeSourceIndex(float scale, size_t dst_index,
   if (align_corners) {
     return scale * dst_index;
   }
-  float src_idx = static_cast<float>(scale * (dst_index + 0.5) - 0.5);
+  const float src_idx = static_cast<float>(scale * (dst_index + 0.5) - 0.5);
   // [Note] Follow Opencv resize logic:
   // We allow negative src_idx here and later will use
   //   dx = src_idx - floorf(src_idx)
@@ -57,15 +57,15 @@ BilinearParams computeSourceIndexAndLambda(const float scale,
     return {output_index, output_index, 1.0, 0.0};
   }
 
-  float ratio = align_corners ? static_cast<float>(input_size - 1) /
-                                    (scale * input_size - 1.0)
-                              : 1.0f / scale;
+  const float ratio = align_corners ? static_cast<float>(input_size - 1) /
+                                          (scale * input_size - 1.0)
+                                    : 1.0f / scale;
 
   const float real_input_index = areaPixelComputeSourceIndex(
       ratio, output_index, align_corners, /*cubic=*/false);
-  size_t index0 = static_cast<int64_t>(real_input_index);
-  size_t offset = (index0 < input_size - 1) ? 1 : 0;
-  float lambda1 = real_input_index - index0;
+  const size_t index0 = static_cast<int64_t>(real_input_index);
+  const size_t offset = (index0 < input_size - 1) ? 1 : 0;
+  const float lambda1 = real_input_index - index0;
 
   return {index0, index0 + offset, 1.0f - lambda1, lambda1};
 }
@@ -104,15 +104,15 @@ poplar::Tensor bilinearMap(poplar::Graph &graph,            // NOLINT
                            const poplar::Tensor &input, float scale_factor,
                            const bool align_corners = false,
                            const poplar::DebugContext &dc = {}) {
-  poputil::PoplibsOpDebugInfo di(dc, DI_ARGS(input, scale_factor));
+  poputil::PoplibsOpDebugInfo const di(dc, DI_ARGS(input, scale_factor));
 
   const auto input_dims = input.shape();
   assert(input_dims.size() == 4); // NOLINT
   auto output_dims = input_dims;
   output_dims[2] =
-      static_cast<size_t>(std::floor(output_dims[2] * scale_factor));
+      static_cast<std::size_t>(std::floor(output_dims[2] * scale_factor));
   output_dims[3] =
-      static_cast<size_t>(std::floor(output_dims[3] * scale_factor));
+      static_cast<std::size_t>(std::floor(output_dims[3] * scale_factor));
   auto input_shuffled = input.dimShuffle({2, 3, 0, 1})
                             .reshape({input_dims[2], input_dims[3],
                                       input_dims[0] * input_dims[1]});
@@ -131,10 +131,10 @@ poplar::Tensor bilinearMap(poplar::Graph &graph,            // NOLINT
 
   std::vector<float> w11s;
   for (size_t h = 0; h < output_dims[2]; ++h) {
-    BilinearParams params_h = computeSourceIndexAndLambda(
+    const BilinearParams params_h = computeSourceIndexAndLambda(
         scale_factor, h, input_dims[2], align_corners);
     for (size_t w = 0; w < output_dims[3]; ++w) {
-      BilinearParams params_w = computeSourceIndexAndLambda(
+      const BilinearParams params_w = computeSourceIndexAndLambda(
           scale_factor, w, input_dims[3], align_corners);
       w00s.push_back(params_h.lambda0 * params_w.lambda0);
       w01s.push_back(params_h.lambda0 * params_w.lambda1);
@@ -146,44 +146,44 @@ poplar::Tensor bilinearMap(poplar::Graph &graph,            // NOLINT
       i11s.push_back(input_shuffled[params_h.input1][params_w.input1]);
     }
   }
-  poplar::Tensor i00 = poplar::concat(i00s).reshape(
+  poplar::Tensor const i00 = poplar::concat(i00s).reshape(
       {output_dims[2], output_dims[3], output_dims[0], output_dims[1]});
-  poplar::Tensor i01 = poplar::concat(i01s).reshape(
+  poplar::Tensor const i01 = poplar::concat(i01s).reshape(
       {output_dims[2], output_dims[3], output_dims[0], output_dims[1]});
-  poplar::Tensor i10 = poplar::concat(i10s).reshape(
+  poplar::Tensor const i10 = poplar::concat(i10s).reshape(
       {output_dims[2], output_dims[3], output_dims[0], output_dims[1]});
-  poplar::Tensor i11 = poplar::concat(i11s).reshape(
+  poplar::Tensor const i11 = poplar::concat(i11s).reshape(
       {output_dims[2], output_dims[3], output_dims[0], output_dims[1]});
-  poplar::ArrayRef<float> w00_ref{w00s};
+  const poplar::ArrayRef<float> w00_ref{w00s};
 
-  poplar::ArrayRef<float> w01_ref{w01s};
+  const poplar::ArrayRef<float> w01_ref{w01s};
 
-  poplar::ArrayRef<float> w10_ref{w10s};
+  const poplar::ArrayRef<float> w10_ref{w10s};
 
-  poplar::ArrayRef<float> w11_ref{w11s};
-  poplar::Tensor w00 = graph.addConstant(input.elementType(),
-                                         {output_dims[2], output_dims[3], 1, 1},
-                                         w00_ref, {di, "w00"});
+  const poplar::ArrayRef<float> w11_ref{w11s};
+  poplar::Tensor const w00 = graph.addConstant(
+      input.elementType(), {output_dims[2], output_dims[3], 1, 1}, w00_ref,
+      {di, "w00"});
   poputil::mapTensorLinearly(graph, w00);
-  poplar::Tensor w01 = graph.addConstant(input.elementType(),
-                                         {output_dims[2], output_dims[3], 1, 1},
-                                         w01_ref, {di, "w01"});
+  poplar::Tensor const w01 = graph.addConstant(
+      input.elementType(), {output_dims[2], output_dims[3], 1, 1}, w01_ref,
+      {di, "w01"});
   poputil::mapTensorLinearly(graph, w01);
-  poplar::Tensor w10 = graph.addConstant(input.elementType(),
-                                         {output_dims[2], output_dims[3], 1, 1},
-                                         w10_ref, {di, "w10"});
+  poplar::Tensor const w10 = graph.addConstant(
+      input.elementType(), {output_dims[2], output_dims[3], 1, 1}, w10_ref,
+      {di, "w10"});
   poputil::mapTensorLinearly(graph, w10);
-  poplar::Tensor w11 = graph.addConstant(input.elementType(),
-                                         {output_dims[2], output_dims[3], 1, 1},
-                                         w11_ref, {di, "w11"});
+  poplar::Tensor const w11 = graph.addConstant(
+      input.elementType(), {output_dims[2], output_dims[3], 1, 1}, w11_ref,
+      {di, "w11"});
   poputil::mapTensorLinearly(graph, w11);
-  poplar::Tensor output = popops::map(graph,
-                                      popops::expr::_1 * popops::expr::_2 +
-                                          popops::expr::_3 * popops::expr::_4 +
-                                          popops::expr::_5 * popops::expr::_6 +
-                                          popops::expr::_7 * popops::expr::_8,
-                                      {i00, w00, i01, w01, i10, w10, i11, w11},
-                                      prog, {di, "mapUpsampling"});
+  poplar::Tensor const output = popops::map(
+      graph,
+      popops::expr::_1 * popops::expr::_2 +
+          popops::expr::_3 * popops::expr::_4 +
+          popops::expr::_5 * popops::expr::_6 +
+          popops::expr::_7 * popops::expr::_8,
+      {i00, w00, i01, w01, i10, w10, i11, w11}, prog, {di, "mapUpsampling"});
   return output.dimShuffle({2, 3, 0, 1});
 }
 
@@ -199,10 +199,10 @@ GradMultipleMap computeGradMap(size_t in_height, size_t in_width,
                                float scale_factor, bool align_corners) {
   GradMultipleMap m;
   for (size_t h = 0; h < in_height; ++h) {
-    BilinearParams params_h =
+    const BilinearParams params_h =
         computeSourceIndexAndLambda(scale_factor, h, out_height, align_corners);
     for (size_t w = 0; w < in_width; ++w) {
-      BilinearParams params_w = computeSourceIndexAndLambda(
+      const BilinearParams params_w = computeSourceIndexAndLambda(
           scale_factor, w, out_width, align_corners);
       m[{params_h.input0, params_w.input0}].push_back(
           GradMultipleVal{params_h.lambda0, params_w.lambda0, h, w});
@@ -226,7 +226,7 @@ computeInputsWeights(const std::vector<GradMultipleVal> &vals,
 
   size_t prev_h = -1;
   for (const auto &v : vals) {
-    float weight = v.lambda0 * v.lambda1;
+    const float weight = v.lambda0 * v.lambda1;
     if (weight > 0.0f) {
       if (v.h == prev_h && v.w == prev_w) {
         weights.back() += weight;
@@ -253,9 +253,9 @@ void splitIntervalMultiple(
     const size_t end_block =
         std::min(start_block + block_size - (start_block % block_size),
                  full_interval.end());
-    std::vector<size_t> start_coords =
+    std::vector<std::size_t> start_coords =
         poputil::unflattenIndex(output.shape(), start_block);
-    std::vector<size_t> end_coords =
+    std::vector<std::size_t> end_coords =
         poputil::unflattenIndex(output.shape(), end_block - 1);
     assert(start_coords[0] == end_coords[0]); // NOLINT
     assert(start_coords[1] == end_coords[1]); // NOLINT
@@ -268,12 +268,12 @@ void splitIntervalMultiple(
         input.elementType(), {weights.size()}, poplar::ArrayRef<float>(weights),
         {di, "upsamplingGradWeights"});
     graph.setTileMapping(weights_t, tile);
-    poplar::Tensor full_input_t =
+    poplar::Tensor const full_input_t =
         poplar::concat(inputs).reshape({inputs.size(), block_size});
-    poplar::Tensor input_t = full_input_t.slice(
+    poplar::Tensor const input_t = full_input_t.slice(
         {0, start_coords[2]}, {inputs.size(), end_coords[2] + 1});
     graph.setTileMapping(input_t, tile);
-    poplar::Interval interval{start_block, end_block};
+    poplar::Interval const interval{start_block, end_block};
     (void)connectVertex(
         graph, cs,
         poputil::templateVertex("BilinearGradVertex", input.elementType()),
@@ -295,9 +295,9 @@ void splitInterval(poplar::Graph &graph, poplar::ComputeSet &cs, // NOLINT
       poputil::splitRegionsBetweenWorkers(graph.getTarget(), intervals, 1);
   const size_t block_size = output.shape()[2];
   const auto &full_interval = *intervals.begin();
-  std::vector<size_t> start_coords =
+  std::vector<std::size_t> start_coords =
       poputil::unflattenIndex(output.shape(), full_interval.begin());
-  std::vector<size_t> end_coords =
+  std::vector<std::size_t> end_coords =
       poputil::unflattenIndex(output.shape(), full_interval.end() - 1);
   assert(start_coords[0] == end_coords[0]); // NOLINT
   assert(start_coords[1] == end_coords[1]); // NOLINT
@@ -310,7 +310,7 @@ void splitInterval(poplar::Graph &graph, poplar::ComputeSet &cs, // NOLINT
       input.elementType(), {weights.size()}, poplar::ArrayRef<float>(weights),
       {di, "upsamplingGradWeights"});
   graph.setTileMapping(weights_t, tile);
-  poplar::Tensor full_input_t =
+  poplar::Tensor const full_input_t =
       poplar::concat(inputs).reshape({inputs.size(), block_size});
   for (const auto &r : regions) {
     assert(r.size() == 1); // NOLINT
@@ -319,7 +319,7 @@ void splitInterval(poplar::Graph &graph, poplar::ComputeSet &cs, // NOLINT
     end_coords = poputil::unflattenIndex(output.shape(), interval.end() - 1);
     assert(start_coords[0] == end_coords[0]); // NOLINT
     assert(start_coords[1] == end_coords[1]); // NOLINT
-    poplar::Tensor input_t = full_input_t.slice(
+    poplar::Tensor const input_t = full_input_t.slice(
         {0, start_coords[2]}, {inputs.size(), end_coords[2] + 1});
     graph.setTileMapping(input_t, tile);
     (void)connectVertex(
@@ -354,9 +354,9 @@ void splitIntervalMultiplePixels(poplar::Graph &graph,   // NOLINT
     std::vector<uint32_t> limits;
     while (start_block < interval.end()) {
       const size_t end_block = start_block + block_size;
-      std::vector<size_t> start_coords =
+      std::vector<std::size_t> start_coords =
           poputil::unflattenIndex(output.shape(), start_block);
-      std::vector<size_t> end_coords =
+      const std::vector<std::size_t> end_coords =
           poputil::unflattenIndex(output.shape(), end_block - 1);
       assert(start_coords[0] == end_coords[0]); // NOLINT
       assert(start_coords[1] == end_coords[1]); // NOLINT
@@ -380,7 +380,7 @@ void splitIntervalMultiplePixels(poplar::Graph &graph,   // NOLINT
         poplar::ArrayRef<unsigned int>(limits), {di, "upsamplingGradLimits"});
     graph.setTileMapping(limits_t, tile);
 
-    poplar::Tensor full_input_t =
+    poplar::Tensor const full_input_t =
         poplar::concat(full_inputs).reshape({full_inputs.size(), block_size});
     graph.setTileMapping(full_input_t, tile);
     assert(0 == (interval.size() % block_size)); // NOLINT
@@ -441,14 +441,14 @@ poplar::Tensor bilinearMapGrads(poplar::Graph &graph,            // NOLINT
                                 float scale_factor, bool align_corners,
                                 uint32_t nb_splits = 0,
                                 const poplar::DebugContext &dc = {}) {
-  poputil::PoplibsOpDebugInfo di(dc, DI_ARGS(grad_output, scale_factor));
+  poputil::PoplibsOpDebugInfo const di(dc, DI_ARGS(grad_output, scale_factor));
   const auto grad_output_dims = grad_output.shape();
   assert(grad_output_dims.size() == 4); // NOLINT
   auto grad_input_dims = grad_output_dims;
   grad_input_dims[2] =
-      static_cast<size_t>(std::floor(grad_output_dims[2] / scale_factor));
+      static_cast<std::size_t>(std::floor(grad_output_dims[2] / scale_factor));
   grad_input_dims[3] =
-      static_cast<size_t>(std::floor(grad_output_dims[3] / scale_factor));
+      static_cast<std::size_t>(std::floor(grad_output_dims[3] / scale_factor));
   auto grad_input = graph.addVariable(
       grad_output.elementType(), grad_input_dims,
       {di, "gradientsInput_" + std::to_string(grad_input_dims[2])});
@@ -468,14 +468,14 @@ poplar::Tensor bilinearMapGrads(poplar::Graph &graph,            // NOLINT
       grad_output.dimShuffle({2, 3, 0, 1})
           .reshape({grad_output_dims[2], grad_output_dims[3],
                     grad_output_dims[0] * grad_output_dims[1]});
-  GradMultipleMap m = computeGradMap(grad_output_dims[2], grad_output_dims[3],
-                                     grad_input_dims[2], grad_input_dims[3],
-                                     scale_factor, align_corners);
+  const GradMultipleMap m = computeGradMap(
+      grad_output_dims[2], grad_output_dims[3], grad_input_dims[2],
+      grad_input_dims[3], scale_factor, align_corners);
   const auto &full_mapping = graph.getTileMapping(grad_input_shuffled);
   if (nb_splits == 0) { // try to guess a good split
     nb_splits = 1;
-    uint32_t blocks_per_tile = std::ceil(static_cast<float>(nb_pixels) /
-                                         static_cast<float>(num_tiles));
+    const uint32_t blocks_per_tile = std::ceil(static_cast<float>(nb_pixels) /
+                                               static_cast<float>(num_tiles));
     if (blocks_per_tile > 6) {
       if (blocks_per_tile <= 12) {
         nb_splits = 2;
@@ -550,9 +550,9 @@ public:
     auto channels = input_info.dim(1);
     auto height = input_info.dim(2);
     auto width = input_info.dim(3);
-    int64_t output_height =
+    const int64_t output_height =
         static_cast<int64_t>(std::floor(height / _scalingFactor));
-    int64_t output_width =
+    const int64_t output_width =
         static_cast<int64_t>(std::floor(width / _scalingFactor));
 
     outInfo(0).set(input_info.dataType(),
@@ -632,9 +632,9 @@ public:
     auto channels = input_info.dim(1);
     auto height = input_info.dim(2);
     auto width = input_info.dim(3);
-    int64_t output_height =
+    const int64_t output_height =
         static_cast<int64_t>(std::floor(height * _scalingFactor));
-    int64_t output_width =
+    const int64_t output_width =
         static_cast<int64_t>(std::floor(width * _scalingFactor));
 
     outInfo(0).set(input_info.dataType(),
@@ -692,11 +692,12 @@ popart::OpCreator<UpsampleOp> upsample_op_creator(
                             upsample_op_def}}),
     [](const popart::OpCreatorInfo &info) {
       // default scalingFactor is 2.0
-      float scaling_factor =
+      float const scaling_factor =
           info.attributes.getAttribute<popart::Attributes::Float>(
               "scaling_factor", 2.0f);
-      int align_corners = info.attributes.getAttribute<popart::Attributes::Int>(
-          "align_corners", 0);
+      int const align_corners =
+          info.attributes.getAttribute<popart::Attributes::Int>("align_corners",
+                                                                0);
       return std::make_unique<UpsampleOp>(info.opid, scaling_factor,
                                           align_corners, info.settings);
     },
@@ -723,8 +724,8 @@ public:
     // Upsample the input. We create a poplar::Tensor of name outId(0)
     std::cerr << "Debug UpsampleOpx::grow\n";
     auto op = getOp<UpsampleOp>();
-    float scaling_factor = op.getScalingFactor();
-    bool align_corners = op.getAlignCorners();
+    const float scaling_factor = op.getScalingFactor();
+    const bool align_corners = op.getAlignCorners();
     auto input = getInTensor(0);
 
     setOutTensor(
@@ -749,8 +750,8 @@ public:
     auto grad_out = getInTensor(1);
 
     auto op = getOp<UpsampleGradOp>();
-    float scaling_factor = op.getScalingFactor();
-    bool align_corners = op.getAlignCorners();
+    const float scaling_factor = op.getScalingFactor();
+    const bool align_corners = op.getAlignCorners();
     setOutTensor(0, bilinearMapGrads(graph(), prog, grad_out, scaling_factor,
                                      align_corners));
   }

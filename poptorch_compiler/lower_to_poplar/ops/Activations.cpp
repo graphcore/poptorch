@@ -300,9 +300,9 @@ void logsoftmax_backward::lowerToPoplar(CompilerContext &context) {
   input = coerceTo2D(input);
 
   // sum_j (g_j)
-  std::vector<size_t> red_dims(input.rank() - 1);
+  std::vector<std::size_t> red_dims(input.rank() - 1);
   std::iota(red_dims.begin(), red_dims.end(), 1);
-  std::vector<size_t> up_ranked(input.rank(), 1);
+  std::vector<std::size_t> up_ranked(input.rank(), 1);
   up_ranked[0] = input.dim(0);
   poplar::Tensor const sum_g =
       popops::reduce(context.graph, grad_output, red_dims,

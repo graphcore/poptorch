@@ -35,7 +35,7 @@ public:
     if (inInfo(0).shape().size() != 1) {
       exit(1);
     }
-    if (static_cast<size_t>(inInfo(0).shape()[0]) != _vec.size()) {
+    if (static_cast<std::size_t>(inInfo(0).shape()[0]) != _vec.size()) {
       exit(1);
     }
     outInfo(0) = inInfo(0);
@@ -57,7 +57,7 @@ private:
 popart::OpCreator<AddScalarVecFloatOp> add_scalar_vec_float_op(
     {{custom_operators::add_scalar_vec_float, {}}},
     [](const popart::OpCreatorInfo &info) {
-      std::vector<float> vec =
+      std::vector<float> const vec =
           info.attributes.getAttribute<popart::Attributes::Floats>("vec");
 
       return std::unique_ptr<popart::Op>(
@@ -111,7 +111,7 @@ public:
     if (inInfo(0).shape().size() != 1) {
       exit(1);
     }
-    if (static_cast<size_t>(inInfo(0).shape()[0]) != _vec.size()) {
+    if (static_cast<std::size_t>(inInfo(0).shape()[0]) != _vec.size()) {
       exit(1);
     }
     outInfo(0) = inInfo(0);
@@ -133,7 +133,7 @@ private:
 popart::OpCreator<AddScalarVecIntOp> add_scalar_vec_int_op(
     {{custom_operators::add_scalar_vec_int, {}}},
     [](const popart::OpCreatorInfo &info) {
-      std::vector<int64_t> vec =
+      std::vector<int64_t> const vec =
           info.attributes.getAttribute<popart::Attributes::Ints>("vec");
 
       return std::unique_ptr<popart::Op>(

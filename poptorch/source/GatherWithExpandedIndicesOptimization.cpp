@@ -12,7 +12,7 @@
 namespace poptorch {
 
 void simplifyGatherWithExpandedIndices(torch::jit::Graph *graph) {
-  logging::LogContext ctx{"GatherWithExpandedIndicesOptimisation"};
+  logging::LogContext const ctx{"GatherWithExpandedIndicesOptimisation"};
 
   std::unordered_set<torch::jit::Node *> to_delete;
 
@@ -35,7 +35,7 @@ void simplifyGatherWithExpandedIndices(torch::jit::Graph *graph) {
       continue;
     }
 
-    WithNodeMetadata meta(node);
+    const WithNodeMetadata meta(node);
     // aten::expand(Tensor self, int[] size, *, bool implicit) -> Tensor
     // aten::expand_as(Tensor self, Tensor other) -> Tensor
     auto *original_indices = expand_node->input(0);
@@ -49,7 +49,7 @@ void simplifyGatherWithExpandedIndices(torch::jit::Graph *graph) {
       expand_shape = shapeFromTensor(expand_node->input(1));
     }
 
-    std::vector<size_t> expand_dims{};
+    std::vector<std::size_t> expand_dims{};
     for (size_t i = 0; i < expand_shape.size(); i++) {
       if (expand_shape[i] > original_indices_shape[i]) {
         expand_dims.push_back(i);
@@ -58,14 +58,14 @@ void simplifyGatherWithExpandedIndices(torch::jit::Graph *graph) {
     if (expand_dims.size() != 1) {
       continue;
     }
-    size_t expand_dim = expand_dims[0];
+    const size_t expand_dim = expand_dims[0];
 
     // Only optimise if:
     // * source tensor's shape has 2 dimensions of length > 1
     // * dimension of gather, and dimension of expand are the 2 dimensions of
     //   length > 1
     const auto self_shape = shapeFromTensor(input);
-    std::vector<size_t> non_singleton_dimensions{};
+    std::vector<std::size_t> non_singleton_dimensions{};
     for (size_t i = 0; i < self_shape.size(); i++) {
       if (self_shape[i] > 1) {
         non_singleton_dimensions.push_back(i);
@@ -92,7 +92,7 @@ void simplifyGatherWithExpandedIndices(torch::jit::Graph *graph) {
                  std::back_inserter(squeezed_shape),
                  [](auto dim) { return dim > 1; });
 
-    torch::jit::WithInsertPoint insert_point(node);
+    torch::jit::WithInsertPoint const insert_point(node);
 
     torch::jit::Node *squeezed =
         createAndInsertNode(graph, c10::aten::squeeze, {original_indices},

@@ -627,8 +627,9 @@ void canonicaliseIfConstant(torch::jit::Graph *graph, torch::jit::Node *node,
   to_delete->insert(node);
 }
 
-void convertReturnedInputsToConstants(torch::jit::Graph *graph) {
-  std::stack<size_t> to_erase;
+void convertReturnedInputsToConstants(
+    torch::jit::Graph *graph, std::vector<std::size_t> &input_index_map) {
+  std::stack<std::size_t> to_erase;
   for (auto i = 0u; i < graph->inputs().size(); i++) {
     auto *input = graph->inputs()[i];
     if (input->uses().size() == 1 &&
@@ -638,6 +639,10 @@ void convertReturnedInputsToConstants(torch::jit::Graph *graph) {
           insertConstant(graph, input->node()->ts(c10::attr::values)[i]);
       input->replaceAllUsesWith(new_const);
       to_erase.push(i);
+    } else {
+      // Save the mapping from PopART input indices to user input indices,
+      // so that the returned-only inputs can be ignored by PopART
+      input_index_map.push_back(i);
     }
   }
 
@@ -649,14 +654,17 @@ void convertReturnedInputsToConstants(torch::jit::Graph *graph) {
 
 } // namespace
 
-void canonicaliseConstants(torch::jit::Graph *graph) {
+void canonicaliseConstants(torch::jit::Graph *graph,
+                           std::vector<std::size_t> &input_index_map) {
   logging::LogContext const ctx_func("CanonicaliseConstants");
   std::unordered_set<torch::jit::Node *> to_delete;
 
-  // If any inputs are simply returned as outputs, replace
-  // those inputs with host-side-only constants so that they
-  // aren't lowered to PopART
-  convertReturnedInputsToConstants(graph);
+  if (isCompilingWithDispatcher()) {
+    // If any inputs are simply returned as outputs, replace
+    // those inputs with host-side-only constants so that they
+    // aren't lowered to PopART
+    convertReturnedInputsToConstants(graph, input_index_map);
+  }
 
   for (auto *node : graph->nodes()) {
     canonicaliseIfConstant(graph, node, &to_delete);

@@ -34,7 +34,7 @@ public:
     if (inInfo(0).shape().size() != 1) {
       exit(1);
     }
-    if (static_cast<size_t>(inInfo(0).shape()[0]) != _vec.size()) {
+    if (static_cast<std::size_t>(inInfo(0).shape()[0]) != _vec.size()) {
       exit(1);
     }
     outInfo(0) = inInfo(0);
@@ -59,9 +59,10 @@ private:
 popart::OpCreator<AddVecScalarMulFloatOp> add_vec_scalar_mul_float_op(
     {{custom_operators::add_vec_scalar_mul_float, {}}},
     [](const popart::OpCreatorInfo &info) {
-      float scalar = info.attributes.getAttribute<popart::Attributes::Float>(
-          "scalar", 0.0f);
-      std::vector<float> vec =
+      float const scalar =
+          info.attributes.getAttribute<popart::Attributes::Float>("scalar",
+                                                                  0.0f);
+      std::vector<float> const vec =
           info.attributes.getAttribute<popart::Attributes::Floats>("vec");
 
       return std::unique_ptr<popart::Op>(

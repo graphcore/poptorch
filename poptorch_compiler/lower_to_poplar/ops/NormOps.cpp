@@ -41,11 +41,11 @@ batchNormaliseGrad(CompilerContext &context, const poplar::Tensor &input,
                    const poplar::Tensor &save_mean,
                    const poplar::Tensor &inv_sd, const poplar::Tensor &grad_out,
                    bool weight_grad) {
-  poplar::Tensor input_whitened = popnn::bn::batchNormWhiten(
+  poplar::Tensor const input_whitened = popnn::bn::batchNormWhiten(
       context.graph, input, save_mean, inv_sd, context.seq);
 
   // Compute the delta for the operand
-  poplar::Tensor grad_input =
+  poplar::Tensor const grad_input =
       popnn::bn::batchNormGradients(context.graph, input_whitened, grad_out,
                                     inv_sd, weight, context.seq, poplar::FLOAT);
 
@@ -61,16 +61,16 @@ batchNormaliseGrad(CompilerContext &context, const poplar::Tensor &input,
 }
 
 void batch_norm::lowerToPoplar(CompilerContext &context) {
-  poplar::Tensor input = context.fromSsa(this->input());
+  poplar::Tensor const input = context.fromSsa(this->input());
   poplar::Tensor weight;
   poplar::Tensor bias;
   poplar::Tensor running_mean;
   poplar::Tensor running_var;
-  bool training = this->training();
-  float momentum = this->momentum().convertToFloat();
-  float epsilon = this->epsilon().convertToFloat();
+  const bool training = this->training();
+  const float momentum = this->momentum().convertToFloat();
+  const float epsilon = this->epsilon().convertToFloat();
 
-  std::vector<uint64_t> param_shape = {input.shape()[1]};
+  const std::vector<uint64_t> param_shape = {input.shape()[1]};
   if (this->weight() && this->bias()) {
     weight = context.fromSsa(this->weight());
     bias = context.fromSsa(this->bias());
@@ -133,19 +133,19 @@ void batch_norm::lowerToPoplar(CompilerContext &context) {
 }
 
 void batch_norm_backward::lowerToPoplar(CompilerContext &context) {
-  poplar::Tensor grad_out = context.fromSsa(this->grad_out());
-  poplar::Tensor input = context.fromSsa(this->input());
+  poplar::Tensor const grad_out = context.fromSsa(this->grad_out());
+  poplar::Tensor const input = context.fromSsa(this->input());
   poplar::Tensor weight;
 
   if (this->weight()) {
     weight = context.fromSsa(this->weight());
   } else {
-    std::vector<uint64_t> param_shape = {input.shape()[1]};
+    const std::vector<uint64_t> param_shape = {input.shape()[1]};
     weight = createConstant(context, input.elementType(), param_shape, 1.0f);
   }
 
-  bool training = this->training();
-  float epsilon = this->epsilon().convertToFloat();
+  const bool training = this->training();
+  const float epsilon = this->epsilon().convertToFloat();
 
   poplar::Tensor mean;
   poplar::Tensor inv_std;
@@ -157,7 +157,7 @@ void batch_norm_backward::lowerToPoplar(CompilerContext &context) {
     inv_std = context.fromSsa(this->save_invstd());
   } else {
     mean = context.fromSsa(this->running_mean());
-    poplar::Tensor running_var = context.fromSsa(this->running_var());
+    poplar::Tensor const running_var = context.fromSsa(this->running_var());
     inv_std = popops::varianceToInvStdDev(context.graph, running_var, epsilon,
                                           context.seq, input.elementType());
   }
@@ -180,14 +180,14 @@ void batch_norm_backward::lowerToPoplar(CompilerContext &context) {
 }
 
 void group_norm::lowerToPoplar(CompilerContext &context) {
-  float epsilon = this->epsilon().convertToFloat();
-  uint64_t num_groups = this->group();
+  const float epsilon = this->epsilon().convertToFloat();
+  const uint64_t num_groups = this->group();
 
   // Hard wire to stable for now
   const bool stable_algo = true;
 
   // Get the inputs
-  poplar::Tensor input = context.fromSsa(this->input());
+  poplar::Tensor const input = context.fromSsa(this->input());
   poplar::Tensor weight;
   poplar::Tensor bias;
 
@@ -195,9 +195,9 @@ void group_norm::lowerToPoplar(CompilerContext &context) {
   auto input_shape = input.shape();
   ERROR_ON(input_shape.at(0) != this->N());
   ERROR_ON(input_shape.at(1) != this->C());
-  auto hx_w =
-      std::accumulate(input_shape.begin() + 2, input_shape.end(),
-                      static_cast<size_t>(1), std::multiplies<size_t>());
+  auto hx_w = std::accumulate(input_shape.begin() + 2, input_shape.end(),
+                              static_cast<std::size_t>(1),
+                              std::multiplies<std::size_t>());
   ERROR_ON(hx_w != this->HxW());
 
   const std::vector<uint64_t> param_shape = {input_shape.at(1)};
@@ -217,8 +217,8 @@ void group_norm::lowerToPoplar(CompilerContext &context) {
   // Hardwire to correct and slightly slower.
   const bool fast_math_group_norm = false;
 
-  poplar::OptionFlags flags{{"groupNormStridedChannelGrouping",
-                             fast_math_group_norm ? "true" : "false"}};
+  poplar::OptionFlags const flags{{"groupNormStridedChannelGrouping",
+                                   fast_math_group_norm ? "true" : "false"}};
 
   std::tie(mean, inv_std_dev) = popnn::gn::groupNormStatistics(
       context.graph, input, epsilon, context.seq,
@@ -241,10 +241,10 @@ void group_norm::lowerToPoplar(CompilerContext &context) {
 }
 
 void group_norm_backward::lowerToPoplar(CompilerContext &context) {
-  uint64_t num_groups = this->group();
+  const uint64_t num_groups = this->group();
 
-  poplar::Tensor input = context.fromSsa(this->input());
-  poplar::Tensor grad_out = context.fromSsa(this->grad_out());
+  poplar::Tensor const input = context.fromSsa(this->input());
+  poplar::Tensor const grad_out = context.fromSsa(this->grad_out());
 
   // popnn expects flattened mean/std
   poplar::Tensor mean = context.fromSsa(this->mean());
@@ -259,9 +259,9 @@ void group_norm_backward::lowerToPoplar(CompilerContext &context) {
   auto input_shape = input.shape();
   ERROR_ON(input_shape.at(0) != this->N());
   ERROR_ON(input_shape.at(1) != this->C());
-  auto hx_w =
-      std::accumulate(input_shape.begin() + 2, input_shape.end(),
-                      static_cast<size_t>(1), std::multiplies<size_t>());
+  auto hx_w = std::accumulate(input_shape.begin() + 2, input_shape.end(),
+                              static_cast<std::size_t>(1),
+                              std::multiplies<std::size_t>());
   ERROR_ON(hx_w != this->HxW());
 
   const std::vector<uint64_t> param_shape = {num_groups};
@@ -275,14 +275,14 @@ void group_norm_backward::lowerToPoplar(CompilerContext &context) {
   // Hardwire to correct and slightly slower.
   const bool fast_math_group_norm = false;
 
-  poplar::OptionFlags flags{{"groupNormStridedChannelGrouping",
-                             fast_math_group_norm ? "true" : "false"}};
+  poplar::OptionFlags const flags{{"groupNormStridedChannelGrouping",
+                                   fast_math_group_norm ? "true" : "false"}};
 
-  poplar::Tensor input_whitened = popnn::gn::groupNormWhiten(
+  poplar::Tensor const input_whitened = popnn::gn::groupNormWhiten(
       context.graph, input, mean, rstd, context.seq, {}, flags);
 
   // Compute the delta for the operand
-  poplar::Tensor grad_input = popnn::gn::groupNormGradients(
+  poplar::Tensor const grad_input = popnn::gn::groupNormGradients(
       context.graph, input_whitened, grad_out, rstd, weight, context.seq,
       poplar::FLOAT, {}, flags);
 
@@ -310,18 +310,18 @@ void group_norm_backward::lowerToPoplar(CompilerContext &context) {
 }
 
 void layer_norm::lowerToPoplar(CompilerContext &context) {
-  float epsilon = this->epsilon().convertToFloat();
+  const float epsilon = this->epsilon().convertToFloat();
 
   // Hard wire to stable for now
   const bool stable_algo = true;
 
-  poplar::Tensor input = context.fromSsa(this->input());
-  size_t m_dim =
+  poplar::Tensor const input = context.fromSsa(this->input());
+  const size_t m_dim =
       (*this)->getAttr("m_dim").cast<::mlir::IntegerAttr>().getUInt();
-  size_t n_dim =
+  const size_t n_dim =
       (*this)->getAttr("n_dim").cast<::mlir::IntegerAttr>().getUInt();
 
-  poplar::Tensor input_reshaped = input.reshape({m_dim, n_dim});
+  poplar::Tensor const input_reshaped = input.reshape({m_dim, n_dim});
 
   // The parameter shape must be flattened for Poplar
   const std::vector<uint64_t> param_shape{n_dim};
@@ -349,7 +349,7 @@ void layer_norm::lowerToPoplar(CompilerContext &context) {
                                           bias, mean, inv_std_dev, context.seq);
 
   // PyTorch's mean has a different shape than popnn's
-  auto stat_shape = convertIntArray<size_t>(
+  auto stat_shape = convertIntArray<std::size_t>(
       (*this)->getAttr("stat_shape").cast<::mlir::ArrayAttr>());
   mean = mean.reshape(stat_shape);
   inv_std_dev = inv_std_dev.reshape(stat_shape);
@@ -363,14 +363,14 @@ void layer_norm::lowerToPoplar(CompilerContext &context) {
 }
 
 void layer_norm_backward::lowerToPoplar(CompilerContext &context) {
-  poplar::Tensor input = context.fromSsa(this->input());
-  size_t m_dim =
+  poplar::Tensor const input = context.fromSsa(this->input());
+  const size_t m_dim =
       (*this)->getAttr("m_dim").cast<::mlir::IntegerAttr>().getUInt();
-  size_t n_dim =
+  const size_t n_dim =
       (*this)->getAttr("n_dim").cast<::mlir::IntegerAttr>().getUInt();
 
-  poplar::Tensor input_reshaped = input.reshape({m_dim, n_dim});
-  poplar::Tensor grad_out = context.fromSsa(this->grad_out());
+  poplar::Tensor const input_reshaped = input.reshape({m_dim, n_dim});
+  poplar::Tensor const grad_out = context.fromSsa(this->grad_out());
 
   // popnn expects flattened mean/std
   poplar::Tensor mean = context.fromSsa(this->mean());
@@ -393,14 +393,14 @@ void layer_norm_backward::lowerToPoplar(CompilerContext &context) {
   // Hardwire to correct and slightly slower.
   const bool fast_math_group_norm = false;
 
-  poplar::OptionFlags flags{{"groupNormStridedChannelGrouping",
-                             fast_math_group_norm ? "true" : "false"}};
+  poplar::OptionFlags const flags{{"groupNormStridedChannelGrouping",
+                                   fast_math_group_norm ? "true" : "false"}};
 
-  poplar::Tensor input_whitened = popnn::ln::layerNormWhiten(
+  poplar::Tensor const input_whitened = popnn::ln::layerNormWhiten(
       context.graph, input_reshaped, mean, rstd, context.seq, {}, flags);
 
   // Rehape grad_out to match
-  poplar::Tensor grad_out_reshaped = grad_out.reshape({m_dim, n_dim});
+  poplar::Tensor const grad_out_reshaped = grad_out.reshape({m_dim, n_dim});
 
   // Calcuate the input on the gradient
   poplar::Tensor grad_input = popnn::ln::layerNormGradients(

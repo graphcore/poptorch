@@ -51,30 +51,33 @@ poplin::ConvParams getForwardParams(const poplar::Tensor &input,
 
 void conv::lowerToPoplar(CompilerContext &context) {
   // Convert the inputs to poplar tensors.
-  poplar::Tensor input = context.fromSsa(this->input());
-  poplar::Tensor weight = context.fromSsa(this->weight());
+  poplar::Tensor const input = context.fromSsa(this->input());
+  poplar::Tensor const weight = context.fromSsa(this->weight());
 
   // Extract the attributes into something usable. Oddly/annoyingly the API
   // requests unsigned but stores as size_t.
-  std::vector<unsigned> stride = convertIntArray<unsigned>(this->stride());
-  std::vector<unsigned> padding = convertIntArray<unsigned>(this->padding());
-  std::vector<unsigned> dilation = convertIntArray<unsigned>(this->dilation());
-  std::vector<unsigned> output_padding =
+  const std::vector<unsigned> stride =
+      convertIntArray<unsigned>(this->stride());
+  const std::vector<unsigned> padding =
+      convertIntArray<unsigned>(this->padding());
+  const std::vector<unsigned> dilation =
+      convertIntArray<unsigned>(this->dilation());
+  const std::vector<unsigned> output_padding =
       convertIntArray<unsigned>(this->output_padding());
   const std::size_t groups = this->groups();
 
-  poplin::ConvParams params = getForwardParams(
+  poplin::ConvParams const params = getForwardParams(
       input, weight, stride, padding, dilation, output_padding, groups);
 
-  poplar::Tensor w = weight.reshapePartial(
+  poplar::Tensor const w = weight.reshapePartial(
       0, 2, {groups, weight.dim(0) / groups, weight.dim(1)});
 
-  poplar::Tensor output =
+  poplar::Tensor const output =
       poplin::convolution(context.graph, input, w, params, false, context.seq);
 
   // MLIR value converts to bool so optional biases will be ignored.
   if (this->bias()) {
-    poplar::Tensor bias = context.fromSsa(this->bias());
+    poplar::Tensor const bias = context.fromSsa(this->bias());
     poplin::addBias(context.graph, output, bias, context.seq);
   }
 
@@ -82,27 +85,31 @@ void conv::lowerToPoplar(CompilerContext &context) {
 }
 
 void conv_backward::lowerToPoplar(CompilerContext &context) {
-  poplar::Tensor grad_output = context.fromSsa(this->grad_output());
-  poplar::Tensor input = context.fromSsa(this->input());
-  poplar::Tensor weight = context.fromSsa(this->weight());
+  poplar::Tensor const grad_output = context.fromSsa(this->grad_output());
+  poplar::Tensor const input = context.fromSsa(this->input());
+  poplar::Tensor const weight = context.fromSsa(this->weight());
 
-  std::vector<unsigned> stride = convertIntArray<unsigned>(this->stride());
-  std::vector<unsigned> padding = convertIntArray<unsigned>(this->padding());
-  std::vector<unsigned> dilation = convertIntArray<unsigned>(this->dilation());
-  std::vector<unsigned> output_padding =
+  const std::vector<unsigned> stride =
+      convertIntArray<unsigned>(this->stride());
+  const std::vector<unsigned> padding =
+      convertIntArray<unsigned>(this->padding());
+  const std::vector<unsigned> dilation =
+      convertIntArray<unsigned>(this->dilation());
+  const std::vector<unsigned> output_padding =
       convertIntArray<unsigned>(this->output_padding());
   const std::size_t groups = this->groups();
   auto output_mask = convertIntArray<bool>(this->output_mask());
 
-  poplin::ConvParams params = getForwardParams(
+  poplin::ConvParams const params = getForwardParams(
       input, weight, stride, padding, dilation, output_padding, groups);
 
   if (output_mask[0]) {
-    poplar::Tensor w = weight.reshapePartial(
+    poplar::Tensor const w = weight.reshapePartial(
         0, 2, {groups, weight.dim(0) / groups, weight.dim(1)});
-    poplin::ConvParams grad_input_params = poplin::getGradientParams(params);
+    poplin::ConvParams const grad_input_params =
+        poplin::getGradientParams(params);
 
-    poplar::Tensor grad_input = poplin::convolution(
+    poplar::Tensor const grad_input = poplin::convolution(
         context.graph, grad_output, w, grad_input_params, true, context.seq);
 
     context.addTensor(this->grad_input(), grad_input);
@@ -116,9 +123,9 @@ void conv_backward::lowerToPoplar(CompilerContext &context) {
     context.addTensor(this->grad_weight(), grad_weight);
   }
   if (output_mask[2]) {
-    std::vector<size_t> reduction_dims(grad_output.rank() - 1);
+    std::vector<std::size_t> reduction_dims(grad_output.rank() - 1);
     std::iota(reduction_dims.begin() + 1, reduction_dims.end(), 2);
-    poplar::Tensor grad_bias =
+    poplar::Tensor const grad_bias =
         popops::reduce(context.graph, grad_output, reduction_dims,
                        popops::Operation::ADD, context.seq);
 
@@ -164,7 +171,7 @@ void matmul::lowerToPoplar(CompilerContext &context) {
   // Reshape into target shape. Jump through some array ref stuff.
   auto llvm_ref =
       this->result().getType().cast<mlir::RankedTensorType>().getShape();
-  poplar::ArrayRef<std::uint64_t> poplar_ref{
+  const poplar::ArrayRef<std::uint64_t> poplar_ref{
       (const std::uint64_t *)llvm_ref.data(), llvm_ref.size()};
 
   out = out.reshape(poplar_ref);
@@ -175,10 +182,10 @@ void matmul::lowerToPoplar(CompilerContext &context) {
 
 void addmm::lowerToPoplar(CompilerContext &context) {
   poplar::Tensor input = context.fromSsa(this->input());
-  poplar::Tensor mat1 = context.fromSsa(this->mat1());
-  poplar::Tensor mat2 = context.fromSsa(this->mat2());
-  float beta = this->beta().convertToFloat();
-  float alpha = this->alpha().convertToFloat();
+  poplar::Tensor const mat1 = context.fromSsa(this->mat1());
+  poplar::Tensor const mat2 = context.fromSsa(this->mat2());
+  const float beta = this->beta().convertToFloat();
+  const float alpha = this->alpha().convertToFloat();
 
   poplar::Tensor out = poplin::matMul(context.graph, mat1, mat2, context.seq,
                                       mat1.elementType());

@@ -15,7 +15,7 @@ torch::jit::Node *convolutionHandler(torch::jit::Graph *graph,
   // aten::_convolution(Tensor input, Tensor weight, Tensor? bias, int[]
   //                    stride, int[] padding, int[] dilation, bool transposed,
   //                    int[] output_padding, int groups) -> Tensor
-  bool transposed = constantToBool(node->input(6)->node());
+  const bool transposed = constantToBool(node->input(6)->node());
 
   torch::jit::Value *input = node->input(0);
   torch::jit::Value *kernel = node->input(1);
@@ -29,7 +29,8 @@ torch::jit::Node *convolutionHandler(torch::jit::Graph *graph,
     inputs.push_back(bias);
   }
 
-  std::vector<std::int64_t> stride = constantToLongVec(node->input(3)->node());
+  const std::vector<std::int64_t> stride =
+      constantToLongVec(node->input(3)->node());
 
   std::vector<std::int64_t> padding = constantToLongVec(node->input(4)->node());
 
@@ -43,13 +44,13 @@ torch::jit::Node *convolutionHandler(torch::jit::Graph *graph,
     padding.push_back(padding[pad_index]);
   }
 
-  std::vector<std::int64_t> dilation =
+  const std::vector<std::int64_t> dilation =
       constantToLongVec(node->input(5)->node());
 
-  std::vector<std::int64_t> output_padding =
+  const std::vector<std::int64_t> output_padding =
       constantToLongVec(node->input(7)->node());
 
-  std::int64_t groups = constantToLong(node->input(8)->node());
+  std::int64_t const groups = constantToLong(node->input(8)->node());
 
   if (!transposed) {
     // Create a "normal" convolution.
@@ -92,7 +93,7 @@ torch::jit::Node *conv2dHandler(torch::jit::Graph *graph,
   const std::uint32_t stride_index = is_mkldnn_conv ? 4 : 3;
   const std::uint32_t padding_index = is_mkldnn_conv ? 3 : 4;
 
-  std::vector<std::int64_t> stride =
+  const std::vector<std::int64_t> stride =
       constantToLongVec(node->input(stride_index)->node());
   std::vector<std::int64_t> padding =
       constantToLongVec(node->input(padding_index)->node());
@@ -107,9 +108,9 @@ torch::jit::Node *conv2dHandler(torch::jit::Graph *graph,
     padding.push_back(padding[pad_index]);
   }
 
-  std::vector<std::int64_t> dilation =
+  const std::vector<std::int64_t> dilation =
       constantToLongVec(node->input(5)->node());
-  std::int64_t groups = constantToLong(node->input(6)->node());
+  std::int64_t const groups = constantToLong(node->input(6)->node());
 
   return poptorch::createConv(graph, inputs, dilation, groups, {}, padding,
                               stride);
@@ -120,7 +121,7 @@ torch::jit::Node *cumsumHandler(torch::jit::Graph *graph,
   torch::jit::Value *data = node->input(0);
   std::vector<int64_t> data_shape = shapeFromTensor(data);
   int64_t dim = constantToLong(node->input(1)->node());
-  int64_t r = static_cast<int64_t>(data_shape.size());
+  const int64_t r = static_cast<int64_t>(data_shape.size());
   ERROR_ON_MSG(dim < -r || dim > r - 1, "Dimension out of range.");
 
   if (dim < 0) {
@@ -144,7 +145,7 @@ torch::jit::Node *cumsumHandler(torch::jit::Graph *graph,
   data = createCast(graph, data, requested_output_dtype)->output();
 
   // The 1-D conv kernel span is the size in the dim we are reducing along
-  int64_t span = data_shape[static_cast<size_t>(dim)];
+  const int64_t span = data_shape[static_cast<std::size_t>(dim)];
 
   if (span < 2) {
     // cumsum in singleton dimension or scalar/empty
@@ -152,7 +153,7 @@ torch::jit::Node *cumsumHandler(torch::jit::Graph *graph,
   }
 
   // Create the 1-d conv kernel
-  std::vector<double> kernel_data(static_cast<size_t>(span), 1.0);
+  const std::vector<double> kernel_data(static_cast<std::size_t>(span), 1.0);
   torch::jit::Value *ones =
       createConstantFloatLike(graph, data, kernel_data, {span})->output();
 

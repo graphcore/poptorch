@@ -302,7 +302,7 @@ public:
         debugContext("embedding_grad"));
 
     if (_padding_idx) {
-      auto start = static_cast<size_t>(*_padding_idx);
+      auto start = static_cast<std::size_t>(*_padding_idx);
       auto padding = out.slice(start, start + 1, 0);
       popops::zero(graph().getPoplarGraph(), padding, prog.getPoplarSequence(),
                    debugContext("zero_padding_idx"));

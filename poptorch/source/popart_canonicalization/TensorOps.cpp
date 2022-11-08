@@ -17,7 +17,7 @@ torch::jit::Node *sizeHandler(torch::jit::Graph *graph,
                               torch::jit::Node *node) {
   //  aten::size(Tensor input, int dim) -> int
   std::vector<std::int64_t> shape = shapeFromTensor(node->input(0));
-  std::int64_t dim = constantToLong(node->input(1)->node());
+  std::int64_t const dim = constantToLong(node->input(1)->node());
   return createConstantInt(graph, {shape[dim]}, {1});
 }
 
@@ -59,15 +59,15 @@ torch::jit::Node *repeatHandler(torch::jit::Graph *graph,
   std::vector<std::int64_t> dim_repeats =
       constantToLongVec(node->input(1)->node());
   std::vector<std::int64_t> old_shape = shapeFromTensor(input);
-  std::vector<std::int64_t> new_shape = shapeFromTensor(node->output());
+  const std::vector<std::int64_t> new_shape = shapeFromTensor(node->output());
 
   // If repeat dimensions exceed shape dimensions, pad the front of the
   // original shape with singleton dimensions so that it can
   // be expanded
 
-  std::size_t padding = dim_repeats.size() > old_shape.size()
-                            ? dim_repeats.size() - old_shape.size()
-                            : 0;
+  std::size_t const padding = dim_repeats.size() > old_shape.size()
+                                  ? dim_repeats.size() - old_shape.size()
+                                  : 0;
 
   std::vector<std::int64_t> dim_expands;
   std::vector<std::int64_t> transform_shape;
@@ -75,7 +75,7 @@ torch::jit::Node *repeatHandler(torch::jit::Graph *graph,
   for (std::size_t i = 0; i < dim_repeats.size(); i++) {
     dim_expands.push_back(dim_repeats[i]);
 
-    std::int64_t padded_dim = i < padding ? 1 : old_shape[i - padding];
+    std::int64_t const padded_dim = i < padding ? 1 : old_shape[i - padding];
     if (padded_dim > 1 && dim_repeats[i] > 1) {
       transform_shape.push_back(1);
       dim_expands.push_back(padded_dim);
@@ -106,7 +106,7 @@ torch::jit::Node *rollHandler(torch::jit::Graph *graph,
                  "The 'shifts' argument of the roll op must be a scalar when "
                  "'dims' is not specified.");
     input = createFlatten(graph, {input}, 0)->output();
-    int64_t flattened_size = std::accumulate(
+    const int64_t flattened_size = std::accumulate(
         input_shape.begin(), input_shape.end(), 1, std::multiplies<int64_t>());
     input_shape.clear();
     input_shape.push_back(1);
@@ -124,15 +124,16 @@ torch::jit::Node *rollHandler(torch::jit::Graph *graph,
   for (size_t i = 0; i < dims.size(); ++i) {
     auto current_dim = dims.at(i);
     // Match the torch API of requiring dim in [-len(shape), len(shape)-1]
-    ERROR_ON_MSG(((static_cast<size_t>(current_dim) >= number_of_dims) &&
-                  (current_dim >= 0)) ||
-                     ((static_cast<size_t>(-current_dim) > number_of_dims) &&
-                      (current_dim < 0)),
-                 "Dimension out of range at index "
-                     << i << " (expected to be in range of ["
-                     << -static_cast<std::int64_t>(number_of_dims) << ", "
-                     << number_of_dims - 1 << "], but got " << current_dim
-                     << ") in the roll op.");
+    ERROR_ON_MSG(
+        ((static_cast<std::size_t>(current_dim) >= number_of_dims) &&
+         (current_dim >= 0)) ||
+            ((static_cast<std::size_t>(-current_dim) > number_of_dims) &&
+             (current_dim < 0)),
+        "Dimension out of range at index "
+            << i << " (expected to be in range of ["
+            << -static_cast<std::int64_t>(number_of_dims) << ", "
+            << number_of_dims - 1 << "], but got " << current_dim
+            << ") in the roll op.");
 
     current_dim = (current_dim + number_of_dims) % number_of_dims;
 
@@ -166,8 +167,8 @@ torch::jit::Node *copyHandler(torch::jit::Graph *graph,
   // aten::copy_(Tensor self, Tensor src, bool non_blocking) -> Tensor
   auto *dest = node->input(0);
   auto *src = node->input(1);
-  at::ScalarType dest_type = getNodeScalarType(dest);
-  at::ScalarType src_type = getNodeScalarType(src);
+  at::ScalarType const dest_type = getNodeScalarType(dest);
+  at::ScalarType const src_type = getNodeScalarType(src);
 
   torch::jit::Node *copy = nullptr;
 
@@ -187,7 +188,7 @@ torch::jit::Node *copyHandler(torch::jit::Graph *graph,
 
 torch::jit::Node *justReturnFalse(torch::jit::Graph *graph,
                                   torch::jit::Node * /*unused*/) {
-  c10::IValue value{false};
+  c10::IValue const value{false};
   torch::jit::Value *val = insertConstant(graph, value);
   return val->node();
 }
@@ -226,7 +227,7 @@ torch::jit::Node *gatherHandler(torch::jit::Graph *graph,
 
   // Move gather axis to the innermost dim
   std::vector<int64_t> permutation;
-  unsigned input_num_dims = input_shape.size();
+  const unsigned input_num_dims = input_shape.size();
   permutation.resize(input_num_dims);
   std::iota(permutation.begin(), permutation.end(), 0);
   permutation.push_back(permutation[axis]);

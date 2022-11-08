@@ -26,7 +26,7 @@ namespace poptorch {
 // Store information related to Graph inputs modified in place.
 struct InplaceGraphInfo {
   // Mapping for a graph input which is not modified in place.
-  static constexpr size_t no_mapping = std::numeric_limits<size_t>::max();
+  static constexpr size_t no_mapping = std::numeric_limits<std::size_t>::max();
 
   // Number of outputs from the graph which are not used to emulate
   // inplace ops. (An output may be a list or tuple as well as a tensor).
@@ -48,7 +48,7 @@ struct InplaceGraphInfo {
   //   m[graph_input_idx] = graph_output_idx
   // else
   //   m[graph_input_idx] = no_mapping
-  std::vector<size_t> input_output_mapping{};
+  std::vector<std::size_t> input_output_mapping{};
 };
 
 // A replacement for and modification to

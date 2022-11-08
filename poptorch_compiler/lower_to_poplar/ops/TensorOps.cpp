@@ -58,7 +58,8 @@ void full::lowerToPoplar(CompilerContext &context) {
 }
 
 void tensorconstant_float::lowerToPoplar(CompilerContext &context) {
-  const std::vector<size_t> shape = convertIntArray<size_t>(this->shape());
+  const std::vector<std::size_t> shape =
+      convertIntArray<std::size_t>(this->shape());
   const std::vector<float> data = convertFloatArray<float>(this->data());
 
   const poplar::Tensor new_tensor =
@@ -69,7 +70,8 @@ void tensorconstant_float::lowerToPoplar(CompilerContext &context) {
 }
 
 void tensorconstant_int::lowerToPoplar(CompilerContext &context) {
-  const std::vector<size_t> shape = convertIntArray<size_t>(this->shape());
+  const std::vector<std::size_t> shape =
+      convertIntArray<std::size_t>(this->shape());
   const std::vector<int> data = convertIntArray<int>(this->data());
 
   const poplar::Tensor new_tensor =

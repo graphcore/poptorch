@@ -845,8 +845,10 @@ def test_scalar_tensor_input(trace_model):
 
 def test_returned_only_inputs():
     class Model(torch.nn.Module):
-        def forward(self, x, y):
-            return x, y
+        def forward(self, x, y, z):
+            # x and y will be erased as inputs and converted to
+            # host-side-only constants
+            return x, y, z + 0.0
 
     m = Model()
     options = poptorch.Options()
@@ -854,6 +856,7 @@ def test_returned_only_inputs():
     p = poptorch.inferenceModel(m, options)
     x = torch.tensor([1, 2])
     y = torch.tensor([3, 4])
+    z = torch.tensor([1.2, 3.4])
 
-    for cpu_out, ipu_out in zip(m(x, y), p(x, y)):
+    for cpu_out, ipu_out in zip(m(x, y, z), p(x, y, z)):
         helpers.assert_allclose(actual=ipu_out, expected=cpu_out)

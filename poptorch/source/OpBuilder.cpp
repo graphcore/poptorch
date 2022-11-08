@@ -199,7 +199,8 @@ void setNodeOutputsTypes(torch::jit::Node *node,
     break;
   }
   case OutputType::AsImplicitCastPromoted: {
-    size_t input_idx = (implicit_cast == ImplicitCast::ExceptFirst) ? 1 : 0;
+    const size_t input_idx =
+        (implicit_cast == ImplicitCast::ExceptFirst) ? 1 : 0;
     resolved_output_type = scalarTypeFromInput(node, input_idx);
     break;
   }
@@ -305,7 +306,7 @@ torch::jit::Node *createConstant(torch::jit::Graph *graph,
                                  const std::vector<U> &data,
                                  const std::vector<int64_t> &new_shape,
                                  at::ScalarType scalar_type) {
-  auto total_size = static_cast<size_t>(std::accumulate(
+  auto total_size = static_cast<std::size_t>(std::accumulate(
       new_shape.begin(), new_shape.end(), 1, std::multiplies<int64_t>()));
 
   size_t stride = 0;
@@ -350,7 +351,7 @@ torch::jit::Node *
 createConstantFloatLike(torch::jit::Graph *graph, torch::jit::Value *t,
                         const std::vector<double> &data,
                         const std::vector<std::int64_t> &new_shape) {
-  at::ScalarType scalar_type =
+  at::ScalarType const scalar_type =
       *t->type()->expect<c10::TensorType>()->scalarType();
   torch::jit::Node *new_node = createConstantFloat32(graph, data, new_shape);
   if (scalar_type == at::ScalarType::Half) {
@@ -365,7 +366,7 @@ torch::jit::Node *createInternalCast(torch::jit::Graph *graph,
                                      torch::jit::Value *A,
                                      const std::string &type) {
   // Convert from onnx string to a torch jit scalar object.
-  c10::ScalarType as_type = onnxStrToScalarType(type.c_str());
+  c10::ScalarType const as_type = onnxStrToScalarType(type.c_str());
 
   // Create the actual cast.
   return createCast(graph, A, as_type);
@@ -373,7 +374,7 @@ torch::jit::Node *createInternalCast(torch::jit::Graph *graph,
 
 torch::jit::Node *createCast(torch::jit::Graph *graph, torch::jit::Value *A,
                              c10::ScalarType scalar_type) {
-  std::string new_type = scalarTypeToOnnxString(scalar_type);
+  std::string const new_type = scalarTypeToOnnxString(scalar_type);
 
   auto *node = createCast(graph, {A}, new_type);
 
@@ -471,7 +472,7 @@ createCustomOperation(torch::jit::Graph *graph,
                       const std::string &name, const std::string &domain,
                       std::int64_t domainVersion, std::int64_t numOutputs,
                       const std::string &attributes_id_str) {
-  OutputType type =
+  const OutputType type =
       (numOutputs > 1) ? OutputType::Unknown : OutputType::AsFirstInput;
 
   torch::jit::Node *new_node =

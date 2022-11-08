@@ -313,12 +313,12 @@ T StepIO::get(const popart::TensorId &id, TensorArrayInfo *map,
   uint8_t *ptr =
       static_cast<uint8_t *>(AccessorType::getDataPointer(array_info.array));
 
-  int64_t num_bytes =
+  const int64_t num_bytes =
       static_cast<int64_t>(step_data.info.getDataTypeInfo()->nbytes()) *
       num_elems;
   if (is_input && array_info.offset == array_info.end_offset) {
     int64_t tidx;
-    int64_t input_group_count = _replica_count / _input_group_size;
+    const int64_t input_group_count = _replica_count / _input_group_size;
 
     if (_input_cgt == popart::CommGroupType::Consecutive) {
       tidx = array_info.replica_idx / _input_group_size;
@@ -477,7 +477,7 @@ std::uint64_t CompilerImpl::numPipelineStages() {
 
   // Every time the IPU ID changes, there is an additional stage. In PopTorch,
   // two blocks/stages with the same IPU ID will be merged.
-  std::uint64_t forward_stages = num_ipu_switches + 1;
+  std::uint64_t const forward_stages = num_ipu_switches + 1;
 
   // If training, there are twice the number of stages for backpropagation
   // minus one (because on the last IPU, the backpropagation happens as part of
@@ -500,7 +500,7 @@ void CompilerImpl::addMemoryToOutput(TensorId id, void *ptr,
 
   memory_manager.push_back(std::move(memory));
 
-  popart::TensorId popart_id = ids[id];
+  popart::TensorId const popart_id = ids[id];
   if (!popart_outgoing.insert({popart_id, *memory_manager.back().get()})
            .second) {
     // Insertion in the map failed because there is already a pointer associated
@@ -519,8 +519,8 @@ CompilerImpl::reshape(const std::vector<popart::TensorId> &tensors,
                       const std::vector<int64_t> &shape) {
   auto ai_onnx = active_builder->aiOnnxOpset10();
 
-  popart::Shape s = {static_cast<int64_t>(shape.size())};
-  popart::TensorInfo tensor_info("INT64", s);
+  popart::Shape const s = {static_cast<int64_t>(shape.size())};
+  popart::TensorInfo const tensor_info("INT64", s);
   auto new_shape = ai_onnx.constant({shape.data(), tensor_info});
   return ai_onnx.reshape({tensors.at(0), new_shape},
                          getDebugContext("Reshape"));
@@ -555,7 +555,7 @@ std::vector<popart::TensorId> CompilerImpl::customOperation(
   }
 
   const std::int32_t num_inputs = static_cast<std::int32_t>(args.size());
-  popart::OperatorIdentifier id = {domain, op, 1, num_inputs};
+  popart::OperatorIdentifier const id = {domain, op, 1, num_inputs};
 
   return active_builder->customOp(id, version, args, num_outputs,
                                   attributes_map, getDebugContext(op));
@@ -585,11 +585,12 @@ CompilerImpl::tensorConstant(const std::vector<popart::TensorId> &tensors,
   }
 
   // To preserve memory, use a clone of the data
-  size_t buff_size = constant.getPopartData().info.nbytes();
+  const size_t buff_size = constant.getPopartData().info.nbytes();
   _constant_cloned_data.emplace_back(new char[buff_size]);
   auto *new_buff = reinterpret_cast<void *>(&_constant_cloned_data.back()[0]);
   std::memcpy(new_buff, constant.getPopartData().data, buff_size);
-  popart::ConstVoidData new_constant(new_buff, constant.getPopartData().info);
+  popart::ConstVoidData const new_constant(new_buff,
+                                           constant.getPopartData().info);
 
   auto ai_onnx = active_builder->aiOnnxOpset10();
   popart::TensorId tensor =
@@ -643,9 +644,9 @@ CompilerImpl::createDevice(bool must_attach) {
 
     std::map<std::string, std::string> model_options;
     model_options["numIPUs"] = std::to_string(num_ipus);
-    std::string env_ipu_model_version = getIpuModelVersion();
+    std::string const env_ipu_model_version = getIpuModelVersion();
     model_options["ipuVersion"] = env_ipu_model_version;
-    int num_tiles_per_ipu = getNumTilesPerIpu(env_ipu_model_version);
+    const int num_tiles_per_ipu = getNumTilesPerIpu(env_ipu_model_version);
     model_options["tilesPerIPU"] = std::to_string(num_tiles_per_ipu);
 
     ERROR_ON_MSG(connection_type == popart::DeviceConnectionType::Never,
@@ -691,8 +692,9 @@ CompilerImpl::createDevice(bool must_attach) {
       auto rounded_num_ipus = roundUpNumIPUs(num_ipus);
 
       if (rounded_num_ipus != num_ipus) {
-        std::string common_msg(", because PopTorch must reserve a power of 2 or"
-                               " maximum of 64 IPUs per process");
+        std::string const common_msg(
+            ", because PopTorch must reserve a power of 2 or"
+            " maximum of 64 IPUs per process");
         if (options.auto_round_num_ipus) {
           logging::warn("Reserving {} IPUs when the model specifices the use "
                         "of only {}{}. {} will be reserved but not used.",
@@ -791,12 +793,12 @@ void CompilerImpl::updateGroups(OptimizerType *optimizer,
   for (std::size_t idx = 1; idx < optimizers.size(); ++idx) {
     // Index 0 is 'defaults'
     const std::size_t group = idx - 1;
-    OptimizerParameters group_opt{optimizers[idx], false};
+    const OptimizerParameters group_opt{optimizers[idx], false};
     logging::debug(
         "Updating group {} optimizer with {} for (tensors affected {})", group,
         group_opt.debug(), toString(grad_update_groups[group]));
     // For each tensor in the group.
-    for (popart::TensorId &id : grad_update_groups[group]) {
+    for (const popart::TensorId &id : grad_update_groups[group]) {
       // Update the optimizer
       optimizer->insertSpecific(id, group_opt.params);
     }
@@ -822,7 +824,7 @@ CompilerImpl::getPopartOptimizer(std::vector<Optimizer> optimizers) {
   }
 
   // The first optimizer contains the default values.
-  OptimizerParameters opt{optimizers[0], true};
+  const OptimizerParameters opt{optimizers[0], true};
 
   // Print to debug the new optimizer.
   logging::debug("Updating graph optimizer with {}", opt.debug());
@@ -893,9 +895,10 @@ CompilerImpl::getPopartOptimizer(std::vector<Optimizer> optimizers) {
   case OptimizerType::RMSPROP:
   case OptimizerType::RMSPROP_CENTERED: {
     ERROR_ON(!opt.accum_types_provided);
-    popart::AdaptiveMode mode = opt.type == OptimizerType::RMSPROP
-                                    ? popart::AdaptiveMode::RMSProp
-                                    : popart::AdaptiveMode::CenteredRMSProp;
+    popart::AdaptiveMode const mode =
+        opt.type == OptimizerType::RMSPROP
+            ? popart::AdaptiveMode::RMSProp
+            : popart::AdaptiveMode::CenteredRMSProp;
     auto optimizer = std::make_unique<popart::Adaptive>(
         opt.params, mode, popart::WeightDecayMode::L2Regularization,
         opt.accum_type, opt.first_order_momentum_accum_type,
@@ -960,23 +963,26 @@ popart::TensorId
 CompilerImpl::zerosOrOnes(const std::vector<popart::TensorId> &tensors,
                           const std::vector<int64_t> &shape,
                           const std::string &dtype, bool zeros) {
-  auto total_size = static_cast<size_t>(std::accumulate(
-      shape.begin(), shape.end(), 1, std::multiplies<size_t>()));
+  auto total_size = static_cast<std::size_t>(std::accumulate(
+      shape.begin(), shape.end(), 1, std::multiplies<std::size_t>()));
 
   if (dtype == "INT32") {
     std::vector<int32_t> const_buff(total_size, zeros ? 0 : 1);
-    PopartConstant popart_const(PopartType::INT32, &const_buff[0], shape);
+    const PopartConstant popart_const(PopartType::INT32, const_buff.data(),
+                                      shape);
     return tensorConstant(tensors, popart_const);
   }
   if (dtype == "FLOAT") {
     std::vector<float> const_buff(total_size, zeros ? 0 : 1);
-    PopartConstant popart_const(PopartType::FLOAT, &const_buff[0], shape);
+    const PopartConstant popart_const(PopartType::FLOAT, const_buff.data(),
+                                      shape);
     return tensorConstant(tensors, popart_const);
   }
   if (dtype == "FLOAT16") {
     std::vector<uint16_t> const_buff(total_size,
                                      popart::floatToHalf(zeros ? 0 : 1));
-    PopartConstant popart_const(PopartType::FLOAT16, &const_buff[0], shape);
+    const PopartConstant popart_const(PopartType::FLOAT16, const_buff.data(),
+                                      shape);
     return tensorConstant(tensors, popart_const);
   }
   if (dtype == "BOOL") {
@@ -984,7 +990,8 @@ CompilerImpl::zerosOrOnes(const std::vector<popart::TensorId> &tensors,
       bool b;
     };
     std::vector<Bool> const_buff(total_size, {!zeros});
-    PopartConstant popart_const(PopartType::BOOL, &(const_buff[0].b), shape);
+    const PopartConstant popart_const(PopartType::BOOL, &(const_buff[0].b),
+                                      shape);
     return tensorConstant(tensors, popart_const);
   }
   ERROR("Unsupported type " << dtype);
@@ -1001,14 +1008,15 @@ CompilerImpl::unfold(const std::vector<popart::TensorId> &tensors,
       popart::TensorId tensor;
 
       popart::TensorId scalarConstI64(int64_t val) const {
-        PopartConstant val_const(PopartType::INT64, &val, {});
+        const PopartConstant val_const(PopartType::INT64, &val, {});
         return parent->tensorConstant({}, val_const);
       }
 
       popart::TensorId shapeAsTensor(const std::vector<uint64_t> &shape) const {
         std::vector<int64_t> new_shape(shape.begin(), shape.end());
-        PopartConstant shape_const(PopartType::INT64, new_shape.data(),
-                                   {static_cast<int64_t>(new_shape.size())});
+        const PopartConstant shape_const(
+            PopartType::INT64, new_shape.data(),
+            {static_cast<int64_t>(new_shape.size())});
         return parent->tensorConstant({}, shape_const);
       }
 
@@ -1066,8 +1074,8 @@ CompilerImpl::unfold(const std::vector<popart::TensorId> &tensors,
 
     static InternalState dimShuffle(const InternalState &state,
                                     const std::vector<uint64_t> &permutation) {
-      std::vector<int64_t> permutation_ints(permutation.begin(),
-                                            permutation.end());
+      const std::vector<int64_t> permutation_ints(permutation.begin(),
+                                                  permutation.end());
       state.builder->setAttribute("perm", permutation_ints);
       auto new_tensor = state.transform(
           state.builder->aiOnnxOpset10().transpose({state.tensor}));
@@ -1181,8 +1189,8 @@ void CompilerImpl::clearAttribute(const std::string &attribute,
 }
 
 popart::DebugContext CompilerImpl::getDebugContext(const std::string &name) {
-  std::string op_name = op_builder->getNameScope() + name;
-  popart::DebugContext dc(name, code_location);
+  std::string const op_name = op_builder->getNameScope() + name;
+  popart::DebugContext const dc(name, code_location);
   popart::DebugInfo di(dc, "poptorch");
   di.setValue("torch_schema", torch_node);
   di.setValue("op_type", name);
@@ -1256,7 +1264,7 @@ PopartType CompilerImpl::getPopartType(TensorId id) const {
     if (!session->hasInfo(popart_id)) {
       return PopartType::UNDEFINED;
     }
-    popart::TensorInfo info = session->getInfo(popart_id);
+    popart::TensorInfo const info = session->getInfo(popart_id);
     dtype = info.dataType();
   }
 

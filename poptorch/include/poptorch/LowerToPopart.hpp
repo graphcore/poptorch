@@ -56,14 +56,16 @@ public:
                 std::vector<popart_compiler::Optimizer> &&opt,
                 const popart_compiler::SessionOptions &options,
                 const AttributeAccessor &attribute_accessor,
-                CPUCallbackMap callback, AnchorList &&anchors);
+                CPUCallbackMap callback, AnchorList &&anchors,
+                std::vector<std::size_t> &&input_index_map);
 
   // Dispatcher entry point: the parameters are embedded in the jit::Graph.
   LowerToPopart(torch::jit::Graph *graph, InplaceGraphInfo &&inplace_info,
                 bool training, std::vector<popart_compiler::Optimizer> &&opt,
                 const popart_compiler::SessionOptions &options,
                 const AttributeAccessor &attribute_accessor,
-                CPUCallbackMap callback, AnchorList &&anchors);
+                CPUCallbackMap callback, AnchorList &&anchors,
+                std::vector<std::size_t> &&input_index_map);
   LowerToPopart(LowerToPopart &&lower);
   ~LowerToPopart();
 

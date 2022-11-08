@@ -254,8 +254,8 @@ void randperm::lowerToPoplar(CompilerContext &context) {
     return;
   }
 
-  const poplar::Tensor shape =
-      createConstant(context, poplar::LONGLONG, {static_cast<size_t>(n)}, 0);
+  const poplar::Tensor shape = createConstant(context, poplar::LONGLONG,
+                                              {static_cast<std::size_t>(n)}, 0);
 
   // Avoid slight bias in `uniform` by making sure `maxVal - minVal + 1` is a
   // power of 2; minimise collisions by maximising the range.
