@@ -11,7 +11,6 @@ add_library(poptorch SHARED
   "source/AddDetachOperations.cpp"
   "source/AddSubgraphConnectionNodes.cpp"
   "source/AliasProcessing.cpp"
-  "source/AutomaticCasting.cpp"
   "source/CPUOffloadingCleanUp.cpp"
   "source/CanonicalizeLists.cpp"
   "source/ErrorOnUnsupportedAten.cpp"

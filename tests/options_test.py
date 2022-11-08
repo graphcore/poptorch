@@ -53,10 +53,10 @@ class TestSetOptionsFromEnvironment:
     def test_dotted_access(self):
         ref = poptorch.Options()
         opts = poptorch.Options()
-        opts.Precision.autocastEnabled(False)
+        opts.Precision.runningStatisticsAlwaysFloat(False)
         try:
             os.environ["POPTORCH_DEFAULT_OPTIONS"] = (
-                '{"Precision.autocastEnabled":false}')
+                '{"Precision.runningStatisticsAlwaysFloat":false}')
             init_set = poptorch.Options()
         finally:
             del os.environ["POPTORCH_DEFAULT_OPTIONS"]
@@ -571,8 +571,6 @@ def test_copying_options():
             deep_copy.Precision.half_float_casting)
     assert (opts.Precision.running_statistics_always_float ==
             deep_copy.Precision.running_statistics_always_float)
-    assert (opts.Precision.autocast_enabled ==
-            deep_copy.Precision.autocast_enabled)
 
     assert (opts.Distributed.distributed_process_id !=
             deep_copy.Distributed.distributed_process_id)

@@ -81,10 +81,6 @@ extern c10::Symbol optimizer_group;
 extern c10::Symbol begin_multi_conv;
 extern c10::Symbol multi_conv_part;
 extern c10::Symbol end_multi_conv;
-extern c10::Symbol begin_autocast;
-extern c10::Symbol suppress_autocast;
-extern c10::Symbol restore_autocast;
-extern c10::Symbol autocast;
 
 // In order to allow a paramater/buffer to be updated in place, the only
 // guaranteed inplace op by PopART, use update_param_inplace.

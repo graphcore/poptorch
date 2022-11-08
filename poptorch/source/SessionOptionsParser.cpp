@@ -3,7 +3,6 @@
 
 #include "popart_compiler/Compiler.hpp"
 #include "popart_compiler/Utils.hpp"
-#include "poptorch/AutomaticCasting.hpp"
 #include "poptorch/ImplicitCasting.hpp"
 #include "poptorch_logging/Tracepoint.hpp"
 
@@ -104,18 +103,6 @@ SessionOptionsParser::SessionOptionsParser(const IPyValue &py_opts)
 }
 
 void processPrecisionOptions(const IPyValue &values_dict, bool dispatcher) {
-  poptorch::setAutocastEnabled(
-      values_dict.getFromDict("autocast_enabled")->toBoolean());
-
-  auto policy = values_dict.getFromDict("autocast_policy_dict");
-  std::vector<std::string> fp16;
-  policy->getFromDict("fp16")->forEachInList(
-      [&fp16](const IPyValue &val) { fp16.push_back(val.toString()); });
-  setAutocastHalf(policy->getFromDict("fp16")->toVectorString());
-  setAutocastFloat(policy->getFromDict("fp32")->toVectorString());
-  setAutocastPromote(policy->getFromDict("promote")->toVectorString());
-  setAutocastDemote(policy->getFromDict("demote")->toVectorString());
-
   auto hf_casting = static_cast<HalfFloatCasting>(
       values_dict.getFromDict("half_float_casting")->toInt64());
 

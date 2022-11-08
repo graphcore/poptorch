@@ -41,9 +41,6 @@ expand("nop", op.nop)
 expand("end_ipu_block", op.passThrough)
 expand("begin_multi_conv", op.passThrough)
 expand("pop_name_scope", op.passThrough)
-expand("begin_autocast", op.passThrough)
-expand("suppress_autocast", op.passThrough)
-expand("restore_autocast", op.passThrough)
 expand("end_cpu_op", op.passThrough)
 
 generate(script, "symbols::poptorch", output_dir + "/PoptorchHandlers.gen.cpp",

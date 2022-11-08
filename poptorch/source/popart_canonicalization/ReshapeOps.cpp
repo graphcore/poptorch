@@ -26,15 +26,15 @@ torch::jit::Node *expandHandler(torch::jit::Graph *graph,
   torch::jit::Node *new_node;
 
   // Extract the type from the pytorch IR.
-  c10::TensorTypePtr self_tensor =
+  const c10::TensorTypePtr self_tensor =
       node->input(0)->type()->expect<c10::TensorType>();
-  c10::VaryingShape self_dims = self_tensor->sizes();
+  const c10::VaryingShape self_dims = self_tensor->sizes();
 
   // Old shape
   std::vector<std::int64_t> old_shape = shapeFromTensor(node->input(0));
 
   // Count the elems in the old shape.
-  std::int64_t old_elem_count = std::accumulate(
+  const std::int64_t old_elem_count = std::accumulate(
       old_shape.begin(), old_shape.end(), 1, std::multiplies<std::int64_t>());
 
   // Get the target size for the expand.
@@ -66,7 +66,7 @@ torch::jit::Node *expandHandler(torch::jit::Graph *graph,
   }
 
   // Count the number of elements in the target shape.
-  std::int64_t new_elem_count = std::accumulate(
+  const std::int64_t new_elem_count = std::accumulate(
       new_shape.begin(), new_shape.end(), 1, std::multiplies<std::int64_t>());
 
   // Elements don't change so just a reshape.
@@ -90,9 +90,9 @@ torch::jit::Node *flattenHandler(torch::jit::Graph *graph,
   std::int64_t start_dim = constantToLong(node->input(1)->node());
   std::int64_t end_dim = constantToLong(node->input(2)->node());
 
-  c10::TensorTypePtr self_tensor =
+  const c10::TensorTypePtr self_tensor =
       node->input(0)->type()->expect<c10::TensorType>();
-  c10::VaryingShape self_dims = self_tensor->sizes();
+  const c10::VaryingShape self_dims = self_tensor->sizes();
 
   // Respect PyTorch negative dimensions
   if (end_dim < 0) {
@@ -142,7 +142,7 @@ torch::jit::Node *asStridedHandler(torch::jit::Graph * /*graph*/,
 torch::jit::Node *reshapeHandler(torch::jit::Graph *graph,
                                  torch::jit::Node *node) {
   // aten::view(Tensor(a) self, int[] size) -> (Tensor(a))
-  std::vector<std::int64_t> new_shape = shapeFromTensor(node->output());
+  const std::vector<std::int64_t> new_shape = shapeFromTensor(node->output());
 
   // Reshape the tensor into that shape.
   return createReshape(graph, node->input(0), new_shape);
@@ -155,9 +155,9 @@ torch::jit::Node *expandAsHandler(torch::jit::Graph *graph,
   torch::jit::Node *new_node;
 
   // Extract the type from the pytorch IR.
-  c10::TensorTypePtr self_tensor =
+  const c10::TensorTypePtr self_tensor =
       node->input(0)->type()->expect<c10::TensorType>();
-  c10::VaryingShape self_dims = self_tensor->sizes();
+  const c10::VaryingShape self_dims = self_tensor->sizes();
 
   std::int64_t old_elem_count = 0;
   for (auto optional_int : *self_dims.sizes()) {
@@ -165,9 +165,9 @@ torch::jit::Node *expandAsHandler(torch::jit::Graph *graph,
   }
 
   // Extract the type from the pytorch IR.
-  c10::TensorTypePtr as_tensor =
+  const c10::TensorTypePtr as_tensor =
       node->input(1)->type()->expect<c10::TensorType>();
-  c10::VaryingShape dims = as_tensor->sizes();
+  const c10::VaryingShape dims = as_tensor->sizes();
 
   // Convert that IR type into a C++ vector of ints.
   std::vector<std::int64_t> new_shape;
@@ -248,7 +248,7 @@ torch::jit::Node *permuteHandler(torch::jit::Graph *graph,
   std::vector<std::int64_t> permutation =
       constantToLongVec(node->input(1)->node());
 
-  c10::TensorTypePtr as_tensor =
+  const c10::TensorTypePtr as_tensor =
       node->input(0)->type()->cast<c10::TensorType>();
   c10::VaryingShape dims = as_tensor->sizes();
 
@@ -341,7 +341,7 @@ torch::jit::Node *reorderBasedOnStride(torch::jit::Graph *graph,
 
   // Alter the indices to match
   for (size_t idx = 0; idx < indices->size(); idx++) {
-    uint64_t old_idx = (*indices)[idx];
+    const uint64_t old_idx = (*indices)[idx];
     (*indices)[idx] =
         (old_idx % stride) * (last_dim_size / stride) + old_idx / stride;
   }
@@ -576,9 +576,9 @@ torch::jit::Node *transposeHandler(torch::jit::Graph *graph,
 
   std::int64_t dim1 = constantToLong(node->input(2)->node());
 
-  c10::TensorTypePtr as_tensor =
+  const c10::TensorTypePtr as_tensor =
       node->input(0)->type()->cast<c10::TensorType>();
-  c10::VaryingShape dims = as_tensor->sizes();
+  const c10::VaryingShape dims = as_tensor->sizes();
 
   // Convert that IR type into a C++ vector of ints. In popart the
   // permutation includes all elements (rotate last two elements with [0, 1,
@@ -633,11 +633,11 @@ torch::jit::Node *splitChunkHandler(torch::jit::Graph *graph,
   // aten::chunk(Tensor self, int chunks, int dim) -> Tensor[]
   // aten::unsafe_chunk(Tensor self, int chunks, int dim) -> Tensor[]
 
-  torch::jit::Symbol kind = node->kind();
+  const torch::jit::Symbol kind = node->kind();
   // Get the shape of the input.
-  c10::TensorTypePtr as_tensor =
+  const c10::TensorTypePtr as_tensor =
       node->input(0)->type()->expect<c10::TensorType>();
-  c10::VaryingShape dims = as_tensor->sizes();
+  const c10::VaryingShape dims = as_tensor->sizes();
 
   // Pythonic axis translation.
   const std::int64_t dim = constantToLong(node->input(2)->node());
@@ -659,10 +659,11 @@ torch::jit::Node *splitChunkHandler(torch::jit::Graph *graph,
     // Chunk takes in the *number of chunks*. Canonicalise it to *size of
     // chunks*.
     auto chunk_dim = *dims[axis];
+    ERROR_ON(!split_size.has_value());
     auto n_chunks = *split_size;
 
     // Integer division: (dim / n_chunks) with rounding up
-    std::int64_t slice_size = (chunk_dim + n_chunks - 1) / n_chunks;
+    const std::int64_t slice_size = (chunk_dim + n_chunks - 1) / n_chunks;
     auto remaining_size = chunk_dim;
     while (remaining_size >= slice_size) {
       size_of_each_split.push_back(slice_size);
@@ -678,7 +679,7 @@ torch::jit::Node *splitChunkHandler(torch::jit::Graph *graph,
     }
   } else if (split_size) {
     // Split takes in the size of each chunk.
-    std::int64_t slice_size = *split_size;
+    const std::int64_t slice_size = *split_size;
     for (int i = 0; i < *dims[axis] / slice_size; ++i) {
       size_of_each_split.push_back(slice_size);
     }
@@ -698,7 +699,7 @@ torch::jit::Node *splitChunkHandler(torch::jit::Graph *graph,
   std::vector<torch::jit::Value *> slices;
 
   // Slice up according to the canonicalised split vector.
-  for (std::int64_t slice_size : size_of_each_split) {
+  for (const std::int64_t slice_size : size_of_each_split) {
     torch::jit::Node *slice = createSlice(
         graph, {node->input(0)}, {index + slice_size}, {index}, {axis});
 
@@ -757,6 +758,7 @@ torch::jit::Node *toHandler(torch::jit::Graph *graph, torch::jit::Node *node) {
   if (!cast_to.has_value() || cast_to == *tensor_type->scalarType()) {
     // NOOP
     if (cast_to == *tensor_type->scalarType()) {
+      ERROR_ON(!cast_to.has_value());
       logging::trace("Ignoring type cast to same type, {}, {}", *cast_to,
                      *tensor_type->scalarType());
     }
@@ -805,7 +807,7 @@ torch::jit::Node *upsampleHandler(torch::jit::Graph *graph,
   auto num_inputs = node->inputs().size();
   torch::jit::Value *input = node->input(0);
   torch::jit::Value *output_size = node->input(1);
-  bool is_bicubic = node->kind() == c10::aten::upsample_bicubic2d;
+  const bool is_bicubic = node->kind() == c10::aten::upsample_bicubic2d;
   size_t scales_idx = 2;
 
   if (is_bicubic) {
@@ -893,12 +895,13 @@ torch::jit::Node *upsampleBilinear2dHandler(torch::jit::Graph *graph,
     scales.push_back(scalesxy[1]);
   }
 
-  std::vector<torch::jit::Value *> inputs = {input};
-  std::string name = "UpsampleBilinear2d";
-  std::string domain = "poptorch.custom_ops";
-  std::string attributes("{\"scaling_factor\":" + std::to_string(scales[2]) +
-                         ", " + "\"align_corners\":" +
-                         std::to_string(static_cast<int>(align_corners)) + "}");
+  const std::vector<torch::jit::Value *> inputs = {input};
+  const std::string name = "UpsampleBilinear2d";
+  const std::string domain = "poptorch.custom_ops";
+  const std::string attributes(
+      "{\"scaling_factor\":" + std::to_string(scales[2]) + ", " +
+      "\"align_corners\":" + std::to_string(static_cast<int>(align_corners)) +
+      "}");
 
   auto *new_node =
       createCustomOperation(graph, inputs, name, domain, 1, 1, attributes);
@@ -918,9 +921,9 @@ torch::jit::Node *unsupportedUpsampleHandler(torch::jit::Graph *graph,
 
 torch::jit::Node *stackHandler(torch::jit::Graph *graph,
                                torch::jit::Node *node) {
-  std::int64_t dim = constantToLong(node->input(1)->node());
+  const std::int64_t dim = constantToLong(node->input(1)->node());
 
-  std::vector<torch::jit::Value *> values =
+  const std::vector<torch::jit::Value *> values =
       handleTensorList(node->input(0)->node());
 
   std::vector<torch::jit::Value *> transformed_tensors;
@@ -936,20 +939,6 @@ torch::jit::Node *stackHandler(torch::jit::Graph *graph,
 
 torch::jit::Node *intHandler(torch::jit::Graph *graph, torch::jit::Node *node) {
   return createCast(graph, node->input(0), at::ScalarType::Int);
-}
-
-torch::jit::Node *autocastHandler(torch::jit::Graph *graph,
-                                  torch::jit::Node *node) {
-  auto from_type = getNodeScalarType(node->input(0));
-  auto to_type = getNodeScalarType(node->output(0));
-
-  if (from_type == to_type) {
-    node->output()->replaceAllUsesWith(node->input(0));
-    markNodeForDeletion(node);
-    return nullptr;
-  }
-
-  return createCast(graph, node->input(0), to_type);
 }
 
 } // namespace
@@ -988,7 +977,6 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::as_strided, asStridedHandler);
   registerHandler(c10::aten::stack, stackHandler);
   registerHandler(c10::aten::Int, intHandler);
-  registerHandler(symbols::poptorch::autocast, autocastHandler);
 }
 
 } // namespace poptorch

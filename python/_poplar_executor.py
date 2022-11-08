@@ -136,8 +136,6 @@ class PoplarExecutor:
 
         self._user_model = user_model or model
 
-        options.Precision.autocast_policy.apply(self._user_model, options)
-
         if training:
             self._attribute_tracker = \
                     _optimizer_attributes.OptimizerAttrTracker(

@@ -2,8 +2,6 @@ accessor
 AdamW
 AMSGrad
 AsyncRebatched
-autocast
-autocasting
 autograd
 backend
 booleans

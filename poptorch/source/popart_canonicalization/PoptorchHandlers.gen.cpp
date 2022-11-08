@@ -13,12 +13,6 @@ namespace poptorch {
 
 namespace {
 
-torch::jit::Node *beginAutocastHandler(torch::jit::Graph * /*graph*/,
-                                       torch::jit::Node * /*node*/) {
-  // <pass through>
-  return nullptr;
-}
-
 torch::jit::Node *beginIpuBlockHandler(torch::jit::Graph *graph,
                                        torch::jit::Node *node) {
   auto *x = node->input(0);
@@ -126,12 +120,6 @@ torch::jit::Node *recomputationCheckpointHandler(torch::jit::Graph *graph,
   return createRecomputationCheckpoint(graph, i0);
 }
 
-torch::jit::Node *restoreAutocastHandler(torch::jit::Graph * /*graph*/,
-                                         torch::jit::Node * /*node*/) {
-  // <pass through>
-  return nullptr;
-}
-
 torch::jit::Node *setMatmulSerializationHandler(torch::jit::Graph *graph,
                                                 torch::jit::Node *node) {
   auto *x = node->input(0);
@@ -152,12 +140,6 @@ torch::jit::Node *startForLoopHandler(torch::jit::Graph *graph,
   return createStartForLoop(graph, inputs);
 }
 
-torch::jit::Node *suppressAutocastHandler(torch::jit::Graph * /*graph*/,
-                                          torch::jit::Node * /*node*/) {
-  // <pass through>
-  return nullptr;
-}
-
 torch::jit::Node *updateParamInplaceHandler(torch::jit::Graph *graph,
                                             torch::jit::Node *node) {
   auto *i0 = node->input(0);
@@ -169,7 +151,6 @@ torch::jit::Node *updateParamInplaceHandler(torch::jit::Graph *graph,
 } // namespace
 
 __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
-  registerHandler(symbols::poptorch::begin_autocast, beginAutocastHandler);
   registerHandler(symbols::poptorch::begin_ipu_block, beginIpuBlockHandler);
   registerHandler(symbols::poptorch::begin_multi_conv, beginMultiConvHandler);
   registerHandler(symbols::poptorch::call_cpu_op, callCpuOpHandler);
@@ -184,12 +165,9 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(symbols::poptorch::pop_name_scope, popNameScopeHandler);
   registerHandler(symbols::poptorch::recomputation_checkpoint,
                   recomputationCheckpointHandler);
-  registerHandler(symbols::poptorch::restore_autocast, restoreAutocastHandler);
   registerHandler(symbols::poptorch::set_matmul_serialization,
                   setMatmulSerializationHandler);
   registerHandler(symbols::poptorch::start_for_loop, startForLoopHandler);
-  registerHandler(symbols::poptorch::suppress_autocast,
-                  suppressAutocastHandler);
   registerHandler(symbols::poptorch::update_param_inplace,
                   updateParamInplaceHandler);
 }

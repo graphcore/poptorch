@@ -14,7 +14,6 @@
 #include "poptorch_logging/Tracepoint.hpp"
 
 #include "poptorch/AliasProcessing.hpp"
-#include "poptorch/AutomaticCasting.hpp"
 #include "poptorch/DispatchTracer.hpp"
 #include "poptorch/ImplicitCasting.hpp"
 #include "poptorch/InplaceOps.hpp"
@@ -226,9 +225,6 @@ poptorch::LowerToPopart lowerToPopartFromTrace(
   poptorch::canonicalizeLists(graph.get());
   logging::trace("Graph after canonicalizing lists:\n{}", *graph);
 
-  poptorch::automaticCasting(graph.get());
-  logging::trace("Graph after automatic casting:\n{}", *graph);
-
   poptorch::cpuOffloadingCleanup(graph.get());
 
   poptorch::removeScatterAddIndexExpansion(graph.get());
@@ -285,7 +281,7 @@ poptorch::LowerToPopart lowerToPopartFromDispatch(
     std::vector<popart_compiler::Optimizer> &&optimizers,
     const AttributeAccessor &attribute_accessor, CPUCallbackMap &callbacks) {
   auto &parsed_options = parser.options();
-  std::shared_ptr<torch::jit::Graph> graph = getTracedGraph();
+  const std::shared_ptr<torch::jit::Graph> graph = getTracedGraph();
   logging::trace("Initial dispatched graph:\n{}", *graph);
 
   torch::jit::EliminateDeadCode(graph);

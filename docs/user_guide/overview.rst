@@ -973,18 +973,6 @@ You can use your models in one of the following ways:
     :emphasize-lines: 1, 2
 
 
-Automatic mixed-precision casting
-=================================
-
-The PopTorch autocasting API is part of the legacy tracing frontend.
-Under the default dispatcher frontend (see :numref:`dispatcher-support`),
-PyTorch casting can be used to manipulate mixed-precision operations, just as
-in CPU-based PyTorch code.
-
-If you are using the legacy tracing frontend, the autocasting API is still
-available; see :numref:`tracing-autocast`.
-
-
 PyTorch buffers
 ===============
 

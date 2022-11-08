@@ -41,7 +41,6 @@ from . import _dataloader
 from . import _impl
 from . import _poptorch_data
 from . import _utils
-from .autocasting import autocast
 from .enums import *
 from .ops import *
 from .options import *

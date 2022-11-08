@@ -222,12 +222,3 @@ Enumerations
 
 .. autoclass:: poptorch.MeanReductionStrategy
    :members:
-
-Autocasting
-===========
-
-.. autoclass:: poptorch.autocasting.autocast
-   :members:
-
-.. autoclass:: poptorch.autocasting.Policy
-   :members:

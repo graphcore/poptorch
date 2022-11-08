@@ -4,7 +4,6 @@ import json
 import copy
 from typing import Optional, Union, Dict, Any, List, Set
 import torch
-from . import autocasting
 from . import enums
 from ._logging import logger
 from . import _options_config
@@ -89,40 +88,7 @@ class _PrecisionOptions(_options_impl.OptionsDict):
                  popart_options: "poptorch.options._PopartOptions") -> None:
         self._popart_options = popart_options
         super().__init__(
-            autocast_enabled=True,
-            autocast_policy=autocasting.default,
-            autocast_policy_dict=autocasting.default._dict(),  # pylint: disable=protected-access
             half_float_casting=enums.HalfFloatCastingBehavior.Default)
-
-    def autocastEnabled(self, autocast_enabled: bool
-                        ) -> "poptorch.options._PrecisionOptions":
-        """ Controls whether automatic casting functionality is turned on.
-
-            :param autocast_enabled: if True, automatic casting is active.
-                                          Default value is True.
-        """
-
-        if not isinstance(autocast_enabled, bool):
-            raise ValueError(
-                'autocastEnabled must be set to either True or False')
-
-        self.set(autocast_enabled=autocast_enabled)
-        return self
-
-    def autocastPolicy(self, autocast_policy: "poptorch.autocasting.Policy"
-                       ) -> "poptorch.options._PrecisionOptions":
-        """ Set the automatic casting policy.
-
-            :param policy: the policy object.
-        """
-
-        if not isinstance(autocast_policy, autocasting.Policy):
-            raise ValueError('autocastPolicy must be set to an instance of'
-                             'poptorch.autocasting.Policy')
-
-        self.set(autocast_policy=autocast_policy)
-        self.set(autocast_policy_dict=self.autocast_policy._dict())  # pylint: disable=protected-access
-        return self
 
     def halfFloatCasting(
             self, half_float_casting: "poptorch.HalfFloatCastingBehavior"

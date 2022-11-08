@@ -83,18 +83,6 @@
    native_func: pop_name_scope() -> ()
    PopTorchDirect: pop_name_scope
 
- - func: begin_autocast
-   native_func: begin_autocast() -> ()
-   PopTorchDirect: begin_autocast
-
- - func: suppress_autocast
-   native_func: suppress_autocast() -> ()
-   PopTorchDirect: suppress_autocast
-
- - func: restore_autocast
-   native_func: restore_autocast() -> ()
-   PopTorchDirect: restore_autocast
-
  - func: end_cpu_op
    native_func: end_cpu_op(Tensor[] output) -> Tensor[]
    PopTorchDirect: end_cpu_op

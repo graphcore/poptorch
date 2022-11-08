@@ -351,18 +351,6 @@ def Poptorch_push_name_scope : Poptorch_NotImplementedOp<"push_name_scope", []> 
 def Poptorch_pop_name_scope : Poptorch_NotImplementedOp<"pop_name_scope", []> {
 }
 
-// begin_autocast() -> ()
-def Poptorch_begin_autocast : Poptorch_NotImplementedOp<"begin_autocast", []> {
-}
-
-// suppress_autocast() -> ()
-def Poptorch_suppress_autocast : Poptorch_NotImplementedOp<"suppress_autocast", []> {
-}
-
-// restore_autocast() -> ()
-def Poptorch_restore_autocast : Poptorch_NotImplementedOp<"restore_autocast", []> {
-}
-
 // end_cpu_op(Tensor[] output) -> Tensor[]
 def Poptorch_end_cpu_op : Poptorch_NotImplementedOp<"end_cpu_op", []> {
   let arguments = (ins Poptorch_tensorlist:$output);
