@@ -536,8 +536,10 @@ void MLIRDispatch::fallback(const c10::OperatorHandle &op, c10::Stack *stack) {
 
   const std::string schema_key = handleOp(op, stack);
 
-  ERROR_ON_MSG(!_compiler.allOpsCanBeLoweredToPoplar(),
-               schema_key << " cannot currently be lowered to Poplar");
+  if (_opts.dispatcher.check_added_ops) {
+    ERROR_ON_MSG(!_compiler.allOpsCanBeLoweredToPoplar(),
+                 schema_key << " cannot currently be lowered to Poplar");
+  }
 
   if (shouldRunAllOpsSynchronously()) {
     markStep();

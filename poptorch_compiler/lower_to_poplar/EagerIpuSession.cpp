@@ -268,4 +268,60 @@ PopitDeviceFunctionWrapper PopitFunctionCache::emplaceWrapped(
                                     std::move(io), std::move(debug_info));
 }
 
+PopitDeviceFunctionWrapper
+EagerIpuSession::createFunction(const mlir::ModuleOp &graph, FunctionIO io,
+                                GraphDebugInfo debug_info,
+                                NonRestartingMLIRTimer &timer) {
+  return _func_cache.emplaceWrapped(graph, *this, std::move(io),
+                                    std::move(debug_info), timer);
+}
+
+Buffer HeadlessIpuSession::allocate(const TensorType &type) {
+  UNUSED(type);
+  // We must return a non-null value from allocate. In order to better test the
+  // providence of the buffers we pass a pointer to the current
+  // HeadlessIpuSession. It is safe to do this because the only way to access
+  // the buffer is through this class
+  return Buffer(PopitMemPtr(std::shared_ptr<popit::Mem_t>(
+      reinterpret_cast<popit::Mem_t *>(this), [](popit::Mem_t *) {})));
+}
+
+void HeadlessIpuSession::copyDataFromCpuSource(Buffer &ipu_dest,
+                                               const char *cpu_data) {
+  ERROR_ON_MSG(reinterpret_cast<HeadlessIpuSession *>(
+                   ipu_dest.getPopitData().get()) != this,
+               "copyDataFromCpuSource: the dest buffer does not belong to this "
+               "HeadlessIpuSession");
+  ERROR_ON(!cpu_data);
+}
+
+void HeadlessIpuSession::copyDataToCpu(char *cpu_dest, Buffer &ipu_src) {
+  ERROR_ON_MSG(reinterpret_cast<HeadlessIpuSession *>(
+                   ipu_src.getPopitData().get()) != this,
+               "copyDataToCpu: the source buffer does not belong to this "
+               "HeadlessIpuSession");
+  ERROR_ON(!cpu_dest);
+}
+
+void HeadlessIpuSession::copyDataOnDevice(Buffer &dest, const Buffer &src) {
+  ERROR_ON_MSG(
+      reinterpret_cast<HeadlessIpuSession *>(dest.getPopitData().get()) != this,
+      "copyDataOnDevice: the dest buffer does not belong to this "
+      "HeadlessIpuSession");
+  ERROR_ON_MSG(
+      reinterpret_cast<HeadlessIpuSession *>(src.getPopitData().get()) != this,
+      "copyDataOnDevice: the source buffer does not belong to this "
+      "HeadlessIpuSession");
+}
+
+PopitDeviceFunctionWrapper
+HeadlessIpuSession::createFunction(const mlir::ModuleOp &graph, FunctionIO io,
+                                   GraphDebugInfo debug_info,
+                                   NonRestartingMLIRTimer &timer) {
+  UNUSED(graph);
+  UNUSED(timer);
+  return PopitDeviceFunctionWrapper(nullptr, std::move(io),
+                                    std::move(debug_info));
+}
+
 } // namespace poptorch_ir

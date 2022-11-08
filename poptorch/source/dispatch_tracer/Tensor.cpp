@@ -439,8 +439,8 @@ TensorStore::getIpuSession() const {
   return _ipu_session;
 }
 
-void TensorStore::enableEagerMode() {
-  _ipu_session = poptorch_ir::createEagerSession();
+void TensorStore::enableEagerMode(bool headless) {
+  _ipu_session = poptorch_ir::createEagerSession(headless);
 }
 
 void TensorStore::reset() { _ipu_session = nullptr; }

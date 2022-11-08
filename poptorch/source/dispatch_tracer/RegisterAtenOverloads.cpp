@@ -350,14 +350,15 @@ bool eagerModeEnabled() {
   return result;
 }
 
-CompilerOptions &enableEagerMode() {
+CompilerOptions &enableEagerMode(bool headless) {
+  UNUSED(headless);
   auto dispatcher = std::make_unique<MLIRDispatch>(
-      CompilerOptions::eagerOptions(), &getContext().tensor_store);
+      CompilerOptions::eagerOptions(!headless), &getContext().tensor_store);
 
   auto &options = dispatcher->getMutableCompilerOptions();
 
   getContext().resetActiveDispatch(std::move(dispatcher));
-  getContext().tensor_store.enableEagerMode();
+  getContext().tensor_store.enableEagerMode(headless);
 
   return options;
 }

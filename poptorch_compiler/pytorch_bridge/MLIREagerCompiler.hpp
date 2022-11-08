@@ -14,7 +14,7 @@
 
 namespace poptorch_ir {
 
-class EagerIpuSession;
+class IEagerIpuSession;
 class ILivenessMap;
 
 namespace detail {
@@ -31,7 +31,7 @@ public:
   void addOutput(TensorId id, const char *name) override;
   TensorId addValue(const mlir::Value &value) override;
 
-  PopitDeviceFunctionWrapper compile(EagerIpuSession &session,
+  PopitDeviceFunctionWrapper compile(IEagerIpuSession &session,
                                      ILivenessMap &liveness);
 
 private:

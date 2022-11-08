@@ -44,6 +44,7 @@ from . import _utils
 from .enums import *
 from .ops import *
 from .options import *
+from ._eager_helpers import markStep
 from ._impl import isRunningOnIpu, createPoptorchError
 from ._utils import accessAttributes, getIpuTensorId
 from ._poplar_executor import PoplarExecutor

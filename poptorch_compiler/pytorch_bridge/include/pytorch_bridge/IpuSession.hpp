@@ -23,6 +23,7 @@ struct FunctionIO {
 };
 
 class EagerIpuSession;
+class HeadlessIpuSession;
 
 class PopitMemPtr : public std::shared_ptr<popit::Mem_t> {
 public:
@@ -31,6 +32,7 @@ public:
 private:
   // Only constructible from the eager ipu session
   friend class EagerIpuSession;
+  friend class HeadlessIpuSession;
   explicit PopitMemPtr(std::shared_ptr<popit::Mem_t> ptr);
 };
 
@@ -69,7 +71,7 @@ public:
 };
 
 std::shared_ptr<IIpuSession> createStaticSession();
-std::shared_ptr<IIpuSession> createEagerSession();
+std::shared_ptr<IIpuSession> createEagerSession(bool headless = false);
 
 class PopitDeviceFunction;
 

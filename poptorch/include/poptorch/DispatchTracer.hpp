@@ -123,7 +123,7 @@ bool isParameter(torch::jit::Value *value);
 bool eagerModeEnabled();
 
 // Switch to the eager mode dispatcher.
-CompilerOptions &enableEagerMode();
+CompilerOptions &enableEagerMode(bool headless = false);
 
 void markStep();
 

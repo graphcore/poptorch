@@ -146,7 +146,7 @@ void MLIREagerCompiler::markOutputs(
   createOp<mlir::func::ReturnOp>(outputs);
 }
 
-PopitDeviceFunctionWrapper MLIREagerCompiler::compile(EagerIpuSession &session,
+PopitDeviceFunctionWrapper MLIREagerCompiler::compile(IEagerIpuSession &session,
                                                       ILivenessMap &liveness) {
   root_timer.start();
 
@@ -176,8 +176,8 @@ PopitDeviceFunctionWrapper MLIREagerCompiler::compile(EagerIpuSession &session,
     debug_info.cached_graph = moduleToSharedStr(_the_module);
   }
 
-  return session.func_cache.emplaceWrapped(
-      _the_module, session,
+  return session.createFunction(
+      _the_module,
       std::move(external_function_io.at(std::string(entry_point_name))),
       std::move(debug_info), root_timer);
 }

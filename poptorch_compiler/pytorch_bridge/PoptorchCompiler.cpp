@@ -127,7 +127,7 @@ PopitDeviceFunctionWrapper PoptorchCompiler::compile(IIpuSession &session,
   ERROR_ON_MSG(
       compiler == nullptr,
       "[internal] Only eager builders may call compile(session, liveness)");
-  return compiler->compile(dynamic_cast<EagerIpuSession &>(session), liveness);
+  return compiler->compile(dynamic_cast<IEagerIpuSession &>(session), liveness);
 }
 
 std::unique_ptr<PoplarExecutorWrapper> PoptorchCompiler::compileAndLoad() {

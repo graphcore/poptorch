@@ -61,8 +61,6 @@ PopitDeviceFunction::PopitDeviceFunction(EagerIpuSession &context,
 
   MLIRToPopitConverter converter{*this};
   converter.convertGraph(module, timer);
-
-  compile_popit.stop();
 }
 
 void PopitDeviceFunction::run(const std::vector<popit::Mem_t *> &inputs,

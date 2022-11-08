@@ -55,7 +55,10 @@ bool Buffer::hasData() const {
 std::shared_ptr<IIpuSession> createStaticSession() {
   return std::make_shared<StaticIpuSession>();
 }
-std::shared_ptr<IIpuSession> createEagerSession() {
+std::shared_ptr<IIpuSession> createEagerSession(bool headless) {
+  if (headless) {
+    return std::make_shared<HeadlessIpuSession>();
+  }
   return std::make_shared<EagerIpuSession>();
 }
 
@@ -82,7 +85,9 @@ void PopitDeviceFunctionWrapper::run(IAllocationMap &alloc_map) const {
                         TensorDebugInfo{_debug_info, output.index()});
                   });
 
-  _func->run(inputs, outputs);
+  if (_func) {
+    _func->run(inputs, outputs);
+  }
 
   poptorch::logging::info("Executed PopIT function");
 }

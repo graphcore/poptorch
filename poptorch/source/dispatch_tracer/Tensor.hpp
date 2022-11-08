@@ -140,7 +140,7 @@ public:
   void copyFromCpu(const at::Tensor &ipu_dest, const at::Tensor &cpu_src);
   void copyToCpu(const at::Tensor &cpu_dest, const at::Tensor &ipu_src);
 
-  void enableEagerMode();
+  void enableEagerMode(bool headless);
   const std::shared_ptr<poptorch_ir::IIpuSession> &getIpuSession() const;
 
   void reset();

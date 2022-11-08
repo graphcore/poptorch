@@ -9,6 +9,7 @@
 
 #include <llvm/ADT/DenseMap.h>
 #include <llvm/ADT/Hashing.h>
+#include <poptorch_logging/Error.hpp>
 
 namespace mlir {
 class ModuleOp;
@@ -23,6 +24,14 @@ using Session_t = Session;
 namespace poptorch_ir {
 
 class NonRestartingMLIRTimer;
+class EagerIpuSession;
+
+class IEagerIpuSession : public IIpuSession {
+public:
+  virtual PopitDeviceFunctionWrapper
+  createFunction(const mlir::ModuleOp &graph, FunctionIO io,
+                 GraphDebugInfo debug_info, NonRestartingMLIRTimer &timer) = 0;
+};
 
 class PopitFunctionCache final {
 public:
@@ -39,7 +48,7 @@ private:
   llvm::DenseMap<llvm::hash_code, std::shared_ptr<PopitDeviceFunction>> _cache;
 };
 
-class EagerIpuSession final : public IIpuSession {
+class EagerIpuSession final : public IEagerIpuSession {
 public:
   EagerIpuSession();
   ~EagerIpuSession();
@@ -49,11 +58,31 @@ public:
   void copyDataToCpu(char *cpu_dest, Buffer &ipu_src) override;
   void copyDataOnDevice(Buffer &dest, const Buffer &src) override;
 
+  PopitDeviceFunctionWrapper
+  createFunction(const mlir::ModuleOp &graph, FunctionIO io,
+                 GraphDebugInfo debug_info,
+                 NonRestartingMLIRTimer &timer) override;
+
   // The popit session references the device. So the device needs to outlive the
   // session.
   std::unique_ptr<popit::Device> device;
   std::shared_ptr<popit::Session_t> session;
-  PopitFunctionCache func_cache;
+
+private:
+  PopitFunctionCache _func_cache;
+};
+
+class HeadlessIpuSession final : public IEagerIpuSession {
+public:
+  Buffer allocate(const TensorType &type) override;
+  void copyDataFromCpuSource(Buffer &ipu_dest, const char *cpu_data) override;
+  void copyDataToCpu(char *cpu_dest, Buffer &ipu_src) override;
+  void copyDataOnDevice(Buffer &dest, const Buffer &src) override;
+
+  PopitDeviceFunctionWrapper
+  createFunction(const mlir::ModuleOp &graph, FunctionIO io,
+                 GraphDebugInfo debug_info,
+                 NonRestartingMLIRTimer &timer) override;
 };
 
 } // namespace poptorch_ir
