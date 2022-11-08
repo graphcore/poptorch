@@ -26,6 +26,8 @@ add_custom_command(
      ${CMAKE_CURRENT_SOURCE_DIR}/AtenOpSupport.yml
      ${CMAKE_CURRENT_SOURCE_DIR}/generate_op_interface.py
      ${CMAKE_CURRENT_SOURCE_DIR}/generate_direct_interface.py
+     ${CMAKE_CURRENT_SOURCE_DIR}/schema_parser.py
+     ${CMAKE_CURRENT_SOURCE_DIR}/helpers.py
 )
 
 add_custom_command(
@@ -52,6 +54,8 @@ add_custom_command(
      ${CMAKE_CURRENT_SOURCE_DIR}/TorchScatterOpSupport.yml
      ${CMAKE_CURRENT_SOURCE_DIR}/generate_op_interface.py
      ${CMAKE_CURRENT_SOURCE_DIR}/generate_direct_interface.py
+     ${CMAKE_CURRENT_SOURCE_DIR}/schema_parser.py
+     ${CMAKE_CURRENT_SOURCE_DIR}/helpers.py
 )
 
 add_custom_command(
@@ -78,6 +82,8 @@ add_custom_command(
      ${CMAKE_CURRENT_SOURCE_DIR}/PoptorchOpSupport.yml
      ${CMAKE_CURRENT_SOURCE_DIR}/generate_op_interface.py
      ${CMAKE_CURRENT_SOURCE_DIR}/generate_direct_interface.py
+     ${CMAKE_CURRENT_SOURCE_DIR}/schema_parser.py
+     ${CMAKE_CURRENT_SOURCE_DIR}/helpers.py
 )
 
 add_custom_target(generate_supported_ops_interface

@@ -2,6 +2,9 @@
 
 import sys
 import warnings
+from typing import List
+from schema_parser import ValueInfo, TypeInfo
+from helpers import addScope
 
 # PyTorch Schema types to C++ convertor.
 schemaToCpp = {
@@ -73,207 +76,119 @@ schemaToCppType = {
 }
 
 
-def addScope(string, scope='    '):
-    return '\n'.join(s if s == '' else scope + s for s in string.split('\n'))
+def add_output(self: TypeInfo, index, named_tensors, output_view, aten_name):
+    assert self.is_tensor
 
-
-# Convert a tensor into it's constituent pieces.
-# Given a tensor type from the yml like Tensor(a!) we turn that into a nicer format.
-# Tensor(a!) -> tensor_id=a, is_inplace=True
-# Tensor(a) -> tensor_id=a, is_view=True
-# Tensor -> tensor_id=''
-# Tensor(a!)[] -> tensor_id=a, is_list=True, is_inplace=True
-# Tensor(a)[] ->  tensor_id=a, is_list=True, is_view=True
-# Tensor[] -> tensor_id='', is_list=True
-# If a tensor is not inplace or a view there is nothing to refer to in the context of arguments and returns.
-# See the usage of these rules in native_functions.yml and in https://github.com/pytorch/pytorch/tree/master/aten/src/ATen/native for a full expansion of the precise rules (of which the above is an approximation).
-class TensorInfo:
-    def __init__(self, tensor):
-        if not tensor.startswith("Tensor"):
-            raise ValueError(f"Type {tensor} not implemented.")
-
-        self.is_list = "[]" in tensor
-        if self.is_list:
-            tensor = tensor.replace("[]", "")
-
-        self.tensor_id = ''
-        self.is_inplace = False
-        self.is_view = False
-
-        # We have a normal non-aliasing tensor.
-        if '(' not in tensor:
-            if tensor != "Tensor":
-                raise ValueError(f"Type {tensor} not implemented.")
-            return
-
-        self.is_inplace = '!' in tensor
-
-        # If there are brackets but no `!` then this is view of a tensor.
-        self.is_view = not self.is_inplace
-
-        # The id of the tensor. This is the identifier given to map an input onto an output.
-        self.tensor_id = tensor[len('Tensor('):-1]
-        assert tensor[-1] == ")"
-
-        # Remove the `!` if this is inplace.
-        if self.is_inplace:
-            assert self.tensor_id[-1] == '!'
-            self.tensor_id = self.tensor_id[:-1]
-
-    def add_output(self, index, named_tensors, output_view, aten_name):
-        # We will get a list of tensor IDs, which could be zero for optional
-        # one ore more.
-        outputs_code = f"""const auto &t_ids = mlir_output.at({str(index)}).tensor_ids;
+    # We will get a list of tensor IDs, which could be zero for optional
+    # one ore more.
+    outputs_code = f"""const auto &t_ids = mlir_output.at({str(index)}).tensor_ids;
 auto requires_grad = requiresGrad(mlir_output.at({str(index)}).requires_grad_types, requires_grad_or);
 """
-        if not self.is_list:
-            outputs_code += "auto t_id = getSingleOptionalTensorId(t_ids);\n"
+    if not self.is_list:
+        outputs_code += "auto t_id = getSingleOptionalTensorId(t_ids);\n"
 
-        output_view_var = 'nullptr'
-        # If the output is a view we need to add the view information
-        if output_view != '':
-            outputs_code += output_view
-            output_view_var = 'output_view'
+    output_view_var = 'nullptr'
+    # If the output is a view we need to add the view information
+    if output_view != '':
+        outputs_code += output_view
+        output_view_var = 'output_view'
 
-        if output_view != '' and self.is_list:
-            print(f"In {aten_name} tensor lists cannot be views")
-            sys.exit(1)
+    if output_view != '' and self.is_list:
+        print(f"In {aten_name} tensor lists cannot be views")
+        sys.exit(1)
 
-        # For each output tensor return it to pytorch in a different way
-        # depending on what the schema tells us.
-        if self.is_inplace:
-            # Inplace operations should be inplaced versions of a certain input.
-            if self.is_list:
-                outputs_code += (
-                    "stack.push_back(outputIsInplaceOfList(t_ids, "
-                    f"{named_tensors[self.tensor_id]}_pytorch, "
-                    f"requires_grad));\n")
-            else:
-                outputs_code += (
-                    "stack.push_back(outputIsInplaceOf(t_id, "
-                    f"{named_tensors[self.tensor_id]}_pytorch, "
-                    f"requires_grad.at(0), {output_view_var}));\n")
+    # For each output tensor return it to pytorch in a different way
+    # depending on what the schema tells us.
+    if self.is_inplace:
+        # Inplace operations should be inplaced versions of a certain input.
+        if self.is_list:
+            outputs_code += ("stack.push_back(outputIsInplaceOfList(t_ids, "
+                             f"{named_tensors[self.tensor_id]}_pytorch, "
+                             f"requires_grad));\n")
         else:
-            # Otherwise we are returning a new tensor or tensor list.
-            if self.is_list:
-                outputs_code += ("stack.push_back(makeEmptyOutputTensorList("
-                                 "t_ids, requires_grad));\n")
-            else:
-                outputs_code += f"""if (t_id == poptorch_ir::none_id) {{
-    stack.push_back(makeEmptyOutputTensor(poptorch_ir::none_id, false, {output_view_var}));
+            outputs_code += ("stack.push_back(outputIsInplaceOf(t_id, "
+                             f"{named_tensors[self.tensor_id]}_pytorch, "
+                             f"requires_grad.at(0), {output_view_var}));\n")
+    else:
+        # Otherwise we are returning a new tensor or tensor list.
+        if self.is_list:
+            outputs_code += ("stack.push_back(makeEmptyOutputTensorList("
+                             "t_ids, requires_grad));\n")
+        else:
+            outputs_code += f"""if (t_id == poptorch_ir::none_id) {{
+stack.push_back(makeEmptyOutputTensor(poptorch_ir::none_id, false, {output_view_var}));
 }} else {{
-    stack.push_back(makeEmptyOutputTensor(t_id, requires_grad.at(0), {output_view_var}));
+stack.push_back(makeEmptyOutputTensor(t_id, requires_grad.at(0), {output_view_var}));
 }}
 """
-        outputs_code = f'{{\n{addScope(outputs_code)}}}\n'
-        return outputs_code
+    outputs_code = f'{{\n{addScope(outputs_code)}}}\n'
+    return outputs_code
 
 
-class ValueInfo:
-    def __init__(self, value_schema):
+def get_member_type(self: ValueInfo, aten_name):
+    if self.type.str not in schemaToCppType:
+        print(
+            f"There is no c++ schema type for {self.type.str} in {aten_name} "
+            f"from {__file__}.")
+        print("You need to add one to schemaToCppType for compilation " +
+              "to succeed.")
+        sys.exit(1)
+    return schemaToCppType[self.type.str]
 
-        # Here we are processing the arguments from native functions.yml, i.e:
-        # aten.contiguous(Tensor(a) self, *, MemoryFormat memory_format=contiguous_format) -> Tensor(a)
 
-        arg = value_schema.split('=')
+def assert_value_is_default(self: ValueInfo, stack_at_index, aten_name):
+    default_value = self.ignored_default
 
-        self.default = None
-        if '=' in value_schema:
-            self.default = arg[-1]
+    if default_value == 'None':
+        # If we know the expected values for the ignored arguments
+        # emit checks for them
+        return (f'ERROR_ON_MSG(!{stack_at_index}.isNone(), '
+                f'"{aten_name}: Poptorch does not handle {self.name}. '
+                'Expected it to be None");\n')
 
-        # Remove default arguments.
-        arg_name = arg[0].split(' ')[-1]
-
-        # E.g Tensor(a) self -> name: self, type : Tensor(a)
-        arg_name = arg_name.split(' ')[-1]
-        self.type = value_schema.split(' ')[0]
-
-        self.name = arg_name
-        self.tensor_info = None
-        self.is_tensor = 'Tensor' in self.type
-
-        # Add the special tensor information. Some tensors don't have any, if there is a
-        # `(` it means there is view or inplace information.
-        # Tensor -> just a tensor.
-        # Tensor(a) -> view of `a`
-        # Tensor(a!) -> `a` modified inplace
-        # Tensor(a!)[] -> list
-        if self.is_tensor and '(' in self.type:
-            self.tensor_info = TensorInfo(self.type)
-            self.type = 'Tensor[]' if self.tensor_info.is_list else "Tensor"
-
-    def getMemberType(self, aten_name):
-        if self.type not in schemaToCppType:
-            print(
-                f"There is no c++ schema type for {self.type} in {aten_name} "
-                f"from {__file__}.")
-            print("You need to add one to schemaToCppType for compilation " +
-                  "to succeed.")
-            sys.exit(1)
-        return schemaToCppType[self.type]
-
-    def assert_value_is_default(self,
-                                stack_at_index,
-                                aten_name,
-                                default_value=None):
-        if default_value is None:
-            default_value = self.default
-
-        if default_value == 'None':
-            # If we know the expected values for the ignored arguments
-            # emit checks for them
-            return (f'ERROR_ON_MSG(!{stack_at_index}.isNone(), '
-                    f'"{aten_name}: Poptorch does not handle {self.name}. '
-                    'Expected it to be None");\n')
-
-        if default_value in ('True', 'False'):
-            return (
-                f'ERROR_ON_MSG({stack_at_index}.toBool() != '
+    if default_value in ('True', 'False'):
+        return (f'ERROR_ON_MSG({stack_at_index}.toBool() != '
                 f'{default_value.lower()}, "{aten_name}: Poptorch does not '
                 f'handle {self.name}. Expected it to be {default_value}");\n')
 
-        if default_value is None:
-            warnings.warn(
-                f'No default value for {self.name} in {aten_name}. You can '
-                'use IgnoreArgs as a dictionary to provide a default '
-                'value.')
-        else:
-            warnings.warn(
-                f'Not implemented: default value ({default_value}) for '
-                f'{self.name} in {aten_name} is not checked')
+    warnings.warn(f'Not implemented: default value ({default_value}) for '
+                  f'{self.name} in {aten_name} is not checked')
 
-        return ''
+    return ''
 
-    def get_argument(self, stack_at_index, aten_name):
-        if self.type not in schemaToCpp:
-            print(f"There is no c++ schema for {self.type} in {aten_name} "
-                  f"from {__file__}.")
-            print("You need to add one to schemaToCpp for compilation " +
-                  "to succeed.")
-            sys.exit(1)
 
-        name = self.name + ('_pytorch' if 'Tensor' in self.type else '')
+def get_argument(self: ValueInfo, stack_at_index, aten_name):
+    if self.type.str not in schemaToCpp:
+        print(f"There is no c++ schema for {self.type.str} in {aten_name} "
+              f"from {__file__}.")
+        print("You need to add one to schemaToCpp for compilation " +
+              "to succeed.")
+        sys.exit(1)
 
-        return (f"[[maybe_unused]] auto {name} ="
-                f" {schemaToCpp[self.type]}({stack_at_index});\n")
+    name = self.name + ('_pytorch' if 'Tensor' in self.type.str else '')
 
-    def convert_to_tensor_id(self):
-        if 'Tensor' in self.type:
-            return (f'[[maybe_unused]] auto {self.name} = '
-                    f'findTensor({self.name}_pytorch);\n')
+    return (f"[[maybe_unused]] auto {name} ="
+            f" {schemaToCpp[self.type.str]}({stack_at_index});\n")
 
-        return ''
 
-    def fill_requires_grad(self):
-        tensor_name = f'{self.name}_pytorch'
-        if 'Tensor[]' in self.type or 'Tensor?[]' in self.type:
+def convert_to_tensor_id(self: ValueInfo):
+    if self.type.is_tensor:
+        return (f'[[maybe_unused]] auto {self.name} = '
+                f'findTensor({self.name}_pytorch);\n')
+
+    return ''
+
+
+def fill_requires_grad(self: ValueInfo):
+    tensor_name = f'{self.name}_pytorch'
+    if self.type.is_tensor:
+        if self.type.is_list:
             return f"""requires_grad_or |= std::any_of({tensor_name}.begin(), {tensor_name}.end(),
-                                [this](const auto& t) {{ return t.requires_grad(); }});
+                            [this](const auto& t) {{ return t.requires_grad(); }});
 """
-        if 'Tensor' in self.type:
-            return f"""requires_grad_or |= {tensor_name}.requires_grad();
+        return f"""requires_grad_or |= {tensor_name}.requires_grad();
 """
-        return ''
+    return ''
 
 
 def add_op(function, parameters, outputs, named_tensors, output_view):
@@ -290,45 +205,22 @@ def add_op(function, parameters, outputs, named_tensors, output_view):
 
     # Handle each of the outputs.
     for index, output in enumerate(outputs):
-        if output == "":  # `ie. -> ()`
-            continue
-        # Capture all metadata related to each of the output tensors.
-        output_info = TensorInfo(output)
-
         # Note we are passing the same output view information to all the
         # outputs. This information is non-empty only when there is a single
         # output
-        function_decl += output_info.add_output(index, named_tensors,
-                                                output_view, function)
+        function_decl += add_output(output, index, named_tensors, output_view,
+                                    function)
 
     return function_decl
 
 
-def filter_ignored_args(op_target, args):
-    args_to_ignore = {} if "IgnoreArgs" not in op_target else op_target[
-        "IgnoreArgs"]
-    key = "UnusedOutputArguments"
-    unused_inplace_arg = {} if key not in op_target else op_target[key]
-
-    def is_ignored(arg):
-        return (arg.name not in args_to_ignore
-                and arg.name not in unused_inplace_arg)
-
-    return list(filter(is_ignored, args))
+def filter_ignored_args(args: List[ValueInfo]):
+    return [arg for arg in args if not arg.should_ignore]
 
 
 # Generate the c++ function which handles this operation.
-def generate_cpp(op_target, canonicalised_args, outputs, named_tensors,
-                 aten_name, output_view):
-    # Some arguments we just completely ignore.
-    args_to_ignore = {} if "IgnoreArgs" not in op_target else op_target[
-        "IgnoreArgs"]
-
-    # Some arguments are only marking the output tensor so we don't pass
-    # them into the mlir call.
-    key = "UnusedOutputArguments"
-    unused_inplace_arg = {} if key not in op_target else op_target[key]
-
+def generate_cpp(cpp_func, canonicalised_args: List[ValueInfo], outputs,
+                 named_tensors, aten_name, output_view):
     function_decl = ""
 
     parameters = []
@@ -337,60 +229,42 @@ def generate_cpp(op_target, canonicalised_args, outputs, named_tensors,
         stack_at_index = "stack.at(" + str(arg_index) + ")"
 
         # If the argument is in args_to_ignore we skip it
-        if arg.name in args_to_ignore:
-            # args_to_ignore is either a set or a dictionary. In the former
-            # case we check the given value against the schema default value.
-            # In the latter case we check the given value against the value in
-            # the dictionary.
-            #
-            # Note: it appears that sets can sometimes be parsed as
-            # dictionaries with None values by the yaml parser (we wish to
-            # check against the schema in this case)
-            is_in_dict = isinstance(
-                args_to_ignore, dict) and args_to_ignore[arg.name] is not None
-            arg_default = args_to_ignore[arg.name] if is_in_dict else None
-
-            function_decl += arg.assert_value_is_default(
-                stack_at_index, aten_name, arg_default)
+        if arg.ignored_default is not None:
+            function_decl += assert_value_is_default(arg, stack_at_index,
+                                                     aten_name)
             continue
 
-        function_decl += arg.get_argument(stack_at_index, aten_name)
+        function_decl += get_argument(arg, stack_at_index, aten_name)
 
-        if arg.name not in unused_inplace_arg:
-            function_decl += arg.convert_to_tensor_id()
-            function_decl += arg.fill_requires_grad()
+        if not arg.is_unused_output:
+            function_decl += convert_to_tensor_id(arg)
+            function_decl += fill_requires_grad(arg)
 
             parameters.append(arg.name)
 
     function_decl = ("[[maybe_unused]] bool requires_grad_or = false;\n" +
                      function_decl)
 
-    if "PopTorchDirect" in op_target:
-        # We are dealing with a vanilla function.
-        function_decl += add_op(op_target["PopTorchDirect"], parameters,
-                                outputs, named_tensors, output_view)
-    else:
-        raise KeyError("Couldn't find a valid PopTorch direct mapping "
-                       "(eg. PopTorchDirect)"
-                       f" for {op_target}")
+    function_decl += add_op(cpp_func, parameters, outputs, named_tensors,
+                            output_view)
 
     return function_decl
 
 
 def generate_view(args, outputs, function_name):
     if len(args) == 0:
-        print(function_name + ": Views cannot have no arguments")
+        print(function_name + ": Views must have arguments")
         sys.exit(1)
 
     class_name = function_name + 'TensorView'
-    members = map(lambda x: f'{x.getMemberType(function_name)} _{x.name}',
+    members = map(lambda x: f'{get_member_type(x,function_name)} _{x.name}',
                   args)
     constructor_args = list(
-        map(lambda x: f'{x.getMemberType(function_name)} {x.name}', args))
+        map(lambda x: f'{get_member_type(x,function_name)} {x.name}', args))
     initializers = map(lambda x: f'_{x.name}{{std::move({x.name})}}', args)
 
     def get_tensors_from_dispatch(arg):
-        if arg.is_tensor:
+        if arg.type.is_tensor:
             return f'auto {arg.name} = dispatch.ensureInDispatch(_{arg.name})'
         return f'auto &{arg.name} = _{arg.name};'
 
@@ -398,13 +272,13 @@ def generate_view(args, outputs, function_name):
     params = map(lambda x: x.name, args)
     tensor_details_params = map(
         lambda x: f'getTensorDetails({x.name}_pytorch)'
-        if 'Tensor' in x.type else x.name, args)
+        if x.type.is_tensor else x.name, args)
 
     if len(outputs) != 1:
         print("Views with multiple outputs aren't handled")
         sys.exit(1)
-    if 'Tensor(' not in outputs[0]:
-        print(f"Views of {outputs[0]} aren't handled")
+    if outputs[0].is_list or not outputs[0].is_tensor:
+        print(f"Views of {outputs[0].str} aren't handled")
         sys.exit(1)
 
     header = (f"friend class {class_name};\n"
@@ -450,31 +324,14 @@ class DirectMLIRGenerator:
         self.lookup = lookup_file
         self.namespace = namespace
 
-    def gen_function(self, function_name, op_target, arguments, outputs):
-        # We convert the args from the schema string to a list of lists.
-        # The outer list being all arguments and the inner being the information
-        # for that given argument. Most types are just [Name, Type] pairs in the list
-        # however tensors can be views or inplace so we track that.
-        canonicalised_args = []
-
+    def gen_function(self, function_name, cpp_func, arguments, outputs):
         # Tensors which have been marked as being inplace/views will have an ID.
-        named_tensors = {}
-        is_view = False
-        # Remove any optional value assignment (`=`) and take the last string which will be the name.
-        for argument in arguments:
-            argument = argument.strip()
+        named_tensors = {
+            value.type.tensor_id: value.name
+            for value in arguments if value.type.tensor_id != ''
+        }
 
-            # The argument '*' is a special case for the python interface, we can ignore.
-            if argument == "*":
-                continue
-
-            value = ValueInfo(argument)
-
-            if value.tensor_info is not None:
-                named_tensors[value.tensor_info.tensor_id] = value.name
-                is_view |= value.tensor_info.is_view
-
-            canonicalised_args.append(value)
+        is_view = any(value.type.is_view for value in arguments)
 
         header = ''
         cpp = ''
@@ -485,10 +342,9 @@ class DirectMLIRGenerator:
         function_name = "{}_{}".format(self.namespace, function_name)
 
         if is_view:
-            non_ignored_args = filter_ignored_args(op_target,
-                                                   canonicalised_args)
-            header, cpp, output_view = generate_view(
-                non_ignored_args, outputs, op_target["PopTorchDirect"])
+            non_ignored_args = filter_ignored_args(arguments)
+            header, cpp, output_view = generate_view(non_ignored_args, outputs,
+                                                     cpp_func)
 
         header += f'void {function_name}(c10::Stack& stack);\n'
 
@@ -496,7 +352,7 @@ class DirectMLIRGenerator:
         cpp += "void MLIRDispatch::" + function_name
         cpp += "(c10::Stack& stack) {\n"
         cpp += addScope(
-            generate_cpp(op_target, canonicalised_args, outputs, named_tensors,
+            generate_cpp(cpp_func, arguments, outputs, named_tensors,
                          aten_name, output_view))
         cpp += "}\n"
 
