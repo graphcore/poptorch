@@ -124,10 +124,6 @@
   PopTorchDirect: elu
   UnusedOutputArguments: {out}
 
-# _softmax(Tensor self, int dim, bool half_to_float) -> Tensor
-- func: _softmax
-  PopTorchDirect: softmax
-
 # _softmax.out(Tensor self, int dim, bool half_to_float, *, Tensor(a!) out) -> Tensor(a!)
 - func: _softmax.out
   PopTorchDirect: softmax

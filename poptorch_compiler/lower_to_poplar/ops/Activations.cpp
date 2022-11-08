@@ -238,7 +238,7 @@ void hardswish::lowerToPoplar(CompilerContext &context) {
 
 void softmax::lowerToPoplar(CompilerContext &context) {
   poplar::Tensor input = context.fromSsa(this->input());
-  const std::uint32_t axis = this->axis();
+  const std::uint32_t axis = this->dim();
 
   // If the axis is not along the last dimension.
   if (axis + 1 != input.rank()) {

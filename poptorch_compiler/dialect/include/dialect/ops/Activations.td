@@ -131,15 +131,15 @@ def Poptorch_log_sigmoid_forward : Poptorch_Op<"log_sigmoid_forward", []> {
 def Poptorch_softmax : Poptorch_Op<"softmax", [SameOperandsAndResultShape]> {
 
   // For now we just ignore the float to half bit.
-  let arguments = (ins Poptorch_tensor:$input, I64Attr:$axis, BoolAttr:$half_to_float);
+  let arguments = (ins Poptorch_tensor:$input, I64Attr:$dim, BoolAttr:$half_to_float);
 
   let results = (outs Poptorch_tensor:$result);
 
-  let builders = [OpBuilder<(ins "mlir::Value":$input, "std::int64_t":$axis, "bool":$half_to_float), [{
+  let builders = [OpBuilder<(ins "mlir::Value":$input, "std::int64_t":$dim, "bool":$half_to_float), [{
         $_state.addOperands({input});
 
-        axis = convertToPositiveDim(axis, getShape(input).size());
-        $_state.addAttribute("axis",$_builder.getI64IntegerAttr(axis));
+        dim = convertToPositiveDim(dim, getShape(input).size());
+        $_state.addAttribute("dim",$_builder.getI64IntegerAttr(dim));
         $_state.addAttribute("half_to_float",$_builder.getBoolAttr(half_to_float));
         $_state.addTypes(input.getType());
   }]>];
