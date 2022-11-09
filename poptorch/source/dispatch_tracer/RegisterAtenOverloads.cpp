@@ -41,7 +41,10 @@ namespace poptorch {
 namespace {
 
 std::string toStdString(const std::shared_ptr<std::vector<char>> &str) {
-  return std::string(str->begin(), str->end());
+  if (str) {
+    return std::string(str->begin(), str->end());
+  }
+  return "";
 }
 
 std::string valueToString(const c10::IValue &ivalue) {

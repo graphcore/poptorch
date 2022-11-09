@@ -15,7 +15,7 @@ struct GraphDebugInfo {
 
 struct TensorDebugInfo {
   GraphDebugInfo debug_info;
-  std::size_t output_idx;
+  std::size_t output_idx = 0;
 };
 
 } // namespace poptorch_ir
