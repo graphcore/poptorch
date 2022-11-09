@@ -85,6 +85,8 @@ public:
 
 class PopitDeviceFunctionWrapper {
 public:
+  static PopitDeviceFunctionWrapper createTrivialFunction() noexcept;
+
   PopitDeviceFunctionWrapper(std::shared_ptr<PopitDeviceFunction> func,
                              FunctionIO io, GraphDebugInfo debug_info);
   PopitDeviceFunctionWrapper(PopitDeviceFunctionWrapper &&) noexcept = default;
@@ -96,10 +98,13 @@ public:
 
   ~PopitDeviceFunctionWrapper();
 
+  bool isTrivial() const noexcept;
   void run(IAllocationMap &alloc_map) const;
 
 private:
-  std::shared_ptr<PopitDeviceFunction> _func;
+  PopitDeviceFunctionWrapper() = default;
+
+  std::shared_ptr<PopitDeviceFunction> _func = nullptr;
   FunctionIO _io;
   GraphDebugInfo _debug_info;
 };

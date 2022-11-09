@@ -38,12 +38,17 @@ public:
   friend class LowerToPopit;
 
 private:
+  // Only the headless ipu session should be making device functions that don't
+  // do anything
+  friend class HeadlessIpuSession;
+  PopitDeviceFunction() = default;
+
   // These attributes get populated by LowerToPopit
   popit::FunctionId_t _popit_fn;
 
   // Note we need to be careful that PopitFunctions aren't called after their
   // context is destroyed
-  EagerIpuSession *_context;
+  EagerIpuSession *_context = nullptr;
 };
 
 } // namespace poptorch_ir

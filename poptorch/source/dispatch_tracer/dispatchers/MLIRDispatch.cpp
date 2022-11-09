@@ -394,6 +394,12 @@ void MLIRDispatch::markStep() {
   LivenessMap liveness_map{_mapper};
   auto device_func =
       _compiler.compile(*_tensor_store->getIpuSession(), liveness_map);
+
+  if (device_func.isTrivial()) {
+    poptorch::logging::trace("MLIR graph empty: skipping compile()");
+    return;
+  }
+
   AllocationMap alloc_map{_mapper, *_tensor_store->getIpuSession()};
   device_func.run(alloc_map);
 }

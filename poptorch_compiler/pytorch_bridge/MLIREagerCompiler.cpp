@@ -155,11 +155,6 @@ PopitDeviceFunctionWrapper MLIREagerCompiler::compile(IEagerIpuSession &session,
 
   auto io = extractInputsAndOutputs(_the_module, mappings);
 
-  // TODO(T69660): filter out unchanged outputs. This will be easier to do after
-  // the passes getting rid of reference semantics have been applied. If every
-  // op in the graph has value semantics any output that is also an input can
-  // just be removed.
-
   GraphDebugInfo debug_info;
 
   if (poptorch::logging::shouldLog(poptorch::logging::Level::Trace)) {
@@ -174,6 +169,10 @@ PopitDeviceFunctionWrapper MLIREagerCompiler::compile(IEagerIpuSession &session,
 
   if (poptorch::logging::shouldLog(poptorch::logging::Level::Debug)) {
     debug_info.cached_graph = moduleToSharedStr(_the_module);
+  }
+
+  if (poptorch_ir::detail::isTrivialGraph(_the_module)) {
+    return PopitDeviceFunctionWrapper::createTrivialFunction();
   }
 
   return session.createFunction(

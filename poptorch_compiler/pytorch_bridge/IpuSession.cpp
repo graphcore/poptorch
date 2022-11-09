@@ -55,11 +55,17 @@ bool Buffer::hasData() const {
 std::shared_ptr<IIpuSession> createStaticSession() {
   return std::make_shared<StaticIpuSession>();
 }
+
 std::shared_ptr<IIpuSession> createEagerSession(bool headless) {
   if (headless) {
     return std::make_shared<HeadlessIpuSession>();
   }
   return std::make_shared<EagerIpuSession>();
+}
+
+PopitDeviceFunctionWrapper
+PopitDeviceFunctionWrapper::createTrivialFunction() noexcept {
+  return PopitDeviceFunctionWrapper(nullptr, {}, {});
 }
 
 PopitDeviceFunctionWrapper::PopitDeviceFunctionWrapper(
@@ -70,6 +76,8 @@ PopitDeviceFunctionWrapper::PopitDeviceFunctionWrapper(
 PopitDeviceFunctionWrapper::~PopitDeviceFunctionWrapper() = default;
 
 void PopitDeviceFunctionWrapper::run(IAllocationMap &alloc_map) const {
+  ERROR_ON(_func == nullptr);
+
   std::vector<popit::Mem_t *> inputs;
   inputs.reserve(_io.inputs.size());
   llvm::transform(_io.inputs, std::back_inserter(inputs), [&](TensorId input) {
@@ -85,11 +93,13 @@ void PopitDeviceFunctionWrapper::run(IAllocationMap &alloc_map) const {
                         TensorDebugInfo{_debug_info, output.index()});
                   });
 
-  if (_func) {
-    _func->run(inputs, outputs);
-  }
+  _func->run(inputs, outputs);
 
   poptorch::logging::info("Executed PopIT function");
+}
+
+bool PopitDeviceFunctionWrapper::isTrivial() const noexcept {
+  return _func == nullptr;
 }
 
 } // namespace poptorch_ir

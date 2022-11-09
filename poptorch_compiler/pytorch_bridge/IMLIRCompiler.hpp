@@ -254,6 +254,10 @@ OpTy implicitCastAndCreate(mlir::ImplicitLocOpBuilder &builder,
                                          std::forward_as_tuple(args...)));
 }
 
+// A corse check on whether the current mlir graph does any computation.
+// Note: this may have false negative but shouldn't have false positives
+bool isTrivialGraph(const mlir::ModuleOp &graph);
+
 class IMLIRCompiler {
 public:
   explicit IMLIRCompiler(const poptorch::CompilerOptions &options);

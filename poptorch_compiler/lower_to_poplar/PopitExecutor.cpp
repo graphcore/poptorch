@@ -65,9 +65,11 @@ PopitDeviceFunction::PopitDeviceFunction(EagerIpuSession &context,
 
 void PopitDeviceFunction::run(const std::vector<popit::Mem_t *> &inputs,
                               const std::vector<popit::Mem_t *> &outputs) {
-  // Execute the function
-  popit::call(_context->session.get(), _popit_fn,
-              /* ipuIndex=*/0, inputs, outputs);
+  if (_context != nullptr) {
+    // Execute the function
+    popit::call(_context->session.get(), _popit_fn,
+                /* ipuIndex=*/0, inputs, outputs);
+  }
 }
 
 } // namespace poptorch_ir

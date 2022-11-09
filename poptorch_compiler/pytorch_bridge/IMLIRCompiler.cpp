@@ -1,9 +1,12 @@
 // Copyright (c) 2021 Graphcore Ltd. All rights reserved.
 #include "IMLIRCompiler.hpp"
 
+#include <llvm/ADT/STLExtras.h>
 #include <mlir/Dialect/Func/IR/FuncOps.h>
 #include <mlir/IR/BuiltinAttributes.h>
+#include <mlir/IR/BuiltinOps.h>
 #include <mlir/IR/BuiltinTypes.h>
+#include <mlir/IR/Operation.h>
 
 #include <deque>
 #include <string>
@@ -17,16 +20,6 @@ namespace poptorch_ir {
 namespace detail {
 
 namespace {
-
-bool containsPoplarOps(const mlir::ModuleOp &module) {
-  bool found_op = false;
-  // mlir does not have a const version of walk despite it being useful
-  const_cast<mlir::ModuleOp &>(module).walk([&](PoplarImplInterface) {
-    found_op = true;
-    return mlir::WalkResult::interrupt();
-  });
-  return found_op;
-}
 
 mlir::LogicalResult printDiagnostic(mlir::Diagnostic &d) {
   poptorch::logging::Level lvl;
@@ -79,6 +72,23 @@ bool higherThan(mlir::Type &lhs, mlir::Type &rhs) {
                                                     << mlirToStr(rhs));
 }
 
+bool isTrivialGraph(const mlir::ModuleOp &graph) {
+  auto func = mlir::dyn_cast_or_null<mlir::func::FuncOp>(
+      const_cast<mlir::ModuleOp &>(graph).lookupSymbol(
+          IMLIRCompiler::entry_point_name));
+  ERROR_ON(!func);
+  // If any of the blocks have an operation which isn't just an empty return
+  // statement the graph may do something
+  return llvm::all_of(func.getBody().getBlocks(), [](mlir::Block &block) {
+    return llvm::all_of(block, [](mlir::Operation &op) {
+      if (auto ret_op = mlir::dyn_cast<mlir::func::ReturnOp>(op)) {
+        return ret_op->getResults().empty();
+      }
+      return false;
+    });
+  });
+}
+
 IMLIRCompiler::IMLIRCompiler(const poptorch::CompilerOptions &options)
     : root_timer(timing_manager.getRootTimer()),
       _builder(mlir::UnknownLoc::get(&context), &context),
@@ -94,7 +104,7 @@ IMLIRCompiler::IMLIRCompiler(const poptorch::CompilerOptions &options)
 }
 
 bool IMLIRCompiler::isTrivialGraph() const {
-  return !containsPoplarOps(_the_module);
+  return poptorch_ir::detail::isTrivialGraph(_the_module);
 }
 
 void IMLIRCompiler::addGlobalState(std::string_view name,

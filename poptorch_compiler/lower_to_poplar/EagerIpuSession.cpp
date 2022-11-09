@@ -320,8 +320,9 @@ HeadlessIpuSession::createFunction(const mlir::ModuleOp &graph, FunctionIO io,
                                    NonRestartingMLIRTimer &timer) {
   UNUSED(graph);
   UNUSED(timer);
-  return PopitDeviceFunctionWrapper(nullptr, std::move(io),
-                                    std::move(debug_info));
+  return PopitDeviceFunctionWrapper(
+      std::make_shared<PopitDeviceFunction>(PopitDeviceFunction()),
+      std::move(io), std::move(debug_info));
 }
 
 } // namespace poptorch_ir
