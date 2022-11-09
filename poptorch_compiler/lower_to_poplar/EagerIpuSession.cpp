@@ -78,15 +78,29 @@ bool shouldWaitIfIpuIsUnavailable() {
   return wait;
 }
 
+std::string getIpuModelVersion() {
+  if (const char *env_ipu_model_version =
+          std::getenv("POPTORCH_IPU_MODEL_VERSION")) {
+    return env_ipu_model_version;
+  }
+  return "ipu2"; // Default to MK2 if unspecified
+}
+
 std::unique_ptr<popit::Device> getPopitDevice() {
   bool model_enabled = false;
   if (const char *env_use_model = std::getenv("POPTORCH_IPU_MODEL")) {
     model_enabled = std::stoi(env_use_model) != 0;
-    ERROR_ON_MSG(model_enabled, "IPU model is unsupported in eager mode");
+    if (model_enabled) {
+      return std::make_unique<popit::Device>(
+          popit::Device::createModelDevice(getIpuModelVersion()));
+    }
   }
   if (const char *env_use_model = std::getenv("POPTORCH_SMALL_IPU_MODEL")) {
     model_enabled = std::stoi(env_use_model) != 0;
-    ERROR_ON_MSG(model_enabled, "IPU model is unsupported in eager mode");
+    if (model_enabled) {
+      return std::make_unique<popit::Device>(
+          popit::Device::createModelDevice(getIpuModelVersion(), 1, 4));
+    }
   }
 
   // Otherwise attempt to acquire hardware
