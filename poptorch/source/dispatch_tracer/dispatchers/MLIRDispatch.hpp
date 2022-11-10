@@ -117,9 +117,16 @@ protected:
 
   // Find any tensors which were created before this Dispatch was created, and
   // promote them by marking them as inputs to the graph.
-  void findAndPromoteExternalTensors(c10::Stack *stack);
+  void findAndPromoteExternalTensors(const c10::Stack *stack);
 
 private:
+  // Add a tensor as an input to the graph (if hasn't been added to the graph
+  // already)
+  void promoteTensor(const at::Tensor &tensor);
+  // Add all the tensors in the value to the graph (if they aren't in the graph
+  // already)
+  void promoteValue(const c10::IValue &value);
+
   void
   setCurrentCodeLocation(const torch::jit::SourceRange &source_location) final;
 

@@ -260,7 +260,7 @@ void threshold_out::lowerToPoplar(CompilerContext &context) {
 
 void pow_Tensor_Scalar_out::lowerToPoplar(CompilerContext &context) {
   poplar::Tensor const lhs = context.fromSsa(this->lhs());
-  const float rhs = this->rhs().convertToFloat();
+  const float rhs = this->exponent().convertToFloat();
   poplar::Tensor const out = popops::map(
       context.graph, pe::Pow(pe::_1, pe::Const(rhs)), {lhs}, context.seq);
   context.addTensor(this->result(), out);
@@ -269,7 +269,7 @@ void pow_Tensor_Scalar_out::lowerToPoplar(CompilerContext &context) {
 #define BINARY_CONDITIONAL_SCALAR_OP_IMPL(op, expr)                            \
   void op::lowerToPoplar(CompilerContext &context) {                           \
     const poplar::Tensor lhs = context.fromSsa(this->lhs());                   \
-    const float rhs = this->rhs().convertToFloat();                            \
+    const float rhs = this->other().convertToFloat();                          \
     const poplar::Tensor out = popops::map(                                    \
         context.graph, pe::expr(pe::_1, pe::Const(rhs)), {lhs}, context.seq);  \
     context.addTensor(this->result(), out);                                    \

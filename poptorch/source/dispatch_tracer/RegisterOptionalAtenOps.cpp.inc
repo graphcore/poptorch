@@ -64,6 +64,9 @@ TORCH_LIBRARY_IMPL(aten, XLA, m) {
   // _index_put_impl_, which exposes unnecessary implementation
   // details
   m.impl("index_put_", PTC_BOXED(poptorch::fallback));
+  // If we don't intercept this op, it will be converted into a clone followed
+  // by an index_put_, which is inefficient in eager mode
+  m.impl("index_put", PTC_BOXED(poptorch::fallback));
 
   // If we don't catch these, PyTorch will try to call aten::resize_ on the
   // result which is not supported.

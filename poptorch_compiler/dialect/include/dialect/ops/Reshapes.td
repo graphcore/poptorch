@@ -758,9 +758,22 @@ def Poptorch_index_put: Poptorch_NotImplementedOp<"index_put", []> {
   let builders = [OpBuilder<(ins "mlir::Value":$self,
                                  "mlir::ValueRange":$indices,
                                  "mlir::Value":$values),[{
+    auto is_none = [&] (mlir::Value v) {
+      return getElementType(v) == $_builder.getNoneType();
+    };
+
     $_state.addOperands(self);
     $_state.addOperands(indices);
     $_state.addOperands(values);
+
+    for (const auto &index : indices) {
+      if (is_none(index)) {
+        continue;
+      }
+      mlir::RankedTensorType index_tensor = index.getType().cast<mlir::RankedTensorType>();
+      ERROR_ON_MSG(!index_tensor.getElementType().isIntOrIndex(),
+                   "indices must have integer type");
+    }
     $_state.addTypes(self.getType());
   }]>];
 }
@@ -1024,7 +1037,7 @@ def Poptorch_upsample_nearest3d_out : Poptorch_upsample<"upsample_nearest3d_out"
 def Poptorch_upsample_nearest3d_vec : Poptorch_upsample<"upsample_nearest3d_vec"> {
   let arguments = (ins Poptorch_tensor:$self,
                        OptionalAttr<I64ArrayAttr>:$output_size,
-                       OptionalAttr<F32ArrayAttr>:$scales);
+                       OptionalAttr<F32ArrayAttr>:$scale_factors);
   let results = (outs Poptorch_tensor:$result);
   let builders = [OpBuilder<(ins "mlir::Value":$self,
                                  "const std::optional<std::vector<std::int64_t>>&":$output_size,
@@ -1052,7 +1065,7 @@ def Poptorch_upsample_nearest3d_vec : Poptorch_upsample<"upsample_nearest3d_vec"
                      });
 
       $_state.addAttribute("output_size", $_builder.getI64ArrayAttr(actual_output_size));
-      $_state.addAttribute("scales", $_builder.getF32ArrayAttr(*scale_factors));
+      $_state.addAttribute("scale_factors", $_builder.getF32ArrayAttr(*scale_factors));
     }
 
     const auto shape = computeShape(actual_output_size, tensor);

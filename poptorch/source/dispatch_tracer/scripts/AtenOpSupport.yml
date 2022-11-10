@@ -264,7 +264,6 @@
   PopTorchDirect: index_put
   IgnoreArgs: {accumulate}
 
-# NOTE: this should split from index_put once given an implementation
 # index_put_(Tensor(a!) self, Tensor?[] indices, Tensor values, bool accumulate=False) -> Tensor(a!)
 - func: index_put_
   PopTorchDirect: index_put
@@ -886,11 +885,6 @@
 - func: bmm.out
   PopTorchDirect: matmul
   UnusedOutputArguments: {out}
-
-# mm(Tensor self, Tensor mat2) -> (Tensor)
-# Matrix-matrix multiplication
-- func: mm
-  PopTorchDirect: matmul
 
 # mv(Tensor self, Tensor vec) -> Tensor
 # Matrix-vector multiplication

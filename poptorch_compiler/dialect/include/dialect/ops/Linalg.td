@@ -239,7 +239,7 @@ def Poptorch_norm_out : Poptorch_not_implemented_norm<"norm_out"> {
         const auto tensor = asTensor(self);
 
         if (p.has_value()) {
-          $_state.addAttribute("p", $_builder.getF32FloatAttr(*p));
+          $_state.addAttribute("p", $_builder.getF64FloatAttr(*p));
         }
         const auto actual_dims = convertToPositiveDim(dim, tensor.getRank());
         $_state.addAttribute("dim", $_builder.getI64ArrayAttr(actual_dims));
@@ -267,7 +267,7 @@ def Poptorch_norm_dtype_out : Poptorch_not_implemented_norm<"norm_dtype_out"> {
         const auto tensor = asTensor(self);
 
         if (p.has_value()) {
-          $_state.addAttribute("p", $_builder.getF32FloatAttr(*p));
+          $_state.addAttribute("p", $_builder.getF64FloatAttr(*p));
         }
         const auto actual_dims = convertToPositiveDim(dim, tensor.getRank());
         $_state.addAttribute("dim", $_builder.getI64ArrayAttr(actual_dims));

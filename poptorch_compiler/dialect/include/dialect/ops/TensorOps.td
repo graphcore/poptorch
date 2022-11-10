@@ -256,28 +256,28 @@ def Poptorch_argsort : Poptorch_NotImplementedOp<"argsort", []> {
 }
 
 def Poptorch_dropout : Poptorch_Op<"dropout", []> {
-    let arguments = (ins Poptorch_tensor:$input, F32Attr:$p, BoolAttr:$training);
+    let arguments = (ins Poptorch_tensor:$input, F32Attr:$p, BoolAttr:$train);
 
     let results = (outs Poptorch_tensor:$result);
 
     let builders = [OpBuilder<(ins "mlir::Value":$input, "float":$p, "bool":$training),[{
         $_state.addOperands({input});
         $_state.addAttribute("p", $_builder.getF32FloatAttr(p));
-        $_state.addAttribute("training", $_builder.getBoolAttr(training));
+        $_state.addAttribute("train", $_builder.getBoolAttr(training));
         $_state.addTypes({input.getType()});
       }]>
     ];
 }
 
 class Poptorch_dropout_NotImplementedOps<string name, list<Trait> traits = []> : Poptorch_NotImplementedOp<name, traits> {
-    let arguments = (ins Poptorch_tensor:$input, F32Attr:$p, BoolAttr:$training);
+    let arguments = (ins Poptorch_tensor:$input, F32Attr:$p, BoolAttr:$train);
 
     let results = (outs Poptorch_tensor:$result);
 
     let builders = [OpBuilder<(ins "mlir::Value":$input, "float":$p, "bool":$training),[{
         $_state.addOperands({input});
         $_state.addAttribute("p", $_builder.getF32FloatAttr(p));
-        $_state.addAttribute("training", $_builder.getBoolAttr(training));
+        $_state.addAttribute("train", $_builder.getBoolAttr(training));
         $_state.addTypes({input.getType()});
       }]>
     ];

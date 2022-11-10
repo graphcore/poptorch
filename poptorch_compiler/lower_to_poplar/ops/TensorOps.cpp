@@ -129,7 +129,7 @@ void topk::lowerToPoplar(CompilerContext &context) {
 void dropout::lowerToPoplar(CompilerContext &context) {
   const poplar::Tensor tensor = context.fromSsa(this->input());
   const float p = this->p().convertToFloat();
-  const bool training = this->training();
+  const bool training = this->train();
 
   if (training) {
     // Special case of p=1: return all zeros

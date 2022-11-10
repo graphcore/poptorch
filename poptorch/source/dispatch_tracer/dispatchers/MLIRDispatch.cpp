@@ -510,24 +510,36 @@ std::string MLIRDispatch::handleOp(const c10::OperatorHandle &op,
   return schema_key;
 }
 
-void MLIRDispatch::findAndPromoteExternalTensors(c10::Stack *stack) {
+void MLIRDispatch::promoteTensor(const at::Tensor &tensor) {
+  // Note: that tensors constructed from empty_tensor are ipu tensors that
+  // don't live in the value mapper without data. All other tensor arguments
+  // should have data
+  if (isIpuTensor(tensor) && !_mapper.hasMapping(tensor) && hasData(tensor)) {
+    logging::trace("[DISPATCHER] Adding parameter {} from tensor store",
+                   str(tensor));
+
+    promoteAsParameter(tensor);
+  }
+}
+
+void MLIRDispatch::promoteValue(const c10::IValue &value) {
+  if (value.isTensor()) {
+    promoteTensor(value.toTensor());
+  } else if (value.isTensorList()) {
+    for (const auto &tensor : value.toTensorList()) {
+      promoteTensor(tensor);
+    }
+  } else if (value.isList()) {
+    for (const auto &v : value.toList()) {
+      promoteValue(v);
+    }
+  }
+}
+
+void MLIRDispatch::findAndPromoteExternalTensors(const c10::Stack *stack) {
   POPTORCH_TRACEPOINT();
-  for (auto &value : *stack) {
-    if (!value.isTensor()) {
-      continue;
-    }
-
-    auto &tensor = value.toTensor();
-
-    // Note: that tensors constructed from empty_tensor are ipu tensors that
-    // don't live in the value mapper without data. All other tensor arguments
-    // should have data
-    if (isIpuTensor(tensor) && !_mapper.hasMapping(tensor) && hasData(tensor)) {
-      logging::trace("[DISPATCHER] Adding parameter {} from tensor store",
-                     str(tensor));
-
-      promoteAsParameter(tensor);
-    }
+  for (const auto &value : *stack) {
+    promoteValue(value);
   }
 }
 

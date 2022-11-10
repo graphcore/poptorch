@@ -267,21 +267,18 @@ def Poptorch_addcmul : Poptorch_addcOutplaceX<"addcmul"> {}
 // aten::addcdiv.out(Tensor self, Tensor tensor1, Tensor tensor2, *, Scalar value=1, Tensor(a!) out) -> (Tensor(a!))
 def Poptorch_addcdiv : Poptorch_addcOutplaceX<"addcdiv"> {}
 
-class Poptorch_elem_binary_scalar<string name, list<Trait> traits = []>
-        : Poptorch_Op<name, traits> {
-    let arguments = (ins Poptorch_tensor:$lhs, F32Attr:$rhs);
-    let results = (outs Poptorch_tensor:$result);
+def Poptorch_pow_Tensor_Scalar_out: Poptorch_Op<"pow_Tensor_Scalar_out"> {
+  let arguments = (ins Poptorch_tensor:$lhs, F32Attr:$exponent);
+  let results = (outs Poptorch_tensor:$result);
 
-    let builders = [OpBuilder<(ins "mlir::Value":$lhs, "float":$rhs),[{
-        $_state.addOperands(lhs);
-        $_state.addAttribute("rhs", $_builder.getF32FloatAttr(rhs));
+  let builders = [OpBuilder<(ins "mlir::Value":$lhs, "float":$rhs),[{
+      $_state.addOperands(lhs);
+      $_state.addAttribute("exponent", $_builder.getF32FloatAttr(rhs));
 
-        $_state.addTypes(lhs.getType());
-     }]>
-    ];
+      $_state.addTypes(lhs.getType());
+   }]>
+  ];
 }
-
-def Poptorch_pow_Tensor_Scalar_out: Poptorch_elem_binary_scalar<"pow_Tensor_Scalar_out"> {}
 
 class Poptorch_binary_conditional<string name, list<Trait> traits = []>
         : Poptorch_Op<name, traits # [ImplicitCastOperand<0>, ImplicitCastOperand<1>]> {
@@ -309,11 +306,11 @@ def Poptorch_logicalOr: Poptorch_binary_conditional<"logicalOr", [ImplicitCastTo
 def Poptorch_logicalXor: Poptorch_binary_conditional<"logicalXor", [ImplicitCastToBool]> {}
 
 class Poptorch_binary_conditional_scalar<string name> : Poptorch_Op<name, []> {
-    let arguments = (ins Poptorch_tensor:$lhs, F32Attr:$rhs);
+    let arguments = (ins Poptorch_tensor:$lhs, F32Attr:$other);
     let results = (outs Poptorch_tensor_no_grad:$result);
     let builders = [OpBuilder<(ins "mlir::Value":$lhs, "float":$rhs),[{
         $_state.addOperands({lhs});
-        $_state.addAttribute("rhs", $_builder.getF32FloatAttr(rhs));
+        $_state.addAttribute("other", $_builder.getF32FloatAttr(rhs));
         mlir::RankedTensorType rtt = lhs.getType().cast<mlir::RankedTensorType>();
         $_state.addTypes(mlir::RankedTensorType::get(rtt.getShape(), $_builder.getIntegerType(1, false)));
      }]>
