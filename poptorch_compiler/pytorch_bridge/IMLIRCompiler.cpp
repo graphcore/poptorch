@@ -82,7 +82,7 @@ bool isTrivialGraph(const mlir::ModuleOp &graph) {
   return llvm::all_of(func.getBody().getBlocks(), [](mlir::Block &block) {
     return llvm::all_of(block, [](mlir::Operation &op) {
       if (auto ret_op = mlir::dyn_cast<mlir::func::ReturnOp>(op)) {
-        return ret_op->getResults().empty();
+        return ret_op.getNumOperands() == 0;
       }
       return false;
     });
