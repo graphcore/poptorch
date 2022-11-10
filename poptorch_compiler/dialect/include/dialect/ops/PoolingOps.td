@@ -10,9 +10,14 @@ def Poptorch_adaptive_avg_pool : Poptorch_Op<"adaptive_avg_pool", []> {
         $_state.addAttribute("output_size", $_builder.getI64ArrayAttr(output_size));
         mlir::RankedTensorType input_type = input.getType().cast<mlir::RankedTensorType>();
         std::vector<std::int64_t> input_shape = input_type.getShape();
-        for (auto spatial_dim = 0; spatial_dim < output_size.size(); spatial_dim++) {
-          input_shape[2 + spatial_dim] = output_size[spatial_dim];
-        }
+
+        ERROR_ON_MSG(input_shape.size() != output_size.size() + 1 &&
+                     input_shape.size() != output_size.size() + 2,
+                     "The output size (" << output_size.size() <<
+                     ") must be 1 or 2 less than the input rank ("
+                     << input_shape.size() << ")");
+
+        std::copy(output_size.begin(), output_size.end(), input_shape.end() - output_size.size());
         $_state.addTypes({mlir::RankedTensorType::get(input_shape, input_type.getElementType())});
       }]>
     ];
@@ -49,6 +54,15 @@ def Poptorch_avg_pool : Poptorch_Op<"avg_pool", []> {
 
         mlir::RankedTensorType input_type = input.getType().cast<mlir::RankedTensorType>();
         std::vector<std::int64_t> input_shape = input_type.getShape();
+
+        ERROR_ON_MSG(input_shape.size() != kernel_size.size() + 1 &&
+                     input_shape.size() != kernel_size.size() + 2,
+                     "The kernel size (" << kernel_size.size() <<
+                     ") must be 1 or 2 less than the input rank ("
+                     << input_shape.size() << ")");
+        ERROR_ON(kernel_size.size() != stride.size());
+        ERROR_ON(kernel_size.size() != padding.size());
+
         size_t offset = (input_shape.size() == kernel_size.size() + 1) ? 1 : 2;
         for (auto s = 0u; s < kernel_size.size(); s++) {
           double tmp = (input_shape[offset + s] + 2. * padding[s] - kernel_size[s]) / stride[s] + 1.;
@@ -90,12 +104,23 @@ def Poptorch_max_pool : Poptorch_Op<"max_pool", []> {
         mlir::RankedTensorType input_type = input.getType().cast<mlir::RankedTensorType>();
         std::vector<std::int64_t> input_shape = input_type.getShape();
 
+        ERROR_ON_MSG(input_shape.size() != kernel_size.size() + 1 &&
+                     input_shape.size() != kernel_size.size() + 2,
+                     "The kernel size (" << kernel_size.size() <<
+                     ") must be 1 or 2 less than the input rank ("
+                     << input_shape.size() << ")");
+        ERROR_ON(kernel_size.size() != stride.size());
+        ERROR_ON(kernel_size.size() != padding.size());
+        ERROR_ON(kernel_size.size() != dilation.size());
+
+        const size_t offset = (input_shape.size() == kernel_size.size() + 1) ? 1 : 2;
+
         for (auto s = 0u; s < kernel_size.size(); s++) {
-          double tmp = (input_shape[2 + s] + 2. * padding[s] - dilation[s] * (kernel_size[s] - 1.) - 1.) / stride[s] + 1.;
+          double tmp = (input_shape[offset + s] + 2. * padding[s] - dilation[s] * (kernel_size[s] - 1.) - 1.) / stride[s] + 1.;
           if (ceil_mode) {
-            input_shape[2 + s] = std::ceil(tmp);
+            input_shape[offset + s] = std::ceil(tmp);
           } else {
-            input_shape[2 + s] = std::floor(tmp);
+            input_shape[offset + s] = std::floor(tmp);
           }
         }
         $_state.addTypes({mlir::RankedTensorType::get(input_shape, input_type.getElementType())});

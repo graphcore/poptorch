@@ -401,6 +401,7 @@ def Poptorch_gather: Poptorch_NotImplementedOp<"gather"> {
 
     $_state.addOperands({self, index});
     $_state.addAttribute("dim", $_builder.getI64IntegerAttr(dim));
+    $_state.addAttribute("sparse_grad", $_builder.getBoolAttr(sparse_grad));
 
     mlir::RankedTensorType t1 = self.getType().cast<mlir::RankedTensorType>();
     auto index_shape = index.getType().cast<mlir::RankedTensorType>().getShape();
@@ -579,12 +580,12 @@ def Poptorch_repeat : Poptorch_Op<"repeat"> {
 }
 
 class Poptorch_NotImplemented_padding<string name> : Poptorch_NotImplementedOp<name, []> {
-  let arguments = (ins Poptorch_tensor:$self, I64ArrayAttr:$pad);
+  let arguments = (ins Poptorch_tensor:$self, I64ArrayAttr:$padding);
   let results = (outs Poptorch_tensor:$result);
   let builders = [OpBuilder<(ins "mlir::Value":$self,
                                   "const std::vector<std::int64_t>&":$pad),[{
     $_state.addOperands({self});
-    $_state.addAttribute("pad", $_builder.getI64ArrayAttr(pad));
+    $_state.addAttribute("padding", $_builder.getI64ArrayAttr(pad));
 
     $_state.addTypes(inferShape(self, pad));
   }]>];
@@ -635,14 +636,14 @@ def Poptorch_replication_pad2d_out : Poptorch_NotImplemented_padding<"replicatio
 def Poptorch_replication_pad3d_out : Poptorch_NotImplemented_padding<"replication_pad3d_out"> {}
 
 def Poptorch_constant_pad_nd : Poptorch_NotImplemented_padding<"constant_pad_nd"> {
-  let arguments = (ins Poptorch_tensor:$self, I64ArrayAttr:$pad, F32Attr:$scalar);
+  let arguments = (ins Poptorch_tensor:$self, I64ArrayAttr:$pad, F32Attr:$value);
   let results = (outs Poptorch_tensor:$result);
   let builders = [OpBuilder<(ins "mlir::Value":$self,
                                  "const std::vector<std::int64_t>&":$pad,
-                                 "float":$scalar),[{
+                                 "float":$value),[{
     $_state.addOperands({self});
     $_state.addAttribute("pad", $_builder.getI64ArrayAttr(pad));
-    $_state.addAttribute("scalar", $_builder.getF32FloatAttr(scalar));
+    $_state.addAttribute("value", $_builder.getF32FloatAttr(value));
 
     $_state.addTypes(inferShape(self, pad));
   }]>];
@@ -652,7 +653,7 @@ class Poptorch_NotImplemented_reflection_padding<string name> : Poptorch_NotImpl
   let builders = [OpBuilder<(ins "mlir::Value":$self,
                                   "const std::vector<std::int64_t>&":$pad),[{
     $_state.addOperands({self});
-    $_state.addAttribute("pad", $_builder.getI64ArrayAttr(pad));
+    $_state.addAttribute("padding", $_builder.getI64ArrayAttr(pad));
 
     constexpr auto checkReflectionPadding = [](std::int64_t shape, std::int64_t lpad, std::int64_t rpad, std::size_t dim) {
       ERROR_ON_MSG(lpad >= shape || rpad >= shape,
@@ -661,7 +662,7 @@ class Poptorch_NotImplemented_reflection_padding<string name> : Poptorch_NotImpl
                    " must be strictly less that the dimension size (" +
                    std::to_string(shape) + ")");
 
-      // NOTE: this isn't as strict as constant pad
+      // NOTE: this isn't as strict as constant padding
       ERROR_ON_MSG(shape + lpad + rpad < 0,
                    "You cannot pad negatively by more than the size of dimension " +
                    std::to_string(dim));
@@ -750,17 +751,13 @@ def Poptorch_index_tensor: Poptorch_NotImplementedOp<"index_tensor", []> {
 def Poptorch_index_put: Poptorch_NotImplementedOp<"index_put", []> {
   let arguments = (ins Poptorch_tensor:$self,
                        Poptorch_tensorlist:$indices,
-                       Poptorch_tensor:$values,
-                       BoolAttr:$accumulate);
+                       Poptorch_tensor:$values);
 
   let results = (outs Poptorch_tensor:$result);
 
   let builders = [OpBuilder<(ins "mlir::Value":$self,
                                  "mlir::ValueRange":$indices,
-                                 "mlir::Value":$values,
-                                 "bool":$accumulate),[{
-    ERROR_ON_MSG(accumulate, "index_put is not supported with accumulate=true.");
-
+                                 "mlir::Value":$values),[{
     $_state.addOperands(self);
     $_state.addOperands(indices);
     $_state.addOperands(values);

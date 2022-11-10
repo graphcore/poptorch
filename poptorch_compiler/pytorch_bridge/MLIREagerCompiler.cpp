@@ -138,9 +138,9 @@ void MLIREagerCompiler::markOutputs(
 
   // Update the function's result types. These must match the arguments of the
   // return op added below.
-  unsigned int result_idx = 0;
-  for (const auto &output : outputs) {
-    _main_graph.graph.insertResult(result_idx++, output.getType(), {});
+  for (const auto &output : llvm::enumerate(outputs)) {
+    _main_graph.graph.insertResult(output.index(), output.value().getType(),
+                                   {});
   }
 
   createOp<mlir::func::ReturnOp>(outputs);

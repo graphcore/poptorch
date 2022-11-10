@@ -594,7 +594,10 @@ def Poptorch_count_nonzero : Poptorch_NotImplementedOp<"count_nonzero", []> {
       if (dim.size() > 0) {
         out_shape = self_shape;
         auto sorted_dims = dim;
-        std::sort(sorted_dims.begin(), sorted_dims.end(), [] (int64_t d1, int64_t d2) { return d1 > d2; });
+        std::sort(sorted_dims.begin(), sorted_dims.end(), std::greater<>{});
+
+        ERROR_ON_MSG(std::adjacent_find(sorted_dims.begin(), sorted_dims.end()) != sorted_dims.end(), 
+                     "The dimensions to count must be unique");
 
         for (auto d : sorted_dims) {
           out_shape.erase(out_shape.begin() + d);

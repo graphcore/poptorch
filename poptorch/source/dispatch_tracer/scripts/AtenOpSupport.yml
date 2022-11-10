@@ -262,11 +262,13 @@
 # func: index_put(Tensor(a) self, Tensor?[] indices, Tensor values, bool accumulate=False) -> Tensor(a)
 - func: index_put
   PopTorchDirect: index_put
+  IgnoreArgs: {accumulate}
 
 # NOTE: this should split from index_put once given an implementation
 # index_put_(Tensor(a!) self, Tensor?[] indices, Tensor values, bool accumulate=False) -> Tensor(a!)
 - func: index_put_
   PopTorchDirect: index_put
+  IgnoreArgs: {accumulate}
 
 # index_fill_.int_Scalar(Tensor(a!) self, int dim, Tensor index, Scalar value) -> Tensor(a!)
 - func: index_fill_.int_Scalar
