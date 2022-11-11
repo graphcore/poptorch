@@ -5,11 +5,18 @@ import warnings
 from typing import Callable, List, Optional
 
 import torch
-from . import enums, poptorch_core, _impl, CompilerOptions
+from . import enums, poptorch_core, _impl, _options_impl
 from ._args_parser import ArgsParser
 from ._utils import flattenTensorStructure, reconstructTensorStructure, isOnIpu
 from .options import Options
 from .optim import Optimizer
+
+
+class CompilerOptions(poptorch_core.CompilerOptions):
+    def __init__(self):
+        super().__init__()
+        self.source_location_excludes = \
+                _options_impl.default_source_location_excludes
 
 
 class IPUScope:
@@ -433,7 +440,7 @@ class _IPUSession:
 
 def ipu_wrapper(_func: Optional[Callable] = None,
                 *,
-                compiler_options: CompilerOptions = CompilerOptions()):
+                compiler_options: Optional[CompilerOptions] = None):
     """Function decorator which compiles the IPU graph contained within.
 
     The previously compiled executable are kept in a cache and compilation is
@@ -456,6 +463,8 @@ def ipu_wrapper(_func: Optional[Callable] = None,
     options -- poptorch.CompilerOptions structure to configure runtime
                parameters.
     """
+    if compiler_options is None:
+        compiler_options = CompilerOptions()
 
     def decorator(func: Callable):
         cache = None

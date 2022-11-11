@@ -224,6 +224,7 @@ const std::vector<std::vector<char>> &
 JITDispatch::getSourceLocationExcludes() const {
   return _mlir_dispatch.getSourceLocationExcludes();
 }
+
 void JITDispatch::setCurrentCodeLocation(
     const torch::jit::SourceRange &source_location) {
   setCurrentPythonCodeLocation(source_location);
@@ -246,7 +247,8 @@ void JITDispatch::fixOutput(c10::Stack &stack, torch::jit::Node *node) {
     if (value.isTensor()) {
       at::Tensor const tensor = value.toTensor();
 
-      val->inferTypeFrom(copyAndCoerceType(tensor));
+      val->inferTypeFrom(tensor);
+
       _mapper.addTensor(tensor, val, false);
 
       logging::trace(

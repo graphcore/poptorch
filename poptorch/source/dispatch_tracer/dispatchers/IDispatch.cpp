@@ -35,6 +35,7 @@ void *IDispatch::getDataSource(torch::jit::Value *value) {
 bool IDispatch::isParameter(const at::Tensor &t) const {
   return _mapper.isParameter(t);
 }
+
 bool IDispatch::isParameter(torch::jit::Value *value) {
   auto *record = _mapper.rawTensorRecord(value);
   ERROR_ON_MSG(record == nullptr,

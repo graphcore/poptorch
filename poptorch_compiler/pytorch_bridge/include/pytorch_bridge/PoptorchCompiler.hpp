@@ -18,7 +18,6 @@ class Operation;
 
 namespace poptorch {
 struct CompilerOptions;
-class ValueMapper;
 } // namespace poptorch
 
 namespace poptorch_ir {

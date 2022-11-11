@@ -10,7 +10,7 @@ set(LLVM_REQUIRES_EH ON)
 # here to correctly include poptorch_logging.
 # (We still attach it to LINK_LIBS so that dependants link against
 # poptorch_logging)
-include_directories(PRIVATE
+include_directories(SYSTEM PRIVATE
     $<TARGET_PROPERTY:poptorch_logging,INTERFACE_INCLUDE_DIRECTORIES>)
 
 add_mlir_dialect_library(poptorch_dialect

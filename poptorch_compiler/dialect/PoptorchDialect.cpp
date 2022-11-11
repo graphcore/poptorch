@@ -10,7 +10,8 @@
 #include <unordered_set>
 #include <vector>
 
-#include "poptorch_logging/Error.hpp"
+#include <poptorch_logging/Error.hpp>
+#include <poptorch_logging/Logging.hpp>
 
 namespace poptorch_ir {
 struct CompilerContext;
@@ -48,7 +49,7 @@ std::vector<int64_t> broadcast(const std::vector<int64_t> &lhs,
   auto rhs_itr = rhs.begin();
 
   // The rhs may have fewer dims.
-  size_t missing_dims = lhs.size() - rhs.size();
+  const size_t missing_dims = lhs.size() - rhs.size();
 
   // The resolution happens from the trailing dimensions but the indices
   // are from leading dimensions.
@@ -62,8 +63,8 @@ std::vector<int64_t> broadcast(const std::vector<int64_t> &lhs,
 
   for (size_t dim = missing_dims; dim < lhs.size() - end_skip;
        dim++, lhs_itr++, rhs_itr++) {
-    size_t lhs_dim = *lhs_itr;
-    size_t rhs_dim = *rhs_itr;
+    const size_t lhs_dim = *lhs_itr;
+    const size_t rhs_dim = *rhs_itr;
 
     if (lhs_dim == rhs_dim) {
       output_shape.at(dim) = lhs_dim;

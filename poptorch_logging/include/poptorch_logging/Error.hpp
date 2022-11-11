@@ -28,8 +28,8 @@ const char *shortPoptorchFilename(const char *filename);
   do {                                                                         \
     std::stringstream __error_msg;                                             \
     __error_msg << msg; /* NOLINT */                                           \
-    throw poptorch::logging::InternalError(__error_msg.str().c_str(),          \
-                                           __FILE__, __LINE__);                \
+    throw ::poptorch::logging::InternalError(__error_msg.str().c_str(),        \
+                                             __FILE__, __LINE__);              \
   } while (0)
 
 #define ERROR_ON_MSG(condition, msg)                                           \
