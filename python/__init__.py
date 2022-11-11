@@ -2,6 +2,7 @@
 import abc
 import atexit
 import copy
+import copyreg
 import os
 from typing import Any, Callable, Dict, Iterator, Optional, Union, Type
 import pickle
@@ -36,7 +37,7 @@ except ImportError as e:
                       "`source /path/to/poplar-sdk/enable`") from e
 
 # pylint: disable=wrong-import-position
-from poptorch.poptorch_core import CompilerOptions, Error, RecoverableError, UnrecoverableError, enableEagerMode, importPoptorchMetadataFromFile
+from poptorch.poptorch_core import Error, RecoverableError, UnrecoverableError, enableEagerMode, importPoptorchMetadataFromFile
 from . import _dataloader
 from . import _impl
 from . import _poptorch_data
@@ -684,18 +685,13 @@ def setLogLevel(level: Union[str, int]):
     _logging.setLogLevel(level)
 
 
-# Hack so that print() works: Torch's print does a lot of slicing
-# and select on the tensor before moving it to the CPU.
-# This is annoying because it pollutes the graph, and generates some dynamic
-# slices, etc.
-# So, instead, we move the tensor to the CPU first, then we let torch do its
-# thing.
-# Upstream fix: https://github.com/pytorch/pytorch/pull/79287/files
+# Hack so that print() works for static graphs: we can print the device, shape, etc.
+# but we print "<unavailable>" instead of trying to retrieve the content of the tensor.
 _real_tensor_str = torch._tensor_str._tensor_str  # pylint: disable=protected-access
 
 
 def _tensor_str(self, indent):
-    if self.device.type == "xla":
+    if self.device.type == "ipu":
         if poptorch_core.eagerModeEnabled():
             return _real_tensor_str(self.to("cpu"), indent)
         return "<unavailable>"
@@ -703,6 +699,57 @@ def _tensor_str(self, indent):
 
 
 torch._tensor_str._tensor_str = _tensor_str  # pylint: disable=protected-access
+
+# TODO(T71316) Similar to above, this is a hack to work around hardcoded device names
+# in torch.Tensor.__deepcopy__. An upstream PR will be made to fix this
+# properly, at which point this can be deleted.
+_real_tensor_deepcopy = torch.Tensor.__deepcopy__
+
+
+def _tensor_deepcopy(self, memo):
+    if self.device.type != "ipu":
+        return _real_tensor_deepcopy(self, memo)
+
+    if id(self) in memo:
+        return memo[id(self)]
+    with torch.no_grad():
+        new_tensor = self.clone()
+        if type(new_tensor) is not type(self):
+            raise RuntimeError(
+                "The default implementation of __deepcopy__() for wrapper "
+                "subclasses nly works for subclass types that implement "
+                "clone() and for which cloning returns another instance of "
+                "the same subclass. You should either properly implement "
+                "clone() for your subclass or override __deepcopy__() if it "
+                "is intended behavior for clone() to return an instance of a "
+                "different type.")
+        if self.requires_grad:
+            new_tensor.requires_grad_()
+        if self.grad is not None:
+            new_tensor.grad = self.grad.__deepcopy__(memo)
+
+        if not isinstance(self, torch.Tensor):
+            if type(new_tensor) is not type(self):
+                raise RuntimeError(
+                    "Type of deepcopy result does not match the type of the "
+                    "source tensor. If you encounter this, please open an "
+                    "issue on PyTorch's GitHub.")
+
+            # Plain Tensors don't have slots
+            slots_to_save = copyreg._slotnames(  # pylint: disable=protected-access
+                self.__class__)  # type: ignore[attr-defined]
+            for slot in slots_to_save:
+                if hasattr(self, slot):
+                    setattr(new_tensor, slot,
+                            copy.deepcopy(getattr(self, slot), memo))
+
+        new_tensor.__dict__ = copy.deepcopy(self.__dict__, memo)
+
+        memo[id(self)] = new_tensor
+        return new_tensor
+
+
+torch.Tensor.__deepcopy__ = _tensor_deepcopy
 
 
 class ICustomArgParser(abc.ABC):

@@ -8,82 +8,14 @@
 
 namespace c10::aten {
 
-c10::Symbol floor_divide;                // NOLINT
-c10::Symbol prelu_;                      // NOLINT
-c10::Symbol leaky_relu_;                 // NOLINT
-c10::Symbol elu_;                        // NOLINT
-c10::Symbol selu_;                       // NOLINT
-c10::Symbol isinf;                       // NOLINT
-c10::Symbol uniform_;                    // NOLINT
-c10::Symbol random_;                     // NOLINT
-c10::Symbol normal_;                     // NOLINT
-c10::Symbol exponential_;                // NOLINT
-c10::Symbol where_;                      // NOLINT
-c10::Symbol poisson_nll_loss;            // NOLINT
 c10::Symbol multilabel_soft_margin_loss; // NOLINT
-c10::Symbol bernoulli_;                  // NOLINT
-c10::Symbol clamp_min_;                  // NOLINT
-c10::Symbol clamp_max_;                  // NOLINT
-c10::Symbol one_hot;                     // NOLINT
-c10::Symbol pow_;                        // NOLINT
-c10::Symbol scatter_add_;                // NOLINT
-c10::Symbol feature_dropout_;            // NOLINT
-c10::Symbol roll;                        // NOLINT
-c10::Symbol nll_loss_nd;                 // NOLINT
-c10::Symbol cross_entropy_loss;          // NOLINT
-c10::Symbol new_ones;                    // NOLINT
-c10::Symbol new_zeros;                   // NOLINT
-c10::Symbol new_full;                    // NOLINT
-c10::Symbol numpy_T;                     // NOLINT
-c10::Symbol col2im;                      // NOLINT
-c10::Symbol im2col;                      // NOLINT
-c10::Symbol _reshape_alias;              // NOLINT
-c10::Symbol argsort;                     // NOLINT
-c10::Symbol minimum;                     // NOLINT
-c10::Symbol maximum;                     // NOLINT
-c10::Symbol native_group_norm;           // NOLINT
-c10::Symbol native_layer_norm;           // NOLINT
 
 // clang-format off
 __attribute__((constructor(SYMBOL_INIT_PRIORITY)))
 static void initializeAtenSymbols() {
   // clang-format on
   poptorch::logging::trace("Initializing aten symbols");
-  SYMBOL_INIT(aten, floor_divide);
-  SYMBOL_INIT(aten, prelu_);
-  SYMBOL_INIT(aten, leaky_relu_);
-  SYMBOL_INIT(aten, elu_);
-  SYMBOL_INIT(aten, selu_);
-  SYMBOL_INIT(aten, isinf);
-  SYMBOL_INIT(aten, uniform_);
-  SYMBOL_INIT(aten, random_);
-  SYMBOL_INIT(aten, normal_);
-  SYMBOL_INIT(aten, exponential_);
-  SYMBOL_INIT(aten, where_);
-  SYMBOL_INIT(aten, poisson_nll_loss);
   SYMBOL_INIT(aten, multilabel_soft_margin_loss);
-  SYMBOL_INIT(aten, bernoulli_);
-  SYMBOL_INIT(aten, clamp_min_);
-  SYMBOL_INIT(aten, clamp_max_);
-  SYMBOL_INIT(aten, one_hot);
-  SYMBOL_INIT(aten, pow_);
-  SYMBOL_INIT(aten, scatter_add_);
-  SYMBOL_INIT(aten, feature_dropout_);
-  SYMBOL_INIT(aten, roll);
-  SYMBOL_INIT(aten, nll_loss_nd);
-  SYMBOL_INIT(aten, cross_entropy_loss);
-  SYMBOL_INIT(aten, new_ones);
-  SYMBOL_INIT(aten, new_zeros);
-  SYMBOL_INIT(aten, new_full);
-  SYMBOL_INIT(aten, numpy_T);
-  SYMBOL_INIT(aten, col2im);
-  SYMBOL_INIT(aten, im2col);
-  SYMBOL_INIT(aten, _reshape_alias);
-  SYMBOL_INIT(aten, argsort);
-  SYMBOL_INIT(aten, minimum);
-  SYMBOL_INIT(aten, maximum);
-  SYMBOL_INIT(aten, native_group_norm);
-  SYMBOL_INIT(aten, native_layer_norm);
 }
 
 } // namespace c10::aten

@@ -65,8 +65,7 @@ def accessAttributes(attribute_id_str):
 
 
 def isOnIpu(x):
-    # TODO(T59880) rename xla -> ipu
-    return x.device.type == "xla"
+    return x.device.type == "ipu"
 
 
 custom_arg_parsers = dict()

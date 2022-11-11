@@ -283,7 +283,7 @@ def test_popart_partials(capfd, dtype, ptype, trace_model):
     x = torch.randn((1, 16, 16), dtype=dtype)
 
     model = torch.nn.Sequential()
-    model.add_module('lin', torch.nn.Linear(16, 16))
+    model.add_module('lin', torch.nn.Linear(16, 16, dtype=dtype))
     model.add_module('conv', torch.nn.Conv1d(16, 16, 1))
 
     opts = poptorch.Options()
@@ -493,7 +493,7 @@ def test_running_statistics(capfd, dtype, setting, trace_model):
     dtype_str = "Float" if dtype == torch.float or \
         (trace_model and setting is None) or setting else "Half"
 
-    device = "cpu" if trace_model else "xla:0"
+    device = "cpu" if trace_model else "ipu:0"
 
     log.assert_contains(
         f" : {dtype_str}(16, strides=[1], requires_grad=0, device={device}) "
@@ -524,7 +524,7 @@ def test_running_statistics_dispatch(capfd):
         "poptorch.Options set runningStatisticsAlwaysFloat to false")
 
     log.assert_contains(
-        " : Float(16, strides=[1], requires_grad=0, device=xla:0) "
+        " : Float(16, strides=[1], requires_grad=0, device=ipu:0) "
         "-> bn.running_var")
 
 

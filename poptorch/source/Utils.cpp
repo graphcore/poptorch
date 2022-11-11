@@ -222,7 +222,7 @@ size_t numTensorsForType(const c10::TypePtr &type) {
     return 1;
 
   case c10::TypeKind::ListType: {
-    auto list_type = std::dynamic_pointer_cast<ListTypeWithNumElements>(type);
+    auto list_type = type->cast<ListTypeWithNumElements>();
     ERROR_ON(!list_type);
     return list_type->numElements();
   }
@@ -304,8 +304,8 @@ std::unique_ptr<char[]> stringToUniquePtr(const std::string &str) {
 // Convert that IR type into a C++ vector of ints.
 std::vector<std::int64_t> shapeFromTensor(torch::jit::Value *value) {
   // Extract the type from the pytorch IR.
-  c10::TensorTypePtr as_tensor = value->type()->expect<c10::TensorType>();
-  c10::VaryingShape dims = as_tensor->sizes();
+  c10::TensorTypePtr const as_tensor = value->type()->expect<c10::TensorType>();
+  c10::VaryingShape const dims = as_tensor->sizes();
 
   // Convert that IR type into a C++ vector of ints.
   std::vector<std::int64_t> shape;
@@ -369,8 +369,8 @@ void validateTensorShapeAndType(torch::jit::Value *value,
                                 const at::Tensor &tensor) {
   JitTensorInfo jit(value);
   JitTensorInfo torch(tensor);
-  bool match = std::tie(torch.scalar_type, torch.dims) ==
-               std::tie(jit.scalar_type, jit.dims);
+  const bool match = std::tie(torch.scalar_type, torch.dims) ==
+                     std::tie(jit.scalar_type, jit.dims);
   ERROR_ON_MSG(!match, "Shape/Type mismatch: JIT tensor %"
                            << value->debugName() << " " << jit.toString()
                            << " is incompatible with " << torch.toString());

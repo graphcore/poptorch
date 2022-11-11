@@ -9,6 +9,7 @@ import yaml
 # Given a tensor type from the yml like Tensor(a!) we turn that into a nicer format.
 # Tensor(a!) -> tensor_id=a, is_inplace=True
 # Tensor(a) -> tensor_id=a, is_view=True
+# Tensor(a -> *) -> tensor_id=a, is_view=True (output may use `a` in a list)
 # Tensor -> tensor_id=''
 # Tensor(a!)[] -> tensor_id=a, is_list=True, is_inplace=True
 # Tensor(a)[] ->  tensor_id=a, is_list=True, is_view=True
@@ -49,13 +50,9 @@ class TypeInfo:
         self.is_view = not self.is_inplace
 
         # The id of the tensor. This is the identifier given to map an input onto an output.
-        self.tensor_id = type_str[len('Tensor('):-1]
-        assert type_str[-1] == ")"
-
-        # Remove the `!` if this is inplace.
-        if self.is_inplace:
-            assert self.tensor_id[-1] == '!'
-            self.tensor_id = self.tensor_id[:-1]
+        self.tensor_id = re.search(r"Tensor\(([a-z]+)(| .*|!)\)",
+                                   type_str).group(1)
+        assert type_str[-1] in [")", "]"]
 
 
 class ValueInfo:
@@ -75,7 +72,7 @@ class ValueInfo:
 
         # E.g Tensor(a) self -> name: self, type : Tensor(a)
         arg_name = arg_name.split(' ')[-1]
-        type_str = value_schema.split(' ')[0]
+        type_str = value_schema.rsplit(' ', 1)[0]
 
         self.name = arg_name
         self.type = TypeInfo(type_str)
@@ -112,7 +109,10 @@ class ValueInfo:
 
 def _process_schema(function_name, op_target):
     # Split around the function return.
-    signature, outputs = op_target['native_func'].split(' -> ')
+
+    # In some cases there are more than 1 '->', make sure to match the one before the outputs.
+    # e.g split_with_sizes(Tensor(a -> *) self, int[] split_sizes, int dim=0) -> Tensor(a)[]
+    signature, outputs = op_target['native_func'].rsplit(' -> ', 1)
 
     # Some operations return multiple outputs, e.g: (Tensor(a!) values, Tensor(b!) indices)
     is_multiple_outputs = outputs.startswith('(')

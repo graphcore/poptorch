@@ -483,7 +483,7 @@ void LowerToPopartImpl::lowerReturn() {
       // tensors as enforced by torch JIT)
 
       // type->expect is static and always succeeds
-      auto list_type = std::dynamic_pointer_cast<ListTypeWithNumElements>(type);
+      auto list_type = type->cast<ListTypeWithNumElements>();
       ERROR_ON(!list_type);
 
       _compiler.addOutputType(
@@ -650,7 +650,7 @@ void LowerToPopartImpl::lowerBody() {
     // When using the dispatcher metadata should always be set.
     std::string meta;
     if (node->sourceRange().source()) {
-      meta = node->sourceRange().source()->text();
+      meta = node->sourceRange().source()->text_str().str();
     }
     ERROR_ON_MSG(_built_in_params && meta.empty(),
                  "Source code location missing for node " + nodeToString(node));

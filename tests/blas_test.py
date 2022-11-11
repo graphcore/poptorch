@@ -3,14 +3,14 @@
 
 import pytest
 import torch
-import poptorch
 import helpers
+import poptorch
 
 
 def blas_op(op, input1, input2, out, trace_model, atol=1e-04, rtol=1e-04):
     class Model(torch.nn.Module):
         def __init__(self, op):
-            super(Model, self).__init__()
+            super().__init__()
             self.op = op
 
         def forward(self, x, y, out=None):
@@ -20,8 +20,12 @@ def blas_op(op, input1, input2, out, trace_model, atol=1e-04, rtol=1e-04):
     args = [input1, input2]
     if out is not None:
         args.append(out)
-    # Run on CPU.
-    native_out = model(*args)
+
+    native_out = None
+    # Matmul fp16 is not supported on the CPU
+    if input1.dtype != torch.half and input2.dtype != torch.half:
+        # Run on CPU.
+        native_out = model(*args)
 
     # Run on IPU.
     options = poptorch.Options()
@@ -29,12 +33,13 @@ def blas_op(op, input1, input2, out, trace_model, atol=1e-04, rtol=1e-04):
     poptorch_model = poptorch.inferenceModel(model, options)
     poptorch_out = poptorch_model(*args)
 
-    helpers.assert_allclose(expected=native_out,
-                            actual=poptorch_out,
-                            atol=atol,
-                            rtol=rtol,
-                            equal_nan=True)
-    if out is not None:
+    if native_out is not None:
+        helpers.assert_allclose(expected=native_out,
+                                actual=poptorch_out,
+                                atol=atol,
+                                rtol=rtol,
+                                equal_nan=True)
+    if out is not None and native_out is not None:
         helpers.assert_allclose(expected=native_out,
                                 actual=out,
                                 atol=atol,
@@ -111,7 +116,7 @@ def test_matmul_training(bias, trace_model):
 
     class Net(torch.nn.Module):
         def __init__(self):
-            super(Net, self).__init__()
+            super().__init__()
             torch.manual_seed(42)
             self.linear = torch.nn.Linear(K, K, bias=bias)
             self.softmax = torch.nn.LogSoftmax(dim=1)
@@ -178,6 +183,44 @@ def test_addmm(params, trace_model):
 
         def forward(self, x1, x2, x3):
             return torch.addmm(x1, x2, x3, beta=self.beta, alpha=self.alpha)
+
+    opts = poptorch.Options()
+    opts.Jit.traceModel(trace_model)
+
+    model = AddmmModel(beta, alpha)
+    cpu_result = model(t1, t2, t3)
+    ipu_result = poptorch.inferenceModel(model, opts)(t1, t2, t3)
+
+    helpers.assert_allclose(expected=cpu_result, actual=ipu_result)
+
+
+@pytest.mark.parametrize(
+    "params",
+    [
+        # input_shape, beta, alpha
+        ((3, 7), 1.0, 1.0),
+        ((3, 1), 1.0, 0.75),
+        ((1, 7), 0.75, 1.0),
+        ((1), 0.75, 0.75),
+    ])
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_baddbmm(params, trace_model):
+    torch.manual_seed(42)
+
+    input_shape, beta, alpha = params
+
+    t1 = torch.randn(input_shape)
+    t2 = torch.randn(2, 3, 5)
+    t3 = torch.randn(2, 5, 7)
+
+    class AddmmModel(torch.nn.Module):
+        def __init__(self, beta, alpha):
+            super().__init__()
+            self.beta = beta
+            self.alpha = alpha
+
+        def forward(self, x1, x2, x3):
+            return torch.baddbmm(x1, x2, x3, beta=self.beta, alpha=self.alpha)
 
     opts = poptorch.Options()
     opts.Jit.traceModel(trace_model)

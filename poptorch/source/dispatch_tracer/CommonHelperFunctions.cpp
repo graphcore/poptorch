@@ -28,7 +28,7 @@ bool isGenericListOfTensors(c10::IValue &value) {
     return false;
   }
   bool not_empty = false;
-  for (c10::IValue list_value : value.toList()) {
+  for (c10::IValue const list_value : value.toList()) {
     if (!list_value.isTensor()) {
       return false;
     }
@@ -50,7 +50,7 @@ torch::jit::Value *insertValueIntoGraphAndTrackIt(c10::IValue &value,
                                                   ValueMapper &mapper) {
   if (value.isTensor()) {
     // Handle tensors.
-    at::Tensor tensor = value.toTensor();
+    at::Tensor const tensor = value.toTensor();
     // Undefined tensors are optional tensors.
     if (!tensor.defined()) {
       // Create a null IR value.
@@ -61,8 +61,7 @@ torch::jit::Value *insertValueIntoGraphAndTrackIt(c10::IValue &value,
 
     torch::jit::Value *val = mapper.getValueForTensor(tensor);
     if (val == nullptr) {
-      // TODO(T59880): rename XLA -> IPU
-      ERROR_ON_MSG(tensor.device().type() == c10::DeviceType::XLA,
+      ERROR_ON_MSG(tensor.device().type() == c10::DeviceType::IPU,
                    "Attempted to promote a Tensor converted (using "
                    ".to(\"ipu\") or .ipu()) outside an IPUScope or IPUContext "
                    "with the PopART compiler.");
@@ -140,7 +139,8 @@ torch::jit::Node *
 createAtenTarget(torch::jit::Graph &graph, const c10::FunctionSchema &schema,
                  const std::vector<torch::jit::Value *> &inputs,
                  c10::Stack *stack, ValueMapper &mapper) {
-  torch::jit::Symbol symbol = torch::jit::Symbol::fromQualString(schema.name());
+  torch::jit::Symbol const symbol =
+      torch::jit::Symbol::fromQualString(schema.name());
 
   // Create the aten target node for our canonicalisation to target.
   torch::jit::Node *aten_target =
@@ -153,7 +153,7 @@ createAtenTarget(torch::jit::Graph &graph, const c10::FunctionSchema &schema,
     if (in->node()->kind() == at::prim::Constant) {
       c10::IValue val = stack->at(i);
       if (val.isTensor()) {
-        at::Tensor as_tensor = val.toTensor();
+        at::Tensor const as_tensor = val.toTensor();
         // But actually we are a previously seen tensor which has been demoted
         // to a constant.
         torch::jit::Value *new_val = mapper.getValueForTensor(as_tensor);
@@ -176,7 +176,7 @@ at::ScalarType scalarTypeOrDefault(c10::optional<at::ScalarType> dtype) {
 }
 
 at::Tensor copyAndCoerceType(const at::Tensor &tensor) {
-  at::Tensor copy;
+  at::Tensor const copy;
   auto scalar_type = tensor.scalar_type();
   auto coerced_scalar_type = coerceToSupportedType(scalar_type);
   if (scalar_type != coerced_scalar_type) {
@@ -200,14 +200,15 @@ std::vector<at::Tensor> getInplaceArguments(const c10::Stack &stack,
     c10::IValue value = stack[arg];
 
     if (value.isTensor()) {
-      at::Tensor tensor = value.toTensor();
+      at::Tensor const tensor = value.toTensor();
 
       // Undefined tensors are optional tensors.
       if (!tensor.defined()) {
         continue;
       }
 
-      if (argument.alias_info() && argument.alias_info()->isWrite()) {
+      if ((argument.alias_info() != nullptr) &&
+          argument.alias_info()->isWrite()) {
         logging::trace("[DISPATCHER][JIT] Found inplace argument, tensor ptr "
                        "{}, tensor {}",
                        reinterpret_cast<void *>(tensor.unsafeGetTensorImpl()),
@@ -243,8 +244,7 @@ bool isHalfTensor(const at::Tensor &t) {
 }
 
 c10::Device deviceOrDefaultIpu(c10::optional<c10::Device> device) {
-  // TODO(T59880) rename kXLA -> kIPU
-  return device ? *device : c10::Device(at::kXLA, 0);
+  return device ? *device : c10::Device(at::kIPU, 0);
 }
 
 } // namespace poptorch

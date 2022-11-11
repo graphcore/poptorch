@@ -3,8 +3,8 @@
 
 import torch
 import pytest
-import poptorch
 import helpers
+import poptorch
 
 non_differentiable_ops = [
     torch.ceil, torch.floor, torch.round, torch.sign, torch.trunc,
@@ -536,7 +536,7 @@ reduction_ops_api1 = [
     torch.mean,
     torch.median,
     # torch.mode,
-    torch.norm,
+    #torch.linalg.norm, TODO(T71314) adding support for aten::linalg_norm
     torch.prod,
     #torch.std, torch.std_mean,
     torch.sum,
@@ -555,7 +555,7 @@ reduction_ops_api2 = [
     torch.mean,
     torch.median,
     # torch.mode,
-    torch.norm,
+    #torch.linalg.norm, TODO(T71314) adding support for aten::linalg_norm
     torch.prod,
     torch.logsumexp,  # logsumexp doesn't support API 1.
     #torch.std, torch.std_mean,
@@ -653,18 +653,24 @@ def test_minmax_tuple_out(op, dim, keepdim, trace_model):
                out_fn=out_fn)
 
 
-# Interesting p-values for testing torch.norm(X, p=<>)
-norm_pvals = ['fro', float('inf'), float('-inf'), 1, 1.0, 2, 2.0, 3, 3.0]
+# Interesting p-values for testing torch.linalg.norm(X, p=<>)
+norm_pvals = [
+    'fro', 'nuc',
+    float('inf'),
+    float('-inf'), 1, 1.0, 2, 2.0, -1, -2
+]
 
 
 @pytest.mark.parametrize("p", norm_pvals)
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_norm_p_values(p, trace_model):
+    pytest.skip("TODO(T71314) adding support for aten::linalg_norm")
+
     torch.manual_seed(42)
-    input = torch.randn([1, 2, 10, 10])
+    input = torch.randn([2, 10])
 
     def operation(x):
-        return torch.norm(x, p=p)
+        return torch.linalg.norm(x, ord=p)
 
     def assert_(native_out, poptorch_out):
         helpers.assert_allclose(actual=poptorch_out, expected=native_out)
@@ -674,11 +680,13 @@ def test_norm_p_values(p, trace_model):
 
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_norm_dtype(trace_model):
+    pytest.skip("TODO(T71314) adding support for aten::linalg_norm")
+
     torch.manual_seed(42)
-    input = torch.randn([1, 2, 10, 10])
+    input = torch.randn([2, 10])
 
     def operation(x):
-        return torch.norm(x, dtype=torch.float, p=2)
+        return torch.linalg.norm(x, dtype=torch.float, ord=2)
 
     def assert_(native_out, poptorch_out):
         helpers.assert_allclose(actual=poptorch_out, expected=native_out)

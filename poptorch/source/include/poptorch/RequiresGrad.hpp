@@ -11,7 +11,7 @@ struct Graph;
 namespace poptorch {
 
 // Autograd sets the requires_grad flag on the ATen tensors
-// after we've instantiated the corresonding ATen node in the dispatcher.
+// after we've instantiated the corresponding ATen node in the dispatcher.
 // This pass goes through all the nodes in the ATen graph and sets the
 // requires_graph flag on a node's outputs if any of its inputs has
 // requires_grad set.

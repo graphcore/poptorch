@@ -46,6 +46,20 @@ torch::jit::Node *addmmHandler(torch::jit::Graph *graph,
   return createGemm(graph, {y, z, x}, t0, t1, 0, 0);
 }
 
+torch::jit::Node *addmvHandler(torch::jit::Graph *graph,
+                               torch::jit::Node *node) {
+  auto *mat = node->input(1);
+  auto *vec = node->input(2);
+  auto *t0 = createMatmul(graph, {mat, vec})->output();
+  auto *alpha = node->input(4);
+  auto *t1 = createMul(graph, {t0, alpha})->output();
+  auto *input = node->input(0);
+  auto *beta = node->input(3);
+  auto *t2 = createMul(graph, {input, beta})->output();
+  // add(mul(matmul(mat, vec), alpha), mul(input, beta))
+  return createAdd(graph, {t1, t2});
+}
+
 torch::jit::Node *asinHandler(torch::jit::Graph *graph,
                               torch::jit::Node *node) {
   auto *i0 = node->input(0);
@@ -80,6 +94,20 @@ torch::jit::Node *atanhHandler(torch::jit::Graph *graph,
   auto *i0 = node->input(0);
   // atanh(i0)
   return createAtanh(graph, {i0});
+}
+
+torch::jit::Node *baddbmmHandler(torch::jit::Graph *graph,
+                                 torch::jit::Node *node) {
+  auto *batch1 = node->input(1);
+  auto *batch2 = node->input(2);
+  auto *t0 = createMatmul(graph, {batch1, batch2})->output();
+  auto *alpha = node->input(4);
+  auto *t1 = createMul(graph, {t0, alpha})->output();
+  auto *input = node->input(0);
+  auto *beta = node->input(3);
+  auto *t2 = createMul(graph, {input, beta})->output();
+  // add(mul(matmul(batch1, batch2), alpha), mul(input, beta))
+  return createAdd(graph, {t1, t2});
 }
 
 torch::jit::Node *catHandler(torch::jit::Graph *graph, torch::jit::Node *node) {
@@ -218,13 +246,6 @@ torch::jit::Node *geHandler(torch::jit::Graph *graph, torch::jit::Node *node) {
   auto *t1 = createEqual(graph, {x, y})->output();
   // logical_or(greater(x, y), equal(x, y))
   return createLogical_or(graph, {t0, t1});
-}
-
-torch::jit::Node *geluHandler(torch::jit::Graph *graph,
-                              torch::jit::Node *node) {
-  auto *i0 = node->input(0);
-  // gelu(i0)
-  return createGelu(graph, {i0});
 }
 
 torch::jit::Node *gtHandler(torch::jit::Graph *graph, torch::jit::Node *node) {
@@ -755,17 +776,17 @@ torch::jit::Node *whereHandler(torch::jit::Graph *graph,
 } // namespace
 
 __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
-  registerHandler(c10::aten::_cat, catHandler);
-  registerHandler(c10::aten::_s_where, whereHandler);
   registerHandler(c10::aten::abs, absHandler);
   registerHandler(c10::aten::acos, acosHandler);
   registerHandler(c10::aten::acosh, acoshHandler);
   registerHandler(c10::aten::addmm, addmmHandler);
+  registerHandler(c10::aten::addmv, addmvHandler);
   registerHandler(c10::aten::asin, asinHandler);
   registerHandler(c10::aten::asinh, asinhHandler);
   registerHandler(c10::aten::atan, atanHandler);
   registerHandler(c10::aten::atan2, atan2Handler);
   registerHandler(c10::aten::atanh, atanhHandler);
+  registerHandler(c10::aten::baddbmm, baddbmmHandler);
   registerHandler(c10::aten::cat, catHandler);
   registerHandler(c10::aten::ceil, ceilHandler);
   registerHandler(c10::aten::celu, celuHandler);
@@ -783,7 +804,6 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::floor, floorHandler);
   registerHandler(c10::aten::fmod, fmodHandler);
   registerHandler(c10::aten::ge, geHandler);
-  registerHandler(c10::aten::gelu, geluHandler);
   registerHandler(c10::aten::gt, gtHandler);
   registerHandler(c10::aten::hardshrink, hardshrinkHandler);
   registerHandler(c10::aten::hardtanh, hardtanhHandler);

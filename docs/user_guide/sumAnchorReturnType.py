@@ -37,7 +37,8 @@ class ExampleClassDataset(torch.utils.data.Dataset):
         torch.manual_seed(RAND_SEED)
         R = torch.rand([vec_length, vec_length])
         R = R + R.transpose(0, 1)
-        self._R = torch.eig(R, eigenvectors=True).eigenvectors
+        _, eigenvectors = torch.linalg.eig(R)
+        self._R = eigenvectors.to(torch.float)
 
         # # For now, use identity for R
         # self._R = torch.eye(vec_length, vec_length)

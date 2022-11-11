@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 
+import copy
+
 import pytest
 import torch
 
-import poptorch
 import helpers
+import poptorch
 
 
 def slice_test_harness(trace_model, tensor_x, tensor_y, start_fn, end_fn,
@@ -387,24 +389,30 @@ def test_unbind(dim, use_half, trace_model):
 
     model = helpers.ModelWithWeights(op, x.shape, out_fn=lambda x: x[0])
 
+    # Unfortunately not all forms of matmul are supported for torch.half on the
+    # CPU (including 1-dim input, 2-dim weights), so we can only run the IPU
+    # model with halves.
+    poptorch_model = copy.deepcopy(model)
     if use_half:
-        x = x.half()
-        model.half()
+        poptorch_model.half()
         # pylint: disable=protected-access
-        model._weights_before = model.lin.weight.detach().clone()
+        poptorch_model._weights_before = poptorch_model.lin.weight.detach(
+        ).clone()
 
     options = poptorch.Options()
     options.Jit.traceModel(trace_model)
-    poptorch_model = poptorch.trainingModel(model, options=options)
+    poptorch_model = poptorch.trainingModel(poptorch_model, options=options)
 
     native_out, _ = model((x, ))
-    poptorch_out, _ = poptorch_model((x, ))
+    poptorch_out, _ = poptorch_model((x.half() if use_half else x, ))
 
     # Check the unbound dim length is the same
     assert len(native_out) == len(poptorch_out)
 
     # Inference test - check outputs
     for tensor_native, tensor_pop in zip(native_out, poptorch_out):
+        if use_half:
+            tensor_native = tensor_native.half()
         helpers.assert_allclose(expected=tensor_native,
                                 actual=tensor_pop,
                                 atol=0.01,

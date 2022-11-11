@@ -30,7 +30,7 @@ def simple_add(capfd):
     cpu = fn(input)
     log = helpers.LogChecker(capfd)
     log.assert_isEmpty()
-    input = input.to("xla")
+    input = input.to("ipu")
     log = helpers.LogChecker(capfd)
     log.assert_contains("CPU -> IPU")
     ipu = fn(input, check_log=True, first_compile=True)
@@ -64,7 +64,7 @@ def simple_add(capfd):
 def test_source_location(mode):
     import poptorch.eager  # pylint: disable=unused-import, import-outside-toplevel
 
-    layer = torch.nn.Linear(1, 2).to('xla')
+    layer = torch.nn.Linear(1, 2).to('ipu')
     expected_filename = inspect.stack()[0].filename
     # +3 -> We expect to see f()'s return line in the log
     expected_line = inspect.stack()[0].lineno + 3
@@ -79,7 +79,7 @@ def test_source_location(mode):
         # All paths have a '/' in them so we essentially exclude everything.
         poptorch.eager.eager_options.source_location_excludes += ['/']
 
-    input = torch.Tensor([[1.], [-1.]]).to('xla')
+    input = torch.Tensor([[1.], [-1.]]).to('ipu')
     res = f(input)
 
     log = helpers.LogChecker(poptorch.poptorch_core.getCachedGraph(res))
@@ -87,7 +87,7 @@ def test_source_location(mode):
     # By default: we point at the user code
     default_loc = r'loc\("' + f'{expected_filename}":{expected_line}'
     # If we clear the list of exclusions we will point at Torch's internals
-    torch_internal_loc = "site-packages/torch/nn/functional.py"
+    torch_internal_loc = "site-packages/torch/nn/modules/linear.py"
     unknown_loc = r"\#loc = loc\(unknown\)"
     if mode == "show_all":
         log.assert_matches(torch_internal_loc)
@@ -106,7 +106,7 @@ def test_source_location(mode):
 def test_unchanged_output_removal():
     import poptorch.eager  # pylint: disable=unused-import, import-outside-toplevel
 
-    t = torch.arange(6).to('xla')
+    t = torch.arange(6).to('ipu')
     s = t.reshape(2, 3).clone()
 
     log = helpers.LogChecker(poptorch.poptorch_core.getCachedGraph(s))
@@ -120,8 +120,8 @@ def test_unused_input_removal():
 
     poptorch.eager.eager_options.use_lazy_tensor = True
 
-    t = torch.arange(6).to('xla')
-    v = torch.tensor(1).to('xla')
+    t = torch.arange(6).to('ipu')
+    v = torch.tensor(1).to('ipu')
 
     t.reshape(2, 3)
     u = v + v
@@ -139,7 +139,7 @@ def test_lazy_tensor(capfd):
 
     poptorch.eager.eager_options.use_lazy_tensor = True
 
-    t = torch.tensor(1.0).to('xla')
+    t = torch.tensor(1.0).to('ipu')
     s = t + t
 
     log = helpers.LogChecker(capfd)
@@ -176,7 +176,7 @@ def test_simple_add_hw(capfd):
 def test_casting():
     import poptorch.eager  # pylint: disable=unused-import, import-outside-toplevel
 
-    t = torch.tensor([1], dtype=torch.int32, device='xla')
+    t = torch.tensor([1], dtype=torch.int32, device='ipu')
     s = t.float().to('cpu')
 
     assert s.dtype is torch.float
@@ -188,7 +188,7 @@ def test_view_output():
     import poptorch.eager  # pylint: disable=unused-import, import-outside-toplevel
 
     t = torch.arange(6)
-    s = t.to('xla').reshape(2, 3).to('cpu')
+    s = t.to('ipu').reshape(2, 3).to('cpu')
 
     helpers.assert_allequal(expected=t.reshape(2, 3), actual=s)
 
@@ -200,7 +200,7 @@ def test_backward(lazy):
     poptorch.eager.eager_options.use_lazy_tensor = lazy
 
     t = torch.tensor([1.0], requires_grad=True)
-    t_x = t.to('xla')
+    t_x = t.to('ipu')
     s = 2.0 * t_x
 
     s.backward()
@@ -221,8 +221,8 @@ def test_squeezenet():
 
     cpu = model(input)
 
-    model.to("xla")
-    input = input.to("xla")
+    model.to("ipu")
+    input = input.to("ipu")
 
     ipu = model(input)
 
@@ -244,8 +244,8 @@ def test_resnet18():
 
     cpu = model(input)
 
-    model.to("xla")
-    input = input.to("xla")
+    model.to("ipu")
+    input = input.to("ipu")
 
     ipu = model(input)
 
@@ -266,7 +266,7 @@ def test_no_unused_empty_tensor(capfd):
         return x**2 + 5
 
     cpu_y = f(x)
-    ipu_y = f(x.to("xla")).to("cpu")
+    ipu_y = f(x.to("ipu")).to("cpu")
 
     log = helpers.LogChecker(capfd)
     log.assert_not_contains("empty_tensor")

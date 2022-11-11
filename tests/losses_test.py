@@ -9,8 +9,8 @@ import torch
 import torch.optim as optim
 import torch.nn.functional as F
 import pytest
-import poptorch
 import helpers
+import poptorch
 
 
 def loss_harness(trace_model,
@@ -480,7 +480,7 @@ def test_MarginRankingLoss(reduction, trace_model):
     input2 = torch.empty(10, 10).uniform_()
 
     # Generate random set of 1s and -1s for labels
-    target = torch.randint(2, [10]) * 2 - 1
+    target = torch.randint(2, [10, 10]) * 2 - 1
 
     loss_harness(trace_model,
                  F.margin_ranking_loss, [input1, input2],

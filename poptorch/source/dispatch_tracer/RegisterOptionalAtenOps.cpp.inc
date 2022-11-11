@@ -1,7 +1,6 @@
 // Copyright (c) 2022 Graphcore Ltd. All rights reserved.
 
-//TODO(T59880) rename XLA -> IPU
-TORCH_LIBRARY_IMPL(aten, XLA, m) {
+TORCH_LIBRARY_IMPL(aten, IPU, m) {
   // These ops otherwise require direct access to the storage of an
   // `IpuTensorImpl`, so we must implement them ourselves.
   m.impl("alias", PTC_BOXED(poptorch::fallback));
@@ -13,10 +12,15 @@ TORCH_LIBRARY_IMPL(aten, XLA, m) {
   m.impl("empty.memory_format", PTC(poptorch::emptyMemoryFormat));
   m.impl("empty_strided", PTC(poptorch::emptyStrided));
 
+  m.impl("_weight_norm_interface", PTC_BOXED(poptorch::weightNormInterface));
+
+  m.impl("index.Tensor", PTC_BOXED(poptorch::fallback));
+
   m.impl("convolution_overrideable", PTC_BOXED(poptorch::fallback));
   m.impl("convolution_backward_overrideable", PTC_BOXED(poptorch::fallback));
   m.impl("transpose.int", PTC_BOXED(poptorch::fallback));
   m.impl("expand", PTC_BOXED(poptorch::fallback));
+  m.impl("_unsafe_view", PTC_BOXED(poptorch::fallback));
   m.impl("gather", PTC_BOXED(poptorch::fallback));
   m.impl("dropout", PTC_BOXED(poptorch::fallback));
   m.impl("avg_pool2d.out", PTC_BOXED(poptorch::fallback));
@@ -48,8 +52,8 @@ TORCH_LIBRARY_IMPL(aten, XLA, m) {
   m.impl("lstm.input",
           torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
 
-// If we don't intercept these ops, they will be decomposed into
-// as_strided which is harder to handle.
+  // If we don't intercept these ops, they will be decomposed into
+  // as_strided which is harder to handle.
   m.impl("slice.Tensor", PTC_BOXED(poptorch::fallback));
   m.impl("squeeze", PTC_BOXED(poptorch::fallback));
   m.impl("squeeze_", PTC_BOXED(poptorch::fallback));
@@ -59,6 +63,7 @@ TORCH_LIBRARY_IMPL(aten, XLA, m) {
   m.impl("permute", PTC_BOXED(poptorch::fallback));
   m.impl("select.int", PTC_BOXED(poptorch::fallback));
   m.impl("transpose_", PTC_BOXED(poptorch::fallback));
+  m.impl("split_with_sizes", PTC_BOXED(poptorch::fallback));
 
   // If we don't intercept this op, it will be decomposed into
   // _index_put_impl_, which exposes unnecessary implementation
@@ -91,11 +96,13 @@ TORCH_LIBRARY_IMPL(aten, XLA, m) {
   m.impl("ctc_loss.Tensor", PTC_BOXED(poptorch::fallback));
   m.impl("hinge_embedding_loss", PTC_BOXED(poptorch::fallback));
   m.impl("kl_div", PTC_BOXED(poptorch::fallback));
-  m.impl("l1_loss.out", PTC_BOXED(poptorch::fallback));
+  m.impl("l1_loss", PTC_BOXED(poptorch::fallback));
   m.impl("margin_ranking_loss", PTC_BOXED(poptorch::fallback));
   m.impl("poisson_nll_loss", PTC_BOXED(poptorch::fallback));
   m.impl("soft_margin_loss.out", PTC_BOXED(poptorch::fallback));
   m.impl("triplet_margin_loss", PTC_BOXED(poptorch::fallback));
+  m.impl("mse_loss", PTC_BOXED(poptorch::fallback));
+  m.impl("smooth_l1_loss", PTC_BOXED(poptorch::fallback));
 
   // Scatter: By default, PyTorch's handler will fail if the index tensor isn't
   // a tensor of int64s (see `scatter_gather_dtype_check` in PyTorch) -- ours
@@ -121,7 +128,7 @@ TORCH_LIBRARY_IMPL(aten, XLA, m) {
   m.impl("scatter_add_", PTC_BOXED(poptorch::fallback));
 }
 
-TORCH_LIBRARY_IMPL(torch_scatter, XLA, m) {
+TORCH_LIBRARY_IMPL(torch_scatter, IPU, m) {
   m.impl("scatter_max", PTC_BOXED(poptorch::fallback));
   m.impl("scatter_min", PTC_BOXED(poptorch::fallback));
 }

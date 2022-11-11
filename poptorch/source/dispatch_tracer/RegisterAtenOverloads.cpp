@@ -1,4 +1,5 @@
 // Copyright (c) 2021 Graphcore Ltd. All rights reserved.
+#include <ATen/Operators.h>
 #include <ATen/core/List.h>
 #include <ATen/core/function_schema.h>
 #include <ATen/native/CPUFallback.h>
@@ -78,8 +79,7 @@ std::string valueToString(const c10::IValue &ivalue) {
 }
 
 bool isIpuDevice(const c10::Device &d) {
-  // TODO(T59880): replace XLA -> IPU
-  return d.type() == c10::DeviceType::XLA;
+  return d.type() == c10::DeviceType::IPU;
 }
 
 /*
@@ -229,7 +229,7 @@ void copyInplace(const c10::OperatorHandle &op, c10::Stack *stack) {
   // In eager mode the dispatcher is always active so this will only be true
   // when working with static graphs
   if (!getContext().hasActiveDispatch()) {
-    if (self.is_xla() && src.is_cpu()) {
+    if (self.is_ipu() && src.is_cpu()) {
       logging::trace("copy_ CPU -> IPU, outside dispatch");
       auto scalar_type = src.scalar_type();
       auto coerced_type = coerceToSupportedType(scalar_type);
@@ -238,7 +238,7 @@ void copyInplace(const c10::OperatorHandle &op, c10::Stack *stack) {
                        << scalar_type << "'. Please cast to `" << coerced_type
                        << "' before moving this tensor to the IPU.");
       getContext().tensor_store.copyFromCpu(self, src);
-    } else if (self.is_cpu() && src.is_xla()) {
+    } else if (self.is_cpu() && src.is_ipu()) {
       logging::trace("copy_ IPU -> CPU, outside dispatch");
       if (const std::shared_ptr<MLIRExecutor> executor =
               getContext().last_mlir_executor.lock()) {
@@ -246,7 +246,7 @@ void copyInplace(const c10::OperatorHandle &op, c10::Stack *stack) {
       }
 
       getContext().tensor_store.copyToCpu(self, src);
-    } else if (self.is_xla() && src.is_xla()) {
+    } else if (self.is_ipu() && src.is_ipu()) {
       if (const std::shared_ptr<MLIRExecutor> executor =
               getContext().last_mlir_executor.lock()) {
         executor->copyWeightsToHostIfNeeded();
@@ -286,8 +286,7 @@ void copyInplace(const c10::OperatorHandle &op, c10::Stack *stack) {
 
   getContext().updatePythonCallstack();
 
-  // TODO(T59880) rename is_xla() -> is_ipu()
-  if (self.is_xla()) {
+  if (self.is_ipu()) {
     if (src.is_cpu()) {
       std::stringstream ss;
       ss << "copy_ CPU -> IPU ";
@@ -317,15 +316,13 @@ void copyInplace(const c10::OperatorHandle &op, c10::Stack *stack) {
       torch::jit::drop(stack, num_arguments);
       torch::jit::push(stack, self);
     } else {
-      // TODO(T59880) rename is_xla() -> is_ipu()
-      ERROR_ON(!src.is_xla());
+      ERROR_ON(!src.is_ipu());
       logging::debug("copy_ IPU {} -> IPU {}", src.dtype(), self.dtype());
       getContext().activeDispatch()->fallback(op, stack);
     }
   } else {
     ERROR_ON(!self.is_cpu());
-    // TODO(T59880) rename is_xla() -> is_ipu()
-    if (src.is_xla()) {
+    if (src.is_ipu()) {
       ERROR_ON_MSG(!getContext().moving_outputs && !eagerModeEnabled(),
                    "Illegal move to CPU (via `.to(\"cpu\")`) when using the "
                    "dispatcher. Instead, return this output as an IPU tensor.");
@@ -633,7 +630,7 @@ at::Tensor emptyStrided(at::IntArrayRef size, at::IntArrayRef stride,
                         c10::optional<bool> pin_memory = c10::nullopt) {
   ERROR_ON(!device); // Internal error: shouldn't happen
   ERROR_ON(!isIpuDevice(*device));
-  logging::trace("[DISPATCHER] Intercepting aten::empty_strided, device {}",
+  logging::debug("[DISPATCHER] Intercepting aten::empty_strided, device {}",
                  device->str());
   ERROR_ON(at::detail::defaultStrides(size) != stride);
   return emptyBase(size, dtype, layout, device, pin_memory);
@@ -664,6 +661,31 @@ void detach(const c10::OperatorHandle &op, c10::Stack *stack) {
     torch::jit::drop(stack, num_arguments);
     torch::jit::push(stack, out);
   }
+}
+
+// NOTE: This gets called by _weight_norm's handler, if certain conditions are
+// met. However, those conditions never used to be met, and so we never had to
+// implement this handler. Now we do, so for now just emulate the old behaviour.
+//
+// This is not fully robust, since strictly speaking the schema of
+// `_weight_norm_interface` returns a (Tensor, Tensor); in its sole usage in
+// `_weight_norm`, only the first member is used.
+void weightNormInterface(const c10::OperatorHandle &op, c10::Stack *stack) {
+  const auto num_arguments = op.schema().arguments().size();
+  auto arguments = torch::jit::last(stack, num_arguments);
+
+  const auto v_in = arguments.at(0).toTensor();
+  const auto g_in = arguments.at(1).toTensor();
+  const std::int64_t dim = arguments.at(2).toInt();
+
+  torch::jit::drop(stack, num_arguments);
+
+  auto v = v_in.contiguous();
+  auto g = g_in.contiguous();
+
+  const auto out = v * (g / at::norm_except_dim(v, 2, dim));
+
+  torch::jit::push(stack, out);
 }
 
 void replaceValueDispatcher(torch::jit::Value *v_old,
@@ -726,14 +748,11 @@ std::string getCachedGraph(const at::Tensor &tensor) {
   fall through to our fallback catchers.
 */
 
-// TODO(T59880) rename XLA -> IPU
-TORCH_LIBRARY_IMPL(_, XLA, m) { m.fallback(PTC_BOXED(poptorch::fallback)); }
+TORCH_LIBRARY_IMPL(_, IPU, m) { m.fallback(PTC_BOXED(poptorch::fallback)); }
 
-/* TODO(T59880) Fallback already registered upstream. Re-enable for AutogradIPU
 TORCH_LIBRARY_IMPL(_, AutogradIPU, m) {
   m.fallback(PTC_BOXED(poptorch::fallback));
 }
-*/
 
 /*
   There are two kinds of PyTorch ops: the ones that require registration
@@ -753,11 +772,10 @@ TORCH_LIBRARY_IMPL(_, AutogradIPU, m) {
 */
 #include "RegisterOptionalAtenOps.cpp.inc"
 
-// TODO(T59880) rename AutogradXLA -> AutogradIPU
 // This is required to intercept detach calls when
 // moving parameters to the IPU. For some reason, these
 // cannot be intercepted using the non-autograd key
-TORCH_LIBRARY_IMPL(aten, AutogradXLA, m) {
+TORCH_LIBRARY_IMPL(aten, AutogradIPU, m) {
   m.impl("detach", PTC_BOXED(poptorch::detach));
 }
 
@@ -1079,7 +1097,7 @@ static auto registry =
 //
 // Note: Presumably, for non-PopART backends these will need to have
 // implementations (`torch::autograd::Function` subclasses).
-TORCH_LIBRARY_IMPL(poptorch, AutogradXLA, m) {
+TORCH_LIBRARY_IMPL(poptorch, AutogradIPU, m) {
   m.impl("begin_ipu_block", torch::autograd::autogradNotImplementedFallback());
   m.impl("end_ipu_block", torch::autograd::autogradNotImplementedFallback());
   m.impl("ipu_print_tensor", torch::autograd::autogradNotImplementedFallback());

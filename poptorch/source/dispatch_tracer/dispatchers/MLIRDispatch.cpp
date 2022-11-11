@@ -10,6 +10,8 @@
 #include <string>
 #include <utility>
 
+#include <ATen/ATen.h>
+
 #include "../../PoptorchSymbols.hpp"
 #include "../../popart_canonicalization/PopartCanonicalizationUtils.hpp"
 #include "MLIRDispatchUtils.hpp"
@@ -75,8 +77,7 @@ MLIRExecutor::execute(const std::vector<at::Tensor> &inputs) {
 
     for (std::size_t i = 0; i < inputs.size(); ++i) {
       const at::Tensor &tensor = inputs[i];
-      // TODO(T59880) rename is_xla() -> is_ipu()
-      if (tensor.is_xla()) {
+      if (tensor.is_ipu()) {
         // This is the tensor we used to compile the executable: the pointer
         // was already set when _compiler.addInput() was called.
         const auto &host_buffer = getHostBuffer(tensor).getCpuData();
@@ -586,7 +587,7 @@ poptorch_ir::TensorId MLIRDispatch::ensureInDispatch(
     val = std::visit(
         Overloaded{[&](const std::shared_ptr<Buffer> &buffer) {
                      logging::trace("[DISPATCHER] Adding tensor data to the "
-                                    "compiler for xla ID {} as parameter #{}",
+                                    "compiler for IPU ID {} as parameter #{}",
                                     details->tensor_id, _next_parameter_idx);
                      const std::string str =
                          "Parameter/" + std::to_string(_next_parameter_idx++);
@@ -595,7 +596,7 @@ poptorch_ir::TensorId MLIRDispatch::ensureInDispatch(
                    },
                    [&](const std::shared_ptr<ITensorView> &view_info) {
                      logging::trace("[DISPATCHER] Adding tensor view to the "
-                                    "compiler for xla ID {}",
+                                    "compiler for IPU ID {}",
                                     details->tensor_id);
                      return view_info->addViewToGraph(*this);
                    }},
@@ -930,6 +931,33 @@ toOptionalIntVector(c10::IValue &value) {
 }
 
 std::int64_t toInt(c10::IValue &value) { return value.toInt(); }
+
+std::int64_t fromSymInt(const c10::IValue &value) {
+  return value.toSymInt().as_int_unchecked();
+}
+
+std::optional<std::int64_t> fromOptionalSymInt(const c10::IValue &value) {
+  if (value.toOptional<c10::SymInt>()) {
+    return fromSymInt(value.toOptional<c10::SymInt>());
+  }
+  return std::nullopt;
+}
+
+std::vector<std::int64_t> fromSymIntList(const c10::IValue &value) {
+  std::vector<int64_t> vec;
+  for (const auto si : value.toList()) {
+    vec.push_back(fromSymInt(si));
+  }
+  return vec;
+}
+
+std::optional<std::vector<std::int64_t>>
+fromOptionalSymIntList(const c10::IValue &value) {
+  if (value.toOptional<c10::List<c10::IValue>>()) {
+    return fromSymIntList(value.toOptional<c10::List<c10::IValue>>());
+  }
+  return std::nullopt;
+}
 
 // Use an int vector to avoid the unusual std::vector<bool>: there is also no
 // "toBoolVector method."

@@ -27,9 +27,9 @@ simplify("div", lambda x, y: 1. / y * x)
 # unary operators
 opers = [
     "abs", "acos", "acosh", "asin", "asinh", "atan", "atanh", "ceil", "cos",
-    "cosh", "detach", "erf", "exp", "expm1", "floor", "gelu", "isnan", "log",
-    "log1p", "logical_not", "neg", "reciprocal", "relu", "round", "sigmoid",
-    "sin", "sinh", "sign", "sqrt", "tan", "tanh"
+    "cosh", "detach", "erf", "exp", "expm1", "floor", "isnan", "log", "log1p",
+    "logical_not", "neg", "reciprocal", "relu", "round", "sigmoid", "sin",
+    "sinh", "sign", "sqrt", "tan", "tanh"
 ]
 
 for oper in opers:
@@ -67,7 +67,6 @@ convert("logical_and", 2)
 convert("logical_or", 2)
 
 expand("cat", lambda x, y: op.concat(tensor_list(x), clong(y)))
-forward("_cat", "cat")
 expand("elu", lambda x, y, z: op.selu(x, cfloat(y), cfloat(z)))
 expand("ge", lambda x, y: x >= y)
 expand("le", lambda x, y: x <= y)
@@ -100,7 +99,6 @@ forward("replication_pad3d", "replication_pad1d")
 # ternary operators
 convert("masked_fill", 3, "where", [1, 2, 0])
 convert("where", 3)
-forward("_s_where", "where")
 
 expand("constant_pad_nd", lambda x, l, c: op.constantPad(
     x, clong_list(l), cfloat(c)))
@@ -166,5 +164,18 @@ def soft_margin_loss_handler(x, y, red):
 expand(
     "addmm", lambda x, y, z, beta, alpha: op.gemm(y, z, x, cfloat(
         alpha), cfloat(beta), clong(0), clong(0)))
+
+
+def baddbmm_handler(input, batch1, batch2, beta, alpha):
+    mul1 = op.mul(op.matmul(batch1, batch2), alpha)
+    mul2 = op.mul(input, beta)
+    return op.add(mul1, mul2)
+
+
+def addmv_handler(input, mat, vec, beta, alpha):
+    # Redeclare the function, just for the benefit of arg names in generated
+    # comments.
+    return baddbmm_handler(input, mat, vec, beta, alpha)
+
 
 generate(script, "c10::aten", output_dir + "/AtenHandlers.gen.cpp", globals())

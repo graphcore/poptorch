@@ -29,14 +29,14 @@ torch::jit::Node *gluHandler(torch::jit::Graph *graph, torch::jit::Node *node) {
   torch::jit::Value *input = node->input(0);
   std::int64_t axis = constantToLong(node->input(1)->node());
   std::vector<std::int64_t> shape_input = shapeFromTensor(input);
-  std::int64_t size = shape_input.size();
+  std::int64_t const size = shape_input.size();
 
   // handle python's negative indices
   if (axis < 0) {
     axis += size;
   }
 
-  ERROR_ON_MSG(!(axis >= 0 && axis < size),
+  ERROR_ON_MSG(axis < 0 || axis >= size,
                "The second input argument of glu is not in the legal range");
 
   ERROR_ON_MSG(shape_input[axis] % 2,
@@ -148,6 +148,17 @@ torch::jit::Node *preluHandler(torch::jit::Graph *graph,
   return createPrelu(graph, self, weight);
 }
 
+torch::jit::Node *geluHandler(torch::jit::Graph *graph,
+                              torch::jit::Node *node) {
+  auto *input = node->input(0);
+  const auto approximate = constantToString(node->input(1)->node());
+
+  ERROR_ON_MSG(approximate != "none",
+               "Approximates other than 'none' are not supported for GELU");
+
+  return createGelu(graph, {input});
+}
+
 } // namespace
 
 __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
@@ -158,6 +169,7 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::hardsigmoid, hardsigmoidHandler);
   registerHandler(c10::aten::hardswish, hardswishHandler);
   registerHandler(c10::aten::prelu, preluHandler);
+  registerHandler(c10::aten::gelu, geluHandler);
 }
 
 } // namespace poptorch

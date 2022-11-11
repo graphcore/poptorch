@@ -13,6 +13,8 @@
 
 #include "../PoptorchSymbols.hpp"
 
+#include <ATen/ATen.h>
+
 namespace poptorch {
 namespace {
 
@@ -142,6 +144,7 @@ torch::jit::Node *asStridedHandler(torch::jit::Graph * /*graph*/,
 torch::jit::Node *reshapeHandler(torch::jit::Graph *graph,
                                  torch::jit::Node *node) {
   // aten::view(Tensor(a) self, int[] size) -> (Tensor(a))
+  // aten::_unsafe_view(Tensor self, SymInt[] size) -> Tensor
   const std::vector<std::int64_t> new_shape = shapeFromTensor(node->output());
 
   // Reshape the tensor into that shape.
@@ -515,7 +518,7 @@ torch::jit::Node *col2imHandler(torch::jit::Graph *graph,
 
   torch::jit::Value *data = node->input(0);
   std::vector<int64_t> data_shape = shapeFromTensor(data);
-  ERROR_ON(data_shape.size() != 3);
+  ERROR_ON(data_shape.size() != 3 && data_shape.size() != 2);
 
   std::vector<std::int64_t> output_size =
       constantToLongVec(node->input(1)->node());
@@ -534,6 +537,14 @@ torch::jit::Node *col2imHandler(torch::jit::Graph *graph,
 
   std::vector<std::int64_t> stride = constantToLongVec(node->input(5)->node());
   ERROR_ON(stride.size() != 2);
+
+  // We can be given an unbatched input, with one less dimension -- just give it
+  // a dummy batch dim, to unify later processing.
+  const bool unbatched_input = data_shape.size() == 2;
+  if (unbatched_input) {
+    data = createUnsqueeze(graph, {data}, {0})->output();
+    data_shape.insert(data_shape.begin(), 1);
+  }
 
   // The batch and original channel ordering is unaffected by im2col so we can
   // reshape to factor them out.
@@ -564,9 +575,16 @@ torch::jit::Node *col2imHandler(torch::jit::Graph *graph,
       createScatterreduce(graph, {reshaped->output(), indices_tiled->output()},
                           output_size[0] * output_size[1], 2, 0);
 
-  return createReshape(
+  auto *res = createReshape(
       graph, scatter_reduced->output(),
       {data_shape[0], out_channels, output_size[0], output_size[1]});
+
+  // If our input was unbatched, remove the dummy batch dim we added earlier.
+  if (unbatched_input) {
+    res = createSqueeze(graph, {res->output()}, {0});
+  }
+
+  return res;
 }
 
 torch::jit::Node *transposeHandler(torch::jit::Graph *graph,
@@ -659,8 +677,10 @@ torch::jit::Node *splitChunkHandler(torch::jit::Graph *graph,
     // Chunk takes in the *number of chunks*. Canonicalise it to *size of
     // chunks*.
     auto chunk_dim = *dims[axis];
-    ERROR_ON(!split_size.has_value());
-    auto n_chunks = split_size.value();
+    ERROR_ON_MSG(!split_size.has_value(),
+                 "aten::chunk/aten::unsfe_chunk expect to receive "
+                 "a single split_size");
+    auto n_chunks = *split_size;
 
     // Integer division: (dim / n_chunks) with rounding up
     std::int64_t const slice_size = (chunk_dim + n_chunks - 1) / n_chunks;
@@ -756,7 +776,6 @@ torch::jit::Node *toHandler(torch::jit::Graph *graph, torch::jit::Node *node) {
   }
 
   if (!cast_to.has_value() || cast_to == *tensor_type->scalarType()) {
-    // NOOP
     if (cast_to.has_value() && cast_to == *tensor_type->scalarType()) {
       logging::trace("Ignoring type cast to same type, {}, {}", cast_to.value(),
                      *tensor_type->scalarType());
@@ -947,6 +966,7 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::expand, expandHandler);
   registerHandler(c10::aten::expand_as, expandAsHandler);
   registerHandler(c10::aten::view, reshapeHandler);
+  registerHandler(c10::aten::_unsafe_view, reshapeHandler);
   registerHandler(c10::aten::unsqueeze, reshapeHandler);
   registerHandler(c10::aten::flatten, flattenHandler);
   registerHandler(c10::aten::reshape, reshapeHandler);

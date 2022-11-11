@@ -30,8 +30,8 @@ poplar::Tensor reduceToScalar(poplar::Tensor &in, CompilerContext &context) {
 void mse_loss::lowerToPoplar(CompilerContext &context) {
   // aten::mse_loss(Tensor self, Tensor target, int reduction) -> Tensor
 
-  poplar::Tensor input = context.fromSsa(this->self());
-  poplar::Tensor target = context.fromSsa(this->target());
+  poplar::Tensor const input = context.fromSsa(this->self());
+  poplar::Tensor const target = context.fromSsa(this->target());
   const TorchReduction reduction = getTorchReduction(this->reduction());
 
   auto error_expr = pe::Sub(pe::_1, pe::_2);
@@ -59,25 +59,25 @@ void mse_loss_backward::lowerToPoplar(CompilerContext &context) {
   //      2            if Reduction is Sum or None
   //      2 / numel()  if Reduction is Mean
 
-  poplar::Tensor input = context.fromSsa(this->input());
-  poplar::Tensor target = context.fromSsa(this->target());
-  poplar::Tensor grad_output = context.fromSsa(this->grad_output());
+  poplar::Tensor const input = context.fromSsa(this->input());
+  poplar::Tensor const target = context.fromSsa(this->target());
+  poplar::Tensor const grad_output = context.fromSsa(this->grad_output());
   const TorchReduction reduction = getTorchReduction(this->reduction());
 
-  float alpha =
+  const float alpha =
       reduction == TorchReduction::MEAN ? 2.0f / input.numElements() : 2.0f;
   auto expr =
       pe::Mul(pe::Const(alpha), pe::Mul(pe::_3, pe::Sub(pe::_1, pe::_2)));
 
-  poplar::Tensor out = popops::map(context.graph, expr,
-                                   {input, target, grad_output}, context.seq);
+  poplar::Tensor const out = popops::map(
+      context.graph, expr, {input, target, grad_output}, context.seq);
 
   context.addTensor(result(), out);
 }
 
 poplar::Tensor maskTensor(CompilerContext &context, poplar::Tensor &tensor,
                           poplar::Tensor &target, const int ignore_index) {
-  poplar::Tensor ignore_index_tensor =
+  poplar::Tensor const ignore_index_tensor =
       createConstant(context, target.elementType(), {}, ignore_index);
 
   auto loss_mask_bool =
@@ -96,14 +96,14 @@ poplar::Tensor maskTensor(CompilerContext &context, poplar::Tensor &tensor,
 }
 
 void nll_loss::lowerToPoplar(CompilerContext &context) {
-  poplar::Tensor input = context.fromSsa(this->self());
+  poplar::Tensor const input = context.fromSsa(this->self());
   poplar::Tensor target = context.fromSsa(this->target());
   const int ignore_index = this->ignore_index();
   const TorchReduction reduction = getTorchReduction(this->reduction());
 
-  poplar::Tensor labels1d = target.flatten();
-  poplar::Tensor probs2d = input.flatten(0, input.rank() - 1);
-  poplar::Tensor onehot = context.graph.clone(probs2d);
+  poplar::Tensor const labels1d = target.flatten();
+  poplar::Tensor const probs2d = input.flatten(0, input.rank() - 1);
+  poplar::Tensor const onehot = context.graph.clone(probs2d);
   popops::encodeOneHot(context.graph, labels1d, onehot, context.seq);
 
   popops::mapInPlace(context.graph, popops::expr::BinaryOpType::MULTIPLY,
@@ -126,13 +126,6 @@ void nll_loss::lowerToPoplar(CompilerContext &context) {
     out = popops::reduce(context.graph, out, {0}, {popops::Operation::ADD},
                          context.seq);
     if (reduction == TorchReduction::MEAN) {
-      if (ignore_index >= 0) {
-        // Prevent dividing by zero
-        popops::mapInPlace(
-            context.graph, popops::expr::BinaryOpType::MAXIMUM, total_elements,
-            createConstant(context, input.elementType(), {}, 1), context.seq);
-      }
-
       popops::mapInPlace(context.graph, popops::expr::BinaryOpType::DIVIDE, out,
                          total_elements, context.seq);
     }
@@ -149,15 +142,15 @@ void nll_loss::lowerToPoplar(CompilerContext &context) {
 }
 
 void nll_loss_backward::lowerToPoplar(CompilerContext &context) {
-  poplar::Tensor input = context.fromSsa(this->self());
-  poplar::Tensor target = context.fromSsa(this->target());
+  poplar::Tensor const input = context.fromSsa(this->self());
+  poplar::Tensor const target = context.fromSsa(this->target());
   poplar::Tensor grad_output = context.fromSsa(this->grad_output());
   const int ignore_index = this->ignore_index();
   const TorchReduction reduction = getTorchReduction(this->reduction());
 
   poplar::Tensor labels1d = target.flatten();
-  poplar::Tensor probs2d = input.flatten(0, input.rank() - 1);
-  poplar::Tensor onehot = context.graph.clone(probs2d);
+  poplar::Tensor const probs2d = input.flatten(0, input.rank() - 1);
+  poplar::Tensor const onehot = context.graph.clone(probs2d);
   popops::encodeOneHot(context.graph, labels1d, onehot, context.seq);
   popops::mapInPlace(context.graph, pe::UnaryOpType::NEGATE, onehot,
                      context.seq);
@@ -201,15 +194,17 @@ poplar::Tensor bce(CompilerContext &context, poplar::Tensor &pred,
   if (pred.elementType() == poplar::HALF) {
     eps_f = 6.104e-05;
   }
-  poplar::Tensor eps = createConstant(context, pred.elementType(), {}, eps_f);
-  poplar::Tensor one = createConstant(context, pred.elementType(), {}, 1.0f);
+  poplar::Tensor const eps =
+      createConstant(context, pred.elementType(), {}, eps_f);
+  poplar::Tensor const one =
+      createConstant(context, pred.elementType(), {}, 1.0f);
 
   // log_prob
-  poplar::Tensor log_prob =
+  poplar::Tensor const log_prob =
       popops::map(context.graph, pe::Log(pe::Max(pe::_1, pe::_2)), {pred, eps},
                   context.seq);
   // log(1-prob)
-  poplar::Tensor inverse_log_prob = popops::map(
+  poplar::Tensor const inverse_log_prob = popops::map(
       context.graph, pe::Log(pe::Max(pe::Sub(pe::_3, pe::_1), pe::_2)),
       {pred, eps, one}, context.seq);
   poplar::Tensor out =
@@ -234,7 +229,7 @@ void binary_cross_entropy::lowerToPoplar(CompilerContext &context) {
   if (reduction != TorchReduction::NONE) {
     out = reduceToScalar(out, context);
     if (reduction == TorchReduction::MEAN) {
-      poplar::Tensor total_elements =
+      poplar::Tensor const total_elements =
           createConstant(context, input.elementType(), {}, input.numElements());
       popops::mapInPlace(context.graph, popops::expr::BinaryOpType::DIVIDE, out,
                          total_elements, context.seq);
@@ -247,22 +242,23 @@ void binary_cross_entropy::lowerToPoplar(CompilerContext &context) {
 }
 
 void binary_cross_entropy_backward::lowerToPoplar(CompilerContext &context) {
-  poplar::Tensor input = context.fromSsa(this->self());
-  poplar::Tensor target = context.fromSsa(this->target());
-  poplar::Tensor grad_output = context.fromSsa(this->grad_output());
+  poplar::Tensor const input = context.fromSsa(this->self());
+  poplar::Tensor const target = context.fromSsa(this->target());
+  poplar::Tensor const grad_output = context.fromSsa(this->grad_output());
   const TorchReduction reduction = getTorchReduction(this->reduction());
-  poplar::Tensor one = createConstant(context, input.elementType(), {1}, 1.0f);
+  poplar::Tensor const one =
+      createConstant(context, input.elementType(), {1}, 1.0f);
 
-  poplar::Tensor first_term =
+  poplar::Tensor const first_term =
       popops::map(context.graph, popops::expr::BinaryOpType::DIVIDE, target,
                   input, context.seq);
 
-  poplar::Tensor second_term =
+  poplar::Tensor const second_term =
       popops::map(context.graph,
                   pe::Divide(pe::Sub(pe::_1, pe::_3), pe::Sub(pe::_3, pe::_2)),
                   {target, input, one}, context.seq);
 
-  poplar::Tensor grad =
+  poplar::Tensor const grad =
       popops::map(context.graph, pe::Neg(pe::Add(pe::_1, pe::_2)),
                   {first_term, second_term}, context.seq);
 
@@ -307,14 +303,14 @@ void binary_cross_entropy_with_logits::lowerToPoplar(CompilerContext &context) {
 
 void binary_cross_entropy_with_logits_backward::lowerToPoplar(
     CompilerContext &context) {
-  poplar::Tensor input = context.fromSsa(this->self());
-  poplar::Tensor target = context.fromSsa(this->target());
-  poplar::Tensor grad_output = context.fromSsa(this->grad_output());
+  poplar::Tensor const input = context.fromSsa(this->self());
+  poplar::Tensor const target = context.fromSsa(this->target());
+  poplar::Tensor const grad_output = context.fromSsa(this->grad_output());
   const TorchReduction reduction = getTorchReduction(this->reduction());
-  poplar::Tensor prob = popnn::nonLinearity(
+  poplar::Tensor const prob = popnn::nonLinearity(
       context.graph, popnn::NonLinearityType::SIGMOID, input, context.seq);
 
-  poplar::Tensor grad =
+  poplar::Tensor const grad =
       popops::map(context.graph, popops::expr::BinaryOpType::SUBTRACT, prob,
                   target, context.seq);
   if (reduction == TorchReduction::MEAN) {

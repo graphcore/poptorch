@@ -132,9 +132,12 @@ computeMeanAndVariance(CompilerContext &context,
 }
 
 void reducemean::lowerToPoplar(CompilerContext &context) {
-  poplar::Tensor in = context.fromSsa(this->input());
+  poplar::Tensor const in = context.fromSsa(this->input());
 
-  std::vector<std::size_t> dims = convertIntArray<std::size_t>(this->axes());
+  const std::optional<std::vector<std::size_t>> maybe_dims =
+      convertOptionalIntArray<std::size_t>(this->axes());
+  const std::vector<std::size_t> dims =
+      maybe_dims.value_or(std::vector<std::size_t>{});
 
   const auto out_type = CompilerContext::poplarTypeOf(
       this->result().getType().cast<mlir::RankedTensorType>().getElementType());
@@ -158,7 +161,7 @@ void reducemean::lowerToPoplar(CompilerContext &context) {
 }
 
 void std_correction::lowerToPoplar(CompilerContext &context) {
-  poplar::Tensor in = context.fromSsa(this->self());
+  poplar::Tensor const in = context.fromSsa(this->self());
 
   const auto out_tensor_type =
       this->result().getType().cast<mlir::RankedTensorType>();
@@ -166,7 +169,7 @@ void std_correction::lowerToPoplar(CompilerContext &context) {
   const std::vector<std::size_t> out_shape{out_shape_llvm.begin(),
                                            out_shape_llvm.end()};
 
-  std::vector<std::size_t> dims =
+  const std::vector<std::size_t> dims =
       convertIntArray<std::size_t>(this->dim().getValue());
 
   auto var_output = computeMeanAndVariance(context, dims, in,
@@ -184,7 +187,7 @@ void std_correction::lowerToPoplar(CompilerContext &context) {
   context.addTensor(this->result(), var_output.variance);
 }
 void var_correction::lowerToPoplar(CompilerContext &context) {
-  poplar::Tensor in = context.fromSsa(this->self());
+  poplar::Tensor const in = context.fromSsa(this->self());
 
   const auto out_tensor_type =
       this->result().getType().cast<mlir::RankedTensorType>();
@@ -192,7 +195,7 @@ void var_correction::lowerToPoplar(CompilerContext &context) {
   const std::vector<std::size_t> out_shape{out_shape_llvm.begin(),
                                            out_shape_llvm.end()};
 
-  std::vector<std::size_t> dims =
+  const std::vector<std::size_t> dims =
       convertIntArray<std::size_t>(this->dim().getValue());
 
   auto var_output = computeMeanAndVariance(context, dims, in,
@@ -205,7 +208,7 @@ void var_correction::lowerToPoplar(CompilerContext &context) {
   context.addTensor(this->result(), var_output.variance);
 }
 void std_mean_correction::lowerToPoplar(CompilerContext &context) {
-  poplar::Tensor in = context.fromSsa(this->self());
+  poplar::Tensor const in = context.fromSsa(this->self());
 
   const auto out_tensor_type =
       this->result().getType().cast<mlir::RankedTensorType>();
@@ -213,7 +216,7 @@ void std_mean_correction::lowerToPoplar(CompilerContext &context) {
   const std::vector<std::size_t> out_shape{out_shape_llvm.begin(),
                                            out_shape_llvm.end()};
 
-  std::vector<std::size_t> dims =
+  const std::vector<std::size_t> dims =
       convertIntArray<std::size_t>(this->dim().getValue());
 
   auto var_output = computeMeanAndVariance(context, dims, in,
@@ -233,7 +236,7 @@ void std_mean_correction::lowerToPoplar(CompilerContext &context) {
   context.addTensor(this->mean(), var_output.mean);
 }
 void var_mean_correction::lowerToPoplar(CompilerContext &context) {
-  poplar::Tensor in = context.fromSsa(this->self());
+  poplar::Tensor const in = context.fromSsa(this->self());
 
   const auto out_tensor_type =
       this->result().getType().cast<mlir::RankedTensorType>();
@@ -241,7 +244,7 @@ void var_mean_correction::lowerToPoplar(CompilerContext &context) {
   const std::vector<std::size_t> out_shape{out_shape_llvm.begin(),
                                            out_shape_llvm.end()};
 
-  std::vector<std::size_t> dims =
+  const std::vector<std::size_t> dims =
       convertIntArray<std::size_t>(this->dim().getValue());
 
   auto var_output = computeMeanAndVariance(context, dims, in,
@@ -257,12 +260,15 @@ void var_mean_correction::lowerToPoplar(CompilerContext &context) {
 }
 
 void reducesum::lowerToPoplar(CompilerContext &context) {
-  poplar::Tensor in = context.fromSsa(this->input());
+  poplar::Tensor const in = context.fromSsa(this->input());
 
   const auto out_type = CompilerContext::poplarTypeOf(
       this->result().getType().cast<mlir::RankedTensorType>().getElementType());
 
-  std::vector<std::size_t> dims = convertIntArray<std::size_t>(this->axes());
+  const std::optional<std::vector<std::size_t>> maybe_dims =
+      convertOptionalIntArray<std::size_t>(this->axes());
+  const std::vector<std::size_t> dims =
+      maybe_dims.value_or(std::vector<std::size_t>{});
 
   auto output_tensor = reduceWithCasts(context, dims, in, out_type,
                                        popops::Operation::ADD, out_type);
@@ -274,7 +280,7 @@ void reducesum::lowerToPoplar(CompilerContext &context) {
 }
 
 void prod::lowerToPoplar(CompilerContext &context) {
-  poplar::Tensor in = context.fromSsa(this->input());
+  poplar::Tensor const in = context.fromSsa(this->input());
 
   const auto out_type = CompilerContext::poplarTypeOf(
       this->result().getType().cast<mlir::RankedTensorType>().getElementType());
@@ -289,12 +295,12 @@ void prod::lowerToPoplar(CompilerContext &context) {
 }
 
 void prod_dim::lowerToPoplar(CompilerContext &context) {
-  poplar::Tensor in = context.fromSsa(this->input());
+  poplar::Tensor const in = context.fromSsa(this->input());
 
   const auto out_type = CompilerContext::poplarTypeOf(
       this->result().getType().cast<mlir::RankedTensorType>().getElementType());
 
-  std::vector<std::size_t> dims{this->dim()};
+  const std::vector<std::size_t> dims{this->dim()};
 
   auto output_tensor = reduceWithCasts(context, dims, in, out_type,
                                        popops::Operation::MUL, out_type);
@@ -306,7 +312,7 @@ void prod_dim::lowerToPoplar(CompilerContext &context) {
 }
 
 void all::lowerToPoplar(CompilerContext &context) {
-  poplar::Tensor in = context.fromSsa(this->input());
+  poplar::Tensor const in = context.fromSsa(this->input());
 
   const auto out_type = CompilerContext::poplarTypeOf(
       this->result().getType().cast<mlir::RankedTensorType>().getElementType());
@@ -322,12 +328,12 @@ void all::lowerToPoplar(CompilerContext &context) {
 }
 
 void all_out::lowerToPoplar(CompilerContext &context) {
-  poplar::Tensor in = context.fromSsa(this->input());
+  poplar::Tensor const in = context.fromSsa(this->input());
 
   const auto out_type = CompilerContext::poplarTypeOf(
       this->result().getType().cast<mlir::RankedTensorType>().getElementType());
 
-  std::vector<std::size_t> dims{this->dim()};
+  const std::vector<std::size_t> dims{this->dim()};
 
   auto output_tensor =
       reduceWithCasts(context, dims, in, poplar::BOOL,
@@ -340,7 +346,7 @@ void all_out::lowerToPoplar(CompilerContext &context) {
 }
 
 void any::lowerToPoplar(CompilerContext &context) {
-  poplar::Tensor in = context.fromSsa(this->input());
+  poplar::Tensor const in = context.fromSsa(this->input());
 
   const auto out_type = CompilerContext::poplarTypeOf(
       this->result().getType().cast<mlir::RankedTensorType>().getElementType());
@@ -355,12 +361,12 @@ void any::lowerToPoplar(CompilerContext &context) {
 }
 
 void any_out::lowerToPoplar(CompilerContext &context) {
-  poplar::Tensor in = context.fromSsa(this->input());
+  poplar::Tensor const in = context.fromSsa(this->input());
 
   const auto out_type = CompilerContext::poplarTypeOf(
       this->result().getType().cast<mlir::RankedTensorType>().getElementType());
 
-  std::vector<std::size_t> dims{this->dim()};
+  const std::vector<std::size_t> dims{this->dim()};
 
   auto output_tensor = reduceWithCasts(context, dims, in, poplar::BOOL,
                                        popops::Operation::LOGICAL_OR, out_type);
@@ -386,7 +392,7 @@ void any_out::lowerToPoplar(CompilerContext &context) {
 // Note: this isn't the quickest algorithm for performing a prefix sum on the
 // ipu it is however easy to implement
 void cumsum_out::lowerToPoplar(CompilerContext &context) {
-  poplar::Tensor in = context.fromSsa(this->input());
+  poplar::Tensor const in = context.fromSsa(this->input());
 
   const auto in_shape = in.shape();
 
@@ -444,12 +450,12 @@ void cumsum_out::lowerToPoplar(CompilerContext &context) {
   const auto ones =
       createConstant(context, to_convolve.elementType(), ones_shape, 1);
 
-  poplin::ConvParams params(to_convolve.elementType() /*input type*/,
-                            to_convolve.dim(0) /*batch_size*/,
-                            {to_convolve.dim(2)} /*input field shape*/,
-                            {ones_shape.back()} /*kernel shape*/,
-                            1 /*input channels per group*/,
-                            1 /*output channels per group*/, 1 /*groups*/);
+  poplin::ConvParams const params(
+      to_convolve.elementType() /*input type*/,
+      to_convolve.dim(0) /*batch_size*/,
+      {to_convolve.dim(2)} /*input field shape*/,
+      {ones_shape.back()} /*kernel shape*/, 1 /*input channels per group*/,
+      1 /*output channels per group*/, 1 /*groups*/);
   const auto convolved = poplin::convolution(context.graph, to_convolve, ones,
                                              params, false, context.seq);
 

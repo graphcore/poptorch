@@ -30,7 +30,7 @@ std::unordered_map<c10::Symbol, SymbolHandler> &symbolHandlers() {
 
 bool registerHandler(c10::Symbol symbol, const SymbolHandler &handler) {
   logging::trace("Registering handler for symbol {}", symbol.toDisplayString());
-  bool new_handler = symbolHandlers().emplace(symbol, handler).second;
+  const bool new_handler = symbolHandlers().emplace(symbol, handler).second;
   ERROR_ON_MSG(!new_handler, "Symbol " << symbol.toDisplayString()
                                        << " already has a handler registered");
   return new_handler;
@@ -109,14 +109,15 @@ intVectorToIrConstant(torch::jit::Graph *graph,
 torch::jit::Value *shapeFromTensorAsIR(torch::jit::Graph *graph,
                                        torch::jit::Value *value) {
   // Extract the type from the pytorch IR.
-  std::vector<std::int64_t> shape = shapeFromTensor(value);
+  const std::vector<std::int64_t> shape = shapeFromTensor(value);
   return intVectorToIrConstant(graph, shape);
 }
 
 // Get the scalar type of a given tensor.
 at::ScalarType getNodeScalarType(const torch::jit::Value *tensor) {
   // The returned value must be a tensor.
-  c10::TensorTypePtr return_tensor = tensor->type()->expect<c10::TensorType>();
+  c10::TensorTypePtr const return_tensor =
+      tensor->type()->expect<c10::TensorType>();
 
   // Deduce the type from the scalar type on the return.
   return *return_tensor->scalarType();
@@ -140,14 +141,14 @@ bool isNone(torch::jit::Node *node) {
 }
 
 bool isNone(const torch::jit::Value *value) {
-  return (value->type()->cast<c10::NoneType>() != nullptr);
+  return value->type()->cast<c10::NoneType>();
 }
 
 std::int64_t handleDimensionParam(torch::jit::Value *value,
                                   const c10::TensorTypePtr &as_tensor) {
   // Extract the dim.
   std::int64_t dim = constantToLong(value->node());
-  c10::VaryingShape dims = as_tensor->sizes();
+  c10::VaryingShape const dims = as_tensor->sizes();
 
   // If dim is less than zero subtract it to get the actual dimension.
   if (dim < 0) {
@@ -243,7 +244,7 @@ std::int64_t constantToLong(torch::jit::Node *node) {
   }
   ERROR_ON(!node->output()->type()->isSubtypeOf(c10::NumberType::get()));
   auto s = torch::jit::constant_as<at::Scalar>(node->output());
-  std::int64_t val = s->toLong();
+  std::int64_t const val = s->toLong();
 
   if (val == INT_MAX) {
     return LONG_MAX;
@@ -375,8 +376,8 @@ void replaceOutputUse(torch::jit::Node *oldNode, torch::jit::Node *new_node,
 std::vector<std::int64_t>
 reduceHelperDimensionCreator(torch::jit::Value *value) {
   // Extract the type from the pytorch IR.
-  c10::TensorTypePtr as_tensor = value->type()->expect<c10::TensorType>();
-  c10::VaryingShape dims = as_tensor->sizes();
+  c10::TensorTypePtr const as_tensor = value->type()->expect<c10::TensorType>();
+  c10::VaryingShape const dims = as_tensor->sizes();
 
   // Convert that IR type into a C++ vector of ints.
   std::vector<std::int64_t> shape;

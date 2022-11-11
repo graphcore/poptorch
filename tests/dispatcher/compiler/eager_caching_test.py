@@ -52,7 +52,7 @@ def harness(fn: Callable[[torch.Tensor, Callable[[], None]], torch.Tensor],
             graph_hash = matches[0]
             checkpoints.append(Checkpoint(graph_hash, log))
 
-    ipu_y = fn(x.to("xla"), checkpoint)
+    ipu_y = fn(x.to("ipu"), checkpoint)
 
     helpers.assert_allclose(actual=ipu_y.to("cpu"),
                             expected=cpu_y,
@@ -138,19 +138,19 @@ def test_lazy_tensor(capfd):
     def f(x):
         return x**2 + 5
 
-    f(x.to("xla")).to("cpu")
+    f(x.to("ipu")).to("cpu")
     log = helpers.LogChecker(capfd)
     graph_hash_1, = log.findall(r"Graph hash is ([0-9]+)")
     log.assert_contains("compiling new PopIT function")
 
     # Different shapes will cause recompilation
-    f(x[4:].to("xla")).to("cpu")
+    f(x[4:].to("ipu")).to("cpu")
     log = helpers.LogChecker(capfd)
     graph_hash_2, = log.findall(r"Graph hash is ([0-9]+)")
     log.assert_contains("compiling new PopIT function")
 
     # But the same shapes and dtypes will allow function reuse
-    f(x.to("xla")).to("cpu")
+    f(x.to("ipu")).to("cpu")
     log = helpers.LogChecker(capfd)
     graph_hash_3, = log.findall(r"Graph hash is ([0-9]+)")
     log.assert_contains("reusing PopIT function")
@@ -166,7 +166,7 @@ def test_argument_lookup():
     import poptorch.eager as poptorch  # pylint: disable=unused-import, import-outside-toplevel
     poptorch.eager_options.use_lazy_tensor = True
 
-    input = (torch.zeros(2, 3, 5).to('xla'), torch.zeros(2, 3, 5).to('xla'))
+    input = (torch.zeros(2, 3, 5).to('ipu'), torch.zeros(2, 3, 5).to('ipu'))
     poptorch.markStep()
 
     res = torch.add(*input)

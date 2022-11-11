@@ -61,7 +61,7 @@ def test_optimizer(optim):
 
     cpu_model = copy.deepcopy(model)
 
-    model.to("xla")
+    model.to("ipu")
 
     # Embed optimiser in a list to allow construction within first training step
     cpu_optim = optim(cpu_model.parameters(), lr=0.1)
@@ -76,7 +76,7 @@ def test_optimizer(optim):
         label = torch.randint(0, C, [N])
 
         training_step(cpu_model, cpu_optim, t, label)
-        ipu_training_step(model, ipu_optim, t.to("xla"), label.int().to("xla"))
+        ipu_training_step(model, ipu_optim, t.to("ipu"), label.int().to("ipu"))
 
         ipu_params_cpu = [param.cpu() for param in model.parameters()]
 

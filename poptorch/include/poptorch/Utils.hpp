@@ -67,7 +67,7 @@ public:
   ListTypeWithNumElements(c10::TypePtr elem_type, size_t num_elements)
       : SingleElementType(std::move(elem_type)), _num_elements(num_elements) {}
 
-  bool operator==(const Type &rhs) const override {
+  bool equals(const Type &rhs) const override {
     if (auto rhs_cast = rhs.cast<ListTypeWithNumElements>()) {
       return numElements() == rhs_cast->numElements();
     }

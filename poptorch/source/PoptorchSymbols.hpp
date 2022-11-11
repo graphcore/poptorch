@@ -4,44 +4,12 @@
 #include <ATen/core/interned_strings.h>
 #include <torch/csrc/jit/ir/ir.h>
 
-// Create all the C10 symbols.
-// For some reason the below symbols are missing from the c10 namespace.
+// Create missing C10 symbols.
+// PyTorch initialises aten Symbols from native_functions.yml (see
+// `aten_interned_strings.h`, and `gen_interned_strings` in torchgen). However,
+// not all the aten Symbols we need are present in native_functions.yml.
 namespace c10::aten {
-extern c10::Symbol floor_divide;                // NOLINT
-extern c10::Symbol prelu_;                      // NOLINT
-extern c10::Symbol leaky_relu_;                 // NOLINT
-extern c10::Symbol elu_;                        // NOLINT
-extern c10::Symbol selu_;                       // NOLINT
-extern c10::Symbol isinf;                       // NOLINT
-extern c10::Symbol uniform_;                    // NOLINT
-extern c10::Symbol random_;                     // NOLINT
-extern c10::Symbol normal_;                     // NOLINT
-extern c10::Symbol exponential_;                // NOLINT
-extern c10::Symbol where_;                      // NOLINT
-extern c10::Symbol poisson_nll_loss;            // NOLINT
 extern c10::Symbol multilabel_soft_margin_loss; // NOLINT
-extern c10::Symbol bernoulli_;                  // NOLINT
-extern c10::Symbol clamp_min_;                  // NOLINT
-extern c10::Symbol clamp_max_;                  // NOLINT
-extern c10::Symbol one_hot;                     // NOLINT
-extern c10::Symbol pow_;                        // NOLINT
-extern c10::Symbol scatter_add_;                // NOLINT
-extern c10::Symbol feature_dropout_;            // NOLINT
-extern c10::Symbol roll;                        // NOLINT
-extern c10::Symbol nll_loss_nd;                 // NOLINT
-extern c10::Symbol cross_entropy_loss;          // NOLINT
-extern c10::Symbol new_ones;                    // NOLINT
-extern c10::Symbol new_zeros;                   // NOLINT
-extern c10::Symbol new_full;                    // NOLINT
-extern c10::Symbol numpy_T;                     // NOLINT
-extern c10::Symbol col2im;                      // NOLINT
-extern c10::Symbol im2col;                      // NOLINT
-extern c10::Symbol _reshape_alias;              // NOLINT
-extern c10::Symbol argsort;                     // NOLINT
-extern c10::Symbol minimum;                     // NOLINT
-extern c10::Symbol maximum;                     // NOLINT
-extern c10::Symbol native_group_norm;           // NOLINT
-extern c10::Symbol native_layer_norm;           // NOLINT
 
 } // namespace c10::aten
 

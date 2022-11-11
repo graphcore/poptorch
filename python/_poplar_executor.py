@@ -48,7 +48,7 @@ class _SetDefaultDeviceType:
                     logger.warning(
                         "No device set in torch.%s(): forcing to IPU",
                         f.__name__)
-                    kwargs["device"] = "xla"
+                    kwargs["device"] = "ipu"
                 return f(*args, **kwargs)
 
             return _wrapper
@@ -73,7 +73,7 @@ class _SetDefaultDeviceType:
                     logger.warning(
                         "No device set in torch.%s(): forcing to IPU",
                         f.__name__)
-                    kwargs["device"] = "xla"
+                    kwargs["device"] = "ipu"
                 return f(*args, **kwargs)
 
             return _wrapper
@@ -261,6 +261,7 @@ class PoplarExecutor:
                     return attribute
 
                 def state_dict(self,
+                               *args,
                                destination=None,
                                prefix="",
                                keep_vars=False):
@@ -271,7 +272,7 @@ class PoplarExecutor:
                     environment where PopTorch is not installed.
                     """
                     out = collections.OrderedDict()
-                    for k, v in super().state_dict(destination, prefix,
+                    for k, v in super().state_dict(*args, destination, prefix,
                                                    keep_vars).items():
                         # If the object is wrapped then the shallow copy will
                         # call _impl._pickleUnwrapObject and the new object will be in
@@ -668,7 +669,7 @@ class PoplarExecutor:
                             param_tensor = param.narrow(0, 0, 1).squeeze(dim=0)
                             setattr(*self._get_module_and_name(name),
                                     torch.nn.Parameter(param_tensor))
-                d = torch.device("xla:0")
+                d = torch.device("ipu:0")
                 poptorch_core.startParametersMove()
                 self._model.to(d)
                 poptorch_core.endParametersMove()
@@ -774,7 +775,7 @@ class PoplarExecutor:
                             "within the model as an alternative, and return "
                             "gradients as outputs to your model, if required.")
 
-                d = torch.device("xla:0")
+                d = torch.device("ipu:0")
                 # Move all the inputs to the IPU
                 tensor_args = [t.to(d) for t in tensor_args]
                 # Re-inject moved tensors in args and kwargs:

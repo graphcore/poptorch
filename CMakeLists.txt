@@ -27,7 +27,7 @@ if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
 endif()
 
 # Note: The next line is also parsed by scripts/utils/_utils.py
-set(TORCH_VERSION 1.10.0)
+set(TORCH_VERSION 1.13.0)
 
 # Convert to cmake list
 string(REPLACE "." ";" TORCH_VERSION_AS_LIST ${TORCH_VERSION})

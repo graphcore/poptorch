@@ -1,5 +1,6 @@
 // Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 
+#include <ATen/ATen.h>
 #include <torch/csrc/jit/ir/ir.h>
 #include <torch/csrc/jit/passes/dead_code_elimination.h>
 
@@ -153,7 +154,9 @@ void handleNumberConstant(torch::jit::Graph *graph, torch::jit::Node *n) {
         at::native::scalar_tensor(*torch::jit::constant_as<bool>(n->output()),
                                   at::kInt, c10::nullopt, at::kCPU));
   } else {
-    auto s = *torch::jit::constant_as<at::Scalar>(n->output());
+    auto so = torch::jit::constant_as<at::Scalar>(n->output());
+    ERROR_ON(!so.has_value());
+    auto s = *so;
 
     c10::ScalarType dtype;
     if (s.isFloatingPoint()) {

@@ -1,6 +1,7 @@
 // Copyright (c) 2021 Graphcore Ltd. All rights reserved.
 #include <limits>
 
+#include <popops/Cast.hpp>
 #include <popops/ElementWise.hpp>
 #include <popops/Expr.hpp>
 #include <popops/ExprOp.hpp>
@@ -82,20 +83,24 @@ void logicalXor::lowerToPoplar(CompilerContext &context) {
 }
 
 void floor_divide::lowerToPoplar(poptorch_ir::CompilerContext &context) {
-  poplar::Tensor const input1 = context.fromSsa(this->in1());
-  poplar::Tensor const input2 = context.fromSsa(this->in2());
+  poplar::Tensor input1 = context.fromSsa(this->in1());
+  poplar::Tensor input2 = context.fromSsa(this->in2());
 
   assert(input1.elementType().isFloatingPoint() ==
          input2.elementType().isFloatingPoint());
 
-  if (input1.elementType().isFloatingPoint()) {
-    auto out = popops::map(context.graph, pe::Trunc(pe::_1 / pe::_2),
-                           {input1, input2}, context.seq);
-    context.addTensor(this->result(), out);
-  } else {
-    auto out = popops::div(context.graph, input1, input2, context.seq);
-    context.addTensor(this->result(), out);
+  auto original_type = input1.elementType();
+  if (!input1.elementType().isFloatingPoint()) {
+    input1 = popops::cast(context.graph, input1, poplar::FLOAT, context.seq);
+    input2 = popops::cast(context.graph, input2, poplar::FLOAT, context.seq);
   }
+  auto out = popops::map(context.graph, pe::Floor(pe::_1 / pe::_2),
+                         {input1, input2}, context.seq);
+  if (!original_type.isFloatingPoint()) {
+    out = popops::cast(context.graph, out, original_type, context.seq);
+  }
+
+  context.addTensor(this->result(), out);
 }
 
 void remainder::lowerToPoplar(CompilerContext &context) {

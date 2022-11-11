@@ -11,16 +11,12 @@ scipy==1.5.4
 setuptools==58.0.4
 sphinx==3.3.1
 sphinx_rtd_theme==0.5.0
-torch==1.10.0+cpu; sys_platform != "darwin" and platform_machine != "aarch64"
-torch==1.10.0; sys_platform == "darwin" or platform_machine == "aarch64"
-torchvision==0.11.1+cpu; sys_platform != "darwin" and platform_machine != "aarch64"
-torchvision==0.11.1; sys_platform == "darwin" or platform_machine == "aarch64"
+torch==1.13.0+cpu; sys_platform != "darwin" and platform_machine != "aarch64"
+torch==1.13.0; sys_platform == "darwin" or platform_machine == "aarch64"
+torchvision==0.14.0+cpu; sys_platform != "darwin" and platform_machine != "aarch64"
+torchvision==0.14.0; sys_platform == "darwin" or platform_machine == "aarch64"
 tqdm==4.46.1
 transformers==4.12.2
 typing-extensions==4.1.1
 # Use old version for wheel.pep425tags support (new versions removed it).
 wheel<0.35
-
-# Add torch-scatter used in PyTorch Geometric
---find-links https://data.pyg.org/whl/torch-1.10.0+cpu.html
-torch-scatter==2.0.9

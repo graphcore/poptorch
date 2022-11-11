@@ -41,9 +41,8 @@ std::shared_ptr<IpuTensorDetails>
 getTensorDetails(const at::TensorImpl &ipu_tensor);
 
 // This is just a useful helper since sometimes we need to pass both keys in.
-// TODO(T59880): replace XLA -> IPU
-c10::DispatchKeySet dispatch_key_set{c10::DispatchKey::XLA,
-                                     c10::DispatchKey::AutogradXLA};
+c10::DispatchKeySet dispatch_key_set{c10::DispatchKey::IPU,
+                                     c10::DispatchKey::AutogradIPU};
 
 } // namespace
 
@@ -111,8 +110,7 @@ struct IpuTensorImpl : public at::TensorImpl {
     }
 
     set_storage_access_should_throw();
-    set_has_contiguity_policy(
-        at::TensorImpl::HasContiguityPolicy::CustomBehavior);
+    set_custom_sizes_strides(at::TensorImpl::SizesStridesPolicy::Default);
     is_non_overlapping_and_dense_ = false;
     refresh_numel();
   }
@@ -143,11 +141,6 @@ struct IpuTensorImpl : public at::TensorImpl {
     impl->refresh_numel();
 
     return impl;
-  }
-
-  bool is_contiguous_custom(c10::MemoryFormat memory_format) const override {
-    UNUSED(memory_format);
-    return true;
   }
 
   void set_size(int64_t dim, int64_t new_size) override {
@@ -203,8 +196,7 @@ getTensorDetails(const at::TensorImpl &ipu_tensor) {
 
 // TODO(T61601) Create a proper implementation of GuardImpl
 struct GuardImpl : public c10::impl::DeviceGuardImplInterface {
-  // TODO(T59880): replace XLA -> IPU
-  at::DeviceType type() const override { return at::DeviceType::XLA; }
+  at::DeviceType type() const override { return at::DeviceType::IPU; }
 
   c10::Device exchangeDevice(c10::Device device) const override {
     logging::trace("exchangeDevice: current {} new {}", _current_device,
@@ -247,12 +239,10 @@ struct GuardImpl : public c10::impl::DeviceGuardImplInterface {
   c10::DeviceIndex deviceCount() const noexcept override { return 1; }
 
 private:
-  // TODO(T59880): replace XLA -> IPU
-  c10::Device _current_device{at::DeviceType::XLA, 0};
+  c10::Device _current_device{at::DeviceType::IPU, 0};
 };
 
-// TODO(T59880): replace XLA -> IPU
-C10_REGISTER_GUARD_IMPL(XLA, GuardImpl)
+C10_REGISTER_GUARD_IMPL(IPU, GuardImpl)
 
 poptorch_ir::TensorType getTensorType(const at::ScalarType &scalar_type,
                                       std::vector<std::int64_t> sizes) {
@@ -287,7 +277,7 @@ std::string str(const at::Tensor &tensor) {
   } else {
     auto device_type = tensor.unsafeGetTensorImpl()->device_type();
     ss << " type " << device_type;
-    if (device_type == at::DeviceType::XLA) {
+    if (device_type == at::DeviceType::IPU) {
       auto *ipu_tensor = toIpuTensorImpl(tensor);
       ss << " ID " << ipu_tensor->details->tensor_id;
     }
@@ -362,8 +352,13 @@ at::Tensor TensorStore::allocateTensor(c10::IntArrayRef size,
       c10::scalarTypeToTypeMeta(coerced_scalar_type),
       deviceOrDefaultIpu(device), size, strides, std::move(details));
 
-  // TODO(T59880): replace XLA -> IPU
-  ERROR_ON(output.device().type() != c10::DeviceType::XLA);
+  for (size_t dim = 0; dim < size.size(); ++dim) {
+    ERROR_ON_MSG(size.at(dim) < 0, "Invalid tensor shape: dimension "
+                                       << dim << " is negative ("
+                                       << size.at(dim) << ")");
+  }
+
+  ERROR_ON(output.device().type() != c10::DeviceType::IPU);
 
   logging::trace(
       "Created IPU tensor: id {} impl_ {} size {} strides {} dtype {}",
@@ -444,8 +439,8 @@ void TensorStore::enableEagerMode(bool headless) {
 }
 
 void TensorStore::reset() { _ipu_session = nullptr; }
-std::shared_ptr<IpuTensorDetails>
 
+std::shared_ptr<IpuTensorDetails>
 getTensorDetails(const at::Tensor &ipu_tensor) {
   return getTensorDetails(*ipu_tensor.unsafeGetTensorImpl());
 }

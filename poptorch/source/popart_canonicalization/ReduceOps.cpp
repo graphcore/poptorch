@@ -10,6 +10,8 @@
 #include "../PoptorchSymbols.hpp"
 #include "poptorch/Utils.hpp"
 
+#include <ATen/ATen.h>
+
 namespace poptorch {
 namespace {
 

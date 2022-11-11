@@ -2,7 +2,7 @@
 
 class Poptorch_IdentityOp<string mnemonic, list<Trait> traits = []> : Poptorch_AbstractOp<mnemonic, traits # [ViewOp]> {
   let arguments = (ins Poptorch_tensor:$input);
-  let results = (outs Poptorch_tensor:$result);
+  let results = (outs Poptorch_tensor_no_grad:$result);
 
   let builders = [OpBuilder<(ins "mlir::Value":$input), [{
     $_state.addOperands({input});
@@ -14,9 +14,7 @@ class Poptorch_IdentityOp<string mnemonic, list<Trait> traits = []> : Poptorch_A
 
 def Poptorch_alias: Poptorch_IdentityOp<"alias">;
 
-def Poptorch_detach: Poptorch_IdentityOp<"detach"> {
-  let results = (outs Poptorch_tensor_no_grad:$result);
-}
+def Poptorch_detach: Poptorch_IdentityOp<"detach">;
 
 // aten::as_strided(Tensor(a) self, int[] size, int[] stride, int? storage_offset=None) -> (Tensor(a))
 def Poptorch_as_strided: Poptorch_AbstractOp<"as_strided", [ViewOp]> {
@@ -25,7 +23,7 @@ def Poptorch_as_strided: Poptorch_AbstractOp<"as_strided", [ViewOp]> {
                        I64ArrayAttr:$strides,
                        OptionalAttr<I64Attr>:$storage_offset);
 
-  let results = (outs Poptorch_tensor:$result);
+  let results = (outs Poptorch_tensor_no_grad:$result);
 
 
   let builders = [OpBuilder<(ins "mlir::Value":$val1,
@@ -77,7 +75,7 @@ def Poptorch_as_strided: Poptorch_AbstractOp<"as_strided", [ViewOp]> {
 // aten::transpose.int(Tensor(a) self, int dim0, int dim1)
 def Poptorch_transpose: Poptorch_AbstractOp<"transpose", [ViewOp]> {
   let arguments = (ins Poptorch_tensor:$input, I64Attr:$dim0,  I64Attr:$dim1);
-  let results = (outs Poptorch_tensor:$result);
+  let results = (outs Poptorch_tensor_no_grad:$result);
 
   let builders = [OpBuilder<(ins "mlir::Value":$value, "std::int64_t":$dim0, "std::int64_t":$dim1),[{
     $_state.addOperands({value});
@@ -105,19 +103,19 @@ def Poptorch_transpose: Poptorch_AbstractOp<"transpose", [ViewOp]> {
 
 def Poptorch_permuteOutplace : Poptorch_InternalOp<"permuteOutplace"> {
   let arguments = (ins Poptorch_tensor:$input, I64ArrayAttr:$dims);
-  let results = (outs Poptorch_tensor:$view);
+  let results = (outs Poptorch_tensor_no_grad:$view);
 }
 
 def Poptorch_permuteInverse : Poptorch_AbstractInternalOp<"permuteInverse"> {
   let arguments = (ins Poptorch_tensor:$view, Poptorch_tensor:$input, I64ArrayAttr:$dims);
-  let results = (outs Poptorch_tensor:$inverse);
+  let results = (outs Poptorch_tensor_no_grad:$inverse);
 
   let hasCanonicalizeMethod = 1;
 }
 
 def Poptorch_permute : Poptorch_ViewOp<"permute", "permuteOutplace", "permuteInverse"> {
   let arguments = (ins Poptorch_tensor:$input, I64ArrayAttr:$dims);
-  let results = (outs Poptorch_tensor:$result);
+  let results = (outs Poptorch_tensor_no_grad:$result);
 
   let builders = [OpBuilder<(ins "mlir::Value":$self,
                                  "const std::vector<std::int64_t>&":$dims),[{
@@ -151,21 +149,21 @@ def Poptorch_permute : Poptorch_ViewOp<"permute", "permuteOutplace", "permuteInv
 
 def Poptorch_viewOutplace : Poptorch_InternalOp<"viewOutplace"> {
   let arguments = (ins Poptorch_tensor:$input, I64ArrayAttr:$shape);
-  let results = (outs Poptorch_tensor:$result);
+  let results = (outs Poptorch_tensor_no_grad:$result);
 
   let hasCanonicalizeMethod = 1;
 }
 
 def Poptorch_viewInverse : Poptorch_AbstractInternalOp<"viewInverse"> {
   let arguments = (ins Poptorch_tensor:$view, Poptorch_tensor:$input, I64ArrayAttr:$shape);
-  let results = (outs Poptorch_tensor:$result);
+  let results = (outs Poptorch_tensor_no_grad:$result);
 
   let hasCanonicalizeMethod = 1;
 }
 
 def Poptorch_view : Poptorch_ViewOp<"view", "viewOutplace", "viewInverse"> {
     let arguments = (ins Poptorch_tensor:$input, I64ArrayAttr:$shape);
-    let results = (outs Poptorch_tensor:$result);
+    let results = (outs Poptorch_tensor_no_grad:$result);
 
     let builders = [OpBuilder<(ins "mlir::Value":$value, "const std::vector<std::int64_t>&":$shape),[{
         $_state.addOperands({value});
@@ -243,7 +241,7 @@ def Poptorch_expandOutplace: Poptorch_InternalOp<"expandOutplace"> {
   let arguments = (ins Poptorch_tensor:$input,
                        I64ArrayAttr:$shape,
                        DefaultValuedAttr<BoolAttr,"false">:$implicit);
-  let results = (outs Poptorch_tensor:$result);
+  let results = (outs Poptorch_tensor_no_grad:$result);
 }
 
 def Poptorch_expandInverse: Poptorch_AbstractInternalOp<"expandInverse", [NotImplementedOp]> {
@@ -251,7 +249,7 @@ def Poptorch_expandInverse: Poptorch_AbstractInternalOp<"expandInverse", [NotImp
                        Poptorch_tensor:$input,
                        I64ArrayAttr:$shape,
                        DefaultValuedAttr<BoolAttr,"false">:$implicit);
-  let results = (outs Poptorch_tensor:$result);
+  let results = (outs Poptorch_tensor_no_grad:$result);
 }
 
 
@@ -261,7 +259,7 @@ def Poptorch_expand: Poptorch_ViewOp<"expand", "expandOutplace", "expandInverse"
   let arguments = (ins Poptorch_tensor:$input,
                        I64ArrayAttr:$shape,
                        DefaultValuedAttr<BoolAttr,"false">:$implicit);
-  let results = (outs Poptorch_tensor:$result);
+  let results = (outs Poptorch_tensor_no_grad:$result);
 
   let builders = [OpBuilder<(ins "mlir::Value":$value,
                                  "const std::vector<std::int64_t>&":$shape,
@@ -340,7 +338,7 @@ class Poptorch_SqueezeOp<string name>: Poptorch_AbstractOp<name, [ViewOp]> {
 
 def Poptorch_squeeze: Poptorch_SqueezeOp<"squeeze"> {
   let arguments = (ins Poptorch_tensor:$input);
-  let results = (outs Poptorch_tensor:$result);
+  let results = (outs Poptorch_tensor_no_grad:$result);
 
   let builders = [OpBuilder<(ins "mlir::Value":$value),[{
       $_state.addOperands({value});
@@ -355,7 +353,7 @@ def Poptorch_squeeze: Poptorch_SqueezeOp<"squeeze"> {
 // squeeze.dim(Tensor(a) self, int dim) -> Tensor(a)
 def Poptorch_squeeze_dim: Poptorch_SqueezeOp<"squeeze_dim"> {
   let arguments = (ins Poptorch_tensor:$input, I64Attr:$dim);
-  let results = (outs Poptorch_tensor:$result);
+  let results = (outs Poptorch_tensor_no_grad:$result);
 
   let builders = [OpBuilder<(ins "mlir::Value":$value, "std::int64_t":$dim),[{
     $_state.addOperands({value});
@@ -369,7 +367,7 @@ def Poptorch_squeeze_dim: Poptorch_SqueezeOp<"squeeze_dim"> {
 // unsqueeze(Tensor(a) self, int dim) -> Tensor(a)
 def Poptorch_unsqueeze : Poptorch_AbstractOp<"unsqueeze", [ViewOp]> {
   let arguments = (ins Poptorch_tensor:$input, I64Attr:$dim);
-  let results = (outs Poptorch_tensor:$result);
+  let results = (outs Poptorch_tensor_no_grad:$result);
   let builders = [OpBuilder<(ins "mlir::Value":$value, "std::int64_t":$dim),[{
     $_state.addOperands({value});
     $_state.addAttribute("dim", $_builder.getI64IntegerAttr(dim));
@@ -434,7 +432,7 @@ def Poptorch_sliceOutplace : Poptorch_InternalOp<"sliceOutplace"> {
                        OptionalAttr<I64Attr>:$end,
                        I64Attr:$step);
 
-  let results = (outs Poptorch_tensor:$result);
+  let results = (outs Poptorch_tensor_no_grad:$result);
 }
 
 def Poptorch_sliceInverse : Poptorch_InternalOp<"sliceInverse"> {
@@ -445,7 +443,7 @@ def Poptorch_sliceInverse : Poptorch_InternalOp<"sliceInverse"> {
                        OptionalAttr<I64Attr>:$end,
                        I64Attr:$step);
 
-  let results = (outs Poptorch_tensor:$result);
+  let results = (outs Poptorch_tensor_no_grad:$result);
 }
 
 def Poptorch_slice_Tensor : Poptorch_ViewOp<"slice_Tensor", "sliceOutplace", "sliceInverse"> {
@@ -455,7 +453,7 @@ def Poptorch_slice_Tensor : Poptorch_ViewOp<"slice_Tensor", "sliceOutplace", "sl
                        OptionalAttr<I64Attr>:$end,
                        I64Attr:$step);
 
-  let results = (outs Poptorch_tensor:$result);
+  let results = (outs Poptorch_tensor_no_grad:$result);
 
   let builders = [OpBuilder<(ins "mlir::Value":$self,
                                  "std::int64_t":$dim,
@@ -509,7 +507,7 @@ def Poptorch_select : Poptorch_AbstractOp<"select", [ViewOp]> {
                        I64Attr:$dim,
                        I64Attr:$idx);
 
-  let results = (outs Poptorch_tensor:$result);
+  let results = (outs Poptorch_tensor_no_grad:$result);
 
   let builders = [OpBuilder<(ins "mlir::Value":$self,
                                  "std::int64_t":$dim,
@@ -1173,33 +1171,46 @@ def Poptorch_col2im : Poptorch_upsample<"col2im"> {
       $_state.addAttribute("stride", $_builder.getI64ArrayAttr(stride));
 
       auto input_shape = getShape(self);
-      ERROR_ON_MSG(input_shape.size() != 3,
-                   "Input must have 3 dimensions.");
+      ERROR_ON_MSG(input_shape.size() != 3 && input_shape.size() != 2,
+                   "Input must have 2 (unbatched) or 3 (batched) dimensions, "
+                   "but got " << input_shape.size() << ".");
 
       ERROR_ON_MSG(output_size.size() != 2,
-                   "output_size must have 2 elements.");
+                   "output_size must have 2 elements, but got " <<
+                   output_size.size() << ".");
       ERROR_ON_MSG(kernel_size.size() != 2,
-                   "kernel_size must have 2 elements.");
+                   "kernel_size must have 2 elements, but got " <<
+                   kernel_size.size() << ".");
 
       // Parameters
-      std::int64_t output_height = output_size[0];
-      std::int64_t output_width = output_size[1];
-      std::int64_t kernel_height = kernel_size[0];
-      std::int64_t kernel_width = kernel_size[1];
+      const std::int64_t output_height = output_size[0];
+      const std::int64_t output_width = output_size[1];
+      const std::int64_t kernel_height = kernel_size[0];
+      const std::int64_t kernel_width = kernel_size[1];
 
       // Derived from the input shape
-      std::int64_t batch_size = input_shape[0];
-      std::int64_t n_input_plane = input_shape[1];
+      if (input_shape.size() == 3) {
+        // Batched input
+        const std::int64_t batch_size = input_shape[0];
+        const std::int64_t n_input_plane = input_shape[1];
+        const std::int64_t n_output_plane = n_input_plane / (kernel_width *
+                                                             kernel_height);
 
-      std::int64_t n_output_plane = n_input_plane / (kernel_width *
-                                      kernel_height);
+        llvm::SmallVector<std::int64_t, 4> shape{batch_size, n_output_plane,
+                                                 output_height, output_width};
+        $_state.addTypes(mlir::RankedTensorType::get(shape,
+                                                     getElementType(self)));
+      } else {
+        // Unbatched input
+        const std::int64_t n_input_plane = input_shape[0];
+        const std::int64_t n_output_plane = n_input_plane / (kernel_width *
+                                                             kernel_height);
 
-      std::int64_t output_length = output_height * output_width;
-
-      llvm::SmallVector<std::int64_t, 4> shape{batch_size, n_output_plane,
-                                               output_height, output_width};
-      $_state.addTypes(mlir::RankedTensorType::get(shape,
-                                                   getElementType(self)));
+        llvm::SmallVector<std::int64_t, 4> shape{n_output_plane,
+                                                 output_height, output_width};
+        $_state.addTypes(mlir::RankedTensorType::get(shape,
+                                                     getElementType(self)));
+      }
     }]>
   ];
 }
@@ -1209,7 +1220,7 @@ def Poptorch_unfold : Poptorch_upsample<"unfold"> {
                        I64Attr:$dimension,
                        I64Attr:$size,
                        I64Attr:$step);
-  let results = (outs Poptorch_tensor:$result);
+  let results = (outs Poptorch_tensor_no_grad:$result);
   let builders = [OpBuilder<(ins "mlir::Value":$self,
                                  "std::int64_t":$dimension,
                                  "std::int64_t":$size,
@@ -1230,5 +1241,38 @@ def Poptorch_unfold : Poptorch_upsample<"unfold"> {
 
     $_state.addTypes(mlir::RankedTensorType::get(output_shape,
                                                  getElementType(self)));
+  }]>];
+}
+
+def Poptorch_split_with_sizes : Poptorch_NotImplementedOp<"split_with_sizes"> {
+  let arguments = (ins Poptorch_tensor:$self,
+                       I64ArrayAttr:$split_sizes,
+                       I64Attr:$dim);
+  let results = (outs Poptorch_tensorlist_no_grad:$result);
+  let builders = [OpBuilder<(ins "mlir::Value":$self,
+                                 "const std::vector<std::int64_t>&":$split_sizes,
+                                 "std::int64_t":$dim), [{
+    $_state.addOperands(self);
+
+    const auto input_shape = getShape(self);
+    dim = convertToPositiveDim(dim, input_shape.size());
+
+    const auto total_elements = std::accumulate(split_sizes.begin(),
+                                                split_sizes.end(), 0);
+    ERROR_ON_MSG(total_elements != input_shape[dim],
+                 "split_with_sizes expects split_sizes to sum exactly to " <<
+                 input_shape[dim] << " (input tensor's size at dimension " <<
+                 dim << ")");
+
+    $_state.addAttribute("split_sizes", $_builder.getI64ArrayAttr(split_sizes));
+    $_state.addAttribute("dim", $_builder.getI64IntegerAttr(dim));
+
+    for (const auto size : split_sizes) {
+      auto output_shape = input_shape;
+      output_shape[dim] = size;
+
+      $_state.addTypes(mlir::RankedTensorType::get(output_shape,
+                                                   getElementType(self)));
+    }
   }]>];
 }

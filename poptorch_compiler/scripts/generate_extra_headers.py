@@ -130,7 +130,9 @@ def resolve_value(json_in, arg_name, type_str, is_attr=False):
     # Otherwise the type should be an anonymous type whose traits can be looked
     # up, or "Poptorch_tensorlist" which is an instance of
     # Variadic<Poptorch_tensor>
-    if ("anonymous" not in type_str and type_str != "Poptorch_tensorlist"):
+    if ("anonymous" not in type_str and type_str not in [
+            "Poptorch_tensorlist", "Poptorch_tensorlist_no_grad"
+    ]):
         raise ValueError(f"{type_str} unknown and not anonymous.")
 
     resolved_type_details = json_in[type_str]

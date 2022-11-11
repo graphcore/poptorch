@@ -106,7 +106,7 @@ template <typename T>
 std::vector<T> convertFloatArray(const mlir::ArrayAttr &array) {
   std::vector<T> output;
 
-  for (mlir::Attribute elem : array) {
+  for (mlir::Attribute const elem : array) {
     output.push_back(
         static_cast<T>(elem.cast<mlir::FloatAttr>().getValueAsDouble()));
   }
@@ -118,7 +118,22 @@ template <typename T>
 std::vector<T> convertIntArray(const mlir::ArrayAttr &array) {
   std::vector<T> output;
 
-  for (mlir::Attribute elem : array) {
+  for (mlir::Attribute const elem : array) {
+    output.push_back(static_cast<T>(elem.cast<mlir::IntegerAttr>().getUInt()));
+  }
+
+  return output;
+}
+
+template <typename T>
+std::optional<std::vector<T>>
+convertOptionalIntArray(const mlir::Optional<mlir::ArrayAttr> &array) {
+  if (!array.has_value()) {
+    return std::nullopt;
+  }
+
+  std::vector<T> output;
+  for (mlir::Attribute const elem : *array) {
     output.push_back(static_cast<T>(elem.cast<mlir::IntegerAttr>().getUInt()));
   }
 

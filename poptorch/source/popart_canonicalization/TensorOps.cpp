@@ -11,6 +11,8 @@
 
 #include "../PoptorchSymbols.hpp"
 
+#include <ATen/ATen.h>
+
 namespace poptorch {
 namespace {
 torch::jit::Node *sizeHandler(torch::jit::Graph *graph,

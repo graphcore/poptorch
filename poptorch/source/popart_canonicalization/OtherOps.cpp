@@ -12,6 +12,8 @@
 #include "poptorch_logging/Error.hpp"
 #include "poptorch_logging/Logging.hpp"
 
+#include <ATen/ATen.h>
+
 namespace poptorch {
 namespace {
 torch::jit::Node *einsumHandler(torch::jit::Graph *graph,
@@ -19,12 +21,13 @@ torch::jit::Node *einsumHandler(torch::jit::Graph *graph,
   // aten::einsum(string equation, Tensor[] tensors) -> Tensor
 
   // Einstein summation convention equation
-  std::string eq = constantToString(node->input(0)->node());
+  std::string const eq = constantToString(node->input(0)->node());
   // List of inputs to perform the operation on
-  std::vector<torch::jit::Value *> tensors =
+  const std::vector<torch::jit::Value *> tensors =
       handleTensorList(node->input(1)->node());
 
-  std::vector<std::int64_t> output_shape = shapeFromTensor(node->output());
+  const std::vector<std::int64_t> output_shape =
+      shapeFromTensor(node->output());
   EinsumOp einsum(eq, tensors);
   return einsum.create(graph, output_shape);
 }
@@ -119,9 +122,9 @@ torch::jit::Node *tensordotHandler(torch::jit::Graph *graph,
   std::vector<std::int64_t> p2 = shape_x2;
   std::iota(p2.begin(), p2.end(), 0);
 
-  std::size_t n_dims_x1 = p1.size();
-  std::size_t n_dims_x2 = p2.size();
-  std::size_t n_rdims = rdims_x1.size();
+  std::size_t const n_dims_x1 = p1.size();
+  std::size_t const n_dims_x2 = p2.size();
+  std::size_t const n_rdims = rdims_x1.size();
 
   // Negative (relative) indexing -> absolute indexing
   for (std::int64_t &rdim : rdims_x1) {

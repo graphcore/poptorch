@@ -11,7 +11,23 @@ def Poptorch_hardsigmoid: Poptorch_elem_unary<"hardsigmoid"> {}
 def Poptorch_hardswish: Poptorch_elem_unary<"hardswish"> {}
 def Poptorch_swish: Poptorch_elem_unary<"swish"> {}
 def Poptorch_relu: Poptorch_elem_unary<"relu"> {}
-def Poptorch_gelu: Poptorch_elem_unary<"gelu"> {}
+
+def Poptorch_gelu: Poptorch_Op<"gelu", [SameOperandsAndResultShape]> {
+    let arguments = (ins Poptorch_tensor:$in1, StrAttr:$approximate);
+    let results = (outs Poptorch_tensor:$result);
+
+    let builders = [OpBuilder<(ins "mlir::Value":$v1,
+                                   "std::string":$approximate),[{
+        $_state.addOperands({v1});
+        $_state.addAttribute("approximate", $_builder.getStringAttr(approximate));
+
+        ERROR_ON_MSG(approximate != "none",
+                     "Approximates other than 'none' are not supported for GELU");
+
+        $_state.addTypes(v1.getType());
+     }]>
+    ];
+}
 
 def Poptorch_elu : Poptorch_Op<"elu", [SameOperandsAndResultShape]> {
     let arguments = (ins Poptorch_tensor:$in1, F32Attr:$alpha, F32Attr:$scale, F32Attr:$input_scale);
@@ -160,11 +176,12 @@ def Poptorch_logsoftmax : Poptorch_Op<"logsoftmax", [SameOperandsAndResultShape]
 
 
 def Poptorch_logsoftmax_backward : Poptorch_Op<"logsoftmax_backward", [SameOperandsAndResultShape]> {
-  let arguments = (ins Poptorch_tensor:$grad_output, Poptorch_tensor:$output, I64Attr:$dim, Poptorch_tensor:$self);
+  let arguments = (ins Poptorch_tensor:$grad_output, Poptorch_tensor:$output, I64Attr:$dim, TypeAttr:$input_dtype);
   let results = (outs Poptorch_tensor:$result);
-  let builders = [OpBuilder<(ins "mlir::Value":$grad_output, "mlir::Value":$output, "std::int64_t":$dim, "mlir::Value":$self), [{
-        $_state.addOperands({grad_output, output, self});
+  let builders = [OpBuilder<(ins "mlir::Value":$grad_output, "mlir::Value":$output, "std::int64_t":$dim, "mlir::Type":$input_dtype), [{
+        $_state.addOperands({grad_output, output});
         $_state.addAttribute("dim",$_builder.getI64IntegerAttr(dim));
+        $_state.addAttribute("input_dtype", mlir::TypeAttr::get(input_dtype));
         $_state.addTypes(grad_output.getType());
   }]>];
 }

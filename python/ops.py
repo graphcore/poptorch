@@ -834,7 +834,7 @@ class CPU:
         if poptorch_core.isCompilingWithDispatcher():
             outputs = [
                 torch.zeros_like(o,
-                                 device="xla",
+                                 device="ipu",
                                  requires_grad=o.requires_grad)
                 for o in cpu_outputs
             ]

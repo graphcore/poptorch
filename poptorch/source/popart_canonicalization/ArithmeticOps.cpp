@@ -61,16 +61,11 @@ torch::jit::Node *fracHandler(torch::jit::Graph *graph,
 torch::jit::Node *floorDivideHandler(torch::jit::Graph *graph,
                                      torch::jit::Node *node) {
   // aten::floor_divide(Tensor x, Tensor y) -> Tensor
-  // floor_divide(x, y) = floor(x/y) where floor(...) rounds towards 0
+  // floor_divide(x, y) = floor(x/y) where floor(...) rounds towards -inf.
 
   torch::jit::Node *quotient =
       createDiv(graph, {node->input(0), node->input(1)});
-
-  torch::jit::Node *cast = createCast(graph, quotient->output(), c10::kInt);
-
-  return createCast(
-      graph, cast->output(),
-      *quotient->output()->type()->expect<c10::TensorType>()->scalarType());
+  return createFloor(graph, {quotient->output()});
 }
 
 torch::jit::Node *mulHandler(torch::jit::Graph *graph, torch::jit::Node *node) {
@@ -103,24 +98,16 @@ torch::jit::Node *clampHandler(torch::jit::Graph *graph,
   auto *min_val = node->input(1);
   auto *max_val = node->input(2);
 
-  const c10::ScalarType type =
-      x->type()->expect<c10::TensorType>()->scalarType().value();
-  const auto apply_with_casting = [&](auto func, auto *lhs, auto *rhs) {
-    if (isNone(rhs->node())) {
-      return lhs->node();
-    }
-    auto *cast_rhs = createCast(graph, rhs, type);
-    return func(graph, {lhs, cast_rhs->output()});
-  };
-
   // We can't use PopART clip because it doesn't support integers,
   // so the following is used instead:
   // output = min(max(x, min_value), max_value)
-  auto *clamped_to_min_value = apply_with_casting(createMax, x, min_val);
-  auto *clamped_value =
-      apply_with_casting(createMin, clamped_to_min_value->output(), max_val);
+  auto *max =
+      isNone(min_val->node()) ? x->node() : createMax(graph, {x, min_val});
+  auto *min = isNone(max_val->node())
+                  ? max
+                  : createMin(graph, {max->output(), max_val});
 
-  return clamped_value;
+  return min;
 }
 
 torch::jit::Node *clampMinHandler(torch::jit::Graph *graph,
@@ -263,7 +250,7 @@ calculateVarMean(torch::jit::Graph *graph,
     for (auto dim : dims) {
       numel_reduced *= shape[dim];
     }
-    double n = static_cast<double>(numel_reduced);
+    const double n = static_cast<double>(numel_reduced);
     auto *unbiased_factor =
         createConstantFloatLike(graph, x, {n / (n - 1)}, {});
     var = createMul(graph, {var, unbiased_factor->output()})->output();
@@ -328,6 +315,7 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::addcdiv, addCDivHandler);
   registerHandler(c10::aten::addcmul, addCMulHandler);
   registerHandler(c10::aten::cross, crossHandler);
+  registerHandler(c10::aten::linalg_cross, crossHandler);
   registerHandler(c10::aten::var, varHandler);
   registerHandler(c10::aten::var_mean, varMeanHandler);
   registerHandler(c10::aten::std, stdHandler);

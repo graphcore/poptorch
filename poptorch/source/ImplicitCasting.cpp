@@ -1,4 +1,5 @@
 // Copyright (c) 2020 Graphcore Ltd. All rights reserved.
+#include <ATen/ATen.h>
 #include <ATen/native/TypeProperties.h>
 #include <torch/csrc/jit/ir/ir.h>
 
@@ -131,8 +132,8 @@ c10::ScalarType inferExpectedTypeDispatch(
 
   unsigned int input_num = 0;
   for (auto *input : inputs) {
-    logging::LogContext ctx(std::string("processing input ") +
-                            std::to_string(input_num));
+    logging::LogContext const ctx(std::string("processing input ") +
+                                  std::to_string(input_num));
 
     if (!skipInput(implicit_cast, input_num) &&
         input->type()->kind() != c10::TypeKind::NoneType) {
@@ -164,8 +165,8 @@ inferExpectedType(const torch::jit::ArrayRef<torch::jit::Value *> &inputs,
 
   unsigned int input_num = 0;
   for (auto *input : inputs) {
-    logging::LogContext ctx(std::string("processing input ") +
-                            std::to_string(input_num));
+    logging::LogContext const ctx(std::string("processing input ") +
+                                  std::to_string(input_num));
 
     if (!skipInput(implicit_cast, input_num) &&
         input->type()->kind() != c10::TypeKind::NoneType) {

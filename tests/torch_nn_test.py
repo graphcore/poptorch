@@ -5,8 +5,8 @@ import sys
 import torch
 from torch.testing._internal.jit_metaprogramming_utils import get_all_nn_module_tests, get_nn_mod_test_name, get_nn_module_name_from_kwargs
 import pytest
-import poptorch
 import helpers
+import poptorch
 
 # Importing jit_metaprogramming_utils changes the default type to
 # double set it back to float.
@@ -161,30 +161,27 @@ EXPECTED_FAILURES = {
     "test_nn_BatchNorm1d_zero_batch": "RuntimeError: ERROR in NormalizationOps.cpp:98: weight->type()->cast<c10::TensorType>() == nullptr Context: PopartCanonicalization processing %10 : Float(0:45, 5:9, 9:1) = aten::batch_norm(%input, %4, %5, %11, %12, %13, %14, %15, %16)",
     "test_nn_BatchNorm3d_zero_batch": "RuntimeError: ERROR in NormalizationOps.cpp:98: weight->type()->cast<c10::TensorType>() == nullptr Context: PopartCanonicalization processing %10 : Float(0:40, 5:8, 2:4, 2:2, 2:1) = aten::batch_norm(%input, %4, %5, %11, %12, %13, %14, %15, %16)",
 
-    # input 1 for ai.graphcore.GroupNormalization
-    "test_nn_InstanceNorm3d_tracking_stats": "Unsupported op(s): aten::instance_norm",
-    "test_nn_InstanceNorm1d": "Unsupported op(s): aten::instance_norm",
-    "test_nn_InstanceNorm2d": "Unsupported op(s): aten::instance_norm",
-    "test_nn_InstanceNorm3d": "Unsupported op(s): aten::instance_norm",
-
     # margin of error
     "test_nn_KLDivLoss_no_reduce": "Unsupported op(s): aten::kl_div aten::kl_div",
 
-    # half/float type mismatch
-    "test_nn_InstanceNorm1d_tracking_stats": "Unsupported op(s): aten::instance_norm",
-    "test_nn_InstanceNorm2d_tracking_stats": "Unsupported op(s): aten::instance_norm",
-
+    "test_nn_FractionalMaxPool2d_alert_nondeterministic": "T30594",
     "test_nn_FractionalMaxPool2d_ratio": "T30594",
     "test_nn_FractionalMaxPool2d_ratio_no_batch_dim": "T30594",
     "test_nn_FractionalMaxPool2d_ratio_no_batch_dim_no_random_samples": "T30594",
+    "test_nn_FractionalMaxPool2d_ratio_return_indices": "T30594",
     "test_nn_FractionalMaxPool2d_size": "T30594",
     "test_nn_FractionalMaxPool2d_size_no_batch_dim": "T30594",
     "test_nn_FractionalMaxPool2d_size_no_batch_dim_no_random_samples": "T30594",
-    "test_nn_FractionalMaxPool2d_alert_nondeterministic": "T30594",
-    "test_nn_FractionalMaxPool3d_ratio": "T30594",
-    "test_nn_FractionalMaxPool3d_size": "T30594",
-    "test_nn_FractionalMaxPool3d_asymsize": "T30594",
     "test_nn_FractionalMaxPool3d_alert_nondeterministic": "T30594",
+    "test_nn_FractionalMaxPool3d_asymsize": "T30594",
+    "test_nn_FractionalMaxPool3d_ratio": "T30594",
+    "test_nn_FractionalMaxPool3d_ratio_no_batch_dim": "T30594",
+    "test_nn_FractionalMaxPool3d_ratio_no_batch_dim_no_random_samples": "T30594",
+    "test_nn_FractionalMaxPool3d_ratio_return_indices": "T30594",
+    "test_nn_FractionalMaxPool3d_size": "T30594",
+    "test_nn_FractionalMaxPool3d_size_no_batch_dim": "T30594",
+    "test_nn_FractionalMaxPool3d_size_no_batch_dim_no_random_samples": "T30594",
+
     "test_nn_BCELoss_no_reduce": "T30603",
     "test_nn_BCEWithLogitsLoss_no_reduce": "T30603",
     "test_nn_NLLLoss_no_reduce_ignore_index": "T30603",
@@ -207,13 +204,12 @@ EXPECTED_FAILURES = {
     "test_nn_MultiMarginLoss_p_no_reduce": "T30603",
     "test_nn_MultiMarginLoss_margin_no_reduce": "T30603",
     "test_nn_MultiMarginLoss_weights_no_reduce": "T30603",
-    "test_nn_Fold": "T30606",
-    "test_nn_Unfold_int_input": "T30606",
-    "test_nn_Fold_int_input": "T30606",
     "test_nn_MultiLabelMarginLoss_1d_no_reduce": "T30603",
     "test_nn_AdaptiveMaxPool3d_single": "T30564",
-    "test_nn_Unfold": "T30606",
 
+    "test_nn_MaxPool1d_return_indices": "Max pool return indices not supported.",
+    "test_nn_MaxPool2d_return_indices": "Max pool return indices not supported.",
+    "test_nn_MaxPool3d_return_indices": "Max pool return indices not supported.",
 
     # TODO(T30564): Support adaptive max pool
     "test_nn_AdaptiveMaxPool1d": "T30564",
@@ -346,24 +342,28 @@ FLOAT_PRECISION_EXCEPTIONS = {
 }
 
 HALF_PRECISION_EXCEPTIONS = {
+    "test_nn_BatchNorm2d_not_tracking_stats": (0.05, 1e-3),
+    "test_nn_BatchNorm3d_not_tracking_stats": (0.05, 1e-2),
     "test_nn_Conv1d_dilated": (0.05, 1e-3),
     "test_nn_Conv1d_pad2": (0.05, 1e-3),
     "test_nn_Conv2d_depthwise_padded": (0.05, 1e-3), # TODO(T31811)?
-    "test_nn_Conv3d_dilated": (0.05, 1e-3),
     "test_nn_Conv2d_groups": (0.05, 1e-3),
+    "test_nn_Conv2d_groups_thnn": (0.05, 1e-3),
+    "test_nn_Conv2d_replicate_stride2_pad2": (0.05, 1e-3),
+    "test_nn_Conv3d_dilated": (0.05, 1e-3),
     "test_nn_Conv3d_groups": (0.05, 1e-3),
+    "test_nn_GroupNorm_2d_affine_large_feature": (0.05, 1e-2),
+    "test_nn_GroupNorm_2d_no_affine_large_feature": (0.05, 1e-2),
+    "test_nn_InstanceNorm1d": (0.05, 1e-3),
+    "test_nn_InstanceNorm1d_no_batch_dim": (0.05, 1e-3),
+    "test_nn_InstanceNorm3d_no_batch_dim": (0.05, 1e-3),
+    "test_nn_KLDivLoss_with_target_no_reduce": (0.05, 1e-2),
     "test_nn_LayerNorm_1d_elementwise_affine": (0.05, 0.002),
     "test_nn_LayerNorm_3d_elementwise_affine": (0.05, 0.002),
     "test_nn_LayerNorm_3d_no_affine_large_feature": (0.05, 0.002),
-    "test_nn_BatchNorm2d_not_tracking_stats": (0.05, 1e-3),
-    "test_nn_BatchNorm3d_not_tracking_stats": (0.05, 1e-2),
-    "test_nn_TransformerDecoderLayer_relu_activation": (0.05, 1e-2),
     "test_nn_Linear_no_bias": (0.05, 1e-3),
-    "test_nn_Conv2d_replicate_stride2_pad2": (0.05, 1e-3),
+    "test_nn_TransformerDecoderLayer_relu_activation": (0.05, 1e-2),
     "test_nn_Transformer_multilayer_coder": (0.05, 1e-2),
-    "test_nn_GroupNorm_2d_affine_large_feature": (0.05, 1e-2),
-    "test_nn_GroupNorm_2d_no_affine_large_feature": (0.05, 1e-2),
-    "test_nn_KLDivLoss_with_target_no_reduce": (0.05, 1e-2),
 }
 
 # pylint: enable=line-too-long

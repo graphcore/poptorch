@@ -75,11 +75,10 @@ if not config.is_aarch64:
 installers.add(PipRequirements("requirements.txt"))
 
 if config.install_linters:
-    installers.add(
-        CondaPackages(
-            "pylint=2.7.2",
-            "yapf=0.27.0",
-        ))
+    installers.add(CondaPackages(
+        "pylint=2.7.2",
+        "yapf=0.27.0",
+    ))
 
 if config.build_llvm:
     installers.add(BuildLLVM())

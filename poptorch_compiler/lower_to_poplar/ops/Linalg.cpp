@@ -207,4 +207,45 @@ void addmm::lowerToPoplar(CompilerContext &context) {
   context.addTensor(this->result(), out);
 }
 
+void baddbmm::lowerToPoplar(CompilerContext &context) {
+  poplar::Tensor const input = context.fromSsa(this->input());
+  poplar::Tensor const batch1 = context.fromSsa(this->batch1());
+  poplar::Tensor const batch2 = context.fromSsa(this->batch2());
+  const float beta = this->beta().convertToFloat();
+  const float alpha = this->alpha().convertToFloat();
+
+  poplar::Tensor const t0 = poplin::matMulGrouped(
+      context.graph, batch1, batch2, context.seq, batch1.elementType());
+  poplar::Tensor const t1 = popops::mul(context.graph, t0, alpha, context.seq);
+  poplar::Tensor const t2 =
+      popops::mul(context.graph, input, beta, context.seq);
+  poplar::Tensor const out = popops::add(context.graph, t1, t2, context.seq);
+
+  context.addTensor(this->result(), out);
+}
+
+void addmv::lowerToPoplar(CompilerContext &context) {
+  poplar::Tensor const self = context.fromSsa(this->self());
+  poplar::Tensor const mat = context.fromSsa(this->mat());
+  poplar::Tensor vec = context.fromSsa(this->vec());
+  const float beta = this->beta().convertToFloat();
+  const float alpha = this->alpha().convertToFloat();
+
+  vec = vec.reshape({vec.numElements(), 1});
+  poplar::Tensor out = poplin::matMul(context.graph, mat, vec, context.seq);
+  if (alpha != 1.0f) {
+    auto expr = pe::Mul(pe::_1, pe::Const(alpha));
+    popops::mapInPlace(context.graph, expr, {out}, context.seq);
+  }
+  out = out.reshape({out.numElements()});
+
+  if (beta != 1.0f) {
+    auto expr = pe::Mul(pe::_1, pe::Const(beta));
+    popops::mapInPlace(context.graph, expr, {self}, context.seq);
+  }
+  popops::addInPlace(context.graph, out, self, context.seq);
+
+  context.addTensor(this->result(), out);
+}
+
 } // namespace poptorch_ir

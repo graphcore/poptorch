@@ -34,13 +34,41 @@ schemaToCpp = {
     "Scalar?": "toOptionalDouble",
     "ScalarType": "toCompilerType",
     "ScalarType?": "toOptionalCompilerType",
-    'Tensor': "toTensor",
-    'Tensor?': "toOptionalTensor",
-    'Tensor[]': "toTensorVector",
-    'Tensor?[]': "toTensorVector",
+    "Tensor": "toTensor",
+    "Tensor?": "toOptionalTensor",
+    "Tensor[]": "toTensorVector",
+    "Tensor?[]": "toTensorVector",
+    "SymInt": "fromSymInt",
+    "SymInt?": "fromOptionalSymInt",
+    "SymInt[]": "fromSymIntList",
+    "SymInt[0]": "fromSymIntList",
+    "SymInt[1]": "fromSymIntList",
+    "SymInt[2]": "fromSymIntList",
+    "SymInt[3]": "fromSymIntList",
+    "SymInt[4]": "fromSymIntList",
+    "SymInt[5]": "fromSymIntList",
+    "SymInt[6]": "fromSymIntList",
+    "SymInt[7]": "fromSymIntList",
+    "SymInt[8]": "fromSymIntList",
+    "SymInt[9]": "fromSymIntList",
+    "SymInt[]?": "fromOptionalSymIntList",
 }
 
 schemaToCppType = {
+    "SymInt": "std::int64_t",
+    "SymInt?": "std::optional<std::int64_t>",
+    "SymInt[]": "std::vector<std::int64_t>",
+    "SymInt[0]": "std::vector<std::int64_t>",
+    "SymInt[1]": "std::vector<std::int64_t>",
+    "SymInt[2]": "std::vector<std::int64_t>",
+    "SymInt[3]": "std::vector<std::int64_t>",
+    "SymInt[4]": "std::vector<std::int64_t>",
+    "SymInt[5]": "std::vector<std::int64_t>",
+    "SymInt[6]": "std::vector<std::int64_t>",
+    "SymInt[7]": "std::vector<std::int64_t>",
+    "SymInt[8]": "std::vector<std::int64_t>",
+    "SymInt[9]": "std::vector<std::int64_t>",
+    "SymInt[]?": "std::optional<std::vector<std::int64_t>>",
     "int[]": "std::vector<std::int64_t>",
     "int[1]": "std::vector<std::int64_t>",
     "int[2]": "std::vector<std::int64_t>",
@@ -95,7 +123,8 @@ auto requires_grad = requiresGrad(mlir_output.at({str(index)}).requires_grad_typ
 
     if output_view != '' and self.is_list:
         print(f"In {aten_name} tensor lists cannot be views")
-        sys.exit(1)
+        #TODO(T71271): silently ignore for now.
+        #sys.exit(1)
 
     # For each output tensor return it to pytorch in a different way
     # depending on what the schema tells us.
@@ -277,7 +306,12 @@ def generate_view(args, outputs, function_name):
     if len(outputs) != 1:
         print("Views with multiple outputs aren't handled")
         sys.exit(1)
-    if outputs[0].is_list or not outputs[0].is_tensor:
+
+    if outputs[0].is_list:
+        print(f"Views of list of {outputs[0].str} aren't handled")
+        #TODO(T71271): silently ignore for now.
+        #sys.exit(1)
+    if not outputs[0].is_tensor:
         print(f"Views of {outputs[0].str} aren't handled")
         sys.exit(1)
 

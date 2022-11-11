@@ -26,7 +26,7 @@ namespace aten = c10::aten;
 // Ops which only have an in-place version
 const std::unordered_set<torch::jit::NodeKind> &onlyInplaceOps() {
   // static to make sure values are initialised
-  static std::unordered_set<torch::jit::NodeKind> only_inplace = {
+  static const std::unordered_set<torch::jit::NodeKind> only_inplace = {
       aten::copy_, aten::normal_, aten::uniform_, aten::random_,
       aten::exponential_};
   return only_inplace;
@@ -35,12 +35,12 @@ const std::unordered_set<torch::jit::NodeKind> &onlyInplaceOps() {
 // Known view operations
 const std::unordered_set<torch::jit::NodeKind> &viewOps() {
   // static to make sure values are initialised
-  static std::unordered_set<torch::jit::NodeKind> view_ops = {
+  static const std::unordered_set<torch::jit::NodeKind> view_ops = {
       aten::chunk,    aten::detach,     aten::narrow,   aten::permute,
       aten::reshape,  aten::select,     aten::slice,    aten::split,
       aten::squeeze,  aten::transpose,  aten::unbind,   aten::unsqueeze,
       aten::view,     aten::as_strided, aten::diagonal, aten::movedim,
-      aten::swapaxes, aten::swapdims,   aten::view_as};
+      aten::swapaxes, aten::swapdims,   aten::view_as,  aten::_unsafe_view};
   return view_ops;
 }
 
@@ -73,7 +73,7 @@ void addAdditionalInputsIfRequired(torch::jit::Graph *graph,
                              static_cast<int>(new_node->inputs().size());
   }
 
-  WithNodeMetadata meta(new_node);
+  const WithNodeMetadata meta(new_node);
   for (int i = 0; i < additional_input_count; ++i) {
     auto *none_node = graph->createNone();
     // NOLINTNEXTLINE readability-suspicious-call-argument
@@ -83,10 +83,10 @@ void addAdditionalInputsIfRequired(torch::jit::Graph *graph,
 }
 
 torch::jit::Node *outplaceOp(torch::jit::Graph &graph, torch::jit::Node *node) {
-  torch::jit::NodeKind new_kind = outplaceKind(node->kind());
+  torch::jit::NodeKind const new_kind = outplaceKind(node->kind());
 
-  torch::jit::WithInsertPoint insert_point(node);
-  WithNodeMetadata meta(node);
+  torch::jit::WithInsertPoint const insert_point(node);
+  const WithNodeMetadata meta(node);
   auto *new_node = createAndInsertNode(&graph, new_kind, node->inputs());
 
   addAdditionalInputsIfRequired(&graph, node, new_node);
@@ -187,7 +187,7 @@ size_t processInput(torch::jit::Graph &graph, torch::jit::Value *graph_input,
   }
 
   // Check if it is not modified in place at all
-  bool is_modified_inplace = current_alias != graph_input;
+  const bool is_modified_inplace = current_alias != graph_input;
   if (!is_modified_inplace) {
     ERROR_ON(!to_delete.empty());
     return InplaceGraphInfo::no_mapping;
@@ -203,7 +203,7 @@ size_t processInput(torch::jit::Graph &graph, torch::jit::Value *graph_input,
                  "between replicas, you can disable buffer broadcasting using "
                  "poptorch.Options.broadcastBuffers(False).");
 
-    WithNodeMetadata meta(current_alias->node());
+    const WithNodeMetadata meta(current_alias->node());
     auto *new_node = graph.create(symbols::poptorch::update_param_inplace, 1);
     new_node->addInput(graph_input);
     new_node->addInput(current_alias);
@@ -251,7 +251,7 @@ InplaceGraphInfo handleInplaceOpsInGraph(torch::jit::Graph &graph,
   InplaceGraphInfo out;
   std::vector<torch::jit::Value *> collapsed_inputs =
       collapsedGraphInputHierachy(&graph);
-  size_t num_tensor_inputs = collapsed_inputs.size() - num_parameters;
+  const size_t num_tensor_inputs = collapsed_inputs.size() - num_parameters;
 
   // To begin with, none of the outputs are used for emulating inplacing.
   // Store the number of outputs (which may be nested) and the total number
@@ -263,7 +263,7 @@ InplaceGraphInfo handleInplaceOpsInGraph(torch::jit::Graph &graph,
 
   // Now process each input and make changes if it is modified in place.
   for (size_t input = 0; input < collapsed_inputs.size(); input++) {
-    bool is_parameter = input >= num_tensor_inputs;
+    const bool is_parameter = input >= num_tensor_inputs;
     auto mapping = processInput(graph, collapsed_inputs.at(input), is_parameter,
                                 replicas_needing_broadcast);
     out.input_output_mapping.push_back(mapping);
@@ -301,7 +301,7 @@ torch::jit::NodeKind outplaceKind(torch::jit::NodeKind kind) {
 void InplaceInputsTracker::addTensor(torch::jit::Value *input) {
   logging::trace("Tracking tensor %{}", input->debugName());
 
-  bool success = _aliases.insert({input, input}).second;
+  const bool success = _aliases.insert({input, input}).second;
   ERROR_ON_MSG(!success, "Value already tracked");
 }
 
@@ -363,15 +363,15 @@ InplaceInputsTracker::finalizeGraph(torch::jit::Graph &graph,
                  "More than one alias for graph input %"
                      << p.second->debugName());
   }
-  size_t num_normal_tensor_outputs = countNumTensorOutputs(graph);
+  const size_t num_normal_tensor_outputs = countNumTensorOutputs(graph);
   InplaceGraphInfo out;
   out.num_normal_outputs = graph.outputs().size() + num_anchors;
   out.num_tensor_outputs = num_normal_tensor_outputs + num_anchors;
 
-  std::vector<torch::jit::Value *> collapsed_inputs =
+  const std::vector<torch::jit::Value *> collapsed_inputs =
       collapsedGraphInputHierachy(&graph);
   out.input_output_mapping.reserve(collapsed_inputs.size());
-  for (auto &graph_input : collapsed_inputs) {
+  for (const auto &graph_input : collapsed_inputs) {
     auto it = input_aliases.find(graph_input);
     ERROR_ON(it == input_aliases.end());
     size_t output_mapping = InplaceGraphInfo::no_mapping;
@@ -390,7 +390,7 @@ InplaceInputsTracker::finalizeGraph(torch::jit::Graph &graph,
             "between replicas, you can disable buffer broadcasting using "
             "poptorch.Options.broadcastBuffers(False).");
 
-        WithNodeMetadata meta(alias->node());
+        const WithNodeMetadata meta(alias->node());
         auto *new_node =
             createAndInsertNode(&graph, symbols::poptorch::update_param_inplace,
                                 {graph_input, alias});

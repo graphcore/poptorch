@@ -17,9 +17,12 @@ New features
 API changes
 -----------
 
+- The PyTorch version that PopTorch targets has changed, from 1.10 to 1.13.
+- Now using IPU DispatchKey.
 - In addition to tensors, :py:func:`~poptorch.set_overlap_for_input` and :py:func:`~poptorch.set_overlap_for_output` can now be applied to tuples, lists, and dicts of tensors.
 - `poptorch.Options.useOfflineIpuTarget` accepts ``ipu_version = 21`` (Mk2x ipu).
 - ``POPTORCH_IPU_MODEL_VERSION`` accepts ``ipu21`` (Mk2x ipu).
+- Deprecated since Torch 1.12: ``torch.norm`` (Replaced by ``torch.linalg.norm``).
 - The mixed-precision automatic casting API, `autocast`, has now been removed.
   Instead, please use PyTorch's built-in casting facility.
 

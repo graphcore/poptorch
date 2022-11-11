@@ -90,5 +90,6 @@ def Poptorch_non_boolean_tensor : AnyTypeOf<[valid_non_boolean_tensor]>;
 def Poptorch_tensor_no_grad : AnyTypeOf<[valid_tensor]>;
 
 def Poptorch_tensorlist : Variadic<Poptorch_tensor>;
+def Poptorch_tensorlist_no_grad : Variadic<Poptorch_tensor_no_grad>;
 
 #endif // POPTORCH_IR_DIALECT

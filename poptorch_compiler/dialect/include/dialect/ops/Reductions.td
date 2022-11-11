@@ -2,24 +2,28 @@
 
 class Poptorch_reduce<string name> : Poptorch_Op<name, []> {
     let arguments = (ins Poptorch_tensor:$input,
-                         I64ArrayAttr:$axes,
+                         OptionalAttr<I64ArrayAttr>:$axes,
                          BoolAttr:$keepdim,
                          OptionalAttr<TypeAttr>:$dtype);
 
     let results = (outs Poptorch_tensor:$result);
 
     let builders = [OpBuilder<(ins "mlir::ValueRange":$values,
-                                      "const std::vector<std::int64_t>&":$axes,
-                                      "std::int64_t":$keepdim,
-                                      "std::optional<mlir::Type>":$dtype),[{
+                                   "const std::optional<std::vector<std::int64_t>>&":$axes,
+                                   "std::int64_t":$keepdim,
+                                   "std::optional<mlir::Type>":$dtype),[{
         $_state.addOperands(values);
 
         mlir::RankedTensorType tensor = values[0].getType().cast<mlir::RankedTensorType>();
         auto in_shape = tensor.getShape();
 
-        auto dims = parseDims(axes, in_shape.size());
+        const auto actual_axes = axes.value_or(std::vector<std::int64_t> {});
 
-        $_state.addAttribute("axes", $_builder.getI64ArrayAttr(dims));
+        auto dims = parseDims(actual_axes, in_shape.size());
+
+        if (axes.has_value()) {
+            $_state.addAttribute("axes", $_builder.getI64ArrayAttr(dims));
+        }
         $_state.addAttribute("keepdim", $_builder.getBoolAttr(keepdim));
         if (dtype.has_value()) {
             $_state.addAttribute("dtype", mlir::TypeAttr::get(*dtype));
@@ -491,8 +495,9 @@ class Poptorch_multi_dim_reduction<string name> : Poptorch_NotImplementedOp<name
     let arguments = (ins Poptorch_tensor:$self, I64ArrayAttr:$dim, BoolAttr:$keepdim);
     let results = (outs Poptorch_tensor:$values);
     let builders = [
-        OpBuilder<(ins "mlir::Value":$self, "const std::vector<std::int64_t>&":$dim,
-                    "bool":$keepdim), [{
+        OpBuilder<(ins "mlir::Value":$self,
+                       "const std::vector<std::int64_t>&":$dim,
+                       "bool":$keepdim), [{
             $_state.addOperands(self);
             $_state.addAttribute("dim", $_builder.getI64ArrayAttr(dim));
             $_state.addAttribute("keepdim", $_builder.getBoolAttr(keepdim));

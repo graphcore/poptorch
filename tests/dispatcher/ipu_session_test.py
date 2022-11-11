@@ -8,7 +8,7 @@ import torch
 from torch import nn
 import helpers
 import poptorch
-from poptorch.experimental import ipu_wrapper
+from poptorch.experimental import ipu_wrapper, CompilerOptions
 
 
 class SimpleModel(torch.nn.Module):
@@ -31,13 +31,11 @@ def test_host_buffers_no_dispatcher(capfd):
 
     m = torch.nn.Linear(in_features=2, out_features=4)
 
-    # TODO(T59880): rename XLA -> IPU
     ipu_m = copy.deepcopy(m)
-    ipu_m.to("xla")
+    ipu_m.to("ipu")
 
-    # TODO(T59880): rename XLA -> IPU
-    assert ipu_m.weight.device.type == "xla"
-    assert ipu_m.bias.device.type == "xla"
+    assert ipu_m.weight.device.type == "ipu"
+    assert ipu_m.bias.device.type == "ipu"
 
     # Check to see we've copied those over in to the host buffers exactly.
     helpers.assert_allequal(actual=ipu_m.weight.to("cpu"), expected=m.weight)
@@ -57,8 +55,7 @@ def test_cast_no_dispatcher():
     # Float
     y = x.float()
 
-    # TODO(T59880): rename XLA -> IPU
-    ipu_x = x.int().to("xla")
+    ipu_x = x.int().to("ipu")
     ipu_y = ipu_x.float()
 
     assert ipu_y.dtype == torch.float
@@ -67,8 +64,7 @@ def test_cast_no_dispatcher():
     # Half
     y = x.half()
 
-    # TODO(T59880): rename XLA -> IPU
-    ipu_x = x.int().to("xla")
+    ipu_x = x.int().to("ipu")
     ipu_y = ipu_x.half()
 
     assert ipu_y.dtype == torch.half
@@ -83,7 +79,7 @@ def test_weights_to_host(capfd):
 
     m = torch.nn.Linear(in_features=2, out_features=4)
     ipu_m = copy.deepcopy(m)
-    ipu_m.to("xla")
+    ipu_m.to("ipu")
 
     x1 = torch.randn((2, ))
     y = m(x1)
@@ -103,13 +99,13 @@ def test_weights_to_host(capfd):
 
     helpers.assert_allclose(actual=weight, expected=m.weight)
     helpers.assert_allclose(actual=bias, expected=m.bias)
-    helpers.assert_allclose(actual=ipu_func(x1.to("xla")).to("cpu"),
+    helpers.assert_allclose(actual=ipu_func(x1.to("ipu")).to("cpu"),
                             expected=y)
 
 
 def test_weights_to_device():
-    param = torch.tensor(1, dtype=torch.int, device='xla')
-    x = torch.tensor(3, dtype=torch.int, device='xla')
+    param = torch.tensor(1, dtype=torch.int, device='ipu')
+    x = torch.tensor(3, dtype=torch.int, device='ipu')
 
     @ipu_wrapper
     def f(x):
@@ -126,8 +122,8 @@ def test_weights_to_device():
 def test_changing_parameters_on_host():
     pytest.skip("TODO(T69899): Parameters currently aren't reuploaded to the "
                 "device if they have been changed on the host")
-    param = torch.tensor(1, dtype=torch.int, device='xla')
-    x = torch.tensor(3, dtype=torch.int, device='xla')
+    param = torch.tensor(1, dtype=torch.int, device='ipu')
+    x = torch.tensor(3, dtype=torch.int, device='ipu')
 
     @ipu_wrapper
     def f(x):
@@ -138,7 +134,7 @@ def test_changing_parameters_on_host():
     f(x).to('cpu')
     assert param.to('cpu').item() == 2
 
-    param = torch.tensor(3.0, dtype=torch.int, device='xla')
+    param = torch.tensor(3.0, dtype=torch.int, device='ipu')
     f(x).to('cpu')
     assert param.to('cpu').item() == 6
 
@@ -147,8 +143,8 @@ def test_changing_parameters_on_device():
     pytest.skip("TODO(T69899): RegisterAtenOverloads.cpp:211: "
                 "'poptorch_cpp_error': !getHostBuffer(*impl)")
 
-    param = torch.tensor(1, dtype=torch.int, device='xla')
-    x = torch.tensor(3, dtype=torch.int, device='xla')
+    param = torch.tensor(1, dtype=torch.int, device='ipu')
+    x = torch.tensor(3, dtype=torch.int, device='ipu')
 
     @ipu_wrapper
     def f(x):
@@ -179,7 +175,7 @@ def test_weights_to_host_after_switch(capfd):
 
     m = torch.nn.Linear(in_features=2, out_features=4)
     ipu_m1 = copy.deepcopy(m)
-    ipu_m1.to("xla")
+    ipu_m1.to("ipu")
 
     x1 = torch.randn((2, ))
     _ = m(x1)
@@ -188,7 +184,7 @@ def test_weights_to_host_after_switch(capfd):
     def ipu_func1(x):
         return ipu_m1(x)
 
-    x1 = x1.to("xla")
+    x1 = x1.to("ipu")
     _ = ipu_func1(x1)
 
     lc = helpers.LogChecker(capfd)
@@ -200,7 +196,7 @@ def test_weights_to_host_after_switch(capfd):
         def forward(self, x):
             return x + 42
 
-    ipu_m2 = AnotherModel().to("xla")
+    ipu_m2 = AnotherModel().to("ipu")
 
     @ipu_wrapper
     def ipu_func2(x):
@@ -226,11 +222,11 @@ def test_copy_tensor():
 
     m = SimpleModel()
     ipu_m = copy.deepcopy(m)
-    ipu_m.to("xla")
+    ipu_m.to("ipu")
 
     x1 = torch.randn((2, ))
     y = m(x1)
-    x2 = x1.to("xla")
+    x2 = x1.to("ipu")
     x3 = copy.deepcopy(x2)
 
     ipu_y = ipu_wrapper(ipu_m)(x3)
@@ -245,11 +241,11 @@ def test_detach():
 
     m = SimpleModelTwo()
     ipu_m = copy.deepcopy(m)
-    ipu_m.to("xla")
+    ipu_m.to("ipu")
 
     x1 = torch.randn((2, ))
     y = m(x1, x1)
-    x2 = x1.to("xla")
+    x2 = x1.to("ipu")
     x3 = x2.detach()
 
     @ipu_wrapper
@@ -265,12 +261,12 @@ def test_args_and_kwargs():
 
     m = SimpleModelTwo()
     ipu_m = copy.deepcopy(m)
-    ipu_m.to("xla")
+    ipu_m.to("ipu")
 
     x = torch.randn((2, ))
     y = m(x, x)
 
-    ipu_x = x.to("xla")
+    ipu_x = x.to("ipu")
 
     @ipu_wrapper
     def ipu_func1(a, b, **kwargs):  # pylint: disable=unused-argument
@@ -343,14 +339,14 @@ def test_mnist():
     input = torch.ones([1, 1, 28, 28])
 
     ipu_model = copy.deepcopy(model)
-    ipu_model.to("xla")
+    ipu_model.to("ipu")
 
     @ipu_wrapper
     def ipu_func(x):
         return ipu_model(x)
 
     helpers.assert_allclose(expected=model(input),
-                            actual=ipu_func(input.to("xla")).to("cpu"),
+                            actual=ipu_func(input.to("ipu")).to("cpu"),
                             atol=1e-05,
                             rtol=1e-05,
                             equal_nan=True)
@@ -360,11 +356,11 @@ def test_compiler_options():
     """Test passing in the CompilerOptions."""
 
     ipu_m = SimpleModel()
-    ipu_m.to("xla")
+    ipu_m.to("ipu")
 
-    x = torch.randn((2, )).to("xla")
+    x = torch.randn((2, )).to("ipu")
 
-    @ipu_wrapper(compiler_options=poptorch.CompilerOptions())
+    @ipu_wrapper(compiler_options=CompilerOptions())
     def ipu_func(inp):
         return ipu_m(inp)
 
@@ -378,7 +374,7 @@ def test_no_tensor_arguments():
     arguments are provided: otherwise, this will fail later on with a strange
     error claiming that the model is being recompiled when it shouldn't be."""
     ipu_model = SimpleModel()
-    ipu_model.to("xla")
+    ipu_model.to("ipu")
 
     @ipu_wrapper()
     def ipu_func1():
@@ -400,10 +396,10 @@ def test_function_reuse():
     def f(x):
         return x + 1
 
-    in1 = torch.tensor(1, dtype=torch.int, device='xla')
+    in1 = torch.tensor(1, dtype=torch.int, device='ipu')
     out1 = f(in1)
 
-    in2 = torch.tensor(2, dtype=torch.int, device='xla')
+    in2 = torch.tensor(2, dtype=torch.int, device='ipu')
     out2 = f(in2)
 
     assert out1.to('cpu').item() == 2

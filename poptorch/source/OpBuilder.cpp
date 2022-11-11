@@ -12,6 +12,8 @@
 
 #include "PoptorchSymbols.hpp"
 
+#include <ATen/ATen.h>
+
 namespace poptorch {
 namespace {
 
@@ -96,7 +98,7 @@ WithNodeMetadata::WithNodeMetadata(torch::jit::Node *node) {
     std::string meta;
     auto sr = node->sourceRange();
     if (sr.source()) {
-      meta = sr.source()->text();
+      meta = sr.source()->text_str().str();
     }
     setCurrentPythonCodeLocation(sr);
     setCurrentMetadata(meta);

@@ -142,10 +142,10 @@ def Poptorch_concat: Poptorch_Op<"concat", [ImplicitCastOperand<0>]> {
 // PyTorch operation:
 /* func: topk.values(Tensor self, int k, int dim=-1,
                     bool largest=True, bool sorted=True,
-                    Tensor(a!) values, Tensor(b!) indices) 
+                    Tensor(a!) values, Tensor(b!) indices)
                     -> (Tensor(a!) , Tensor(b!))*/
 def Poptorch_topk : Poptorch_Op<"topk", []> {
-    let arguments = (ins Poptorch_tensor:$self, 
+    let arguments = (ins Poptorch_tensor:$self,
                          I64Attr:$K,
                          I64Attr:$dim,
                          BoolAttr:$largest,
@@ -154,7 +154,7 @@ def Poptorch_topk : Poptorch_Op<"topk", []> {
 
     let results = (outs Poptorch_tensor:$values, Poptorch_tensor_no_grad:$indices);
 
-    let builders = [OpBuilder<(ins "mlir::Value":$self, 
+    let builders = [OpBuilder<(ins "mlir::Value":$self,
                                       "std::int64_t":$K,
                                       "std::int64_t":$dim,
                                       "bool":$largest,
@@ -292,11 +292,17 @@ def Poptorch_where : Poptorch_Op<"where", [SameOperandsAndResultShape]> {
 
   let results = (outs Poptorch_tensor:$result);
   let builders = [OpBuilder<(ins "mlir::Value":$condition,
-                                    "mlir::Value":$self,
-                                    "mlir::Value":$other), [{
-          $_state.addOperands({condition, self, other});
-          $_state.addTypes({self.getType()});
+                                 "mlir::Value":$self,
+                                 "mlir::Value":$other), [{
+      const auto cond_shape = getShape(condition);
+      const auto self_shape = getShape(self);
+      const auto other_shape = getShape(other);
 
+      ERROR_ON_MSG((!self_shape.empty() && cond_shape != self_shape) ||
+                   (!other_shape.empty() && cond_shape != other_shape),
+                   "Poptorch does not support broadcasting with torch.where.");
+      $_state.addOperands({condition, self, other});
+      $_state.addTypes({self.getType()});
   }]>];
 }
 

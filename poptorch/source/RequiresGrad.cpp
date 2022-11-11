@@ -22,7 +22,7 @@ void fixRequiresGradFromDispatch(torch::jit::Graph *graph) {
       if (!device) {
         continue;
       }
-      if (device->type() != at::DeviceType::XLA) {
+      if (device->type() != at::DeviceType::IPU) {
         continue;
       }
       // If the output is an IPU tensor, check if any of the inputs has

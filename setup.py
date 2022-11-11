@@ -65,7 +65,8 @@ core_mod = Pybind11Extension(
 # If the symbols are stripped then error messages will only contain symbol
 # addresses instead of human readable names.
 core_mod.extra_compile_args = [
-    f for f in core_mod.extra_compile_args if not "visibility=hidden" in f
+    f for f in core_mod.extra_compile_args
+    if not "visibility=hidden" in f and not "-g0" in f
 ]
 
 setup(

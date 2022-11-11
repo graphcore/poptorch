@@ -141,7 +141,7 @@ class IPUScope:
             # TODO(T61576) We currently use a state machine to determine if
             # tensors are inputs or parameters.
             # We need to find a better solution.
-            d = torch.device("xla:0")
+            d = torch.device("ipu:0")
             poptorch_core.startParametersMove()
             self._model.to(d)
             poptorch_core.endParametersMove()
@@ -316,7 +316,7 @@ class _IPUContext:
                         "within the model as an alternative, and return "
                         "gradients as outputs to your model, if required.")
 
-            d = torch.device("xla:0")
+            d = torch.device("ipu:0")
             # Move all the inputs to the IPU
             tensor_args = [t.to(d) for t in tensor_args]
             # Re-inject moved tensors in args and kwargs:

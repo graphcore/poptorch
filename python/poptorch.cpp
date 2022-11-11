@@ -4,6 +4,8 @@
 #include <torch/csrc/jit/passes/lower_graph.h>
 #include <torch/csrc/jit/python/pybind_utils.h>
 
+#include <ATen/ATen.h>
+
 #include <pybind11/functional.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
@@ -121,9 +123,7 @@ TypePtr inferType(py::handle input) {
 // Cut down version of torch::jit::toTraceableStack which only supports nested
 // tuples and lists of tensors.
 Stack toTraceableStack(const py::tuple &inputs) {
-  // TODO(T57255) In Torch 1.13
-  // return toIValue(inputs, inferType(inputs)).toTupleRef().elements().vec();
-  return toIValue(inputs, inferType(inputs)).toTuple()->elements();
+  return toIValue(inputs, inferType(inputs)).toTupleRef().elements().vec();
 }
 
 } // namespace poptorch

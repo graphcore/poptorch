@@ -17,7 +17,7 @@ TYPE_MAPPINGS = {
         'Poptorch_tensor', 'Poptorch_tensor_no_grad', 'Poptorch_float_tensor',
         'Poptorch_non_boolean_tensor', 'Poptorch_integral_tensor'
     ],
-    'Tensor[]': ['Poptorch_tensorlist'],
+    'Tensor[]': ['Poptorch_tensorlist', 'Poptorch_tensorlist_no_grad'],
     'int': ['I64Attr'],
     'int[]': ['I64ArrayAttr'],
     'bool': ['BoolAttr'],
@@ -27,6 +27,8 @@ TYPE_MAPPINGS = {
     'float[]': ['F32ArrayAttr'],
     'str': ['StrAttr'],
     'ScalarType': ['TypeAttr'],
+    'SymInt': ['I64Attr'],
+    'SymInt[]': ['I64ArrayAttr'],
 }
 
 native_functions = sys.argv[1]

@@ -169,22 +169,81 @@ def Poptorch_addmm : Poptorch_Op<"addmm", []> {
     let results = (outs Poptorch_tensor:$result);
 
     let builders = [OpBuilder<(ins "mlir::Value":$input,
-                                      "mlir::Value":$mat1,
-                                      "mlir::Value":$mat2,
-                                      "float":$beta,
-                                      "float":$alpha),[{
+                                   "mlir::Value":$mat1,
+                                   "mlir::Value":$mat2,
+                                   "float":$beta,
+                                   "float":$alpha), [{
         $_state.addOperands({input, mat1, mat2});
         $_state.addAttribute("beta", $_builder.getF32FloatAttr(beta));
         $_state.addAttribute("alpha", $_builder.getF32FloatAttr(alpha));
 
-        mlir::RankedTensorType input_type = input.getType().cast<mlir::RankedTensorType>();
-        mlir::RankedTensorType mat1_type = mat1.getType().cast<mlir::RankedTensorType>();
-        mlir::RankedTensorType mat2_type = mat2.getType().cast<mlir::RankedTensorType>();
-        std::vector<std::int64_t> shape = mat1_type.getShape();
-        shape[1] = mat2_type.getShape()[1];
-        $_state.addTypes(mlir::RankedTensorType::get(shape, input_type.getElementType()));
-     }]>
-    ];
+        const auto mat1_shape = getShape(mat1);
+        llvm::SmallVector<std::int64_t, 2> shape{mat1_shape.begin(),
+                                                 mat1_shape.end()};
+        ERROR_ON_MSG(shape.size() != 2,
+                     "argument `mat1' to `addmm' must be a 2-D tensor");
+        const auto mat2_shape = getShape(mat2);
+        ERROR_ON_MSG(shape.size() != 2,
+                     "argument `mat2' to `addmm' must be a 2-D tensor");
+        shape[1] = mat2_shape[1];
+        $_state.addTypes(mlir::RankedTensorType::get(shape,
+                                                     getElementType(input)));
+    }]>];
+}
+
+def Poptorch_baddbmm : Poptorch_Op<"baddbmm", []> {
+    let arguments = (ins Poptorch_tensor:$input,
+                         Poptorch_tensor:$batch1,
+                         Poptorch_tensor:$batch2,
+                         F32Attr:$beta,
+                         F32Attr:$alpha);
+    let results = (outs Poptorch_tensor:$result);
+
+    let builders = [OpBuilder<(ins "mlir::Value":$input,
+                                   "mlir::Value":$batch1,
+                                   "mlir::Value":$batch2,
+                                   "float":$beta,
+                                   "float":$alpha), [{
+        $_state.addOperands({input, batch1, batch2});
+        $_state.addAttribute("beta", $_builder.getF32FloatAttr(beta));
+        $_state.addAttribute("alpha", $_builder.getF32FloatAttr(alpha));
+
+        auto batch1_shape = getShape(batch1);
+        llvm::SmallVector<std::int64_t, 3> shape{batch1_shape.begin(),
+                                                 batch1_shape.end()};
+        ERROR_ON_MSG(shape.size() != 3,
+                     "argument `batch1' to `baddbmm' must be a 3-D tensor");
+        const auto batch2_shape = getShape(batch2);
+        ERROR_ON_MSG(shape.size() != 3,
+                     "argument `batch2' to `baddbmm' must be a 3-D tensor");
+        shape[2] = batch2_shape[2];
+        $_state.addTypes(mlir::RankedTensorType::get(shape,
+                                                     getElementType(input)));
+    }]>];
+}
+
+// addmv.out(Tensor self, Tensor mat, Tensor vec, *, Scalar beta=1, Scalar alpha=1, Tensor(a!) out) -> Tensor(a!)
+def Poptorch_addmv : Poptorch_Op<"addmv", []> {
+  let arguments = (ins Poptorch_tensor:$self,
+                       Poptorch_tensor:$mat,
+                       Poptorch_tensor:$vec,
+                       F32Attr:$beta,
+                       F32Attr:$alpha);
+
+  let results = (outs Poptorch_tensor:$result);
+
+  let builders = [OpBuilder<(ins "mlir::Value":$self,
+                                 "mlir::Value":$mat,
+                                 "mlir::Value":$vec,
+                                 "float":$beta,
+                                 "float":$alpha),[{
+    $_state.addOperands({self, mat, vec});
+    $_state.addAttribute("beta", $_builder.getF32FloatAttr(beta));
+    $_state.addAttribute("alpha", $_builder.getF32FloatAttr(alpha));
+
+    const auto n = getShape(mat)[0];
+    $_state.addTypes(mlir::RankedTensorType::get({n}, getElementType(self)));
+  }]>];
 }
 
 class Poptorch_not_implemented_norm<string mnemonic, list<Trait> traits = []> :
@@ -290,6 +349,7 @@ def Poptorch_frobenius_norm_out : Poptorch_not_implemented_norm<"frobenius_norm_
                                    "bool":$keepdim),[{
         $_state.addOperands(self);
         const auto tensor = asTensor(self);
+        poptorch::logging::warn("Undefined behaviour: aten::frobenius_norm was deprecated in PyTorch 1.12, use torch.linalg.norm() instead.");
 
         const auto actual_dims = convertToPositiveDim(dim, tensor.getRank());
         $_state.addAttribute("dim", $_builder.getI64ArrayAttr(actual_dims));

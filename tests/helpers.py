@@ -403,8 +403,7 @@ class LogChecker:
 # created on the IPU.
 def outputDevice():
     if poptorch.isRunningOnIpu() and poptorch._impl.isDispatchTracing():  # pylint: disable=protected-access
-        # TODO(T59880) rename "xla" -> "ipu"
-        return "xla"
+        return "ipu"
     return None
 
 
@@ -412,7 +411,7 @@ def runFunctionOnIpu(fn, *inputs):
     """Helper function to automatically move the inputs to the IPU, run the
     function on the IPU and move the outputs back to CPU."""
     inputs = [
-        i.to("xla") if isinstance(i, torch.Tensor) else i for i in inputs
+        i.to("ipu") if isinstance(i, torch.Tensor) else i for i in inputs
     ]
 
     output = ipu_wrapper(fn)(*inputs)

@@ -163,7 +163,7 @@ void ConstExprEvaluator::markSubgraphNodesForExclusion() {
 }
 
 void ConstExprEvaluator::copyAllConstNodesToConstexprGraph() {
-  logging::LogContext ctx_func("ConstExprEvaluator");
+  logging::LogContext const ctx_func("ConstExprEvaluator");
   std::vector<torch::jit::Node *> nodes_plus_return;
   for (auto *node : _graph->nodes()) {
     nodes_plus_return.push_back(node);
@@ -171,7 +171,7 @@ void ConstExprEvaluator::copyAllConstNodesToConstexprGraph() {
   nodes_plus_return.push_back(_graph->return_node());
 
   for (auto *node : nodes_plus_return) {
-    logging::LogContext ctx("processing " + nodeToString(node));
+    logging::LogContext const ctx("processing " + nodeToString(node));
 
     if (!isMarkedForExclusion(node) && nodeIsConstExpr(*node)) {
       copyNodeToConstexprGraph(node);
@@ -233,7 +233,7 @@ void ConstExprEvaluator::removeLoneConstants() {
 }
 
 void ConstExprEvaluator::evaluateConstExprGraph(torch::jit::Stack *stack) {
-  torch::jit::Code code(_constexpr_graph, "");
+  torch::jit::Code const code(_constexpr_graph, "");
   torch::jit::InterpreterState state(code);
 
   state.run(*stack);
@@ -260,8 +260,8 @@ void ConstExprEvaluator::replaceWithConstants(const torch::jit::Stack &stack) {
     }
 
     // Insert a constant to replace the original node and replace all uses
-    torch::jit::WithInsertPoint insert_point(value->node());
-    WithNodeMetadata meta(value->node());
+    torch::jit::WithInsertPoint const insert_point(value->node());
+    const WithNodeMetadata meta(value->node());
     torch::jit::Value *new_const = insertConstant(_graph, resolved_value);
     value->replaceAllUsesWith(new_const);
   }
@@ -311,13 +311,13 @@ void ConstExprEvaluator::copyNodeToConstexprGraph(torch::jit::Node *node) {
 
   for (auto *input : new_node->inputs()) {
     auto maybe_device = input->type()->cast<c10::DeviceObjType>();
-    if (maybe_device != nullptr) {
+    if (maybe_device) {
       // All code should be running on CPU here
       input->node()->s_(c10::attr::value, "cpu");
     }
   }
 
-  WithNodeMetadata meta(new_node);
+  const WithNodeMetadata meta(new_node);
 
   insertNodeInGraph(_constexpr_graph.get(), new_node);
 

@@ -8,6 +8,8 @@
 #include "poptorch_logging/Error.hpp"
 #include "poptorch_logging/Logging.hpp"
 
+#include <ATen/ATen.h>
+
 namespace poptorch {
 namespace {
 
@@ -16,8 +18,8 @@ torch::jit::Node *embeddingHandler(torch::jit::Graph *graph,
   // aten::embedding(Tensor weight, Tensor indices, int padding_idx, bool
   // scale_grad_by_freq, bool sparse) -> Tensor
 
-  bool scale_grad_by_freq = constantToBool(node->input(3)->node());
-  bool sparse = constantToBool(node->input(4)->node());
+  const bool scale_grad_by_freq = constantToBool(node->input(3)->node());
+  const bool sparse = constantToBool(node->input(4)->node());
 
   ERROR_ON_MSG(scale_grad_by_freq || sparse,
                "Unsupported aten::embedding operation");
@@ -50,8 +52,8 @@ torch::jit::Node *embeddingBagHandler(torch::jit::Graph *graph,
   // scale_grad_by_freq, int mode, bool sparse, Tensor per_sample_weights, bool
   // include_last_offset, int? padding_idx) -> Tensor
 
-  bool scale_grad_by_freq = constantToBool(node->input(3)->node());
-  bool sparse = constantToBool(node->input(5)->node());
+  const bool scale_grad_by_freq = constantToBool(node->input(3)->node());
+  const bool sparse = constantToBool(node->input(5)->node());
   auto *padding_idx = node->input(8);
 
   ERROR_ON_MSG(scale_grad_by_freq || sparse,
@@ -73,9 +75,9 @@ torch::jit::Node *embeddingBagHandler(torch::jit::Graph *graph,
   auto *weight = node->input(0);
   auto *indices = node->input(1);
   auto *offsets = node->input(2);
-  int64_t mode = constantToLong(node->input(4)->node());
+  const int64_t mode = constantToLong(node->input(4)->node());
   auto *per_sample_weights = node->input(6);
-  bool include_last_offset = constantToBool(node->input(7)->node());
+  const bool include_last_offset = constantToBool(node->input(7)->node());
 
   auto reduction = [mode](torch::jit::Graph *g, torch::jit::Value *v) {
     if (mode == 0) {
@@ -125,7 +127,7 @@ torch::jit::Node *onehotHandler(torch::jit::Graph *graph,
                                 torch::jit::Node *node) {
   torch::jit::Value *tensor = node->input(0);
 
-  std::int64_t num_classes = constantToLong(node->input(1)->node());
+  std::int64_t const num_classes = constantToLong(node->input(1)->node());
 
   ERROR_ON_MSG(num_classes == -1,
                "OneHot num classes must be specified and must be constant.");

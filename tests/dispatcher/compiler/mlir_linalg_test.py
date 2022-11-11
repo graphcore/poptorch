@@ -38,8 +38,8 @@ def test_matmul(size):
 
     assert ipu_result.size() == cpu_result.size()
 
-    helpers.assert_allclose(expected=ipu_result,
-                            actual=cpu_result,
+    helpers.assert_allclose(expected=cpu_result,
+                            actual=ipu_result,
                             atol=1e-05,
                             rtol=1e-05,
                             equal_nan=True)
@@ -68,5 +68,32 @@ def test_addmm(params):
 
     cpu_result = addmm(t1, t2, t3)
     ipu_result = IPUContext(addmm)(t1, t2, t3)
+
+    helpers.assert_allclose(expected=cpu_result, actual=ipu_result)
+
+
+@pytest.mark.parametrize(
+    "params",
+    [
+        # input_shape, beta, alpha
+        ((3, 7), 1.0, 1.0),
+        ((3, 1), 1.0, 0.75),
+        ((1, 7), 0.75, 1.0),
+        ((1), 0.75, 0.75),
+    ])
+def test_baddbmm(params):
+    torch.manual_seed(42)
+
+    input_shape, beta, alpha = params
+
+    t1 = torch.randn(input_shape)
+    t2 = torch.randn(2, 3, 5)
+    t3 = torch.randn(2, 5, 7)
+
+    def op(x1, x2, x3):
+        return torch.baddbmm(x1, x2, x3, beta=beta, alpha=alpha)
+
+    cpu_result = op(t1, t2, t3)
+    ipu_result = IPUContext(op)(t1, t2, t3)
 
     helpers.assert_allclose(expected=cpu_result, actual=ipu_result)
