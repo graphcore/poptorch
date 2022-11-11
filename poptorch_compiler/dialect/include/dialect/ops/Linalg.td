@@ -300,27 +300,6 @@ def Poptorch_frobenius_norm_out : Poptorch_not_implemented_norm<"frobenius_norm_
     ];
 }
 
-def Poptorch_nuclear_norm_out : Poptorch_not_implemented_norm<"nuclear_norm_out"> {
-    let arguments = (ins Poptorch_tensor:$self,
-                         I64ArrayAttr:$dim,
-                         BoolAttr:$keepdim);
-    let results = (outs Poptorch_tensor:$result);
-
-    let builders = [OpBuilder<(ins "mlir::Value":$self,
-                                   "const std::vector<std::int64_t>&":$dim,
-                                   "bool":$keepdim),[{
-        $_state.addOperands(self);
-        const auto tensor = asTensor(self);
-
-        const auto actual_dims = convertToPositiveDim(dim, tensor.getRank());
-        $_state.addAttribute("dim", $_builder.getI64ArrayAttr(actual_dims));
-        $_state.addAttribute("keepdim", $_builder.getBoolAttr(keepdim));
-
-        $_state.addTypes(inferType(self, actual_dims, keepdim));
-     }]>
-    ];
-}
-
 // func: cross(Tensor self, Tensor other, int? dim=None, *) -> Tensor(a!)
 def Poptorch_cross : Poptorch_NotImplementedOp<"cross", []> {
     let arguments = (ins Poptorch_tensor:$self, Poptorch_tensor:$other,

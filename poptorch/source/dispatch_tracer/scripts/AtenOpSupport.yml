@@ -924,13 +924,6 @@
   PopTorchDirect: frobenius_norm_out
   UnusedOutputArguments: {out}
 
-- func: nuclear_norm.dim
-  PopTorchDirect: nuclear_norm_out
-
-- func: nuclear_norm.dim_out
-  PopTorchDirect: nuclear_norm_out
-  UnusedOutputArguments: {out}
-
 # Both declarations are required.
 # func: cross(Tensor self, Tensor other, int? dim=None, *) -> Tensor(a!)
 - func: cross
