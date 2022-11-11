@@ -15,6 +15,7 @@
 #include <set>
 #include <string>
 #include <unordered_map>
+#include <utility>
 
 #include "../popart_canonicalization/PopartCanonicalizationUtils.hpp"
 #include "CommonHelperFunctions.hpp"
@@ -51,6 +52,7 @@ std::string valueToString(const c10::IValue &ivalue) {
   if (ivalue.isTensor()) {
     return str(ivalue.toTensor());
   }
+  // TODO(T59880)
   // Don't rely on operator<< for everything as we're currently using
   // the XLA dispatch key but using our own Tensor type: bad things
   // might happen if upstream torch tries to print a tensor by itself.
@@ -103,6 +105,14 @@ struct GlobalTracerContext {
     _active_dispatch = std::move(new_dispatch);
   }
 
+  void updatePythonCallstack() {
+    if (_python_traceback_accessor) {
+      activeDispatch()->setPythonStack(_python_traceback_accessor());
+    } else {
+      activeDispatch()->setPythonStack({});
+    }
+  }
+
   // A simple guard to stop us from redispatching when we are already in a
   // dispatch context.
   bool dispatch_on{false};
@@ -138,9 +148,14 @@ struct GlobalTracerContext {
   // Create and store Tensors...
   TensorStore tensor_store;
 
+  void setPythonTracebackAccessor(PythonTracebackAccessor accessor) {
+    _python_traceback_accessor = std::move(accessor);
+  }
+
 private:
   // The active dispatcher. Created once upon dispatch start.
   std::unique_ptr<IDispatch> _active_dispatch;
+  PythonTracebackAccessor _python_traceback_accessor;
 };
 
 std::unique_ptr<GlobalTracerContext> context =
@@ -269,8 +284,7 @@ void copyInplace(const c10::OperatorHandle &op, c10::Stack *stack) {
     return;
   }
 
-  getContext().activeDispatch()->setPythonStack(
-      torch::jit::tracer::pythonCallstack());
+  getContext().updatePythonCallstack();
 
   // TODO(T59880) rename is_xla() -> is_ipu()
   if (self.is_xla()) {
@@ -366,6 +380,10 @@ CompilerOptions &enableEagerMode(bool headless) {
   return options;
 }
 
+void setPythonTracebackAccessor(PythonTracebackAccessor accessor) {
+  getContext().setPythonTracebackAccessor(std::move(accessor));
+}
+
 void markStep() { getContext().activeDispatch()->markStep(); }
 
 // Turn off.
@@ -457,8 +475,7 @@ void createGraph(TracingMode mode, const std::vector<at::Tensor> &inputs,
     ERROR("Unsupported target");
   }
 
-  getContext().activeDispatch()->setPythonStack(
-      torch::jit::tracer::pythonCallstack());
+  getContext().updatePythonCallstack();
   getContext().graph_inputs.clear();
   for (const auto &input : inputs) {
     getContext().graph_inputs.emplace(
@@ -479,8 +496,7 @@ void fallback(const c10::OperatorHandle &op, c10::Stack *stack) {
   const c10::FunctionSchema &schema = op.schema();
   logging::debug("[DISPATCHER] Intercepting {} ", schema);
 
-  getContext().activeDispatch()->setPythonStack(
-      torch::jit::tracer::pythonCallstack());
+  getContext().updatePythonCallstack();
   for (const auto &t : *stack) {
     logging::trace("[Input {}] {}", schema.name(), valueToString(t));
   }
@@ -578,8 +594,7 @@ emptyBase(at::IntArrayRef size,
         size, dtype, nullptr, deviceOrDefaultIpu({}));
     // TODO(T61576) Find a better way to identify parameters and buffers.
     if (getContext().hasActiveDispatch()) {
-      getContext().activeDispatch()->setPythonStack(
-          torch::jit::tracer::pythonCallstack());
+      getContext().updatePythonCallstack();
       getContext().activeDispatch()->registerEmptyTensor(
           output, getContext().moving_parameters);
     }
@@ -629,8 +644,7 @@ void detach(const c10::OperatorHandle &op, c10::Stack *stack) {
   logging::debug("[DISPATCHER] Intercepting aten::detach");
 
   if (getContext().hasActiveDispatch()) {
-    getContext().activeDispatch()->setPythonStack(
-        torch::jit::tracer::pythonCallstack());
+    getContext().updatePythonCallstack();
 
     // Perform the shallow copy and detach.
     getContext().activeDispatch()->detach(op, stack,

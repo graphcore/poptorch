@@ -35,6 +35,101 @@
 
 #include "pytorch_bridge/CompilerOptions.hpp"
 
+// This is a workaround because torch::jit::toTraceableStack() is broken:
+// torch::jit::as_module() fails to initialise its static local variable
+// ScriptModule and segfaults as a result.
+namespace torch {
+namespace jit {
+namespace poptorch {
+namespace {
+
+TypePtr inferType(py::handle input) {
+
+  // Try tensor types
+  if (THPVariable_Check(input.ptr())) {
+    return TensorType::get();
+  }
+
+  if (input.is(py::none())) {
+    return NoneType::get();
+  }
+
+  if (six::isTuple(input)) {
+    py::tuple tuple = py::cast<py::tuple>(input);
+    std::vector<TypePtr> element_types;
+    element_types.reserve(tuple.size());
+
+    for (py::handle elem : tuple) {
+      element_types.push_back(inferType(elem));
+    }
+    return TupleType::create(element_types);
+  } else if (PyDict_Check(input.ptr())) {
+    // Check to make sure we can generate useful input/output types
+    auto dict = py::cast<py::dict>(input);
+    size_t len = py::len(dict);
+    ERROR_ON_MSG(len == 0, "Dictionary inputs must have entries");
+    TypePtr key_type = nullptr;
+    TypePtr value_type = nullptr;
+
+    for (auto entry : dict) {
+      // Try to infer the key type and unify it with the existing one
+      auto entry_key_type = inferType(entry.first);
+      auto unified_key = unifyOrInitializeType(key_type, entry_key_type);
+      ERROR_ON_MSG(!unified_key,
+                   c10::str("Dictionary inputs to traced functions must have "
+                            "consistent type. Found ",
+                            key_type->repr_str(), " and ",
+                            entry_key_type->repr_str()));
+
+      // Try to infer the value type and unify it with the existing one
+      auto entry_value_type = inferType(entry.second);
+      auto unified_value = unifyOrInitializeType(value_type, entry_value_type);
+      ERROR_ON_MSG(!unified_value,
+                   c10::str("Dictionary inputs to traced functions must have "
+                            "consistent type. Found ",
+                            value_type->repr_str(), " and ",
+                            entry_value_type->repr_str()));
+
+      key_type = *unified_key;
+      value_type = *unified_value;
+    }
+    return DictType::create(key_type, value_type);
+  } else if (PyList_Check(input.ptr())) {
+    auto list = py::cast<py::list>(input);
+    size_t len = py::len(list);
+    ERROR_ON_MSG(len == 0, "List trace inputs must have elements");
+
+    TypePtr element_type = nullptr;
+    for (auto elem : list) {
+      auto this_element_type = inferType(elem);
+      auto unified_type =
+          unifyOrInitializeType(element_type, this_element_type);
+      ERROR_ON_MSG(!unified_type,
+                   c10::str("List inputs to traced functions must have "
+                            "consistent element type. Found ",
+                            element_type->repr_str(), " and ",
+                            this_element_type->repr_str()));
+      element_type = *unified_type;
+    }
+    return ListType::create(element_type);
+  }
+  ERROR("Only nested lists and tuples of tensors are supported");
+}
+
+} // namespace
+
+// Cut down version of torch::jit::toTraceableStack which only supports nested
+// tuples and lists of tensors.
+Stack toTraceableStack(const py::tuple &inputs) {
+  // TODO(T57255) In Torch 1.13
+  // return toIValue(inputs, inferType(inputs)).toTupleRef().elements().vec();
+  return toIValue(inputs, inferType(inputs)).toTuple()->elements();
+}
+
+} // namespace poptorch
+} // namespace jit
+} // namespace torch
+
 namespace poptorch {
 namespace {
 
@@ -73,6 +168,18 @@ void registerBuffersWithCallback(
     tensor = tensor.contiguous();
     metadata.output_pointers.push_back(tensor.data_ptr());
   }
+}
+
+std::vector<torch::jit::StackEntry> pythonTracebackAccessor() {
+  // Workaround for bug in upstream Torch: they don't check
+  // if the frame is null before dereferencing it and will
+  // therefore segfault if called from a non-python thread.
+  pybind11::gil_scoped_acquire gil;
+  PyFrameObject *frame = PyEval_GetFrame();
+  if (frame == nullptr) {
+    return {};
+  }
+  return torch::jit::tracer::pythonCallstack();
 }
 
 // Python interface to map a given CPU op with the IR calls.
@@ -326,7 +433,7 @@ getParameterBuffers(const pybind11::tuple &names,
                     const pybind11::tuple &tensors) {
   ERROR_ON(names.size() != tensors.size());
   std::map<std::string, void *> parameters;
-  torch::jit::Stack stack = torch::jit::toTraceableStack(tensors);
+  torch::jit::Stack stack = torch::jit::poptorch::toTraceableStack(tensors);
   for (std::uint64_t i = 0; i < names.size(); ++i) {
     parameters.insert(
         {names[i].cast<std::string>(), stack[i].toTensor().data_ptr()});
@@ -492,7 +599,8 @@ poptorch::LowerToPopart lowerToPopartFromTrace(
   }
 
   // Create a jit stack from the incoming pytorch tensors.
-  torch::jit::Stack input_stack = torch::jit::toTraceableStack(inputs);
+  torch::jit::Stack input_stack =
+      torch::jit::poptorch::toTraceableStack(inputs);
 
   // And turn convert them into at tensors which we can then resolve the
   // address of.
@@ -564,7 +672,7 @@ lowerToPopartFromDispatch(const pybind11::dict &options,
 void mapParamsToNames(const pybind11::tuple &names,
                       const pybind11::tuple &tensors) {
   ERROR_ON(names.size() != tensors.size());
-  torch::jit::Stack stack = torch::jit::toTraceableStack(tensors);
+  torch::jit::Stack stack = torch::jit::poptorch::toTraceableStack(tensors);
   for (uint64_t i = 0; i < names.size(); ++i) {
     const auto name = names[i].cast<std::string>();
     const auto tensor = stack[i].toTensor();
@@ -696,7 +804,8 @@ execute(const std::shared_ptr<poptorch::PoplarExecutable> &executable,
   poptorch::logging::Tracepoint tp{__FUNCTION__};
   ERROR_ON_MSG(!executable, "No built executable");
   // Create a jit stack from the incoming pytorch tensors.
-  torch::jit::Stack input_stack = torch::jit::toTraceableStack(inputs);
+  torch::jit::Stack input_stack =
+      torch::jit::poptorch::toTraceableStack(inputs);
 
   // And turn convert them into at tensors which we can then resolve the
   // address of.
@@ -1147,6 +1256,7 @@ PYBIND11_MODULE(poptorch_core, m) { // NOLINT
         "all canonicalization passes have been applied");
 
   poptorch::initialiseExceptionHandling(m);
+  poptorch::setPythonTracebackAccessor(&poptorch::pythonTracebackAccessor);
 
   py::enum_<poptorch::popart_compiler::TestErrorType>(m, "TestErrorType")
       .value("Poptorch", poptorch::popart_compiler::TestErrorType::Poptorch)

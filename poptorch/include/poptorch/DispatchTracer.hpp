@@ -3,6 +3,7 @@
 #define INCLUDE_POPTORCH_DISPATCH_TRACER_HPP_
 
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <string>
 #include <vector>
@@ -16,6 +17,7 @@ namespace jit {
 struct Graph;
 struct Node;
 struct Value;
+struct StackEntry;
 } // namespace jit
 } // namespace torch
 
@@ -175,6 +177,11 @@ bool movingParameters();
 std::string getInitialGraph(const at::Tensor &tensor);
 
 std::string getCachedGraph(const at::Tensor &tensor);
+
+using PythonTracebackAccessor =
+    std::function<std::vector<torch::jit::StackEntry>()>;
+// Set the function that will access and return the current python stacktrace
+void setPythonTracebackAccessor(PythonTracebackAccessor accessor);
 
 } // namespace poptorch
 
