@@ -19,6 +19,7 @@
 #include "poptorch/InplaceOps.hpp"
 #include "poptorch/OverlappedIO.hpp"
 #include "poptorch/PopartCanonicalization.hpp"
+#include "poptorch/RequiresGrad.hpp"
 #include "poptorch/TypeAndConstantCanonicalization.hpp"
 #include "poptorch/Utils.hpp"
 
@@ -286,6 +287,7 @@ poptorch::LowerToPopart lowerToPopartFromDispatch(
   const std::shared_ptr<torch::jit::Graph> graph = getTracedGraph();
   logging::trace("Initial dispatched graph:\n{}", *graph);
 
+  fixRequiresGradFromDispatch(graph.get());
   torch::jit::EliminateDeadCode(graph);
   torch::jit::PeepholeOptimize(graph);
   logging::trace("Optimised graph:\n{}", *graph);
