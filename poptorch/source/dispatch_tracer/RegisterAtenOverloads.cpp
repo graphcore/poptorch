@@ -3,6 +3,7 @@
 #include <ATen/core/List.h>
 #include <ATen/core/function_schema.h>
 #include <ATen/native/CPUFallback.h>
+#include <c10/core/MemoryFormat.h>
 #include <c10/core/ScalarType.h>
 #include <c10/core/TensorImpl.h>
 #include <torch/csrc/autograd/autograd_not_implemented_fallback.h>
@@ -237,7 +238,9 @@ void copyInplace(const c10::OperatorHandle &op, c10::Stack *stack) {
                    "Unsupported scalar type `"
                        << scalar_type << "'. Please cast to `" << coerced_type
                        << "' before moving this tensor to the IPU.");
-      getContext().tensor_store.copyFromCpu(self, src);
+      // TODO(T71349): contiguous is needed to ensure the cpu data has the
+      // standard striding layout and is continuous in memory
+      getContext().tensor_store.copyFromCpu(self, src.contiguous());
     } else if (self.is_cpu() && src.is_ipu()) {
       logging::trace("copy_ IPU -> CPU, outside dispatch");
       if (const std::shared_ptr<MLIRExecutor> executor =
@@ -291,8 +294,10 @@ void copyInplace(const c10::OperatorHandle &op, c10::Stack *stack) {
       std::stringstream ss;
       ss << "copy_ CPU -> IPU ";
       if (isParameter(self) || getContext().moving_parameters) {
-        getContext().activeDispatch()->addParameter(downCastIfNeeded(src),
-                                                    self);
+        // TODO(T71349): src.contiguous() is needed to ensure the cpu data has
+        // the standard striding layout and is continuous in memory
+        getContext().activeDispatch()->addParameter(
+            downCastIfNeeded(src.contiguous()), self);
         // Make sure the parameter flag is preserved.
         ss << "parameter";
       } else {
@@ -301,11 +306,14 @@ void copyInplace(const c10::OperatorHandle &op, c10::Stack *stack) {
             "An input tensor to an IPU model can not have requires_grad set "
             "to True.");
 
+        // TODO(T71349): src.contiguous() is needed to ensure the cpu data has
+        // the standard striding layout and is continuous in memory
         if (getContext().graph_inputs.count(src.unsafeGetTensorImpl()) > 0) {
-          getContext().activeDispatch()->addInput(downCastIfNeeded(src), self);
+          getContext().activeDispatch()->addInput(
+              downCastIfNeeded(src.contiguous()), self);
         } else {
-          getContext().activeDispatch()->addConstant(downCastIfNeeded(src),
-                                                     self);
+          getContext().activeDispatch()->addConstant(
+              downCastIfNeeded(src.contiguous()), self);
         }
         ss << "input";
         // Make sure the parameter flag is preserved.
@@ -632,7 +640,10 @@ at::Tensor emptyStrided(at::IntArrayRef size, at::IntArrayRef stride,
   ERROR_ON(!isIpuDevice(*device));
   logging::debug("[DISPATCHER] Intercepting aten::empty_strided, device {}",
                  device->str());
-  ERROR_ON(at::detail::defaultStrides(size) != stride);
+  // TODO(T71349): once upstream torch understands that the ipu tensor doesn't
+  // support striding the striding should always be default
+  // ERROR_ON(at::detail::defaultStrides(size) != stride);
+  UNUSED(stride);
   return emptyBase(size, dtype, layout, device, pin_memory);
 }
 
