@@ -257,6 +257,9 @@ inplace_unary_ops = [
 def test_inplace_unary(op, input):
     if op in (torch.asinh_, torch.log1p_) and torch.any(torch.isinf(input)):
         pytest.skip("TODO(T62888) `-inf` -> `nan`")
+    if op in (torch.round_, torch.ceil_, torch.floor_, torch.trunc_) \
+        and input.dtype is torch.bool:
+        pytest.skip("op is not implemented on CPU for bool")
 
     torch.manual_seed(42)
     op_harness(op, input)
