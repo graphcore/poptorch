@@ -207,6 +207,10 @@ def test_unary(op, input):
     if op is torch.square and input.dtype is torch.bool:
         pytest.skip("TODO(T68511) handle scalar attributes")
 
+    if op in (torch.round, torch.ceil, torch.floor, torch.trunc) \
+        and input.dtype is torch.bool:
+        pytest.skip("op is not implemented on CPU for bool")
+
     torch.manual_seed(42)
     op_harness(op, input)
 
