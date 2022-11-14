@@ -711,7 +711,7 @@ toOptionalIntVector(c10::IValue &value) {
 std::int64_t toInt(c10::IValue &value) { return value.toInt(); }
 
 std::int64_t fromSymInt(const c10::IValue &value) {
-  return value.toSymInt().as_int_unchecked();
+  return value.toSymInt().expect_int();
 }
 
 std::optional<std::int64_t> fromOptionalSymInt(const c10::IValue &value) {
