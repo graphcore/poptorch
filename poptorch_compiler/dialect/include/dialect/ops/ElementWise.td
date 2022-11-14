@@ -53,14 +53,14 @@ def Poptorch_bitwiseNot: Poptorch_elem_unary<"bitwiseNot"> {
     let arguments = (ins Poptorch_integral_tensor:$in1);
     let hasCanonicalizeMethod = 1;
 }
-def Poptorch_ceil: Poptorch_elem_unary<"ceil"> {
+def Poptorch_ceil: Poptorch_elem_unary<"ceil", [ImplicitCastOperand<0>, ImplicitCastToFloat]> {
     let arguments = (ins Poptorch_float_tensor:$in1);
 }
 def Poptorch_countLeadingZeros: Poptorch_elem_unary<"countLeadingZeros"> {}
 def Poptorch_erf: Poptorch_elem_unary<"erf", [ImplicitCastOperand<0>, ImplicitCastToFloat]> {}
 def Poptorch_exp: Poptorch_elem_unary<"exp", [ImplicitCastOperand<0>, ImplicitCastToFloat]> {}
 def Poptorch_expm1: Poptorch_elem_unary<"expm1"> {}
-def Poptorch_floor: Poptorch_elem_unary<"floor"> {
+def Poptorch_floor: Poptorch_elem_unary<"floor", [ImplicitCastOperand<0>, ImplicitCastToFloat]> {
     let arguments = (ins Poptorch_float_tensor:$in1);
 }
 def Poptorch_inv: Poptorch_elem_unary<"inv"> {}
@@ -72,10 +72,10 @@ def Poptorch_popcount: Poptorch_elem_unary<"popcount"> {}
 def Poptorch_signum: Poptorch_elem_unary<"signum"> {
     let hasCanonicalizeMethod = 1;
 }
-def Poptorch_round: Poptorch_elem_unary<"round"> {
+def Poptorch_round: Poptorch_elem_unary<"round", [ImplicitCastOperand<0>, ImplicitCastToFloat]> {
     let arguments = (ins Poptorch_float_tensor:$in1);
 }
-def Poptorch_trunc: Poptorch_elem_unary<"trunc"> {
+def Poptorch_trunc: Poptorch_elem_unary<"trunc", [ImplicitCastOperand<0>, ImplicitCastToFloat]> {
     let arguments = (ins Poptorch_float_tensor:$in1);
 }
 def Poptorch_sqrt: Poptorch_elem_unary<"sqrt", [ImplicitCastOperand<0>, ImplicitCastToFloat]> {}
