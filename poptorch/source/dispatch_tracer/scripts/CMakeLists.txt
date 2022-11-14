@@ -1,4 +1,18 @@
 
+set(native_functions_yml "${CMAKE_CURRENT_SOURCE_DIR}/native_functions/native_functions.1.${TORCH_MINOR_VERSION}.yml")
+
+add_custom_target(update_schemas
+    python3 ${CMAKE_CURRENT_SOURCE_DIR}/update_aten_schemas.py
+     # The file containing the list of operations we are creating an interface for.
+     --ops-to-generate "${CMAKE_CURRENT_SOURCE_DIR}/AtenOpSupport.yml"
+
+     # A copy of the upstream native_functions.yml for this version of pytorch.
+     --pytorch-base-native-function "${native_functions_yml}"
+  DEPENDS
+    ${CMAKE_CURRENT_SOURCE_DIR}/AtenOpSupport.yml
+    ${native_functions_yml}
+)
+
 add_custom_command(
   OUTPUT
     ${CMAKE_CURRENT_BINARY_DIR}/../AtenToMLIRInterface.cpp.inc
@@ -9,7 +23,7 @@ add_custom_command(
      --ops-to-generate "${CMAKE_CURRENT_SOURCE_DIR}/AtenOpSupport.yml"
 
      # A copy of the upstream native_functions.yml for this version of pytorch.
-     --pytorch-base-native-function "${CMAKE_CURRENT_SOURCE_DIR}/native_functions/native_functions.1.${TORCH_MINOR_VERSION}.yml"
+     --pytorch-base-native-function "${native_functions_yml}"
 
      # The file to generate into.
      --gen-cpp-file-path "${CMAKE_CURRENT_BINARY_DIR}/../AtenToMLIRInterface.cpp.inc"
