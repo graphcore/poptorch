@@ -37,13 +37,16 @@
 
 #include "pytorch_bridge/CompilerOptions.hpp"
 
-// This is a workaround because torch::jit::toTraceableStack() is broken:
-// torch::jit::as_module() fails to initialise its static local variable
-// ScriptModule and segfaults as a result.
-namespace torch {
-namespace jit {
 namespace poptorch {
 namespace {
+
+// Everything in this namespace is a workaround because
+// torch::jit::toTraceableStack() is broken:torch::jit::as_module() fails to
+// initialise its static local variable ScriptModule and segfaults as a
+// result.
+namespace jit {
+
+using namespace torch::jit;
 
 TypePtr inferType(py::handle input) {
 
@@ -118,20 +121,13 @@ TypePtr inferType(py::handle input) {
   ERROR("Only nested lists and tuples of tensors are supported");
 }
 
-} // namespace
-
 // Cut down version of torch::jit::toTraceableStack which only supports nested
 // tuples and lists of tensors.
 Stack toTraceableStack(const py::tuple &inputs) {
   return toIValue(inputs, inferType(inputs)).toTupleRef().elements().vec();
 }
 
-} // namespace poptorch
 } // namespace jit
-} // namespace torch
-
-namespace poptorch {
-namespace {
 
 template <typename Func> class CallOnExit : Func {
 public:
@@ -433,7 +429,7 @@ getParameterBuffers(const pybind11::tuple &names,
                     const pybind11::tuple &tensors) {
   ERROR_ON(names.size() != tensors.size());
   std::map<std::string, void *> parameters;
-  torch::jit::Stack stack = torch::jit::poptorch::toTraceableStack(tensors);
+  torch::jit::Stack stack = jit::toTraceableStack(tensors);
   for (std::uint64_t i = 0; i < names.size(); ++i) {
     parameters.insert(
         {names[i].cast<std::string>(), stack[i].toTensor().data_ptr()});
@@ -599,8 +595,7 @@ poptorch::LowerToPopart lowerToPopartFromTrace(
   }
 
   // Create a jit stack from the incoming pytorch tensors.
-  torch::jit::Stack input_stack =
-      torch::jit::poptorch::toTraceableStack(inputs);
+  torch::jit::Stack input_stack = jit::toTraceableStack(inputs);
 
   // And turn convert them into at tensors which we can then resolve the
   // address of.
@@ -672,7 +667,7 @@ lowerToPopartFromDispatch(const pybind11::dict &options,
 void mapParamsToNames(const pybind11::tuple &names,
                       const pybind11::tuple &tensors) {
   ERROR_ON(names.size() != tensors.size());
-  torch::jit::Stack stack = torch::jit::poptorch::toTraceableStack(tensors);
+  torch::jit::Stack stack = jit::toTraceableStack(tensors);
   for (uint64_t i = 0; i < names.size(); ++i) {
     const auto name = names[i].cast<std::string>();
     const auto tensor = stack[i].toTensor();
@@ -804,8 +799,7 @@ execute(const std::shared_ptr<poptorch::PoplarExecutable> &executable,
   poptorch::logging::Tracepoint tp{__FUNCTION__};
   ERROR_ON_MSG(!executable, "No built executable");
   // Create a jit stack from the incoming pytorch tensors.
-  torch::jit::Stack input_stack =
-      torch::jit::poptorch::toTraceableStack(inputs);
+  torch::jit::Stack input_stack = jit::toTraceableStack(inputs);
 
   // And turn convert them into at tensors which we can then resolve the
   // address of.
