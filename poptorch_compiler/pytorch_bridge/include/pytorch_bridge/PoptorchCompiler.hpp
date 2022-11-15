@@ -9,7 +9,6 @@
 
 #include "pytorch_bridge/CompilerTypes.hpp"
 #include "pytorch_bridge/IpuSession.hpp"
-#include "pytorch_bridge/PoplarExecutorWrapper.hpp"
 
 namespace mlir {
 class RankedTensorType;
@@ -67,15 +66,6 @@ public:
   TensorId addInput(const TensorType &type, const char *);
   TensorId addParameter(Buffer &ptr, const TensorType &type, const char *);
   void addOutput(TensorId id, const char *);
-
-  // Only if ExecutionType::EagerMode is used.
-  bool isTrivialGraph() const;
-  // Only if ExecutionType::EagerMode is used.
-  PopitDeviceFunctionWrapper compile(IIpuSession &session,
-                                     ILivenessMap &liveness);
-
-  // Only if ExecutionType::StaticGraph is used
-  std::unique_ptr<PoplarExecutorWrapper> compileAndLoad();
 
   std::vector<std::int64_t> getSize(TensorId id) const;
   Type getType(TensorId id) const;

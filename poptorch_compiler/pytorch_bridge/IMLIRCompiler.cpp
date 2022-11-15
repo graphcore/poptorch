@@ -12,7 +12,6 @@
 #include <string>
 #include <vector>
 
-#include "passes/PassUtils.hpp"
 #include "poptorch_logging/Logging.hpp"
 #include "pytorch_bridge/CompilerTypes.hpp"
 
@@ -90,8 +89,7 @@ bool isTrivialGraph(const mlir::ModuleOp &graph) {
 }
 
 IMLIRCompiler::IMLIRCompiler(const poptorch::CompilerOptions &options)
-    : root_timer(timing_manager.getRootTimer()),
-      _builder(mlir::UnknownLoc::get(&context), &context),
+    : _builder(mlir::UnknownLoc::get(&context), &context),
       _compiler_options(&options) {
 
   context.getDiagEngine().registerHandler(printDiagnostic);

@@ -37,7 +37,7 @@ except ImportError as e:
                       "`source /path/to/poplar-sdk/enable`") from e
 
 # pylint: disable=wrong-import-position
-from poptorch.poptorch_core import Error, RecoverableError, UnrecoverableError, enableEagerMode, importPoptorchMetadataFromFile
+from poptorch.poptorch_core import Error, RecoverableError, UnrecoverableError, importPoptorchMetadataFromFile
 from . import _dataloader
 from . import _impl
 from . import _poptorch_data
@@ -45,14 +45,12 @@ from . import _utils
 from .enums import *
 from .ops import *
 from .options import *
-from ._eager_helpers import markStep
 from ._impl import isRunningOnIpu, createPoptorchError
 from ._utils import accessAttributes, getIpuTensorId
 from ._poplar_executor import PoplarExecutor
 from ._printing import *
 from . import optim
 from . import profiling
-from . import experimental
 # pylint: enable=wrong-import-position
 
 __version__ = "@VERSION@-@SNAPSHOT@"
@@ -692,8 +690,6 @@ _real_tensor_str = torch._tensor_str._tensor_str  # pylint: disable=protected-ac
 
 def _tensor_str(self, indent):
     if self.device.type == "ipu":
-        if poptorch_core.eagerModeEnabled():
-            return _real_tensor_str(self.to("cpu"), indent)
         return "<unavailable>"
     return _real_tensor_str(self, indent)
 

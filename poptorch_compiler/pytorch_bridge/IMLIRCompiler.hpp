@@ -17,7 +17,6 @@
 #include <vector>
 
 #include "dialect/PoptorchDialect.hpp"
-#include "lower_to_poplar/NonRestartingMLIRTimer.hpp"
 #include "pytorch_bridge/CompilerOptions.hpp"
 #include "pytorch_bridge/CompilerTypes.hpp"
 
@@ -392,9 +391,6 @@ public:
 
   // A timer for us to record how long it takes to compile each stage.
   mlir::DefaultTimingManager timing_manager;
-
-  // Wrapped root timer, which does not restart if start is called twice.
-  NonRestartingMLIRTimer root_timer;
 
   // A helper to provide a hidden interface to PopTorch to record how long it
   // takes to trace a model.

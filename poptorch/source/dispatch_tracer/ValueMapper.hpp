@@ -124,8 +124,6 @@ public:
   getTensorDetailsForMlirId(poptorch_ir::TensorId mlir_id) const;
 
   Buffer getBufferForId(IpuTensorId id) const;
-  poptorch_ir::PopitMemPtr
-  getBufferForMlirId(poptorch_ir::TensorId mlir_id) const;
   poptorch_ir::CpuBuffer getBufferForValue(torch::jit::Value *value) const;
 
   bool hasMapping(const at::Tensor &t) const;

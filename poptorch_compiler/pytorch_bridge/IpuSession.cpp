@@ -8,27 +8,64 @@
 #include <thread>
 #include <utility>
 
-#include "lower_to_poplar/EagerIpuSession.hpp"
-#include "lower_to_poplar/PopitExecutor.hpp"
-#include "lower_to_poplar/StaticIpuSession.hpp"
 #include "pytorch_bridge/DebugInfo.hpp"
 
 #include <poptorch_logging/Logging.hpp>
 
 namespace poptorch_ir {
 
-PopitMemPtr::PopitMemPtr(std::nullptr_t)
-    : std::shared_ptr<popit::Mem_t>(nullptr) {}
-PopitMemPtr::PopitMemPtr(std::shared_ptr<popit::Mem_t> ptr)
-    : std::shared_ptr<popit::Mem_t>(std::move(ptr)) {}
+namespace {
 
-Buffer::Buffer(CpuBuffer buf) noexcept : _store(std::move(buf)) {}
-Buffer::Buffer(PopitMemPtr buf) noexcept : _store(std::move(buf)) {}
-Buffer &Buffer::operator=(CpuBuffer buf) noexcept {
-  _store = std::move(buf);
-  return *this;
+std::size_t dataSize(Type element_type) {
+  switch (element_type) {
+  case Type::BOOL:
+  case Type::CHAR:
+  case Type::UNSIGNED_CHAR:
+    return 1;
+  case Type::SHORT:
+  case Type::UNSIGNED_SHORT:
+  case Type::HALF:
+  case Type::BFLOAT16:
+    return 2;
+  case Type::INT:
+  case Type::UNSIGNED_INT:
+  case Type::FLOAT:
+    return 4;
+  case Type::NONE:
+  case Type::UNDEFINED:
+    break;
+  }
+  ERROR("No type");
 }
-Buffer &Buffer::operator=(PopitMemPtr buf) noexcept {
+
+class StaticIpuSession : public IIpuSession {
+public:
+  Buffer allocate(const TensorType &type) override {
+    auto data_size = dataSize(type.element_type) * type.getNumElements();
+    return Buffer(std::make_shared<std::vector<char>>(data_size));
+  }
+  void copyDataFromCpuSource(Buffer &ipu_dest, const char *cpu_data) override {
+    const auto &ipu_data = ipu_dest.getCpuData();
+    ERROR_ON(!ipu_data);
+    std::copy(cpu_data, cpu_data + ipu_data->size(), ipu_data->data());
+  }
+  void copyDataToCpu(char *cpu_dest, Buffer &ipu_src) override {
+    const auto &ipu_data = ipu_src.getCpuData();
+    ERROR_ON(!ipu_data);
+    std::copy(ipu_data->data(), ipu_data->data() + ipu_data->size(), cpu_dest);
+  }
+  void copyDataOnDevice(Buffer &dest, const Buffer &src) override {
+    const auto &dest_data = dest.getCpuData();
+    const auto &src_data = src.getCpuData();
+    ERROR_ON(dest_data->size() != src_data->size());
+    std::copy(src_data->data(), src_data->data() + src_data->size(),
+              dest_data->data());
+  }
+};
+
+} // namespace
+Buffer::Buffer(CpuBuffer buf) noexcept : _store(std::move(buf)) {}
+Buffer &Buffer::operator=(CpuBuffer buf) noexcept {
   _store = std::move(buf);
   return *this;
 }
@@ -40,14 +77,6 @@ const CpuBuffer &Buffer::getCpuData() const {
   ERROR_ON(!std::holds_alternative<CpuBuffer>(_store));
   return std::get<CpuBuffer>(_store);
 }
-PopitMemPtr &Buffer::getPopitData() {
-  ERROR_ON(!std::holds_alternative<PopitMemPtr>(_store));
-  return std::get<PopitMemPtr>(_store);
-}
-const PopitMemPtr &Buffer::getPopitData() const {
-  ERROR_ON(!std::holds_alternative<PopitMemPtr>(_store));
-  return std::get<PopitMemPtr>(_store);
-}
 bool Buffer::hasData() const {
   return !std::holds_alternative<std::monostate>(_store);
 }
@@ -55,51 +84,4 @@ bool Buffer::hasData() const {
 std::shared_ptr<IIpuSession> createStaticSession() {
   return std::make_shared<StaticIpuSession>();
 }
-
-std::shared_ptr<IIpuSession> createEagerSession(bool headless) {
-  if (headless) {
-    return std::make_shared<HeadlessIpuSession>();
-  }
-  return std::make_shared<EagerIpuSession>();
-}
-
-PopitDeviceFunctionWrapper
-PopitDeviceFunctionWrapper::createTrivialFunction() noexcept {
-  return PopitDeviceFunctionWrapper(nullptr, {}, {});
-}
-
-PopitDeviceFunctionWrapper::PopitDeviceFunctionWrapper(
-    std::shared_ptr<PopitDeviceFunction> func, FunctionIO io,
-    GraphDebugInfo debug_info)
-    : _func(std::move(func)), _io(std::move(io)),
-      _debug_info(std::move(debug_info)) {}
-PopitDeviceFunctionWrapper::~PopitDeviceFunctionWrapper() = default;
-
-void PopitDeviceFunctionWrapper::run(IAllocationMap &alloc_map) const {
-  ERROR_ON(_func == nullptr);
-
-  std::vector<popit::Mem_t *> inputs;
-  inputs.reserve(_io.inputs.size());
-  llvm::transform(_io.inputs, std::back_inserter(inputs), [&](TensorId input) {
-    return alloc_map.getAllocation(input);
-  });
-
-  std::vector<popit::Mem_t *> outputs;
-  outputs.reserve(_io.outputs.size());
-  llvm::transform(llvm::enumerate(_io.outputs), std::back_inserter(outputs),
-                  [&](auto output) {
-                    return alloc_map.getOrAllocate(
-                        output.value(),
-                        TensorDebugInfo{_debug_info, output.index()});
-                  });
-
-  _func->run(inputs, outputs);
-
-  poptorch::logging::info("Executed PopIT function");
-}
-
-bool PopitDeviceFunctionWrapper::isTrivial() const noexcept {
-  return _func == nullptr;
-}
-
 } // namespace poptorch_ir

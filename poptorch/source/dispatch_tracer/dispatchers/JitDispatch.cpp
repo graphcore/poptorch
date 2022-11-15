@@ -363,11 +363,6 @@ void JITDispatch::fallback(const c10::OperatorHandle &op, c10::Stack *stack) {
             // No need to register the tensor if it's undefined.
             return;
           }
-          // If the tensor is not tracked by JIT then don't track it in MLIR.
-          // (It's probably a CPU constant)
-          if (_mapper.getValueForTensor(tensor) != nullptr) {
-            _mlir_dispatch.registerEmptyTensor(tensor, true);
-          }
         } else {
           // If this assertion is hit then we need to add support for this kind
           // of value by going through the container and identifying all the

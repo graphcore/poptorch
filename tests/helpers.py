@@ -5,7 +5,6 @@ import re
 import torch
 import poptorch
 import poptorch.poptorch_core as poptorch_core  # type: ignore
-from poptorch.experimental import ipu_wrapper
 
 # Will be changed by conftest.py if pytest is only collecting tests
 is_running_tests = True
@@ -405,18 +404,3 @@ def outputDevice():
     if poptorch.isRunningOnIpu() and poptorch._impl.isDispatchTracing():  # pylint: disable=protected-access
         return "ipu"
     return None
-
-
-def runFunctionOnIpu(fn, *inputs):
-    """Helper function to automatically move the inputs to the IPU, run the
-    function on the IPU and move the outputs back to CPU."""
-    inputs = [
-        i.to("ipu") if isinstance(i, torch.Tensor) else i for i in inputs
-    ]
-
-    output = ipu_wrapper(fn)(*inputs)
-    if isinstance(output, torch.Tensor):
-        return output.to("cpu")
-    assert isinstance(output, (tuple, list))
-    return type(output)(o.to("cpu") if isinstance(o, torch.Tensor) else o
-                        for o in output)

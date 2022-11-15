@@ -275,20 +275,6 @@ Buffer ValueMapper::getBufferForId(IpuTensorId id) const {
   return *it->second.buffer;
 }
 
-poptorch_ir::PopitMemPtr
-ValueMapper::getBufferForMlirId(poptorch_ir::TensorId id) const {
-  auto it = _mlir_id_tensors_map.find(id);
-  if (it == _mlir_id_tensors_map.end()) {
-    return nullptr;
-  }
-
-  if (auto b = getBufferForId(it->second); b.hasData()) {
-    return b.getPopitData();
-  }
-
-  return nullptr;
-}
-
 poptorch_ir::CpuBuffer
 ValueMapper::getBufferForValue(torch::jit::Value *value) const {
   auto itr = _values_map.find(value);

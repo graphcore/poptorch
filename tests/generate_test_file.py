@@ -2,7 +2,6 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 import argparse
 import contextlib
-import glob
 import os
 import io
 import re
@@ -12,12 +11,6 @@ import pytest
 parser = argparse.ArgumentParser(description="Generate CTestTestfile.cmake")
 parser.add_argument("test_dir", help="Path to the folder containing the tests")
 parser.add_argument("output_file", help="Path to CTestTestfile.cmake")
-parser.add_argument("--poptorch-opt",
-                    help=("Path to poptorch-opt binary. If not set, MLIR pass "
-                          "tests will not be generated."))
-parser.add_argument("--filecheck-bin",
-                    help=("Path to FileCheck binary. If not set, MLIR pass "
-                          "tests will not be generated."))
 parser.add_argument("--add-to-sys-path", help="Path to add to sys.path")
 parser.add_argument("--extra-pytest-args",
                     type=str,
@@ -133,29 +126,6 @@ def add_test(output, test, root_folder, folder, test_id, test_properties,
 
 work_dir = os.getcwd()
 
-
-def collect_mlir_tests(test_root: str) -> [(str, str)]:
-    '''
-    Get a list of (testname, /path/to/testname_test.mlir).
-
-    '''
-
-    suffix = '_test.mlir'
-    # NOTE: can't limit search to `mlir/`, since if `COPY_TESTS` is specified
-    # the hierarchy inside `tests/` will be collapsed.
-    files = glob.glob(test_root + f'/**/*{suffix}', recursive=True)
-    names = [os.path.basename(f)[:-len(suffix)] for f in files]
-    return zip(names, files)
-
-
-def add_mlir_test(output, name: str, file: str, poptorch_opt_bin: str,
-                  filecheck_bin: str):
-    output.write(f"add_test({name} lit -vv {file} "
-                 f"--param poptorch-opt={poptorch_opt_bin} "
-                 f"--param FileCheck={filecheck_bin})\n")
-    output.write(f"set_tests_properties({name} PROPERTIES LABELS mlir)\n")
-
-
 with open(args.output_file, "w") as output:
     test_id = 0
     # Add the short_tests files
@@ -211,8 +181,3 @@ with open(args.output_file, "w") as output:
             add_test(output, f"{test_file}::{m.group(2)}", args.test_dir,
                      dir_path, test_id, test_properties, extra_args)
             test_id += 1
-
-    if args.poptorch_opt and args.filecheck_bin:
-        for test_name, test_file in collect_mlir_tests(args.test_dir):
-            add_mlir_test(output, test_name, test_file, args.poptorch_opt,
-                          args.filecheck_bin)

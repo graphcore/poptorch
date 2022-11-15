@@ -5,9 +5,6 @@ add_definitions(${LLVM_DEFINITIONS})
 add_library(poptorch_compiler SHARED
   PoptorchCompiler.cpp
   IMLIRCompiler.cpp
-  MLIREagerCompiler.cpp
-  MLIRStaticGraphCompiler.cpp
-  PoplarExecutorWrapper.cpp
   Ops.cpp
   PytorchBridgeUtils.cpp
   IpuSession.cpp
@@ -23,8 +20,7 @@ target_link_libraries(poptorch_compiler
     MLIRIR
     MLIRSupport
     LLVMSupport
-
-    lower_to_poplar
+    poptorch_mlir_passes
 )
 
 set_property(TARGET poptorch_compiler PROPERTY CXX_STANDARD 17)

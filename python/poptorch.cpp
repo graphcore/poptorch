@@ -1194,32 +1194,10 @@ PYBIND11_MODULE(poptorch_core, m) { // NOLINT
         PTC(poptorch::registerBuffersWithCallback));
   m.def("_validateOptions", PTC(poptorch::parseSessionOptionsVoid));
 
-  py::class_<poptorch::MLIRExecutor, std::shared_ptr<poptorch::MLIRExecutor>>(
-      m, "MLIRExecutor")
-      .def("execute",
-           [&](const std::shared_ptr<poptorch::MLIRExecutor> mlir_executor,
-               const std::vector<at::Tensor> &inputs) {
-             poptorch::swapLastMLIRExecutor(mlir_executor);
-             return poptorch::toPythonList(mlir_executor->execute(inputs));
-           })
-      .def("weightsToDevice", &poptorch::MLIRExecutor::weightsToDevice)
-      .def("copyWeightsToHostIfNeeded",
-           &poptorch::MLIRExecutor::copyWeightsToHostIfNeeded);
-  m.def("compileMLIR", PTC(poptorch::compileMLIR));
-
   py::enum_<poptorch::TracingMode>(m, "TracingMode")
       .value("PopART", poptorch::TracingMode::POPART)
-      .value("MLIR", poptorch::TracingMode::MLIR)
-      .value("Sentinel", poptorch::TracingMode::SENTINEL)
       .export_values();
 
-  m.def("enableEagerMode", PTC(poptorch::enableEagerMode),
-        py::return_value_policy::reference);
-  m.def("eagerModeEnabled", PTC(poptorch::eagerModeEnabled));
-  m.def("markStep", PTC(poptorch::markStep),
-        "Break the current lazy tensor trace and start executing it "
-        "asynchronously. This doesn't do anything when not in eager mode or "
-        "when use_lazy_tensor is off");
   m.def("poptorchAtExit", PTC(poptorch::poptorchAtExit));
   m.def("destroyDispatcher", PTC(poptorch::destroyDispatcher));
   m.def("startDispatch", PTC(poptorch::startDispatch));
@@ -1239,8 +1217,6 @@ PYBIND11_MODULE(poptorch_core, m) { // NOLINT
         PTC(poptorch::bindings::processDispatchAndImportExecutable));
   m.def("_throwTestError", PTC(poptorch::popart_compiler::throwTestError));
   m.def("getIpuTensorId", PTC(poptorch::getIpuTensorId));
-  m.def("promoteArgsAsInputs", PTC(poptorch::promoteArgsAsInputs));
-  m.def("promoteOutputs", PTC(poptorch::promoteOutputs));
 
   m.def("getInitialGraph", PTC(poptorch::getInitialGraph),
         "Get the last graph that assigned to this tensor before any passes "

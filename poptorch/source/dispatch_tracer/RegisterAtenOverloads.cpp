@@ -35,7 +35,6 @@
 #include "pytorch_bridge/IpuSession.hpp"
 
 #include "dispatchers/JitDispatch.hpp"
-#include "dispatchers/MLIRDispatch.hpp"
 
 #include "pytorch_bridge/CompilerOptions.hpp"
 
@@ -142,10 +141,6 @@ struct GlobalTracerContext {
   // exist.
   std::set<void *> graph_inputs;
 
-  // Store a weak pointer to the MLIRExecutor which was last run. This allows us
-  // to move associated tensors off the device when we load a new executor.
-  std::weak_ptr<MLIRExecutor> last_mlir_executor;
-
   // Create and store Tensors...
   TensorStore tensor_store;
 
@@ -165,8 +160,6 @@ std::unique_ptr<GlobalTracerContext> context =
 GlobalTracerContext &getContext() { return *context; }
 
 // Poplar doesn't support long, so cast to int if needed.
-// All the downcasts added here must also be handled
-// in MLIRExecutor::execute()
 at::Tensor downCastIfNeeded(const at::Tensor &t) {
   if (t.scalar_type() == at::ScalarType::Long) {
     return t.to(at::ScalarType::Int);
@@ -243,18 +236,8 @@ void copyInplace(const c10::OperatorHandle &op, c10::Stack *stack) {
       getContext().tensor_store.copyFromCpu(self, src.contiguous());
     } else if (self.is_cpu() && src.is_ipu()) {
       logging::trace("copy_ IPU -> CPU, outside dispatch");
-      if (const std::shared_ptr<MLIRExecutor> executor =
-              getContext().last_mlir_executor.lock()) {
-        executor->copyWeightsToHostIfNeeded();
-      }
-
       getContext().tensor_store.copyToCpu(self, src);
     } else if (self.is_ipu() && src.is_ipu()) {
-      if (const std::shared_ptr<MLIRExecutor> executor =
-              getContext().last_mlir_executor.lock()) {
-        executor->copyWeightsToHostIfNeeded();
-      }
-
       if (!getHostBuffer(self).hasData()) {
         getContext().tensor_store.allocateBuffer(self);
       }
@@ -302,7 +285,7 @@ void copyInplace(const c10::OperatorHandle &op, c10::Stack *stack) {
         ss << "parameter";
       } else {
         ERROR_ON_MSG(
-            src.requires_grad() && !eagerModeEnabled(),
+            src.requires_grad(),
             "An input tensor to an IPU model can not have requires_grad set "
             "to True.");
 
@@ -331,7 +314,7 @@ void copyInplace(const c10::OperatorHandle &op, c10::Stack *stack) {
   } else {
     ERROR_ON(!self.is_cpu());
     if (src.is_ipu()) {
-      ERROR_ON_MSG(!getContext().moving_outputs && !eagerModeEnabled(),
+      ERROR_ON_MSG(!getContext().moving_outputs,
                    "Illegal move to CPU (via `.to(\"cpu\")`) when using the "
                    "dispatcher. Instead, return this output as an IPU tensor.");
       logging::debug("copy_ output IPU -> CPU");
@@ -360,30 +343,6 @@ void endOutputsMove() { getContext().moving_outputs = false; }
 
 // Turn on.
 void startDispatch() { getContext().dispatch_on = true; }
-
-bool eagerModeEnabled() {
-  bool result = false;
-  if (getContext().hasActiveDispatch()) {
-    auto *mlir = dynamic_cast<MLIRDispatch *>(getContext().activeDispatch());
-    if (mlir != nullptr) {
-      result = mlir->isEagerMode();
-    }
-  }
-  return result;
-}
-
-CompilerOptions &enableEagerMode(bool headless) {
-  UNUSED(headless);
-  auto dispatcher = std::make_unique<MLIRDispatch>(
-      CompilerOptions::eagerOptions(!headless), &getContext().tensor_store);
-
-  auto &options = dispatcher->getMutableCompilerOptions();
-
-  getContext().resetActiveDispatch(std::move(dispatcher));
-  getContext().tensor_store.enableEagerMode(headless);
-
-  return options;
-}
 
 void setPythonTracebackAccessor(PythonTracebackAccessor accessor) {
   getContext().setPythonTracebackAccessor(std::move(accessor));
@@ -445,15 +404,6 @@ bool isCompilingWithDispatcher() { return getContext().hasActiveDispatch(); }
 // to us.
 bool isDispatcherOn() { return getContext().isDispatchOn(); }
 
-void swapLastMLIRExecutor(const std::shared_ptr<MLIRExecutor> &mlir_executor) {
-  if (const std::shared_ptr<MLIRExecutor> replaced_mlir_executor =
-          getContext().last_mlir_executor.lock()) {
-    replaced_mlir_executor->copyWeightsToHostIfNeeded();
-  }
-  getContext().last_mlir_executor = mlir_executor;
-  mlir_executor->weightsToDevice();
-}
-
 CompilerOptions
 createMLIROptions(const std::vector<std::string> &source_location_excludes) {
   CompilerOptions options;
@@ -473,9 +423,6 @@ void createGraph(TracingMode mode, const std::vector<at::Tensor> &inputs,
   if (mode == TracingMode::POPART) {
     getContext().resetActiveDispatch(
         std::make_unique<JITDispatch>(options, &getContext().tensor_store));
-  } else if (mode == TracingMode::MLIR) {
-    getContext().resetActiveDispatch(
-        std::make_unique<MLIRDispatch>(options, &getContext().tensor_store));
   } else {
     ERROR("Unsupported target");
   }
@@ -509,14 +456,6 @@ void fallback(const c10::OperatorHandle &op, c10::Stack *stack) {
   for (const auto &t : *stack) {
     logging::trace("[Output {}] {}", schema.name(), valueToString(t));
   }
-}
-
-std::shared_ptr<MLIRExecutor> compileMLIR() {
-  auto *mlir = dynamic_cast<MLIRDispatch *>(getContext().activeDispatch());
-  ERROR_ON(mlir == nullptr);
-  auto executor = mlir->compile();
-  destroyDispatcher();
-  return executor;
 }
 
 InplaceGraphInfo getInplaceGraphInfo(size_t num_anchors,
@@ -572,12 +511,10 @@ at::Scalar localScalarDense(const at::Tensor &self) {
 }
 
 at::Scalar item(const at::Tensor &self) {
-  ERROR_ON_MSG(
-      !eagerModeEnabled(),
-      "aten::item is only supported in eager mode, but was intercepted in "
-      "a static graph. This means an IPU to CPU copy was triggered before "
-      "the end of the graph, for example by calling tensor.item(). "
-      "Please ensure that any such copies are removed.");
+  ERROR("aten::item is only supported in eager mode, but was intercepted in "
+        "a static graph. This means an IPU to CPU copy was triggered before "
+        "the end of the graph, for example by calling tensor.item(). "
+        "Please ensure that any such copies are removed.");
 
   return at::native::call_fallback_fn<&poptorch::cpuFallback,
                                       ATEN_OP(item)>::call(self);
@@ -711,24 +648,6 @@ std::uint64_t getIpuTensorId(const at::Tensor &tensor) {
   ERROR_ON_MSG(!isIpuTensor(tensor),
                "You may only call getIpuTensorId on an IPU tensor");
   return ipuTensorId(tensor);
-}
-
-void promoteArgsAsInputs(const std::vector<at::Tensor> &args) {
-  auto *mlir = dynamic_cast<MLIRDispatch *>(getContext().activeDispatch());
-  ERROR_ON(mlir == nullptr);
-
-  for (const at::Tensor &arg : args) {
-    mlir->promoteAsInput(arg, true);
-  }
-}
-
-void promoteOutputs(const std::vector<at::Tensor> &outputs) {
-  auto *mlir = dynamic_cast<MLIRDispatch *>(getContext().activeDispatch());
-  ERROR_ON(mlir == nullptr);
-
-  for (const at::Tensor &out : outputs) {
-    mlir->promoteAsOutput(out);
-  }
 }
 
 bool movingParameters() { return getContext().moving_parameters; }

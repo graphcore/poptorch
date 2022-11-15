@@ -11,14 +11,6 @@ def Poptorch_PoplarImplInterface : OpInterface<"PoplarImplInterface"> {
     into lower_to_poplar.
   }];
 
-  let methods = [
-    InterfaceMethod<
-      [{Lowers this operation to a poplar implementation.}],
-        "void",
-        "lowerToPoplar",
-        (ins "poptorch_ir::CompilerContext&":$context)
-    >,
-  ];
 }
 
 //class Poptorch_ViewInterface<string outplaceCppOpType, string inverseCppOpType>

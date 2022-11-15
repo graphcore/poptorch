@@ -8,16 +8,35 @@
 #include <memory>
 #include <utility>
 
-#include "lower_to_poplar/EagerIpuSession.hpp"
-#include "lower_to_poplar/PoplarDeviceAndTarget.hpp"
 #include "pytorch_bridge/CompilerOptions.hpp"
 #include "pytorch_bridge/PytorchBridgeUtils.hpp"
 
 #include "IMLIRCompiler.hpp"
-#include "MLIREagerCompiler.hpp"
-#include "MLIRStaticGraphCompiler.hpp"
 
 namespace poptorch_ir {
+
+namespace {
+
+class ShapeInferenceCompiler : public detail::IMLIRCompiler {
+public:
+  using IMLIRCompiler::IMLIRCompiler;
+  TensorId addInput(const mlir::RankedTensorType & /*input*/,
+                    const char * /*name*/) override {
+    ERROR("Not implemented");
+  }
+
+  TensorId addParameter(Buffer & /*ptr*/,
+                        const mlir::RankedTensorType & /*parameter*/,
+                        const char * /*name*/) override {
+    ERROR("Not implemented");
+  }
+
+  void addOutput(TensorId /*id*/, const char * /*name*/) override {
+    ERROR("Not implemented");
+  }
+};
+
+} // namespace
 
 PoptorchCompiler::PoptorchCompiler() {}
 
@@ -33,20 +52,12 @@ PoptorchCompiler::PoptorchCompiler(PoptorchCompiler &&other) = default;
 PoptorchCompiler &
 PoptorchCompiler::operator=(PoptorchCompiler &&other) = default;
 
-void PoptorchCompiler::init(ExecutionType execution_type,
+void PoptorchCompiler::init(ExecutionType /*execution_type*/,
                             CompilerBackend compiler_backend,
                             const poptorch::CompilerOptions &options) {
   ERROR_ON_MSG(compiler_backend != CompilerBackend::Poplar,
                "Only CompilerBackend::Poplar supported for now");
-
-  if (compiler_backend == CompilerBackend::Poplar) {
-    if (execution_type == ExecutionType::StaticGraph) {
-      _impl = std::make_unique<detail::MLIRStaticGraphCompiler>(options);
-    } else if (execution_type == ExecutionType::EagerMode) {
-      _impl = std::make_unique<detail::MLIREagerCompiler>(options);
-    }
-  }
-  ERROR_ON(_impl == nullptr);
+  _impl = std::make_unique<ShapeInferenceCompiler>(options);
 }
 
 TensorId PoptorchCompiler::addInput(const TensorType &type, const char *name) {
@@ -78,8 +89,8 @@ void PoptorchCompiler::addOutput(TensorId id, const char *name) {
 void PoptorchCompiler::startTraceTiming() {
   _impl->timing_manager.setEnabled(true);
 
-  _impl->root_timer.start();
-  _impl->tracer_timer = _impl->root_timer.nestAndScope("PytorchTracingTime");
+  //_impl->root_timer.start();
+  //_impl->tracer_timer = _impl->root_timer.nestAndScope("PytorchTracingTime");
 }
 
 void PoptorchCompiler::endTraceTiming() {
@@ -114,51 +125,6 @@ PoptorchCompiler::getRankedTensorType(TensorId id) const {
 
 bool PoptorchCompiler::allOpsCanBeLoweredToPoplar() const {
   return _impl->allOpsCanBeLoweredToPoplar();
-}
-
-bool PoptorchCompiler::isTrivialGraph() const {
-  return _impl->isTrivialGraph();
-}
-
-PopitDeviceFunctionWrapper PoptorchCompiler::compile(IIpuSession &session,
-                                                     ILivenessMap &liveness) {
-  auto *compiler = dynamic_cast<detail::MLIREagerCompiler *>(_impl.get());
-
-  ERROR_ON_MSG(
-      compiler == nullptr,
-      "[internal] Only eager builders may call compile(session, liveness)");
-  return compiler->compile(dynamic_cast<IEagerIpuSession &>(session), liveness);
-}
-
-std::unique_ptr<PoplarExecutorWrapper> PoptorchCompiler::compileAndLoad() {
-  auto *compiler = dynamic_cast<detail::MLIRStaticGraphCompiler *>(_impl.get());
-  ERROR_ON_MSG(compiler == nullptr,
-               "[Internal] Only static graph builders can compileAndLoad()");
-  ERROR_ON_MSG(
-      compiler->input_callbacks.empty() && compiler->output_callbacks.empty(),
-      "Either no inputs or outputs were added or compiling a second time.");
-
-  // Obtain the device
-  const auto device = PoplarDevice::defaultDevice();
-  auto exe = compiler->compile(device.getTarget());
-
-  exe.load(device);
-
-  for (auto &pair : compiler->weight_callbacks) {
-    exe.connectStream(
-        std::string("Write-") + std::string(pair.nameStringView()), pair.buff);
-    exe.connectStream(std::string("Read-") + std::string(pair.nameStringView()),
-                      std::move(pair.buff));
-  }
-  compiler->weight_callbacks.clear();
-
-  auto executor = std::make_unique<PoplarExecutorWrapper>(
-      std::move(exe), std::move(compiler->input_callbacks),
-      std::move(compiler->output_callbacks));
-  compiler->input_callbacks.clear();
-  compiler->output_callbacks.clear();
-
-  return executor;
 }
 
 } // namespace poptorch_ir

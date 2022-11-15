@@ -11,10 +11,6 @@
 #include "pytorch_bridge/DebugInfo.hpp"
 #include <poptorch_logging/Error.hpp>
 
-namespace popit {
-using Mem_t = struct MemRef;
-} // namespace popit
-
 namespace poptorch_ir {
 
 struct FunctionIO {
@@ -22,40 +18,19 @@ struct FunctionIO {
   std::vector<TensorId> outputs;
 };
 
-class EagerIpuSession;
-class HeadlessIpuSession;
-
-class PopitMemPtr : public std::shared_ptr<popit::Mem_t> {
-public:
-  PopitMemPtr(std::nullptr_t);
-
-private:
-  // Only constructible from the eager ipu session
-  friend class EagerIpuSession;
-  friend class HeadlessIpuSession;
-  explicit PopitMemPtr(std::shared_ptr<popit::Mem_t> ptr);
-};
-
 class Buffer {
   // TODO(T70841): since Buffer is stored as a shared pointer it should be
-  // possible at least stop CpuBuffer being a shared pointer and it might be
-  // possible to tidy up PopitMemPtr at the same time
-  std::variant<std::monostate, CpuBuffer, PopitMemPtr> _store =
-      std::monostate{};
+  // possible at least stop CpuBuffer being a shared pointer.
+  std::variant<std::monostate, CpuBuffer> _store = std::monostate{};
 
 public:
   Buffer() = default;
   explicit Buffer(CpuBuffer buf) noexcept;
-  explicit Buffer(PopitMemPtr buf) noexcept;
 
   Buffer &operator=(CpuBuffer buf) noexcept;
-  Buffer &operator=(PopitMemPtr buf) noexcept;
 
   const CpuBuffer &getCpuData();
   const CpuBuffer &getCpuData() const;
-
-  PopitMemPtr &getPopitData();
-  const PopitMemPtr &getPopitData() const;
 
   bool hasData() const;
 };
@@ -71,43 +46,6 @@ public:
 };
 
 std::shared_ptr<IIpuSession> createStaticSession();
-std::shared_ptr<IIpuSession> createEagerSession(bool headless = false);
-
-class PopitDeviceFunction;
-
-class IAllocationMap {
-public:
-  virtual ~IAllocationMap() = default;
-
-  virtual popit::Mem_t *getAllocation(TensorId id) const = 0;
-  virtual popit::Mem_t *getOrAllocate(TensorId id, TensorDebugInfo info) = 0;
-};
-
-class PopitDeviceFunctionWrapper {
-public:
-  static PopitDeviceFunctionWrapper createTrivialFunction() noexcept;
-
-  PopitDeviceFunctionWrapper(std::shared_ptr<PopitDeviceFunction> func,
-                             FunctionIO io, GraphDebugInfo debug_info);
-  PopitDeviceFunctionWrapper(PopitDeviceFunctionWrapper &&) noexcept = default;
-  PopitDeviceFunctionWrapper &
-  operator=(PopitDeviceFunctionWrapper &&) noexcept = default;
-  PopitDeviceFunctionWrapper(const PopitDeviceFunctionWrapper &) = delete;
-  PopitDeviceFunctionWrapper &
-  operator=(const PopitDeviceFunctionWrapper &) = delete;
-
-  ~PopitDeviceFunctionWrapper();
-
-  bool isTrivial() const noexcept;
-  void run(IAllocationMap &alloc_map) const;
-
-private:
-  PopitDeviceFunctionWrapper() = default;
-
-  std::shared_ptr<PopitDeviceFunction> _func = nullptr;
-  FunctionIO _io;
-  GraphDebugInfo _debug_info;
-};
 
 } // namespace poptorch_ir
 

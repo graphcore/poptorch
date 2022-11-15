@@ -31,7 +31,6 @@ public:
                     const at::Tensor &ipu_tensor) final;
   void addOutput(const at::Tensor &ipu_src, const at::Tensor &cpu_dest) final;
   void finalizeGraph() final;
-  void markStep() final;
 
   void fallback(const c10::OperatorHandle &op, c10::Stack *stack) final;
   std::string handleOp(const c10::OperatorHandle &op, c10::Stack *stack);
@@ -51,8 +50,6 @@ public:
                                          bool is_param);
 
   void registerEmptyTensor(const at::Tensor &tensor, bool is_param) final;
-
-  std::shared_ptr<MLIRExecutor> compile();
 
   poptorch_ir::TensorId
   ensureInDispatch(const std::shared_ptr<IpuTensorDetails> &details);
@@ -96,9 +93,6 @@ public:
       const std::vector<poptorch_ir::OptionalTensorId> &output_id,
       const std::vector<bool> &requires_grad);
 
-  bool isEagerMode() const;
-  bool shouldRunAllOpsSynchronously() const;
-  bool extractOutputImmediately() const;
   CompilerOptions &getMutableCompilerOptions();
   const std::vector<std::vector<char>> &getSourceLocationExcludes() const final;
 
@@ -154,8 +148,6 @@ private:
   static const DispatchTable direct_dispatch_lookup;
 
   CompilerOptions _opts;
-
-  bool isDeferredEmptyTensor(const at::Tensor &tensor) const;
 };
 
 } // namespace poptorch

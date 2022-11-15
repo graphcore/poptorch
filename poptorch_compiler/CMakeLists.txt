@@ -22,10 +22,6 @@ foreach(lib ${MLIR_EXPORTED_TARGETS})
   remove_shared_llvm(${lib})
 endforeach()
 
-find_package(poplar REQUIRED)
-find_package(popir REQUIRED)
-find_package(poplibs REQUIRED)
-
 # Add LLVM to the module path. Needed to find the "include" code below.
 list(APPEND CMAKE_MODULE_PATH "${MLIR_CMAKE_DIR}")
 list(APPEND CMAKE_MODULE_PATH "${LLVM_CMAKE_DIR}")
@@ -76,31 +72,13 @@ set(BRIDGE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/pytorch_bridge/")
 # Build the dialect.
 add_subdirectory(dialect)
 
-
-# Add lower to poplar to include path.
-include_directories("${PROJECT_SOURCE_DIR}/lower_to_poplar/include/")
-
-# Include the PyTorch interface
-include_directories("${PROJECT_SOURCE_DIR}/pytorch_bridge/include/")
-
-# Include the generic passes
-include_directories("${PROJECT_SOURCE_DIR}/transforms/include/")
-
 # Build the mlir passes
 add_subdirectory(transforms)
-
-# Build the poplar lowering code.
-add_subdirectory(lower_to_poplar)
 
 # Add the main LIB.
 add_subdirectory(pytorch_bridge)
 
-# Add the tools.
-add_subdirectory(tools)
-
 # LLVM can lead to a few link problems.
 message(STATUS "Checking LLVM link libs:\n")
-mlir_check_all_link_libraries(poptorch_compiler)
-mlir_check_all_link_libraries(lower_to_poplar)
 mlir_check_all_link_libraries(poptorch_dialect)
 
