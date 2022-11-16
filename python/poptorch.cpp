@@ -1109,22 +1109,6 @@ PYBIND11_MODULE(poptorch_core, m) { // NOLINT
       give_me_a_name(m, "InternalPoplarExecutable");
   py::class_<poptorch::CompilerOptions>(m, "CompilerOptions")
       .def(py::init<>())
-      .def_property_readonly(
-          "use_eager_mode",
-          [](const poptorch::CompilerOptions &options) {
-            return options.eager.eager_mode;
-          },
-          "Whether this options struct is for the eager mode compiler")
-      .def_property(
-          "use_lazy_tensor",
-          [](const poptorch::CompilerOptions &options) {
-            return options.eager.use_lazy_tensor;
-          },
-          [](poptorch::CompilerOptions &options, bool val) {
-            options.eager.use_lazy_tensor = val;
-          },
-          "Use Lazy Tensor: whether to run operations on the ipu immediately"
-          "or delay running them until after a synchronisation point")
       .def_property(
           "source_location_excludes",
           [](const poptorch::CompilerOptions &options) {
@@ -1217,13 +1201,6 @@ PYBIND11_MODULE(poptorch_core, m) { // NOLINT
         PTC(poptorch::bindings::processDispatchAndImportExecutable));
   m.def("_throwTestError", PTC(poptorch::popart_compiler::throwTestError));
   m.def("getIpuTensorId", PTC(poptorch::getIpuTensorId));
-
-  m.def("getInitialGraph", PTC(poptorch::getInitialGraph),
-        "Get the last graph that assigned to this tensor before any passes "
-        "have been ran");
-  m.def("getCachedGraph", PTC(poptorch::getCachedGraph),
-        "Get the last graph that assigned to this tensor after "
-        "all canonicalization passes have been applied");
 
   poptorch::initialiseExceptionHandling(m);
   poptorch::setPythonTracebackAccessor(&poptorch::pythonTracebackAccessor);

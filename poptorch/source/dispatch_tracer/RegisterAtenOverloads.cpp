@@ -42,13 +42,6 @@ namespace poptorch {
 
 namespace {
 
-std::string toStdString(const std::shared_ptr<std::vector<char>> &str) {
-  if (str) {
-    return std::string(str->begin(), str->end());
-  }
-  return "";
-}
-
 std::string valueToString(const c10::IValue &ivalue) {
   if (ivalue.isTensor()) {
     return str(ivalue.toTensor());
@@ -119,7 +112,6 @@ struct GlobalTracerContext {
 
   // A state used to determine if the new tensors we receive from the dispatcher
   // are inputs or parameters.
-  // TODO(T61576) Find a better way to identify parameters and buffers.
   bool moving_parameters{false};
 
   // A state used to determine whether we are currently registering output
@@ -128,9 +120,6 @@ struct GlobalTracerContext {
   // this might happen is using torch dynamic slicing in the dispatcher
   // (instead of poptorch.dynamic_slice()).
   bool moving_outputs{false};
-
-  // Each tensor allocated must have a unique id.
-  IpuTensorId next_tensor_id{1};
 
   // We can't make the difference between inputs and constants so for
   // now we ask the user to manually specify the input tensors.
@@ -347,8 +336,6 @@ void startDispatch() { getContext().dispatch_on = true; }
 void setPythonTracebackAccessor(PythonTracebackAccessor accessor) {
   getContext().setPythonTracebackAccessor(std::move(accessor));
 }
-
-void markStep() { getContext().activeDispatch()->markStep(); }
 
 // Turn off.
 void endDispatch(bool error_occurred) {
@@ -648,27 +635,6 @@ std::uint64_t getIpuTensorId(const at::Tensor &tensor) {
   ERROR_ON_MSG(!isIpuTensor(tensor),
                "You may only call getIpuTensorId on an IPU tensor");
   return ipuTensorId(tensor);
-}
-
-bool movingParameters() { return getContext().moving_parameters; }
-
-std::string getInitialGraph(const at::Tensor &tensor) {
-  ERROR_ON_MSG(!isIpuTensor(tensor),
-               "You may only call getInitialGraph on an IPU tensor");
-  const auto &debug_info = getTensorDetails(tensor)->debug_info;
-  return toStdString(debug_info.debug_info.initial_graph);
-}
-
-std::string getCachedGraph(const at::Tensor &tensor) {
-  ERROR_ON_MSG(!isIpuTensor(tensor),
-               "You may only call getCachedGraph on an IPU tensor");
-  const auto &debug_info = getTensorDetails(tensor)->debug_info;
-  auto out = toStdString(debug_info.debug_info.cached_graph);
-  if (!out.empty()) {
-    return out +
-           "\nWith output index: " + std::to_string(debug_info.output_idx);
-  }
-  return out;
 }
 
 } // namespace poptorch

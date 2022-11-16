@@ -39,9 +39,6 @@ public:
   virtual void addOutput(const at::Tensor &ipu_src,
                          const at::Tensor &cpu_dest) = 0;
   virtual void finalizeGraph() = 0;
-  // When running in eager mode with use lazy tensor on stop tracing and execute
-  // asynchronously
-  virtual void markStep() {}
 
   void setPythonStack(const std::vector<torch::jit::StackEntry> &stack);
 
@@ -72,7 +69,7 @@ public:
                               PerReplicaSettings &settings) const;
 
 protected:
-  // We use the value mapper to map between incoming at::Tensors and JIR/MLIR
+  // We use the value mapper to map between incoming at::Tensors and JIT/MLIR
   // types.
   ValueMapper _mapper;
 

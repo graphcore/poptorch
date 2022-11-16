@@ -69,12 +69,8 @@ void MLIRDispatch::initCompiler(const CompilerOptions &options) {
   POPTORCH_TRACEPOINT();
   _opts = options;
   // Init our MLIR compiler.
-  if (_opts.eager.eager_mode) {
-    ERROR("Eager mode not supported");
-  } else {
-    _compiler.init(poptorch_ir::ExecutionType::StaticGraph,
-                   poptorch_ir::CompilerBackend::Poplar, _opts);
-  }
+  _compiler.init(poptorch_ir::ExecutionType::StaticGraph,
+                 poptorch_ir::CompilerBackend::Poplar, _opts);
 }
 
 void MLIRDispatch::addConstant(const at::Tensor &cpu_tensor,

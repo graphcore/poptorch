@@ -82,11 +82,9 @@ void *getDataSourceForValue(torch::jit::Value *value);
 bool isParameter(torch::jit::Value *value);
 
 // Start capturing calls.
-// TODO(T61528): not needed anymore?
 void startDispatch();
 
 // Stop capturing calls.
-// TODO(T61528): not needed anymore?
 void endDispatch(bool error_occurred = false);
 
 // Called before starting to move parameters between the CPU and the IPU.
@@ -95,7 +93,6 @@ void endDispatch(bool error_occurred = false);
 // >>> poptorch_core.startParametersMove()
 // >>> my_model.to("ipu")
 // >>> poptorch_core.endParametersMove()
-// TODO(T61576) Find a better way to identify parameters and buffers.
 void startParametersMove();
 void endParametersMove();
 
@@ -117,12 +114,6 @@ void destroyDispatcher();
 void replaceValueDispatcher(torch::jit::Value *v_old, torch::jit::Value *v_new);
 
 std::uint64_t getIpuTensorId(const at::Tensor &tensor);
-
-bool movingParameters();
-
-std::string getInitialGraph(const at::Tensor &tensor);
-
-std::string getCachedGraph(const at::Tensor &tensor);
 
 using PythonTracebackAccessor =
     std::function<std::vector<torch::jit::StackEntry>()>;
