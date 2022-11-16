@@ -45,13 +45,21 @@ def blas_op(op, input1, input2, out, atol=1e-04, rtol=1e-04):
                                 equal_nan=True)
 
 
-@pytest.mark.parametrize("optional_out", [True, False])
-def test_matmul(optional_out):
+@pytest.mark.parametrize("out", [True, False])
+@pytest.mark.parametrize("shapes", [([10, 200], [200, 45], [10, 45]),
+                                    ([10, 200], [200], [10]),
+                                    ([200], [200, 45], [1, 45]),
+                                    ([200], [200], [])])
+def test_matmul(out, shapes):
     torch.manual_seed(42)
 
-    input1 = torch.randn([10, 200])
-    input2 = torch.randn([200, 45])
-    out = torch.randn([10, 45]) if optional_out else None
+    if len(shapes[0]) == 1 and len(shapes[1]) == 1 and out:
+        pytest.skip(
+            "TODO(T71439) No shape inference handler for aten::fill_.Tensor")
+
+    input1 = torch.randn(shapes[0])
+    input2 = torch.randn(shapes[1])
+    out = torch.randn(shapes[2]) if out else None
 
     blas_op(torch.matmul, input1, input2, out)
 

@@ -121,33 +121,31 @@ def Poptorch_matmul : Poptorch_Op<"matmul", []> {
         `(`$in1 `,` $in2 `)` `(`type($in1)`,`type($in2)`)` `->` type($result) attr-dict
     }];
 
-
     let extraClassDeclaration = [{
         static mlir::Type inferType(mlir::Value v1, mlir::Value v2) {
             // Get the types of the inputs.
-            mlir::RankedTensorType t1 = v1.getType().cast<mlir::RankedTensorType>();
-            mlir::RankedTensorType t2 = v2.getType().cast<mlir::RankedTensorType>();
+            const mlir::RankedTensorType t1 = asTensor(v1);
+            const mlir::RankedTensorType t2 = asTensor(v2);
 
             // Elem type.
-            mlir::Type e1 = t1.getElementType();
+            const mlir::Type e1 = t1.getElementType();
 
-
-            // Technically according to pytorch this case is scalar but we will return 1D tensor of shape {1} instead.
+            // Dot product.
             if (t1.getRank() == 1 && t2.getRank() == 1) {
-                return mlir::RankedTensorType::get({1}, e1);
+                return mlir::RankedTensorType::get({}, e1);
             }
 
-            // Matrix-vector product. [n, m, k, j, v] * [v] == [n, m, k, j]
+            // Vector-matrix product. [n, m, k, j, v] * [v] == [n, m, k, j]
             if (t1.getRank() == 1 && t2.getRank() > 1) {
                 return mlir::RankedTensorType::get(t2.getShape().drop_back(1), e1);
             }
 
-
-            // Matrix-vector
+            // Matrix-vector product.
             if (t1.getRank() > 1 && t2.getRank() == 1) {
                 return mlir::RankedTensorType::get(t1.getShape().drop_back(1), e1);
             }
 
+            // Matrix-matrix product.
             auto s1 = t1.getShape();
             auto s2 = t2.getShape();
             auto shape = broadcast(s1, s2, 2);
@@ -155,7 +153,6 @@ def Poptorch_matmul : Poptorch_Op<"matmul", []> {
             shape[shape.size() - 1] = s2[s2.size() - 1];
 
             return mlir::RankedTensorType::get(shape, e1);
-
         }
     }];
 }
