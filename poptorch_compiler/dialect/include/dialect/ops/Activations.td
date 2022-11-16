@@ -21,9 +21,6 @@ def Poptorch_gelu: Poptorch_Op<"gelu", [SameOperandsAndResultShape]> {
         $_state.addOperands({v1});
         $_state.addAttribute("approximate", $_builder.getStringAttr(approximate));
 
-        ERROR_ON_MSG(approximate != "none",
-                     "Approximates other than 'none' are not supported for GELU");
-
         $_state.addTypes(v1.getType());
      }]>
     ];

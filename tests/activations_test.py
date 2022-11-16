@@ -7,6 +7,8 @@ import torch.nn as nn
 import helpers
 import poptorch
 
+# pylint: enable=wrong-import-order
+
 # Non-linear activations (Weighted activations)
 # 'torch.nn.ELU', 'torch.nn.Hardshrink', 'torch.nn.Hardtanh', 'torch.nn.LeakyReLU', 'torch.nn.LogSigmoid', 'torch.nn.MultiheadAttention', 'torch.nn.MultiheadAttention.forward',
 # 'torch.nn.PReLU', 'torch.nn.ReLU', 'torch.nn.ReLU6', 'torch.nn.RReLU', 'torch.nn.SELU', 'torch.nn.SiLU', 'torch.nn.CELU', 'torch.nn.GELU', 'torch.nn.Sigmoid', 'torch.nn.Softplus',
@@ -24,10 +26,10 @@ class SoftplusWithParams(nn.Softplus):
 
 
 activation_functions = [
-    nn.ReLU, nn.Tanh, nn.Sigmoid, nn.SELU, nn.SiLU, nn.ELU, nn.GELU,
-    nn.Softmax, nn.LogSoftmax, nn.Softsign, nn.LeakyReLU, nn.Hardtanh,
-    nn.Softplus, nn.Softshrink, nn.Hardshrink, nn.CELU, nn.Hardsigmoid,
-    nn.Hardswish, SoftplusWithParams
+    nn.ReLU, nn.Tanh, nn.Sigmoid, nn.SELU, nn.SiLU, nn.ELU, nn.Softmax,
+    nn.LogSoftmax, nn.Softsign, nn.LeakyReLU, nn.Hardtanh, nn.Softplus,
+    nn.Softshrink, nn.Hardshrink, nn.CELU, nn.Hardsigmoid, nn.Hardswish,
+    SoftplusWithParams
 ]
 
 
@@ -49,14 +51,40 @@ def test_activations(op):
     poptorch_model = poptorch.trainingModel(model)
     poptorch_out, _ = poptorch_model((input, ))
 
-    tol = [0.01, 1e-3] if op is nn.GELU else [1e-4, 1e-7]
-
     # Inference test - check outputs
     helpers.assert_allclose(actual=poptorch_out,
                             expected=native_out,
-                            rtol=tol[0],
-                            atol=tol[1],
+                            rtol=1e-4,
+                            atol=1e-7,
                             equal_nan=True)
+
+    poptorch_model.assert_weights_changed()
+
+
+@pytest.mark.parametrize("approximate", ["tanh", "none"])
+def test_gelu(approximate):
+    torch.manual_seed(42)
+
+    input = torch.randn((2, 20))
+    op = nn.GELU(approximate=approximate)
+
+    model = helpers.ModelWithWeights(op, input.shape)
+    model.train()
+
+    # Run on CPU.
+    native_out, _ = model((input, ))
+
+    # Run on IPU.
+    poptorch_model = poptorch.trainingModel(model)
+    poptorch_out, _ = poptorch_model((input, ))
+
+    # PopART GELU doesn't match PyTorch's exactly
+    tol = [0.01, 1e-3] if approximate == "none" else [None, None]
+
+    helpers.assert_allclose(actual=poptorch_out,
+                            expected=native_out,
+                            rtol=tol[0],
+                            atol=tol[1])
 
     poptorch_model.assert_weights_changed()
 

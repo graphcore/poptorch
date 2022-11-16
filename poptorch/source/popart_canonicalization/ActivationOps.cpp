@@ -147,10 +147,34 @@ torch::jit::Node *geluHandler(torch::jit::Graph *graph,
   auto *input = node->input(0);
   const auto approximate = constantToString(node->input(1)->node());
 
-  ERROR_ON_MSG(approximate != "none",
-               "Approximates other than 'none' are not supported for GELU");
+  if (approximate == "tanh") {
+    // 0.5 * x * (1 + tanh(sqrt(2/π) * (x + 0.044715 * x^3)))
+    auto *t0 = createConstantFloat32(graph, {3.0}, {})->output();
+    auto *t1 = createPow(graph, {input, t0})->output();
 
-  return createGelu(graph, {input});
+    auto *t2 = createConstantFloat32(graph, {0.044715}, {})->output();
+    auto *t3 = createMul(graph, {t1, t2})->output();
+
+    auto *t4 = createAdd(graph, {input, t3})->output();
+
+    auto *t5 = createConstantFloat32(graph, {sqrt(2.0f / M_PI)}, {})->output();
+    auto *t6 = createMul(graph, {t4, t5})->output();
+
+    auto *t7 = createTanh(graph, {t6})->output();
+
+    auto *t8 = createConstantFloat32(graph, {1.0}, {})->output();
+    auto *t9 = createAdd(graph, {t7, t8})->output();
+
+    auto *t10 = createMul(graph, {t9, input})->output();
+
+    auto *t11 = createConstantFloat32(graph, {0.5}, {})->output();
+    return createMul(graph, {t10, t11});
+  }
+  if (approximate == "none") {
+    return createGelu(graph, {input});
+  }
+
+  ERROR("Unknown GELU approximate '" << approximate << "'");
 }
 
 } // namespace
