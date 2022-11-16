@@ -38,14 +38,14 @@ def Poptorch_normal_Tensor_Tensor : Poptorch_Op<"normal_Tensor_Tensor",
 def Poptorch_normal_Tensor_float : Poptorch_Op<"normal_Tensor_float",
                                                [SameOperandsAndResultShape]> {
   let arguments = (ins Poptorch_tensor:$means,
-                       F32Attr:$stdv);
+                       F32Attr:$std);
 
   let results = (outs Poptorch_tensor:$result);
 
   let builders = [OpBuilder<(ins "mlir::Value":$means,
-                                    "float":$stdv), [{
+                                    "float":$std), [{
         $_state.addOperands({means});
-        $_state.addAttribute("stdv", $_builder.getF32FloatAttr(stdv));
+        $_state.addAttribute("std", $_builder.getF32FloatAttr(std));
         $_state.addTypes({means.getType()});
   }]>];
 }
@@ -127,7 +127,7 @@ def Poptorch_exponential_ : Poptorch_Op<"exponential_", [SameOperandsAndResultSh
   }]>];
 }
 
-def Poptorch_bernoulli : Poptorch_NotImplementedOp<"bernoulli", [SameOperandsAndResultShape]> {
+def Poptorch_bernoulli : Poptorch_Op<"bernoulli", [SameOperandsAndResultShape]> {
   let arguments = (ins Poptorch_tensor:$input);
 
   let results = (outs Poptorch_tensor:$result);
@@ -154,38 +154,6 @@ def Poptorch_bernoulli__float : Poptorch_Op<"bernoulli__float", [SameOperandsAnd
         llvm::SmallVector<std::int64_t, 4> input_shape {input_tensor.getShape().begin(), input_tensor.getShape().end()};
 
         $_state.addTypes(mlir::RankedTensorType::get(input_shape, $_builder.getF32Type()));
-  }]>];
-}
-
-def Poptorch_bernoulli__tensor : Poptorch_Op<"bernoulli__tensor", [SameOperandsAndResultShape]> {
-  let arguments = (ins Poptorch_tensor:$input,
-                       Poptorch_tensor:$probs);
-
-  let results = (outs Poptorch_tensor:$result);
-
-  let builders = [OpBuilder<(ins "mlir::Value":$input,
-                                    "mlir::Value":$probs), [{
-        $_state.addOperands({input, probs});
-
-        mlir::RankedTensorType input_tensor = input.getType().cast<mlir::RankedTensorType>();
-        llvm::SmallVector<std::int64_t, 4> input_shape {input_tensor.getShape().begin(), input_tensor.getShape().end()};
-
-        $_state.addTypes(mlir::RankedTensorType::get(input_shape, $_builder.getF32Type()));
-  }]>];
-}
-
-def Poptorch_bernoulli_out : Poptorch_Op<"bernoulli_out", [SameOperandsAndResultShape]> {
-  let arguments = (ins Poptorch_tensor:$self);
-
-  let results = (outs Poptorch_tensor:$result);
-
-  let builders = [OpBuilder<(ins "mlir::Value":$self), [{
-        $_state.addOperands({self});
-
-        mlir::RankedTensorType self_tensor = self.getType().cast<mlir::RankedTensorType>();
-        llvm::SmallVector<std::int64_t, 4> self_shape {self_tensor.getShape().begin(), self_tensor.getShape().end()};
-
-        $_state.addTypes(mlir::RankedTensorType::get(self_shape, $_builder.getF32Type()));
   }]>];
 }
 

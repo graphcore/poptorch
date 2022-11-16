@@ -155,8 +155,8 @@ for yf in yml_files:
             return {dict_or_set}
 
         ignored_args = set()
-        if 'IgnoredArgs' in entry:
-            ignored_args.update(to_set(entry['IgnoredArgs']))
+        if 'IgnoreArgs' in entry:
+            ignored_args.update(to_set(entry['IgnoreArgs']))
         if 'UnusedOutputArguments' in entry:
             ignored_args.update(to_set(entry['UnusedOutputArguments']))
 

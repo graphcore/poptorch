@@ -1,4 +1,5 @@
 # Copyright (c) 2022 Graphcore Ltd. All rights reserved.
+import ast
 import itertools
 import re
 import sys
@@ -63,9 +64,13 @@ class ValueInfo:
 
         arg = value_schema.split('=')
 
+        has_default = '=' in value_schema
         self.default = None
-        if '=' in value_schema:
-            self.default = arg[-1]
+        if has_default:
+            if arg[-1] == 'Mean':
+                self.default = 0
+            else:
+                self.default = ast.literal_eval(arg[-1])
 
         # Remove default arguments.
         arg_name = arg[0].split(' ')[-1]
@@ -78,9 +83,10 @@ class ValueInfo:
         self.type = TypeInfo(type_str)
 
         self.is_unused_output = self.name in unused_inplace_args
+        self.is_ignored = self.name in args_to_ignore
         self.ignored_default = None
 
-        if self.name in args_to_ignore:
+        if self.is_ignored:
             assert not self.is_unused_output
             # args_to_ignore is either a set or a dictionary. In the former
             # case we check the given value against the schema default value.
@@ -92,11 +98,11 @@ class ValueInfo:
             # check against the schema in this case)
             if (isinstance(args_to_ignore, dict)
                     and args_to_ignore[self.name] is not None):
-                self.ignored_default = args_to_ignore[self.name]
-            else:
+                self.ignored_default = ast.literal_eval(
+                    args_to_ignore[self.name])
+            elif has_default:
                 self.ignored_default = self.default
-
-            if self.ignored_default is None:
+            else:
                 print(f'No default value for {self.name} in {aten_name}. You '
                       'may use IgnoreArgs as a dictionary to provide a '
                       'default value.')
@@ -104,7 +110,7 @@ class ValueInfo:
 
     @property
     def should_ignore(self):
-        return self.ignored_default is not None or self.is_unused_output
+        return self.is_ignored or self.is_unused_output
 
 
 def _process_schema(function_name, op_target):

@@ -391,15 +391,12 @@ def Poptorch_unsqueeze : Poptorch_AbstractOp<"unsqueeze", [ViewOp]> {
 
 // gather(Tensor self, int dim, Tensor index, *, bool sparse_grad=False) -> Tensor(a!)
 def Poptorch_gather: Poptorch_NotImplementedOp<"gather"> {
-  let arguments = (ins Poptorch_tensor:$self, I64Attr:$dim, Poptorch_tensor:$index, DefaultValuedAttr<BoolAttr,"false">:$sparse_grad);
+  let arguments = (ins Poptorch_tensor:$self, I64Attr:$dim, Poptorch_tensor:$index);
   let results = (outs Poptorch_tensor:$result);
 
-  let builders = [OpBuilder<(ins "mlir::Value":$self, "std::int64_t":$dim, "mlir::Value":$index, "bool":$sparse_grad),[{
-    ERROR_ON_MSG(sparse_grad, "gather: sparse_grad=True not supported");
-
+  let builders = [OpBuilder<(ins "mlir::Value":$self, "std::int64_t":$dim, "mlir::Value":$index),[{
     $_state.addOperands({self, index});
     $_state.addAttribute("dim", $_builder.getI64IntegerAttr(dim));
-    $_state.addAttribute("sparse_grad", $_builder.getBoolAttr(sparse_grad));
 
     mlir::RankedTensorType t1 = self.getType().cast<mlir::RankedTensorType>();
     auto index_shape = index.getType().cast<mlir::RankedTensorType>().getShape();

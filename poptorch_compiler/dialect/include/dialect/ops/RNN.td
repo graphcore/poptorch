@@ -4,23 +4,23 @@
 // int num_layers, float dropout, bool train, bool bidirectional,
 // bool batch_first) -> (Tensor, Tensor, Tensor)
 def Poptorch_lstm_input: Poptorch_Op<"lstm_input", [AttrSizedOperandSegments]> {
-    let arguments = (ins Poptorch_tensor:$input, Poptorch_tensorlist:$hx,
-                         Poptorch_tensorlist:$params, BoolAttr:$has_biases,
-                         I64Attr:$num_layers, F32Attr:$dropout,
-                         BoolAttr:$train, BoolAttr:$bidrectional,
+    let arguments = (ins Poptorch_tensor:$input,
+                         Poptorch_tensorlist:$hx,
+                         Poptorch_tensorlist:$params,
+                         BoolAttr:$train,
                          BoolAttr:$batch_first);
-    let results = (outs Poptorch_tensor:$output, Poptorch_tensor:$hy,
+    let results = (outs Poptorch_tensor:$output,
+                        Poptorch_tensor:$hy,
                         Poptorch_tensor:$cy);
 
     let builders = [OpBuilder<(ins "mlir::Value":$input,
                                    "llvm::SmallVector<mlir::Value, 4>":$hx,
                                    "llvm::SmallVector<mlir::Value, 4>":$params,
-                                   "bool":$has_biases,
-                                   "std::int64_t":$num_layers,
-                                   "float":$dropout,
                                    "bool":$train,
-                                   "bool":$bidrectional,
                                    "bool":$batch_first), [{
+        int num_layers = 1;
+        bool bidrectional = false;
+        bool has_biases = true;
 
         ERROR_ON_MSG(hx.size() != 2, "lstm expects two hidden states");
         mlir::Value h_n = hx[0];
@@ -33,12 +33,6 @@ def Poptorch_lstm_input: Poptorch_Op<"lstm_input", [AttrSizedOperandSegments]> {
         // For now, we do not support projections or bidirectional
         ERROR_ON_MSG(has_projections,
                      "PopTorch does not yet support LSTMs with projections.");
-        ERROR_ON_MSG(bidrectional,
-                     "PopTorch does not yet support bidrectional LSTMs.");
-
-        // Dropout must be 0.0
-        ERROR_ON_MSG(dropout != 0.0, "PopTorch does not yet support LSTMs with "
-                                     "dropout not equal to 0.0.");
 
         // Check all tensors are the same type
         mlir::Type input_type = getElementType(input);
@@ -77,9 +71,9 @@ def Poptorch_lstm_input: Poptorch_Op<"lstm_input", [AttrSizedOperandSegments]> {
             }
         }
 
-        ERROR_ON_MSG(params.size()%param_divider != 0,
+        ERROR_ON_MSG(params.size() % param_divider != 0,
                      "got an incorrect number of RNN parameters: got " <<
-                     params.size() << " which does not divice by {}"
+                     params.size() << " which is not divisible by "
                      <<  param_divider);
 
         std::vector<mlir::Value> operands = {input, hx[0], hx[1]};
@@ -159,11 +153,7 @@ def Poptorch_lstm_input: Poptorch_Op<"lstm_input", [AttrSizedOperandSegments]> {
 
         std::vector<std::int32_t> segments = {1, 2, params.size()};
         $_state.addAttribute("operand_segment_sizes", $_builder.getI32VectorAttr(segments));
-        $_state.addAttribute("has_biases", $_builder.getBoolAttr(has_biases));
-        $_state.addAttribute("num_layers", $_builder.getI64IntegerAttr(num_layers));
-        $_state.addAttribute("dropout", $_builder.getF32FloatAttr(dropout));
         $_state.addAttribute("train", $_builder.getBoolAttr(train));
-        $_state.addAttribute("bidrectional", $_builder.getBoolAttr(bidrectional));
         $_state.addAttribute("batch_first", $_builder.getBoolAttr(batch_first));
 
     }]>];

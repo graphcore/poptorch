@@ -168,16 +168,32 @@ def get_member_type(self: ValueInfo, aten_name):
 def assert_value_is_default(self: ValueInfo, stack_at_index, aten_name):
     default_value = self.ignored_default
 
-    if default_value == 'None':
+    if default_value is None:
         # If we know the expected values for the ignored arguments
         # emit checks for them
         return (f'ERROR_ON_MSG(!{stack_at_index}.isNone(), '
                 f'"{aten_name}: Poptorch does not handle {self.name}. '
                 'Expected it to be None");\n')
 
-    if default_value in ('True', 'False'):
-        return (f'ERROR_ON_MSG({stack_at_index}.toBool() != '
-                f'{default_value.lower()}, "{aten_name}: Poptorch does not '
+    if isinstance(default_value, bool):
+        return (
+            f'ERROR_ON_MSG({stack_at_index}.toBool() != '
+            f'{str(default_value).lower()}, "{aten_name}: Poptorch does not '
+            f'handle {self.name}. Expected it to be {default_value}");\n')
+
+    if isinstance(default_value, str):
+        return (f'ERROR_ON_MSG({stack_at_index}.toStringRef() != '
+                f'"{default_value}",  "{aten_name}: Poptorch does not '
+                f'handle {self.name}. Expected it to be {default_value}");\n')
+
+    if isinstance(default_value, int):
+        return (f'ERROR_ON_MSG({stack_at_index}.toInt() != '
+                f'{default_value},  "{aten_name}: Poptorch does not '
+                f'handle {self.name}. Expected it to be {default_value}");\n')
+
+    if isinstance(default_value, float):
+        return (f'ERROR_ON_MSG({stack_at_index}.toDouble() != '
+                f'{default_value},  "{aten_name}: Poptorch does not '
                 f'handle {self.name}. Expected it to be {default_value}");\n')
 
     warnings.warn(f'Not implemented: default value ({default_value}) for '
@@ -258,7 +274,7 @@ def generate_cpp(cpp_func, canonicalised_args: List[ValueInfo], outputs,
         stack_at_index = "stack.at(" + str(arg_index) + ")"
 
         # If the argument is in args_to_ignore we skip it
-        if arg.ignored_default is not None:
+        if arg.is_ignored:
             function_decl += assert_value_is_default(arg, stack_at_index,
                                                      aten_name)
             continue

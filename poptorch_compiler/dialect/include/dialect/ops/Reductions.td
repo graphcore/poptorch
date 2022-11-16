@@ -2,14 +2,14 @@
 
 class Poptorch_reduce<string name> : Poptorch_Op<name, []> {
     let arguments = (ins Poptorch_tensor:$input,
-                         OptionalAttr<I64ArrayAttr>:$axes,
+                         OptionalAttr<I64ArrayAttr>:$dim,
                          BoolAttr:$keepdim,
                          OptionalAttr<TypeAttr>:$dtype);
 
     let results = (outs Poptorch_tensor:$result);
 
     let builders = [OpBuilder<(ins "mlir::ValueRange":$values,
-                                   "const std::optional<std::vector<std::int64_t>>&":$axes,
+                                   "const std::optional<std::vector<std::int64_t>>&":$dim,
                                    "std::int64_t":$keepdim,
                                    "std::optional<mlir::Type>":$dtype),[{
         $_state.addOperands(values);
@@ -17,12 +17,12 @@ class Poptorch_reduce<string name> : Poptorch_Op<name, []> {
         mlir::RankedTensorType tensor = values[0].getType().cast<mlir::RankedTensorType>();
         auto in_shape = tensor.getShape();
 
-        const auto actual_axes = axes.value_or(std::vector<std::int64_t> {});
+        const auto actual_axes = dim.value_or(std::vector<std::int64_t> {});
 
         auto dims = parseDims(actual_axes, in_shape.size());
 
-        if (axes.has_value()) {
-            $_state.addAttribute("axes", $_builder.getI64ArrayAttr(dims));
+        if (dim.has_value()) {
+            $_state.addAttribute("dim", $_builder.getI64ArrayAttr(dims));
         }
         $_state.addAttribute("keepdim", $_builder.getBoolAttr(keepdim));
         if (dtype.has_value()) {
@@ -53,9 +53,9 @@ class Poptorch_reduce<string name> : Poptorch_Op<name, []> {
     ];
 
     let extraClassDeclaration = [{
-        static std::vector<std::int64_t> parseDims(const std::vector<std::int64_t>& axes,
+        static std::vector<std::int64_t> parseDims(const std::vector<std::int64_t>& dim,
                                                    std::size_t in_dim_count) {
-            auto dims = convertToPositiveDim(axes, in_dim_count);
+            auto dims = convertToPositiveDim(dim, in_dim_count);
 
             // NOTE: an empty list of dimensions means we're reducing over all the dimensions
             if (dims.empty()) {
@@ -324,23 +324,14 @@ def Poptorch_var_mean_correction : Poptorch_std_var_mean_correction<"var_mean_co
 def Poptorch_embedding : Poptorch_NotImplementedOp<"embedding", []> {
     let arguments = (ins Poptorch_tensor:$weight,
                          Poptorch_tensor:$indices,
-                         I64Attr:$padding_idx,
-                         BoolAttr:$scale_grad_by_freq,
-                         BoolAttr:$sparse);
+                         I64Attr:$padding_idx);
     let results = (outs Poptorch_tensor:$result);
 
     let builders = [OpBuilder<(ins "mlir::Value":$weight,
                                    "mlir::Value":$indices,
-                                   "std::int64_t":$padding_idx,
-                                   "bool":$scale_grad_by_freq,
-                                   "bool":$sparse), [{
+                                   "std::int64_t":$padding_idx), [{
       $_state.addOperands({weight, indices});
       $_state.addAttribute("padding_idx", $_builder.getI64IntegerAttr(padding_idx));
-      $_state.addAttribute("scale_grad_by_freq", $_builder.getBoolAttr(scale_grad_by_freq));
-      $_state.addAttribute("sparse", $_builder.getBoolAttr(sparse));
-
-      ERROR_ON_MSG(scale_grad_by_freq, "scale_grad_by_freq is unsupported for aten::embedding");
-      ERROR_ON_MSG(sparse, "sparse is unsupported for aten::embedding");
 
       auto embedding_dim = getShape(weight)[1];
       auto out_shape = getShape(indices);

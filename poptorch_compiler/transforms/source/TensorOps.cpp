@@ -24,8 +24,7 @@ namespace poptorch_ir {
 
 CANONICALIZE_TO_FULL(ones, rewriter.getF32FloatAttr(1.0f))
 CANONICALIZE_TO_FULL(zeros_like, rewriter.getF32FloatAttr(0.0f))
-CANONICALIZE_TO_FULL(full_like,
-                     op->getAttrOfType<mlir::FloatAttr>("fill_value"))
+CANONICALIZE_TO_FULL(full_like, op->getAttrOfType<mlir::FloatAttr>("value"))
 
 ::mlir::LogicalResult clone::canonicalize(clone op,
                                           ::mlir::PatternRewriter &rewriter) {

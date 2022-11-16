@@ -233,6 +233,7 @@
 
 - func: gather
   PopTorchDirect: gather
+  IgnoreArgs: {sparse_grad: null}
   native_func: gather(Tensor self, int dim, Tensor index, *, bool sparse_grad=False) -> Tensor
 
 - func: constant_pad_nd
@@ -508,10 +509,6 @@
   PopTorchDirect: max
   native_func: max(Tensor self) -> Tensor
 
-- func: max.dim
-  PopTorchDirect: max_dim
-  native_func: max.dim(Tensor self, int dim, bool keepdim=False) -> (Tensor values, Tensor indices)
-
 - func: max.dim_max
   PopTorchDirect: max_dim
   UnusedOutputArguments: {max: null, max_values: null}
@@ -529,10 +526,6 @@
   PopTorchDirect: median_dim_values
   UnusedOutputArguments: {values: null, indices: null}
   native_func: median.dim_values(Tensor self, int dim, bool keepdim=False, *, Tensor(a!) values, Tensor(b!) indices) -> (Tensor(a!) values, Tensor(b!) indices)
-
-- func: min.dim
-  PopTorchDirect: min_dim
-  native_func: min.dim(Tensor self, int dim, bool keepdim=False) -> (Tensor values, Tensor indices)
 
 - func: min.dim_min
   PopTorchDirect: min_dim
@@ -884,20 +877,10 @@
   native_func: convolution_backward_overrideable(Tensor grad_output, Tensor input, Tensor weight, int[] stride, int[] padding, int[] dilation, bool transposed, int[] output_padding, int groups, bool[3] output_mask) -> (Tensor grad_input, Tensor grad_weight, Tensor grad_bias)
 
 # Batch matrix-matrix multiplication
-- func: bmm
-  PopTorchDirect: matmul
-  native_func: bmm(Tensor self, Tensor mat2) -> Tensor
-
-# Batch matrix-matrix multiplication
 - func: bmm.out
   PopTorchDirect: matmul
   UnusedOutputArguments: {out: null}
   native_func: bmm.out(Tensor self, Tensor mat2, *, Tensor(a!) out) -> Tensor(a!)
-
-# Matrix-vector multiplication
-- func: mv
-  PopTorchDirect: matmul
-  native_func: mv(Tensor self, Tensor vec) -> Tensor
 
 - func: dot
   PopTorchDirect: matmul
@@ -912,6 +895,10 @@
   PopTorchDirect: addmm
   UnusedOutputArguments: {out: null}
   native_func: addmm.out(Tensor self, Tensor mat1, Tensor mat2, *, Scalar beta=1, Scalar alpha=1, Tensor(a!) out) -> Tensor(a!)
+
+- func: baddbmm
+  PopTorchDirect: baddbmm
+  native_func: baddbmm(Tensor self, Tensor batch1, Tensor batch2, *, Scalar beta=1, Scalar alpha=1) -> Tensor
 
 - func: baddbmm.out
   PopTorchDirect: baddbmm
@@ -941,11 +928,6 @@
   PopTorchDirect: frobenius_norm_out
   UnusedOutputArguments: {out: null}
   native_func: frobenius_norm.out(Tensor self, int[1] dim, bool keepdim=False, *, Tensor(a!) out) -> Tensor(a!)
-
-# Both declarations are required.
-- func: cross
-  PopTorchDirect: cross
-  native_func: cross(Tensor self, Tensor other, int? dim=None) -> Tensor
 
 - func: cross.out
   PopTorchDirect: cross
@@ -1027,23 +1009,19 @@
   IgnoreArgs: {generator: null}
   native_func: exponential_(Tensor(a!) self, float lambd=1, *, Generator? generator=None) -> Tensor(a!)
 
-- func: bernoulli
-  PopTorchDirect: bernoulli
-  IgnoreArgs: {generator: null}
-  native_func: bernoulli(Tensor self, *, Generator? generator=None) -> Tensor
-
 - func: bernoulli_.float
   PopTorchDirect: bernoulli__float
   IgnoreArgs: {generator: null}
   native_func: bernoulli_.float(Tensor(a!) self, float p=0.5, *, Generator? generator=None) -> Tensor(a!)
 
 - func: bernoulli_.Tensor
-  PopTorchDirect: bernoulli__tensor
+  PopTorchDirect: bernoulli
   IgnoreArgs: {generator: null}
+  UnusedOutputArguments: {self: null}
   native_func: bernoulli_.Tensor(Tensor(a!) self, Tensor p, *, Generator? generator=None) -> Tensor(a!)
 
 - func: bernoulli.out
-  PopTorchDirect: bernoulli_out
+  PopTorchDirect: bernoulli
   IgnoreArgs: {generator: null}
   UnusedOutputArguments: {out: null}
   native_func: bernoulli.out(Tensor self, *, Generator? generator=None, Tensor(a!) out) -> Tensor(a!)
@@ -1064,14 +1042,9 @@
   IgnoreArgs: non_blocking
   native_func: copy_(Tensor(a!) self, Tensor src, bool non_blocking=False) -> Tensor(a!)
 
-- func: clone
-  PopTorchDirect: clone
-  IgnoreArgs: memory_format
-  native_func: clone(Tensor self, *, MemoryFormat? memory_format=None) -> Tensor
-
 - func: to.dtype
   PopTorchDirect: cast
-  IgnoreArgs: non_blocking, copy, memory_format
+  IgnoreArgs: {non_blocking: null, copy: null, memory_format: null}
   native_func: to.dtype(Tensor(a) self, ScalarType dtype, bool non_blocking=False, bool copy=False, MemoryFormat? memory_format=None) -> Tensor(a)
 
 - func: arange.start_out
@@ -1156,16 +1129,6 @@
   PopTorchDirect: var_mean_correction
   native_func: var_mean.correction(Tensor self, int[1]? dim, *, int? correction, bool keepdim=False) -> (Tensor, Tensor)
 
-- func: zeros_like
-  PopTorchDirect: zeros_like
-  IgnoreArgs: {layout: null, device: null, pin_memory: null, memory_format: null}
-  native_func: zeros_like(Tensor self, *, ScalarType? dtype=None, Layout? layout=None, Device? device=None, bool? pin_memory=None, MemoryFormat? memory_format=None) -> Tensor
-
-- func: full_like
-  PopTorchDirect: full_like
-  IgnoreArgs: {dtype: null, layout: null, device: null, pin_memory: null, memory_format: null}
-  native_func: full_like(Tensor self, Scalar fill_value, *, ScalarType? dtype=None, Layout? layout=None, Device? device=None, bool? pin_memory=None, MemoryFormat? memory_format=None) -> Tensor
-
 - func: one_hot
   PopTorchDirect: one_hot
   native_func: one_hot(Tensor self, int num_classes=-1) -> Tensor
@@ -1174,13 +1137,13 @@
   PopTorchDirect: masked_fill_Scalar
   native_func: masked_fill.Scalar(Tensor self, Tensor mask, Scalar value) -> Tensor
 
-# NOTE: this should split from masked_fill_Scalar once given an implementation
 - func: masked_fill_.Scalar
   PopTorchDirect: masked_fill_Scalar
   native_func: masked_fill_.Scalar(Tensor(a!) self, Tensor mask, Scalar value) -> Tensor(a!)
 
 - func: embedding
   PopTorchDirect: embedding
+  IgnoreArgs: {scale_grad_by_freq: null, sparse: null}
   native_func: embedding(Tensor weight, Tensor indices, int padding_idx=-1, bool scale_grad_by_freq=False, bool sparse=False) -> Tensor
 
 - func: _embedding_bag
@@ -1199,10 +1162,6 @@
   PopTorchDirect: resize_
   IgnoreArgs: {memory_format: null}
   native_func: resize_(Tensor(a!) self, SymInt[] size, *, MemoryFormat? memory_format=None) -> Tensor(a!)
-
-- func: triu
-  PopTorchDirect: triu
-  native_func: triu(Tensor self, int diagonal=0) -> Tensor
 
 - func: triu.out
   PopTorchDirect: triu
@@ -1384,4 +1343,5 @@
 
 - func: lstm.input
   PopTorchDirect: lstm_input
+  IgnoreArgs: {bidirectional: 'False', dropout: '0.0', num_layers: '1', has_biases: 'True'}
   native_func: lstm.input(Tensor input, Tensor[] hx, Tensor[] params, bool has_biases, int num_layers, float dropout, bool train, bool bidirectional, bool batch_first) -> (Tensor, Tensor, Tensor)

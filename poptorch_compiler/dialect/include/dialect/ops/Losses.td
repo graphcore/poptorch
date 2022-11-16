@@ -202,7 +202,15 @@ def Poptorch_binary_cross_entropy_with_logits : Poptorch_Op<"binary_cross_entrop
                                       "mlir::Value":$weight,
                                       "mlir::Value":$pos_weight,
                                       "std::int64_t":$reduction),[{
-        $_state.addOperands({self, target});
+        std::vector<mlir::Value> operands = {self, target};
+        if (weight) {
+            operands.push_back(weight);
+        }
+        if (pos_weight) {
+            operands.push_back(pos_weight);
+        }
+        $_state.addOperands(operands);
+
         $_state.addAttribute("reduction",$_builder.getI64IntegerAttr(reduction));
         mlir::RankedTensorType tensor = self.getType().cast<mlir::RankedTensorType>();
         std::vector<std::int64_t> shape;
@@ -229,7 +237,15 @@ def Poptorch_binary_cross_entropy_with_logits_backward : Poptorch_Op<"binary_cro
                                       "mlir::Value":$weight,
                                       "mlir::Value":$pos_weight,
                                       "std::int64_t":$reduction),[{
-        $_state.addOperands({grad_output, self, target});
+        std::vector<mlir::Value> operands = {grad_output, self, target};
+        if (weight) {
+            operands.push_back(weight);
+        }
+        if (pos_weight) {
+            operands.push_back(pos_weight);
+        }
+        $_state.addOperands(operands);
+
         $_state.addAttribute("reduction",$_builder.getI64IntegerAttr(reduction));
         $_state.addTypes(self.getType());
     }]>
@@ -513,7 +529,7 @@ def Poptorch_ctc_loss_tensor : Poptorch_not_implemented_simple_reduced_loss<"ctc
                                    "std::int64_t":$blank,
                                    "std::int64_t":$reduction,
                                    "bool":$zero_infinity),[{
-        $_state.addOperands({log_probs, input_lengths, target_lengths, targets});
+        $_state.addOperands({log_probs, targets, input_lengths, target_lengths});
         $_state.addAttribute("blank", $_builder.getI64IntegerAttr(blank));
         $_state.addAttribute("reduction", $_builder.getI64IntegerAttr(reduction));
         $_state.addAttribute("zero_infinity", $_builder.getBoolAttr(zero_infinity));

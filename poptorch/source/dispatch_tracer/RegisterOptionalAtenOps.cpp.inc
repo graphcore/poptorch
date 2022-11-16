@@ -72,6 +72,12 @@ TORCH_LIBRARY_IMPL(aten, IPU, m) {
   // If we don't intercept this op, it will be converted into a clone followed
   // by an index_put_, which is inefficient in eager mode
   m.impl("index_put", PTC_BOXED(poptorch::fallback));
+  // If we don't intercept this op, it will be converted into a clone followed
+  // by an baddbmm.out, which is inefficient in eager mode
+  m.impl("baddbmm", PTC_BOXED(poptorch::fallback));
+  // If we don't intercept this op, it will be converted into a clone followed
+  // by an masked_fill_.Scalar, which is inefficient in eager mode
+  m.impl("masked_fill.Scalar", PTC_BOXED(poptorch::fallback));
 
   // If we don't catch these, PyTorch will try to call aten::resize_ on the
   // result which is not supported.

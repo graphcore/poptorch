@@ -8,7 +8,7 @@ def Poptorch_batch_norm : Poptorch_Op<"batch_norm", [AttrSizedOperandSegments]> 
                         Optional<Poptorch_tensor>:$running_var,
                         BoolAttr:$training,
                         F32Attr:$momentum,
-                        F32Attr:$epsilon);
+                        F32Attr:$eps);
   let results = (outs Poptorch_tensor:$result, Poptorch_tensor:$save_mean, Poptorch_tensor:$save_invstd);
   let builders = [OpBuilder<(ins "mlir::Value":$input,
                                     "mlir::Value":$weight,
@@ -17,7 +17,7 @@ def Poptorch_batch_norm : Poptorch_Op<"batch_norm", [AttrSizedOperandSegments]> 
                                     "mlir::Value":$running_var,
                                     "bool":$training,
                                     "float":$momentum,
-                                    "float":$epsilon), [{
+                                    "float":$eps), [{
         std::vector<mlir::Value> operands = {input};
         // These segments represent the optional tensors in the order they
         // appear in the arguments. For each segment, 1 indicates a value has
@@ -39,7 +39,7 @@ def Poptorch_batch_norm : Poptorch_Op<"batch_norm", [AttrSizedOperandSegments]> 
         $_state.addOperands(operands);
         $_state.addAttribute("training",$_builder.getBoolAttr(training));
         $_state.addAttribute("momentum",$_builder.getF32FloatAttr(momentum));
-        $_state.addAttribute("epsilon",$_builder.getF32FloatAttr(epsilon));
+        $_state.addAttribute("eps",$_builder.getF32FloatAttr(eps));
         $_state.addAttribute("operand_segment_sizes", $_builder.getI32VectorAttr(segments));
         mlir::Type running_type = mlir::RankedTensorType::get({input.getType().cast<mlir::RankedTensorType>().getDimSize(1)}, input.getType().cast<mlir::RankedTensorType>().getElementType());
         $_state.addTypes({input.getType(), running_type, running_type});
@@ -55,7 +55,7 @@ def Poptorch_group_norm : Poptorch_Op<"group_norm",
                        I64Attr:$C,
                        I64Attr:$HxW,
                        I64Attr:$group,
-                       F32Attr:$epsilon);
+                       F32Attr:$eps);
 
   let results = (outs Poptorch_tensor:$result, Poptorch_tensor:$mean,
                       Poptorch_tensor:$rstd);
@@ -67,7 +67,7 @@ def Poptorch_group_norm : Poptorch_Op<"group_norm",
                                     "int":$C,
                                     "int":$HxW,
                                     "int":$group, //  num_groups (PyTorch op)
-                                    "float":$epsilon), [{
+                                    "float":$eps), [{
 
         std::vector<mlir::Value> operands = {input};
         // These segments represent the optional tensors in the order they
@@ -87,7 +87,7 @@ def Poptorch_group_norm : Poptorch_Op<"group_norm",
         $_state.addOperands(operands);
 
         $_state.addAttribute("group", $_builder.getI64IntegerAttr(group));
-        $_state.addAttribute("epsilon",$_builder.getF32FloatAttr(epsilon));
+        $_state.addAttribute("eps",$_builder.getF32FloatAttr(eps));
         $_state.addAttribute("operand_segment_sizes",
                              $_builder.getI32VectorAttr(segments));
 
@@ -112,14 +112,14 @@ def Poptorch_layer_norm : Poptorch_Op<"layer_norm",
                    I64ArrayAttr:$normalized_shape,
                    Optional<Poptorch_tensor>:$weight,
                    Optional<Poptorch_tensor>:$bias,
-                   F32Attr:$epsilon);
+                   F32Attr:$eps);
   let results = (outs Poptorch_tensor:$result, Poptorch_tensor:$mean,
                       Poptorch_tensor:$rstd);
   let builders = [OpBuilder<(ins "mlir::Value":$input,
                                     "const std::vector<std::int64_t>&":$normalized_shape,
                                     "mlir::Value":$weight,
                                     "mlir::Value":$bias,
-                                    "float":$epsilon), [{
+                                    "float":$eps), [{
     std::vector<mlir::Value> operands = {input};
 
     // These segments represent the optional tensors in the order they appear in the arguments.
@@ -136,7 +136,7 @@ def Poptorch_layer_norm : Poptorch_Op<"layer_norm",
     $_state.addAttribute("stat_shape",$_builder.getI64ArrayAttr(stat_shape));
     $_state.addAttribute("m_dim",$_builder.getI64IntegerAttr(m_dim));
     $_state.addAttribute("n_dim",$_builder.getI64IntegerAttr(n_dim));
-    $_state.addAttribute("epsilon",$_builder.getF32FloatAttr(epsilon));
+    $_state.addAttribute("eps",$_builder.getF32FloatAttr(eps));
     $_state.addAttribute("operand_segment_sizes",
       $_builder.getI32VectorAttr(segments));
 
@@ -161,7 +161,7 @@ def Poptorch_batch_norm_backward: Poptorch_Op<"batch_norm_backward",
                        Optional<Poptorch_tensor>:$save_mean,
                        Optional<Poptorch_tensor>:$save_invstd,
                        BoolAttr:$training,
-                       F32Attr:$epsilon,
+                       F32Attr:$eps,
                        I64ArrayAttr:$output_mask);
   let results = (outs Optional<Poptorch_tensor>:$grad_input,
                       Optional<Poptorch_tensor>:$grad_weight,
@@ -174,7 +174,7 @@ def Poptorch_batch_norm_backward: Poptorch_Op<"batch_norm_backward",
                                  "mlir::Value":$save_mean,
                                  "mlir::Value":$save_invstd,
                                  "bool":$training,
-                                 "float":$epsilon,
+                                 "float":$eps,
                                  "const std::vector<std::int64_t>":$output_mask), [{
     // Weight would ordinarily be optional but we always populate it in the
     // forward pass if it doesn't exist
@@ -209,7 +209,7 @@ def Poptorch_batch_norm_backward: Poptorch_Op<"batch_norm_backward",
     $_state.addOperands(operands);
 
     $_state.addAttribute("training",$_builder.getBoolAttr(training));
-    $_state.addAttribute("epsilon",$_builder.getF32FloatAttr(epsilon));
+    $_state.addAttribute("eps",$_builder.getF32FloatAttr(eps));
     $_state.addAttribute("output_mask",
                          $_builder.getI64ArrayAttr(output_mask));
 

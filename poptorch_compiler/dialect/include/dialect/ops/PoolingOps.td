@@ -49,7 +49,7 @@ def Poptorch_avg_pool : Poptorch_Op<"avg_pool", []> {
         $_state.addAttribute("ceil_mode", $_builder.getBoolAttr(ceil_mode));
         $_state.addAttribute("count_include_pad", $_builder.getBoolAttr(count_include_pad));
         if (divisor_override.has_value()) {
-          $_state.addAttribute("divisor_override", $_builder.getSI32IntegerAttr(divisor_override.value()));
+          $_state.addAttribute("divisor_override", $_builder.getI64IntegerAttr(*divisor_override));
         }
 
         mlir::RankedTensorType input_type = input.getType().cast<mlir::RankedTensorType>();

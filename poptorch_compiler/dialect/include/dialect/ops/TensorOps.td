@@ -146,7 +146,7 @@ def Poptorch_concat: Poptorch_Op<"concat", [ImplicitCastOperand<0>]> {
                     -> (Tensor(a!) , Tensor(b!))*/
 def Poptorch_topk : Poptorch_Op<"topk", []> {
     let arguments = (ins Poptorch_tensor:$self,
-                         I64Attr:$K,
+                         I64Attr:$k,
                          I64Attr:$dim,
                          BoolAttr:$largest,
                          BoolAttr:$sorted);
@@ -155,7 +155,7 @@ def Poptorch_topk : Poptorch_Op<"topk", []> {
     let results = (outs Poptorch_tensor:$values, Poptorch_tensor_no_grad:$indices);
 
     let builders = [OpBuilder<(ins "mlir::Value":$self,
-                                      "std::int64_t":$K,
+                                      "std::int64_t":$k,
                                       "std::int64_t":$dim,
                                       "bool":$largest,
                                       "bool":$sorted),[{
@@ -172,13 +172,13 @@ def Poptorch_topk : Poptorch_Op<"topk", []> {
         }
 
         // Add attrs
-        $_state.addAttribute("K", $_builder.getI64IntegerAttr(K));
+        $_state.addAttribute("k", $_builder.getI64IntegerAttr(k));
         $_state.addAttribute("dim", $_builder.getI64IntegerAttr(dim));
         $_state.addAttribute("largest", $_builder.getBoolAttr(largest));
         $_state.addAttribute("sorted", $_builder.getBoolAttr(sorted));
 
         // add returns
-        out_shape[dim] = K;
+        out_shape[dim] = k;
 
         auto out_type = mlir::RankedTensorType::get(out_shape, input_shape.getElementType());
         auto out_indices = mlir::RankedTensorType::get(out_shape, $_builder.getIntegerType(32 /*width*/, true /*signed*/));
@@ -327,12 +327,12 @@ def Poptorch_zeros_like : Poptorch_AbstractOp<"zeros_like", [SameOperandsAndResu
 }
 
 def Poptorch_full_like : Poptorch_AbstractOp<"full_like", [SameOperandsAndResultShape]> {
-  let arguments = (ins Poptorch_tensor:$self, F32Attr:$fill_value);
+  let arguments = (ins Poptorch_tensor:$self, F32Attr:$value);
 
   let results = (outs Poptorch_tensor:$result);
   let builders = [OpBuilder<(ins "mlir::Value":$self, "float":$fill_value), [{
     $_state.addOperands(self);
-    $_state.addAttribute("fill_value", $_builder.getF32FloatAttr(fill_value));
+    $_state.addAttribute("value", $_builder.getF32FloatAttr(fill_value));
 
     $_state.addTypes({self.getType()});
   }]>];
@@ -341,7 +341,7 @@ def Poptorch_full_like : Poptorch_AbstractOp<"full_like", [SameOperandsAndResult
 }
 
 def Poptorch_full : Poptorch_InternalOp<"full"> {
-  let arguments = (ins F32Attr:$fill_value);
+  let arguments = (ins F32Attr:$value);
   let results = (outs Poptorch_tensor:$result);
 }
 
@@ -403,12 +403,12 @@ def Poptorch_ones: Poptorch_AbstractOp<"ones"> {
 }
 
 def Poptorch_masked_fill_Scalar : Poptorch_NotImplementedOp<"masked_fill_Scalar", []> {
-  let arguments = (ins Poptorch_tensor:$self, Poptorch_tensor:$mask, F32Attr:$scalar);
+  let arguments = (ins Poptorch_tensor:$self, Poptorch_tensor:$mask, F32Attr:$value);
 
   let results = (outs Poptorch_tensor:$result);
-  let builders = [OpBuilder<(ins "mlir::Value":$self, "mlir::Value":$mask, "float":$scalar), [{
+  let builders = [OpBuilder<(ins "mlir::Value":$self, "mlir::Value":$mask, "float":$value), [{
     $_state.addOperands({self, mask});
-    $_state.addAttribute("scalar", $_builder.getF32FloatAttr(scalar));
+    $_state.addAttribute("value", $_builder.getF32FloatAttr(value));
 
     mlir::RankedTensorType tensor = self.getType().cast<mlir::RankedTensorType>();
     mlir::RankedTensorType mask_tensor = mask.getType().cast<mlir::RankedTensorType>();
