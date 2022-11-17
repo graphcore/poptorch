@@ -123,9 +123,6 @@ The following constraints apply when using PopTorch:
   arguments may change between model invocations, as other types will be
   statically compiled inside the executable.
 
-* Additional constraints apply when using the legacy tracing frontend. See
-  :numref:`tracing-constraints`.
-
 
 Other resources
 ===============

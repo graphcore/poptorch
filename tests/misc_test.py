@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
-from inspect import currentframe, getframeinfo
-
 import re
 import pytest
 import torch
@@ -97,103 +95,6 @@ def test_zero_size_tensor_error(trace_model):
             r"Zero-sized tensors are unsupported \(Got shape \[0, 2, 5, 5\]\)"
     ):
         poptorch_model(x)
-
-
-orig_input_trace_tensors = [
-    torch.tensor([1.], dtype=torch.half),
-    torch.tensor([2.]),
-    torch.tensor([3], dtype=torch.int32)
-]
-
-
-def print_orig_input_trace_harness(capfd, model, orig_types, *input_args):
-    options = poptorch.Options()
-    options.Jit.traceModel(True)
-    inference_model = poptorch.inferenceModel(model, options)
-    inference_model(*input_args)
-
-    testlog = helpers.LogChecker(capfd)
-
-    orig_str = "[orig:" + orig_types + "]"
-    trace_types = orig_types.replace("Half", "Float")
-    trace_str = "graph(" + trace_types + "):\n"
-    testlog.assert_contains(trace_str + orig_str)
-
-
-@helpers.overridePoptorchLogLevel("TRACE")
-@helpers.printCapfdOnExit
-def test_print_orig_input_trace_nested_tuple_tensors(capfd):
-    class Model(torch.nn.Module):
-        def forward(self, xss):
-            return xss[0][0] + xss[0][1] + xss[1][0]
-
-    print_orig_input_trace_harness(
-        capfd, Model(),
-        "%xss : ((Half(1, strides=[1], requires_grad=0, device=cpu), "
-        "Float(1, strides=[1], requires_grad=0, device=cpu)), "
-        "(Int(1, strides=[1], requires_grad=0, device=cpu)))",
-        ((orig_input_trace_tensors[0], orig_input_trace_tensors[1]),
-         (orig_input_trace_tensors[2], )))
-
-
-@helpers.overridePoptorchLogLevel("TRACE")
-@helpers.printCapfdOnExit
-def test_print_orig_input_trace_tuple_tensors(capfd):
-    class Model(torch.nn.Module):
-        def forward(self, xs):
-            return xs[0] + xs[1] + xs[2]
-
-    print_orig_input_trace_harness(
-        capfd, Model(),
-        "%xs : (Half(1, strides=[1], requires_grad=0, device=cpu), "
-        "Float(1, strides=[1], requires_grad=0, device=cpu), "
-        "Int(1, strides=[1], requires_grad=0, device=cpu))",
-        (orig_input_trace_tensors[0], orig_input_trace_tensors[1],
-         orig_input_trace_tensors[2]))
-
-
-@helpers.overridePoptorchLogLevel("TRACE")
-@helpers.printCapfdOnExit
-def test_print_orig_input_trace_tensors(capfd):
-    class Model(torch.nn.Module):
-        def forward(self, x, y, z):
-            return x + y + z
-
-    print_orig_input_trace_harness(
-        capfd, Model(),
-        "%x : Half(1, strides=[1], requires_grad=0, device=cpu),\n      "
-        "%y : Float(1, strides=[1], requires_grad=0, device=cpu),\n      "
-        "%z : Int(1, strides=[1], requires_grad=0, device=cpu)",
-        orig_input_trace_tensors[0], orig_input_trace_tensors[1],
-        orig_input_trace_tensors[2])
-
-
-def test_untracable_type_error():
-    class Model(torch.nn.Module):
-        def forward(self, t, f):
-            return t + torch.tensor([f])
-
-    frame = getframeinfo(currentframe())
-    fwd_line = frame.lineno - 3
-
-    x = torch.tensor([3.4])
-    options = poptorch.Options()
-    options.Jit.traceModel(True)
-    poptorch_model = poptorch.inferenceModel(Model(), options)
-
-    error_message = (
-        r"Cannot trace forward function in .*/misc_test\.py:"
-        r"<class 'misc_test\.test_untracable_type_error\."
-        r"<locals>\.Model'>:" + str(fwd_line) + r" with input types "
-        r"\[Tensor, float\]\. All forward function arguments used"
-        r" to compile and run the model must be Tensors or"
-        r" \(possibly nested\) Lists and Tuples of Tensors\."
-        r" \nTo resolve this error you must either convert any"
-        r" problem arguments to Tensor inputs or define them class"
-        r" attributes\.")
-
-    with pytest.raises(TypeError, match=error_message):
-        poptorch_model(x, 5.6)
 
 
 @pytest.mark.parametrize("trace_model", [True, False])

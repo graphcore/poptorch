@@ -12,12 +12,11 @@ from . import _utils
 
 class ArgsParser:
     class Args:
-        def __init__(self, tracing):
+        def __init__(self):
             self._args = []
             self._arg_names = []
             self._kwargs = {}
             self.first_none = None
-            self._tracing = tracing
 
         @property
         def args(self):
@@ -44,7 +43,7 @@ class ArgsParser:
 
         def clone(self):
             # pylint: disable=protected-access
-            clone = ArgsParser.Args(self._tracing)
+            clone = ArgsParser.Args()
             clone._args = copy.copy(self._args)
             clone._arg_names = copy.copy(self._arg_names)
             clone._kwargs = copy.copy(self._kwargs)
@@ -68,13 +67,6 @@ class ArgsParser:
                 "To recompile the model for the new inputs create a new "
                 "inferenceModel / trainingModel wrapper or call destroy() on "
                 "the curent one and try again.")
-            if self._tracing and inputs.first_none != self.first_none:
-                raise _impl.createPoptorchError(
-                    "Number of arguments mismatch: "
-                    f"{self.first_none} "
-                    f"arguments used to compile the model and "
-                    f"{inputs.first_none} provided this time")
-
             if len(inputs.args) != len(self.args):
                 raise _impl.createPoptorchError(
                     "Number of positional arguments mismatch: expected "
@@ -182,19 +174,6 @@ class ArgsParser:
             self._args = self._forEach(self._args, fn)
             self._kwargs = self._forEach(self._kwargs, fn)
 
-        def asTuple(self):
-            # Lists are hard to parse in the C++ because their size is not
-            # known in the IValue, so convert them to tuples.
-            def convert(input):
-                if isinstance(input, (tuple, list)):
-                    return tuple(convert(d) for d in input)
-                return input
-
-            # Unreachable: asTuple() is only used by the tracer and
-            # kwargs are not compatible with tracing.
-            assert not self._kwargs
-            return tuple(convert(a) for a in self._args)
-
         def asPackedFlatTuple(self, canonical_args=None):
             # Remove all the non torch.tensor types and flatten
             # any data structure.
@@ -204,7 +183,7 @@ class ArgsParser:
                 _utils.flattenTensorStructure(self._args, cargs) +
                 _utils.flattenTensorStructure(self._kwargs, ckwargs))
 
-    def __init__(self, model: Any, tracing: bool = True):
+    def __init__(self, model: Any):
         # Combine args and kwargs:
         if isinstance(model, _impl.OptimizerWrapper):
             sig = inspect.signature(model.model.forward)
@@ -242,7 +221,6 @@ class ArgsParser:
             }
 
         self._warned_not_contiguous_input = False
-        self._tracing = tracing
 
     def __call__(self,
                  args: Any,
@@ -252,13 +230,12 @@ class ArgsParser:
            tensors or tuples/lists of tensors. Will convert list to tuples
            as we can't natively support lists in the JIT.
         """
-        in_tensors = ArgsParser.Args(self._tracing)
+        in_tensors = ArgsParser.Args()
         assert self._has_variadic_arguments or len(args) + len(kwargs) <= len(
             self._varnames), ("Too many arguments provided: expected %s (%d) "
                               "but got %d") % (self._varnames,
                                                len(self._varnames),
                                                len(args) + len(kwargs))
-        none_passed = []
         # Make sure all the arguments provided are allowed.
         if not self._has_variadic_arguments:
             for k in kwargs.keys():
@@ -305,10 +282,6 @@ class ArgsParser:
                 assert name not in kwargs, ("Parameter %s was passed more "
                                             "than once") % name
             elif name in kwargs:
-                assert not none_passed, (
-                    "Torch doesn't support passing tensors (%s)"
-                    " after the following parameters have defaulted to None."
-                    " %s") % (name, ", ".join(none_passed))
                 # Non fast path for compilation, fast path for executing.
                 if not fast_path:
                     self._dictCheck(kwargs[name])
@@ -323,18 +296,11 @@ class ArgsParser:
                     raise _impl.createPoptorchError("Mandatory parameter "
                                                     f"{name} missing")
                 value = self._defaults[name]
-                # We only need to keep track of None values when tracing because
-                # torch.jit.trace() can't handle them.
-                if value is None and self._tracing:
-                    if in_tensors.first_none is None:
-                        in_tensors.first_none = i
-                    none_passed.append("%s (%d)" % (name, i))
-                if not none_passed:
-                    # Everything after a variadic positional argument must be named
-                    if variadic_pos_set:
-                        in_tensors.setNamedArg(name, value)
-                    else:
-                        in_tensors.appendArg(value, name)
+                # Everything after a variadic positional argument must be named
+                if variadic_pos_set:
+                    in_tensors.setNamedArg(name, value)
+                else:
+                    in_tensors.appendArg(value, name)
 
         if in_tensors.forEachMatchedAtLeastOnce(
                 condition=lambda t: isinstance(t, torch.Tensor
@@ -344,34 +310,6 @@ class ArgsParser:
                 logger.warning("At least one input tensor is not contiguous: "
                                "non-contiguous tensors will be converted.")
                 self._warned_not_contiguous_input = True
-
-        # The checks past this point are specific to torch.jit.trace() because
-        # of the limited support it has for None and default values.
-        if not self._tracing:
-            return in_tensors
-
-        if in_tensors.first_none is None:
-            in_tensors.first_none = len(self._varnames)
-
-        # filter-out trailing None arguments when they default to None
-        # Extending this to any argument set to its default value has
-        # proven problematic - the trace may be computed with fewer
-        # inputs than intended.
-        for i in reversed(range(len(in_tensors.args))):
-            if in_tensors.args[i] is not None:
-                break
-            if self._defaults.get(in_tensors.arg_names[i],
-                                  "no default") is not None:
-                break
-            in_tensors.popArg()
-            if in_tensors.first_none == i:
-                in_tensors.first_none = None
-
-        # assert we are not passing None parameters to avoid a cryptic error
-        if None in in_tensors.args:
-            raise _impl.createPoptorchError(
-                "'None' may not be passed as explicit model argument. It may "
-                "only be used as default initialiser")
 
         return in_tensors
 

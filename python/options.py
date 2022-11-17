@@ -54,22 +54,17 @@ class _JitOptions(_options_impl.OptionsDict):
     >>> opts.Jit.traceModel(True)
     """
 
-    def __init__(self) -> None:
-        super().__init__(trace_model=False)
-
     def traceModel(self, trace_model: bool) -> "poptorch.options._JitOptions":
         """
-        Controls whether to use PyTorch's JIT tracing or the dispatcher
-        to build the PopTorch graph.
-
-        :param bool trace_model:
-            * True (deprecated): use `torch.jit.trace <https://pytorch.org/docs/1.10.0/generated/torch.jit.trace.html#torch.jit.trace>`_
-            * False: use Torch's dispatcher to trace the graph.
-       """
+        DO NOT USE: about to be removed.
+        """
+        logger.warning("[Deprecated] Do not call options.Jit.traceModel(): "
+                       "options.Jit.traceModel(False) is now the default, "
+                       "and True is no longer supported, therefore this "
+                       "function will be removed shortly")
         if trace_model:
-            logger.warning("trace_model=True is deprecated since version 3.0 "
-                           "and will be removed in a future release")
-        self.set(trace_model=trace_model)
+            raise ValueError(
+                "options.Jit.traceModel(True) is no longer supported")
         return self
 
 

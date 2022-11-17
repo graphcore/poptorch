@@ -22,7 +22,7 @@ import poptorch
 # torch._C.Generator.device,
 
 
-def zeros_and_ones_harness(model, dtype, is_like, trace_model):
+def zeros_and_ones_harness(model, dtype, is_like):
     assert dtype in [torch.float16, torch.float32, torch.int32, torch.bool]
     torch.manual_seed(42)
 
@@ -35,7 +35,6 @@ def zeros_and_ones_harness(model, dtype, is_like, trace_model):
     inputs = tuple(inputs)
 
     options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
     if test_training:
         out_fn = lambda out: out[0]
         model = helpers.ModelWithWeights(model, inputs[0].shape, out_fn=out_fn)
@@ -47,7 +46,7 @@ def zeros_and_ones_harness(model, dtype, is_like, trace_model):
         if dtype is torch.float16:
             # Promote CPU model and input
             model_copy = model_copy.float()
-            inputs = tuple([input.float() for input in inputs])
+            inputs = tuple(input.float() for input in inputs)
             # promote IPU result to allow comparison
             poptorch_out = [pop.float() for pop in poptorch_out]
         native_out, _ = model_copy(inputs)
@@ -73,9 +72,8 @@ def zeros_and_ones_harness(model, dtype, is_like, trace_model):
 zeros_and_ones_dtypes = [torch.float16, torch.float32, torch.int32, torch.bool]
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
 @pytest.mark.parametrize("dtype", zeros_and_ones_dtypes)
-def test_zeros_and_ones(dtype, trace_model):
+def test_zeros_and_ones(dtype):
     class Model(torch.nn.Module):
         def forward(self, z):
             x = torch.zeros(3, 5, 1, dtype=dtype)
@@ -83,12 +81,11 @@ def test_zeros_and_ones(dtype, trace_model):
 
             return (x * y) + z, (y + x) + z
 
-    zeros_and_ones_harness(Model(), dtype, False, trace_model)
+    zeros_and_ones_harness(Model(), dtype, False)
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
 @pytest.mark.parametrize("dtype", zeros_and_ones_dtypes)
-def test_new_zeros_and_new_ones(dtype, trace_model):
+def test_new_zeros_and_new_ones(dtype):
     class Model(torch.nn.Module):
         def forward(self, z):
             x = z.new_zeros(3, 5, 1)
@@ -96,12 +93,11 @@ def test_new_zeros_and_new_ones(dtype, trace_model):
 
             return (x * y) + z, (y + x) + z
 
-    zeros_and_ones_harness(Model(), dtype, False, trace_model)
+    zeros_and_ones_harness(Model(), dtype, False)
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
 @pytest.mark.parametrize("dtype", zeros_and_ones_dtypes)
-def test_zeros_like_and_ones_like(dtype, trace_model):
+def test_zeros_like_and_ones_like(dtype):
     class Model(torch.nn.Module):
         def forward(self, z, t):
             x = torch.zeros_like(t, dtype=dtype)
@@ -109,7 +105,7 @@ def test_zeros_like_and_ones_like(dtype, trace_model):
 
             return (x * y) + z, (y + x) + z
 
-    zeros_and_ones_harness(Model(), dtype, True, trace_model)
+    zeros_and_ones_harness(Model(), dtype, True)
 
 
 def fuzzy_compare_exceptions(e_cpu, e_ipu):
@@ -118,10 +114,9 @@ def fuzzy_compare_exceptions(e_cpu, e_ipu):
     are also in the IPU exception) an error is raised.
     """
     e_ipu_words = {word: i for i, word in enumerate(str(e_ipu).split())}
-    if not all([
+    if not all(
             e_ipu_words.get(word, -1) >= i
-            for i, word in enumerate(str(e_cpu).split())
-    ]):
+            for i, word in enumerate(str(e_cpu).split())):
         raise ValueError("CPU and IPU error messages did not match: "
                          f"'{e_cpu}' not in '{e_ipu}'") from e_ipu
     print(f"CPU and IPU error messages did match: '{e_cpu}' in '{e_ipu}'")
@@ -134,7 +129,6 @@ def op_harness(op,
                out_fn=None,
                native_out=None,
                fuzzy_errors=False,
-               trace_model=True,
                allow_native_errors=True):
     """The op harness allows to test the native torch API against poptorch.
 
@@ -173,7 +167,6 @@ def op_harness(op,
 
     op_raises_exception = False
     options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
     if test_training:
         # Set a fixed seed for the weights of the model
         torch.manual_seed(42)
@@ -190,7 +183,7 @@ def op_harness(op,
                     raise native_out[1]
             elif isinstance(native_out, tuple):
                 # pylint: disable=E1101
-                native_out = tuple([n.clone().detach() for n in native_out])
+                native_out = tuple(n.clone().detach() for n in native_out)
             else:
                 native_out = native_out.clone().detach()
         else:
@@ -257,11 +250,6 @@ class TestOpHarness:
     def training(self, request, monkeypatch):
         monkeypatch.setattr(self, "op_harness",
                             partial(op_harness, test_training=request.param))
-
-    @pytest.fixture(autouse=True, params=[True, False])
-    def trace_model(self, request, monkeypatch):
-        monkeypatch.setattr(self, "op_harness",
-                            partial(op_harness, trace_model=request.param))
 
     def test_fuzzy_error_mismatch(self):
         x = torch.randn(2, 3)
@@ -351,7 +339,6 @@ class TestOpHarness:
 
 
 @pytest.mark.parametrize("dim", [0, 1])
-@pytest.mark.parametrize("trace_model", [True, False])
 @pytest.mark.parametrize(
     "dtypes", [
         [torch.float] * 3,
@@ -360,7 +347,7 @@ class TestOpHarness:
         [torch.float, torch.int],
     ],
     ids=["all_floats", "all_ints", "int,float", "float,int"])
-def test_cat(dim, trace_model, dtypes):
+def test_cat(dim, dtypes):
     torch.manual_seed(42)
     # Cannot control the type of the first tensor as it needs to be
     # torch.float32 to be a valid input to the Linear layer used in
@@ -369,16 +356,11 @@ def test_cat(dim, trace_model, dtypes):
     tensors = [torch.randn(2, 3).to(dtype=dtype) for dtype in dtypes]
 
     op = lambda *xs: torch.cat(xs, dim=dim)
-    op_harness(op,
-               first_input,
-               *tensors,
-               allow_native_errors=False,
-               trace_model=trace_model)
+    op_harness(op, first_input, *tensors, allow_native_errors=False)
 
 
 @pytest.mark.parametrize("dim", [0, 1])
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_cat_transpose(dim, trace_model):
+def test_cat_transpose(dim):
     """This combination of ops without ImplicitCasting causes the code
     to crash out."""
     torch.manual_seed(42)
@@ -388,26 +370,20 @@ def test_cat_transpose(dim, trace_model):
     op = lambda floatTensor, intTensor: torch.cat((intTensor, floatTensor),
                                                   dim=dim).transpose(1, 0)
 
-    op_harness(op,
-               floatTensor,
-               intTensor,
-               allow_native_errors=False,
-               trace_model=trace_model)
+    op_harness(op, floatTensor, intTensor, allow_native_errors=False)
 
 
 @pytest.mark.parametrize("dim_size", [11, 12, 13])
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_chunk(dim_size, trace_model):
+def test_chunk(dim_size):
     torch.manual_seed(42)
     x = torch.randn(dim_size)
 
     op = lambda x: torch.chunk(x, 6)
 
-    op_harness(op, x, out_fn=lambda x: x[0], trace_model=trace_model)
+    op_harness(op, x, out_fn=lambda x: x[0])
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_cat_chunk_slice(trace_model):
+def test_cat_chunk_slice():
     def forward(x, mems):
         index = 8
         cat = torch.cat([mems, x], 0)
@@ -419,11 +395,10 @@ def test_cat_chunk_slice(trace_model):
     x = torch.randn(8, 1, 10, 10, 5)
 
     op = forward
-    op_harness(op, x, mems, test_training=False, trace_model=trace_model)
+    op_harness(op, x, mems, test_training=False)
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_cat_chunk_slice_multiple_slices(trace_model):
+def test_cat_chunk_slice_multiple_slices():
     def forward(x, mems):
         index = 8
         cat = torch.cat([mems, x], 0)
@@ -435,7 +410,7 @@ def test_cat_chunk_slice_multiple_slices(trace_model):
     x = torch.randn(8, 1, 10, 10, 5)
 
     op = forward
-    op_harness(op, x, mems, test_training=False, trace_model=trace_model)
+    op_harness(op, x, mems, test_training=False)
 
 
 def fast_gather_last_dim(data, idx):
@@ -458,46 +433,38 @@ def fast_gather_last_dim(data, idx):
 
 
 @pytest.mark.ipuHardwareRequired
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_fastgather_3dim(trace_model):
+def test_fastgather_3dim():
     torch.manual_seed(42)
     shape = (9, 11, 6)
     input = torch.randn(shape)
     indices = torch.randint(0, 6, shape)
-    op_harness(fast_gather_last_dim, input, indices, trace_model=trace_model)
+    op_harness(fast_gather_last_dim, input, indices)
 
     # Gather index last dim smaller than input last dim
     indices = torch.randint(0, 6, (9, 11, 3))
-    op_harness(fast_gather_last_dim, input, indices, trace_model=trace_model)
+    op_harness(fast_gather_last_dim, input, indices)
 
     # Gather index different shape should fail
     indices = torch.randint(0, 6, (9, 1, 6))
     with pytest.raises(poptorch.poptorch_core.Error):
-        op_harness(fast_gather_last_dim,
-                   input,
-                   indices,
-                   trace_model=trace_model)
+        op_harness(fast_gather_last_dim, input, indices)
 
     # Gather index different rank should fail
     indices = torch.randint(0, 6, (11, 6))
     with pytest.raises(poptorch.poptorch_core.Error):
-        op_harness(fast_gather_last_dim,
-                   input,
-                   indices,
-                   trace_model=trace_model)
+        op_harness(fast_gather_last_dim, input, indices)
 
 
 @pytest.mark.parametrize("dim", [0, 1, 2, -1, -2])
 @pytest.mark.parametrize("larger_index", [True, False])
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_gather_3dim(dim, larger_index, trace_model):
+def test_gather_3dim(dim, larger_index):
     torch.manual_seed(42)
     shape = (9, 11, 6)
     input = torch.randn(shape)
 
     indices = torch.randint(0, 6, shape)
     op = lambda x, y: torch.gather(x, dim, y)
-    op_harness(op, input, indices, trace_model=trace_model)
+    op_harness(op, input, indices)
 
     small_shape = (7, 9, 5)
     if larger_index:
@@ -506,20 +473,19 @@ def test_gather_3dim(dim, larger_index, trace_model):
         small_shape = tuple(larger_dims)
     indices = torch.randint(0, 6, small_shape)
     op = lambda x, y: torch.gather(x, dim, y)
-    op_harness(op, input, indices, trace_model=trace_model)
+    op_harness(op, input, indices)
 
 
 @pytest.mark.parametrize("dim", [0, 1, 2, 3])
 @pytest.mark.parametrize("larger_index", [True, False])
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_gather_4dim(dim, larger_index, trace_model):
+def test_gather_4dim(dim, larger_index):
     torch.manual_seed(42)
     shape = (5, 8, 6, 7)
     input = torch.randn(shape)
 
     indices = torch.randint(0, 5, shape)
     op = lambda x, y: torch.gather(x, dim, y)
-    op_harness(op, input, indices, trace_model=trace_model)
+    op_harness(op, input, indices)
 
     small_shape = (4, 5, 2, 6)
     if larger_index:
@@ -528,20 +494,19 @@ def test_gather_4dim(dim, larger_index, trace_model):
         small_shape = tuple(larger_dims)
     indices = torch.randint(0, 5, small_shape)
     op = lambda x, y: torch.gather(x, dim, y)
-    op_harness(op, input, indices, trace_model=trace_model)
+    op_harness(op, input, indices)
 
 
 @pytest.mark.parametrize("dim", [0, 1, 2, 3, 4])
 @pytest.mark.parametrize("larger_index", [True, False])
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_gather_5dim(dim, larger_index, trace_model):
+def test_gather_5dim(dim, larger_index):
     torch.manual_seed(42)
     shape = (3, 3, 3, 3, 3)
     input = torch.randn(shape)
 
     indices = torch.randint(0, 3, shape)
     op = lambda x, y: torch.gather(x, dim, y)
-    op_harness(op, input, indices, trace_model=trace_model)
+    op_harness(op, input, indices)
 
     small_shape = (2, 2, 2, 2, 2)
     if larger_index:
@@ -550,12 +515,11 @@ def test_gather_5dim(dim, larger_index, trace_model):
         small_shape = tuple(larger_dims)
     indices = torch.randint(0, 3, small_shape)
     op = lambda x, y: torch.gather(x, dim, y)
-    op_harness(op, input, indices, trace_model=trace_model)
+    op_harness(op, input, indices)
 
 
 @pytest.mark.parametrize("dim", range(-3, 3))
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_scatter(dim, trace_model):
+def test_scatter(dim):
     torch.manual_seed(42)
     dim_length = 3
     shape = (dim_length, ) * 3
@@ -565,12 +529,11 @@ def test_scatter(dim, trace_model):
     source = torch.randn(shape)
 
     op = lambda inp, idx, src: inp.scatter(dim, idx, src)
-    op_harness(op, input, indices, source, trace_model=trace_model)
+    op_harness(op, input, indices, source)
 
 
 @pytest.mark.parametrize("dim", range(-3, 3))
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_scatter_(dim, trace_model):
+def test_scatter_(dim):
     torch.manual_seed(42)
     dim_length = 3
     shape = (dim_length, ) * 3
@@ -580,12 +543,11 @@ def test_scatter_(dim, trace_model):
     source = torch.randn(shape)
 
     op = lambda inp, idx, src: inp.scatter_(dim, idx, src)
-    op_harness(op, input, indices, source, trace_model=trace_model)
+    op_harness(op, input, indices, source)
 
 
 @pytest.mark.parametrize("dim", range(-3, 3))
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_scatter_scalar(dim, trace_model):
+def test_scatter_scalar(dim):
     torch.manual_seed(42)
     dim_length = 3
     shape = (dim_length, ) * 3
@@ -595,20 +557,18 @@ def test_scatter_scalar(dim, trace_model):
     source = 5.0
 
     op = lambda inp, idx: inp.scatter(dim, idx, source)
-    op_harness(op, input, indices, trace_model=trace_model)
+    op_harness(op, input, indices)
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_reshape(trace_model):
+def test_reshape():
     op = lambda x: torch.reshape(x, (1, 1, 2, 2))
 
     x = torch.arange(4.)
 
-    op_harness(op, x, trace_model=trace_model)
+    op_harness(op, x)
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_constExpr_reshape(trace_model):
+def test_constExpr_reshape():
     a = 2
     b = 3
     c = 4
@@ -629,7 +589,6 @@ def test_constExpr_reshape(trace_model):
     native = Model()
     out_native = native(input)
     opts = poptorch.Options()
-    opts.Jit.traceModel(trace_model)
     m = poptorch.inferenceModel(Model(), opts)
     out_ipu = m(input)
     helpers.assert_allequal(actual=out_ipu, expected=out_native)
@@ -637,27 +596,24 @@ def test_constExpr_reshape(trace_model):
 
 @pytest.mark.parametrize("split_size_or_sections",
                          (1, 5, 6, 20, [10, 10], [19, 1]))
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_split(split_size_or_sections, trace_model):
+def test_split(split_size_or_sections):
     torch.manual_seed(42)
     x = torch.randn(20, 10)
     op = lambda x: torch.split(x, split_size_or_sections)
 
-    op_harness(op, x, out_fn=lambda x: x[0], trace_model=trace_model)
+    op_harness(op, x, out_fn=lambda x: x[0])
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_split_singleton(trace_model):
+def test_split_singleton():
     torch.manual_seed(42)
     x = torch.randn(1, 4, 3, 1)
     op = lambda x: torch.split(x, 1, 1)[0]
 
-    op_harness(op, x, trace_model=trace_model)
+    op_harness(op, x)
 
 
 @pytest.mark.parametrize("inplace", [True, False])
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_squeeze(inplace, trace_model):
+def test_squeeze(inplace):
     torch.manual_seed(42)
     x = torch.randn(1, 1, 5, 1, 10, 1)
 
@@ -667,64 +623,58 @@ def test_squeeze(inplace, trace_model):
             return t
         return torch.squeeze(t)
 
-    op_harness(f, x, trace_model=trace_model)
+    op_harness(f, x)
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_t(trace_model):
+def test_t():
     torch.manual_seed(42)
     x = torch.randn(20, 10)
 
-    op_harness(torch.t, x, trace_model=trace_model)
+    op_harness(torch.t, x)
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_transpose(trace_model):
+def test_transpose():
     torch.manual_seed(42)
     x = torch.randn(3, 2, 5, 2)
     op = lambda x: torch.transpose(x, 3, 0)
 
-    op_harness(op, x, trace_model=trace_model)
+    op_harness(op, x)
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_transpose_negative_dims(trace_model):
+def test_transpose_negative_dims():
     torch.manual_seed(42)
     x = torch.randn(3, 2, 5, 2)
     y = torch.randn(2, 2, 5, 3)
     op = lambda x, y: torch.transpose(x, -1, 0) + y
 
-    op_harness(op, x, y, trace_model=trace_model, test_training=trace_model)
+    op_harness(op, x, y, test_training=False)
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_numpy_T(trace_model):
+def test_numpy_T():
     torch.manual_seed(42)
     op = lambda x: x.T
 
     x = torch.randn(3, 2, 5, 4)
-    op_harness(op, x, trace_model=trace_model)
+    op_harness(op, x)
 
     x = torch.randn(5)
-    op_harness(op, x, trace_model=trace_model)
+    op_harness(op, x)
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_unsqueeze(trace_model):
+def test_unsqueeze():
     torch.manual_seed(42)
     x = torch.randn(3, 2, 5, 2)
     op = lambda x: torch.unsqueeze(x, 1)
 
-    op_harness(op, x, trace_model=trace_model)
+    op_harness(op, x)
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_broadcast_to(trace_model):
+def test_broadcast_to():
     torch.manual_seed(42)
     x = torch.randn(3, 1)
     op = lambda x: torch.broadcast_to(x, (3, 4))
 
-    op_harness(op, x, trace_model=trace_model)
+    op_harness(op, x)
 
 
 @pytest.mark.parametrize(
@@ -735,60 +685,54 @@ def test_broadcast_to(trace_model):
         (2, 4, -1),  # negative dimension
         (2, 2, -1, 2, 4),  # negative & extra dimensions
     ])
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_expand(shape, trace_model):
+def test_expand(shape):
     torch.manual_seed(42)
     x = torch.randn(2, 1, 4)
     op = lambda x: x.expand(shape)
 
-    op_harness(op, x, trace_model=trace_model)
+    op_harness(op, x)
 
 
 @pytest.mark.parametrize("shape", [(5), (1, 2, 3)])
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_expand_scalar(shape, trace_model):
+def test_expand_scalar(shape):
     torch.manual_seed(42)
     x = torch.randn(())
     op = lambda x: x.expand(shape)
 
-    op_harness(op, x, trace_model=trace_model, test_training=False)
+    op_harness(op, x, test_training=False)
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_expand_as(trace_model):
+def test_expand_as():
     torch.manual_seed(42)
     x = torch.randn(3, 1)
     y = torch.randn(3, 4)
     op = lambda x, y: x.expand_as(y)
 
-    op_harness(op, x, y, trace_model=trace_model)
+    op_harness(op, x, y)
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_flatten(trace_model):
+def test_flatten():
     torch.manual_seed(42)
     x = torch.randn(3, 1)
 
-    op_harness(torch.flatten, x, trace_model=trace_model)
+    op_harness(torch.flatten, x)
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_view(trace_model):
+def test_view():
     torch.manual_seed(42)
     x = torch.randn(30, 5)
     op = lambda x: x.view((15, 2, 5))
 
-    op_harness(op, x, trace_model=trace_model)
+    op_harness(op, x)
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
 @pytest.mark.parametrize("input_shapes", [(1, ), (2, ), (2, 2), (2, 3, 4)])
-def test_size(input_shapes, trace_model):
+def test_size(input_shapes):
     x = torch.ones(*input_shapes)
     # Use size as input to another operation to workaround pruning error
     op = lambda x: x.view(x.size())
 
-    op_harness(op, x, trace_model=trace_model)
+    op_harness(op, x)
 
 
 input_shapes = [(1, 4, 5), (2, ), (2, 2), (2, 3, 4, 1, 3, 4)]
@@ -799,8 +743,7 @@ dtypes = [torch.float, torch.float16, torch.int32]
 @helpers.overridePoptorchLogLevel("DEBUG")
 @pytest.mark.parametrize("input_shapes", input_shapes)
 @pytest.mark.parametrize("t", dtypes)
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_fill(capfd, input_shapes, t, trace_model):
+def test_fill(capfd, input_shapes, t):
     float_test_num = 1.9375
 
     def op(x):
@@ -814,8 +757,8 @@ def test_fill(capfd, input_shapes, t, trace_model):
     x = torch.ones(*input_shapes, dtype=t)
 
     native_out = tuple(
-        [torch.full(input_shapes, float_test_num)
-         for _ in range(3)]) if t == torch.float16 else None
+        torch.full(input_shapes, float_test_num)
+        for _ in range(3)) if t == torch.float16 else None
 
     def assert_fn(native_out, poptorch_out):
         for native, pop in zip(native_out, poptorch_out):
@@ -830,14 +773,12 @@ def test_fill(capfd, input_shapes, t, trace_model):
                x,
                test_training=False,
                assert_fn=assert_fn,
-               native_out=native_out,
-               trace_model=trace_model)
+               native_out=native_out)
     testlog = helpers.LogChecker(capfd)
     testlog.assert_no_matches("expand")
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_triu_in_constexpr(trace_model):
+def test_triu_in_constexpr():
     # triu is unsupported but the RHS should be reduced
     # to a constant before the op reaches PopART
     # canonicalisation
@@ -850,15 +791,14 @@ def test_triu_in_constexpr(trace_model):
         return x + torch.triu(torch.ones(3, 3))
 
     x = torch.ones(3, 3)
-    op_harness(triu_inplace, x, test_training=False, trace_model=trace_model)
+    op_harness(triu_inplace, x, test_training=False)
 
-    op_harness(triu_out, x, test_training=False, trace_model=trace_model)
+    op_harness(triu_out, x, test_training=False)
 
 
 @pytest.mark.parametrize("input_shapes", input_shapes)
 @pytest.mark.parametrize("value", [0.666, -4.32, float("Inf"), float("-Inf")])
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_masked_fill(input_shapes, value, trace_model):
+def test_masked_fill(input_shapes, value):
     torch.manual_seed(42)
 
     class Model(torch.nn.Module):
@@ -868,13 +808,12 @@ def test_masked_fill(input_shapes, value, trace_model):
             return fill_result, where_result
 
     x = torch.randn(*input_shapes)
-    op_harness(Model(), x, out_fn=lambda x: x[0], trace_model=trace_model)
+    op_harness(Model(), x, out_fn=lambda x: x[0])
 
 
 @pytest.mark.parametrize("input_shapes", [(1, ), (2, ), (3, 4), (1, 3, 4)])
 @pytest.mark.parametrize("dim", [0, 1, 2])
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_stack(input_shapes, dim, trace_model):
+def test_stack(input_shapes, dim):
     torch.manual_seed(42)
 
     if dim > len(input_shapes):
@@ -883,14 +822,13 @@ def test_stack(input_shapes, dim, trace_model):
     op = lambda *xs: torch.stack(xs, dim=dim)
     inputs = [torch.randn(*input_shapes) for _ in range(3)]
 
-    op_harness(op, *inputs, trace_model=trace_model)
+    op_harness(op, *inputs)
 
 
 @pytest.mark.parametrize("input_shapes", [(1, ), (2, ), (2, 3), (1, 3, 4)])
 @pytest.mark.parametrize("dims",
                          [[1], [3], [2, 1], [2, 3], [1, 1, 1], [3, 2, 4]])
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_repeat(input_shapes, dims, trace_model):
+def test_repeat(input_shapes, dims):
     if len(dims) < len(input_shapes):
         pytest.skip(
             "Number of dimensions of repeat dims can not be smaller than number"
@@ -901,11 +839,10 @@ def test_repeat(input_shapes, dims, trace_model):
     op = lambda x: x.repeat(dims)
     a = torch.randn(*input_shapes)
 
-    op_harness(op, a, trace_model=trace_model)
+    op_harness(op, a)
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_repeat_training_input(trace_model):
+def test_repeat_training_input():
     class Model(torch.nn.Module):
         def __init__(self):
             super().__init__()
@@ -922,7 +859,6 @@ def test_repeat_training_input(trace_model):
 
     model = Model()
     options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
     poptorch_model = poptorch.trainingModel(model, options=options)
 
     native_out, _ = model(input)
@@ -933,8 +869,7 @@ def test_repeat_training_input(trace_model):
 
 @pytest.mark.parametrize("input_shapes", [(1, ), (2, ), (2, 3), (1, 3, 4)])
 @pytest.mark.parametrize("dtype", [torch.float, torch.int])
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_clone_one(input_shapes, dtype, trace_model):
+def test_clone_one(input_shapes, dtype):
     torch.manual_seed(42)
 
     op = lambda x: x.clone()
@@ -948,15 +883,10 @@ def test_clone_one(input_shapes, dtype, trace_model):
 
     # Calculating with integers does not produce meaningful gradients
     test_training = dtype is torch.float
-    op_harness(op,
-               x,
-               test_training=test_training,
-               assert_fn=assert_fn,
-               trace_model=trace_model)
+    op_harness(op, x, test_training=test_training, assert_fn=assert_fn)
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_clone_two(trace_model):
+def test_clone_two():
     torch.manual_seed(42)
 
     class Model(torch.nn.Module):
@@ -977,7 +907,6 @@ def test_clone_two(trace_model):
     native_out = model(dummy_x.clone(), dummy_y.clone(), dummy_z.clone())
 
     options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
     poptorch_model = poptorch.inferenceModel(model, options)
     poptorch_out = poptorch_model(dummy_x.clone(), dummy_y.clone(),
                                   dummy_z.clone())
@@ -987,8 +916,7 @@ def test_clone_two(trace_model):
 
 @pytest.mark.parametrize("input_shapes", [(1, ), (2, ), (2, 3), (1, 3, 4)])
 @pytest.mark.parametrize("dtype", [torch.float, torch.half, torch.int])
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_copy_(input_shapes, dtype, trace_model):
+def test_copy_(input_shapes, dtype):
     torch.manual_seed(42)
 
     op = lambda x, y: y.copy_(x)
@@ -1004,12 +932,7 @@ def test_copy_(input_shapes, dtype, trace_model):
 
     # Calculating with integers does not produce meaningful gradients
     test_training = dtype is torch.float
-    op_harness(op,
-               x,
-               y,
-               test_training=test_training,
-               assert_fn=assert_fn,
-               trace_model=trace_model)
+    op_harness(op, x, y, test_training=test_training, assert_fn=assert_fn)
 
 
 @pytest.mark.parametrize("shifts,dims", [(1, 0), (-1, 0), (10, 1), (-10, 1),
@@ -1019,27 +942,24 @@ def test_copy_(input_shapes, dtype, trace_model):
                                          ((-1, -2, -3), (0, 1, 2)), (5, None),
                                          (-3, None), (1, -1), (1, -3), (1, -4),
                                          (1, 3)])
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_roll(shifts, dims, trace_model):
+def test_roll(shifts, dims):
     torch.manual_seed(0)
     op = lambda x: x.roll(shifts, dims)
     x = torch.randn((2, 3, 4))
-    op_harness(op, x, fuzzy_errors=True, trace_model=trace_model)
+    op_harness(op, x, fuzzy_errors=True)
 
 
 @pytest.mark.parametrize("dims", [0, 1, -1])
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_flip(dims, trace_model):
+def test_flip(dims):
     torch.manual_seed(0)
     op = lambda x: x.flip(dims)
     x = torch.randn((2, 3))
-    op_harness(op, x, trace_model=trace_model)
+    op_harness(op, x)
 
 
 @pytest.mark.parametrize("with_clone", [True, False])
 @pytest.mark.parametrize("with_detach", [True, False])
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_detach_and_clone(with_clone, with_detach, trace_model):
+def test_detach_and_clone(with_clone, with_detach):
     torch.manual_seed(42)
 
     class Model(torch.nn.Module):
@@ -1062,7 +982,6 @@ def test_detach_and_clone(with_clone, with_detach, trace_model):
 
     model = Model()
     options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
     poptorch_model = poptorch.trainingModel(model,
                                             options=options,
                                             optimizer=torch.optim.SGD(
@@ -1085,8 +1004,7 @@ def test_detach_and_clone(with_clone, with_detach, trace_model):
         assert (weight_at_start != model.first_layer.weight).all()
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_torch_inference_mode(trace_model):
+def test_torch_inference_mode():
     class SimpleModel(torch.nn.Module):
         def __init__(self):
             super().__init__()
@@ -1101,7 +1019,6 @@ def test_torch_inference_mode(trace_model):
 
     model = SimpleModel()
     options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
     model = poptorch.inferenceModel(model.train(), options=options)
 
     x = torch.rand(4, 10)
@@ -1111,11 +1028,9 @@ def test_torch_inference_mode(trace_model):
 
 
 @helpers.printCapfdOnExit
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_requires_grad_true(capfd, trace_model):
+def test_requires_grad_true(capfd):
     model = torch.nn.Linear(1, 1)
     options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
     poptorch_model = poptorch.inferenceModel(model, options)
 
     poptorch_model(torch.tensor([0.0], requires_grad=True))
@@ -1129,8 +1044,7 @@ def test_requires_grad_true(capfd, trace_model):
 @pytest.mark.parametrize("args", [(5, ), (1, ), (5, 10),
                                   (5, 10, 2), (10, 1, -1), (10, 1, -2),
                                   (1, 5, 10), (2.5, ), (2, 10.), (2, 10, 3.4)])
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_arange(args, trace_model):
+def test_arange(args):
     torch.manual_seed(42)
 
     class Model(torch.nn.Module):
@@ -1138,7 +1052,6 @@ def test_arange(args, trace_model):
             return torch.arange(*args) + a
 
     options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
 
     cpu_model = Model()
     ipu_model = poptorch.inferenceModel(cpu_model, options)
@@ -1153,8 +1066,7 @@ def test_arange(args, trace_model):
 
 @pytest.mark.parametrize("args", [(5, ), (5, 10), (5, 10, 2), (2.5, ),
                                   (2, 10.), (2, 10, 3.4)])
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_arange_types(args, trace_model):
+def test_arange_types(args):
     torch.manual_seed(42)
 
     should_be_float = any(isinstance(a, float) for a in args)
@@ -1166,7 +1078,6 @@ def test_arange_types(args, trace_model):
             return torch.index_select(res, 0, a)  # So the graph's not empty
 
     options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
 
     cpu_model = Model()
     ipu_model = poptorch.inferenceModel(cpu_model, options)
@@ -1191,9 +1102,8 @@ def test_arange_types(args, trace_model):
                           ((10, ), 0, 2, 2), ((10, ), 0, 2, 1),
                           ((5, 5), 0, 2, 2), ((5, 5), 1, 2, 2),
                           ((3, 2, 1), 0, 2, 2), ((10, 10, 10), 1, 5, 2)])
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_unfold(input_shape, dim, size, step, trace_model):
+def test_unfold(input_shape, dim, size, step):
     torch.manual_seed(0)
     op = lambda x: x.unfold(dim, size, step)
     x = torch.randn(input_shape)
-    op_harness(op, x, trace_model=trace_model)
+    op_harness(op, x)

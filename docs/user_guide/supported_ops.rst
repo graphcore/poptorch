@@ -387,12 +387,11 @@ Support nearest and bicubic mode.
    Handling of ``float16`` operations has been greatly simplified since PopTorch version 3.0. Please read this section
    carefully if you are used to the way this worked prior to version 3.0.
 
-In PopTorch version 3.0 and newer, ``float16`` operations are handled straightforwardly by the dispatcher frontend (see
-:numref:`dispatcher-support`). Tensors and models can be freely cast to and from ``float16``, and normalization running
+In PopTorch version 3.0 and later, ``float16`` operations are handled straightforwardly by the dispatcher frontend.
+Tensors and models can be freely cast to and from ``float16``, and normalization running
 statistics can also be retyped by simple casting.
 
-If you have PopTorch code created with a previous version of PopTorch, please see :ref:`float_16_migration`. If you wish
-to use the legacy tracing frontend, please see :numref:`tracing-float16`.
+If you have PopTorch code created with a previous version of PopTorch, see :numref:`float_16_migration`.
 
 .. _float_16_migration:
 

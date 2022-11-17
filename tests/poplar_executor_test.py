@@ -340,50 +340,6 @@ def test_distributed_compile(capfd, trace_model):
         includes_compilation = False
 
 
-def test_nondeterministic_warning_filter():
-    # This simple model generates a few jit warnings including the
-    # non-deterministic ones that we filter in poptorch.  This test checks that
-    # these additional warnings are still emitted.
-    class Model(torch.nn.Module):
-        def __init__(self):
-            super().__init__()
-            self.uniform = torch.distributions.Uniform(-1.0, 1.0)
-
-        def forward(self):
-            sz = torch.tensor((20, ))
-            return self.uniform.sample(sz)
-
-    model = Model()
-
-    # trace and capture all warnings for a baseline
-    with warnings.catch_warnings(record=True) as native_warnings:
-        torch.jit.trace(model, ())
-
-    jit_warns = set(str(w.message) for w in native_warnings)
-
-    options = poptorch.Options()
-    options.Jit.traceModel(True)
-    # compile with poptorch and capture all warnings
-    with warnings.catch_warnings(record=True) as filtered_warnings:
-        poptorch.inferenceModel(model, options).compile()
-
-    pop_warns = set(str(w.message) for w in filtered_warnings)
-
-    # The only differences in warnings should be the filtered ones
-    remainder = list(jit_warns - pop_warns)
-    assert len(remainder) == 2, "Expected exactly two filtered warnings"
-
-    expected_filtered_warnings = [
-        "Trace had nondeterministic nodes",
-        "the traced function does not match the corresponding output"
-    ]
-
-    for r in remainder:
-        assert any(
-            f in r for f in expected_filtered_warnings
-        ), f"Compilation generated unexpected warning.\nActual warning: {r}"
-
-
 def test_dispatcher_cpu_output():
     const1 = torch.tensor([1, 2])
     const2 = torch.tensor([3, 4])

@@ -46,7 +46,7 @@ New features
 API changes
 -----------
 
-- Use the dispatcher instead of ``torch.jit.trace()`` by default to capture the graph on supported platforms (see :numref:`dispatcher-support`).
+- Use the dispatcher instead of ``torch.jit.trace()`` by default to capture the graph on supported platforms.
   Use ``poptorch.Options.Jit.traceModel(True)`` to revert to previous behaviour.
 
 Bug Fixes
@@ -66,7 +66,7 @@ New features
 - Improved error message when trying to apply bitwise ops to unsupported scalar types.
 - Support for upsample bicubic mode.
 - Support for ``zero_infinity`` in ``torch.nn.CTCLoss``.
-- Experimental support for Torch's dispatcher as an alternative to ``torch.jit.trace()`` (see :numref:`dispatcher-support`).
+- Experimental support for Torch's dispatcher as an alternative to ``torch.jit.trace()``.
 - Improved performance by compiling built-in custom ops at install time.
 
 

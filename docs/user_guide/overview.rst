@@ -904,9 +904,8 @@ For more information see: :py:func:`~poptorch.nop`.
 poptorch.dynamic_slice
 ----------------------
 
-When the dispatcher is enabled (see :numref:`dispatcher-support`), standard
-slicing syntax cannot currently be used to create dynamic slices. In order to
-support dynamic slicing with the dispatcher, this function is provided.
+Standard PyTorch slicing syntax cannot currently be used to create dynamic slices.
+This function supports dynamic slicing on the IPU.
 
 For more information see: :py:func:`~poptorch.dynamic_slice`.
 
@@ -961,8 +960,7 @@ You can use your models in one of the following ways:
 #. Use a mix of ``float32`` and ``float16`` parameters by manually specifying parameters as ``float16`` or ``float32``.
 
 .. note::  When PyTorch encounters a mix of ``float16`` and ``float32`` inputs for a given operation, it will usually cast all inputs to ``float32``,
-    and PopTorch complies with this convention when using the default dispatcher frontend. If you are using the legacy tracing frontend, the
-    behaviour is different. Please see :numref:`tracing-float16` for details.
+    and PopTorch complies with this convention.
 
 .. literalinclude:: inferenceModel.py
     :language: python

@@ -431,20 +431,6 @@ def test_none_input_pass_skip_one_kwarg(trace_model):
         helpers.assert_allclose(expected=native_out, actual=poptorch_out)
 
 
-def test_none_input_trace_fail_non_default_kwarg():
-    class Model(torch.nn.Module):
-        def forward(self, x, y=torch.ones(2, 2)):
-            return x + y
-
-    model = Model()
-    options = poptorch.Options()
-    options.Jit.traceModel(True)
-    poptorch_model = poptorch.inferenceModel(model, options)
-
-    with pytest.raises(poptorch.Error, match="'None' may not be passed"):
-        poptorch_model(x, y=None)
-
-
 def test_none_input_trace_dispatch_non_default_kwarg():
     model = Model()
     options = poptorch.Options()
@@ -716,60 +702,6 @@ def test_none_input_dispatch_args_kwargs(fwd_args):
         print(f"Run {i}")
         poptorch_out = poptorch_model(a, b)
         helpers.assert_allclose(expected=native_out, actual=poptorch_out)
-
-
-def test_none_input_trace_fail_non_default_arg():
-    class Model(torch.nn.Module):
-        def forward(self, x, y=torch.ones(2, 2)):
-            return x + y
-
-    model = Model()
-    options = poptorch.Options()
-    options.Jit.traceModel(True)
-    poptorch_model = poptorch.inferenceModel(model, options)
-
-    with pytest.raises(poptorch.Error, match="'None' may not be passed"):
-        poptorch_model(x, None)
-
-
-def test_none_input_fail():
-    class Model(torch.nn.Module):
-        def forward(self, x=None, y=ones):
-            if x is None:
-                return y
-            if y is None:
-                return ones
-            return torch.add(x, y)
-
-    model = Model()
-    options = poptorch.Options()
-    options.Jit.traceModel(True)
-    poptorch_model = poptorch.inferenceModel(model, options)
-
-    with pytest.raises(poptorch.Error, match="'None' may not be passed"):
-        poptorch_model(x, None)
-
-
-def test_no_inputs():
-    class Model(torch.nn.Module):
-        def __init__(self):
-            super().__init__()
-            self.x = torch.tensor([1.], dtype=torch.float)
-
-        def forward(self):
-            self.x += 1.0
-            return self.x
-
-    model = Model()
-    options = poptorch.Options()
-    options.Jit.traceModel(True)
-    poptorch_model = poptorch.inferenceModel(model, options)
-
-    # It appears that forward is called enough time as to make the value 7 as
-    # part of the tracing.
-
-    assert poptorch_model() == 7.
-    assert poptorch_model() == 7.
 
 
 @pytest.mark.parametrize("trace_model", [True, False])

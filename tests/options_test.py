@@ -276,8 +276,7 @@ def test_popart_patterns():
 @pytest.mark.parametrize("dtype", [torch.half, torch.float])
 @pytest.mark.parametrize("ptype", [torch.half, torch.float])
 @helpers.overridePoptorchLogLevel("TRACE")
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_popart_partials(capfd, dtype, ptype, trace_model):
+def test_popart_partials(capfd, dtype, ptype):
     # pylint: disable=protected-access
     torch.manual_seed(42)
     x = torch.randn((1, 16, 16), dtype=dtype)
@@ -288,7 +287,6 @@ def test_popart_partials(capfd, dtype, ptype, trace_model):
 
     opts = poptorch.Options()
     opts.Precision.setPartialsType(ptype)
-    opts.Jit.traceModel(trace_model)
     poptorch_model = poptorch.inferenceModel(model, opts)
     poptorch_model(x)
 
@@ -317,8 +315,7 @@ def test_popart_partials(capfd, dtype, ptype, trace_model):
     poptorch.optim.LAMB,
 ])
 @pytest.mark.parametrize("initial_ls", [1.0, 2.0])
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_automatic_loss_scaling(optim, initial_ls, trace_model):
+def test_automatic_loss_scaling(optim, initial_ls):
     input = torch.ones(5)
     # Just a simple model with weights and a loss function
     model = helpers.ModelWithWeights(lambda x: x, input.shape)
@@ -327,7 +324,6 @@ def test_automatic_loss_scaling(optim, initial_ls, trace_model):
     model.half()
     opts = poptorch.Options()
     opts.Training.setAutomaticLossScaling(True)
-    opts.Jit.traceModel(trace_model)
     # Anchor the final loss scale to compare against the update factor in ipu_state
     opts.anchorTensor("ls_final", "finalLossScale", poptorch.OutputMode.Final)
 
@@ -457,8 +453,7 @@ def test_tensor_location():
 @pytest.mark.parametrize("dtype", [torch.half, torch.float])
 @pytest.mark.parametrize("setting", [True, False, None])
 @helpers.overridePoptorchLogLevel("TRACE")
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_running_statistics(capfd, dtype, setting, trace_model):
+def test_running_statistics(capfd, dtype, setting):
     x = torch.randn((16, 16), dtype=dtype)
 
     model = torch.nn.Sequential()
@@ -471,10 +466,9 @@ def test_running_statistics(capfd, dtype, setting, trace_model):
     opts = poptorch.Options()
     if setting is not None:
         opts.Precision.runningStatisticsAlwaysFloat(setting)
-    opts.Jit.traceModel(trace_model)
     poptorch_model = poptorch.inferenceModel(model, opts)
 
-    if not trace_model and setting:
+    if setting:
         err_msg = "runningStatisticsAlwaysFloat is deprecated"
         with pytest.raises(poptorch.Error, match=err_msg):
             poptorch_model(x)
@@ -483,7 +477,7 @@ def test_running_statistics(capfd, dtype, setting, trace_model):
     poptorch_model(x)
 
     log = helpers.LogChecker(capfd)
-    if (trace_model and setting is None) or setting:
+    if setting:
         log.assert_contains(
             "poptorch.Options set runningStatisticsAlwaysFloat to true")
     else:
@@ -491,9 +485,9 @@ def test_running_statistics(capfd, dtype, setting, trace_model):
             "poptorch.Options set runningStatisticsAlwaysFloat to false")
 
     dtype_str = "Float" if dtype == torch.float or \
-        (trace_model and setting is None) or setting else "Half"
+        setting else "Half"
 
-    device = "cpu" if trace_model else "ipu:0"
+    device = "ipu:0"
 
     log.assert_contains(
         f" : {dtype_str}(16, strides=[1], requires_grad=0, device={device}) "
@@ -588,11 +582,8 @@ def test_copying_options():
     assert (opts.Training.gradient_accumulation ==
             deep_copy.Training.gradient_accumulation)
 
-    assert opts.Jit.trace_model == deep_copy.Jit.trace_model
 
-
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_preserving_options_intact(trace_model):
+def test_preserving_options_intact():
     class ExampleModel(torch.nn.Module):
         def __init__(self):
             super().__init__()
@@ -617,7 +608,6 @@ def test_preserving_options_intact(trace_model):
 
     model = ExampleModelWithLoss()
     opts = poptorch.Options()
-    opts.Jit.traceModel(trace_model)
     training = poptorch.trainingModel(model, opts)
     inference = poptorch.inferenceModel(model, opts)
 
@@ -629,8 +619,7 @@ def test_preserving_options_intact(trace_model):
 @helpers.printCapfdOnExit
 @helpers.overridePoptorchLogLevel("DEBUG")
 @pytest.mark.parametrize("namescopes_enabled", [True, False])
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_name_scope_hook_disabled(capfd, namescopes_enabled, trace_model):
+def test_name_scope_hook_disabled(capfd, namescopes_enabled):
     class Network(torch.nn.Module):
         def __init__(self):
             super().__init__()
@@ -652,7 +641,6 @@ def test_name_scope_hook_disabled(capfd, namescopes_enabled, trace_model):
     options = poptorch.Options()
     if not namescopes_enabled:
         options.disableModuleNamescope()
-    options.Jit.traceModel(trace_model)
     poptorch_model = poptorch.inferenceModel(model, options)
 
     input = torch.randn(2, 1, 15, 15)
@@ -681,8 +669,7 @@ def test_name_scope_hook_disabled(capfd, namescopes_enabled, trace_model):
     it.assert_not_contains("Char")
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_ipu_context_flag(trace_model):
+def test_ipu_context_flag():
     class Network(nn.Module):
         def forward(self, x, y):
             if poptorch.isRunningOnIpu():
@@ -695,7 +682,6 @@ def test_ipu_context_flag(trace_model):
     model = Network()
 
     options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
     inference_model = poptorch.inferenceModel(model, options)
 
     x = torch.tensor([50])
@@ -735,8 +721,7 @@ def test_ipu_model(enabled, capfd):
 
 @pytest.mark.ipuHardwareRequired
 @helpers.overridePoptorchLogLevel("DEBUG")
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_log_cycle_count(capfd, trace_model):
+def test_log_cycle_count(capfd):
     class LogChecker(helpers.LogChecker):
         def validate(self):
             self.assert_contains("Total number of IPU cycles: ")
@@ -746,7 +731,6 @@ def test_log_cycle_count(capfd, trace_model):
             return x + y
 
     opts = poptorch.Options().logCycleCount(True)
-    opts.Jit.traceModel(trace_model)
     inference_model = poptorch.inferenceModel(Network(), opts)
 
     x = torch.tensor([1])
@@ -760,14 +744,12 @@ def test_log_cycle_count(capfd, trace_model):
     log.validate()
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_profile_report_with_model_name(trace_model):
+def test_profile_report_with_model_name():
     def test(dirname):
         model = torch.nn.Linear(100, 100)
         opts = poptorch.Options()
         opts.modelName("tommyflowers")
         opts.enableProfiling(dirname)
-        opts.Jit.traceModel(trace_model)
 
         poptorch_model = poptorch.inferenceModel(model, opts)
         x = torch.randn(100, 100)
@@ -781,13 +763,11 @@ def test_profile_report_with_model_name(trace_model):
     assert os.path.exists(os.path.join(dirname, "tommyflowers", "profile.pop"))
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_profile_report(trace_model):
+def test_profile_report():
     def test(dirname):
         model = torch.nn.Linear(100, 100)
         opts = poptorch.Options()
         opts.enableProfiling(dirname)
-        opts.Jit.traceModel(trace_model)
 
         poptorch_model = poptorch.inferenceModel(model, opts)
         x = torch.randn(100, 100)
@@ -820,16 +800,14 @@ mean_reduction_strategy_params = [
 @pytest.mark.parametrize(
     "accum_type, training, combined_accum, correct_strategy",
     mean_reduction_strategy_params)
-@pytest.mark.parametrize("trace_model", [True, False])
 def test_mean_reduction_strategy_implicit(accum_type, training, combined_accum,
-                                          correct_strategy, trace_model):
+                                          correct_strategy):
     t1 = torch.tensor([1.])
     t2 = torch.tensor([2.])
 
     # A simple adder model just to test the correct strategy is set
     model = helpers.ModelWithWeights(lambda x, y: x + y, t1.shape)
     options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
     optimizer = poptorch.optim.SGD(model.parameters(),
                                    lr=0.01,
                                    accum_type=accum_type,
@@ -846,8 +824,7 @@ def test_mean_reduction_strategy_implicit(accum_type, training, combined_accum,
         "meanAccumulationAndReplicationReductionStrategy") == correct_strategy)
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_mean_reduction_strategy_explicit(trace_model):
+def test_mean_reduction_strategy_explicit():
     t1 = torch.tensor([1.])
     t2 = torch.tensor([2.])
 
@@ -855,7 +832,6 @@ def test_mean_reduction_strategy_explicit(trace_model):
     model = helpers.ModelWithWeights(lambda x, y: x + y, t1.shape)
 
     options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
     options.Training.setMeanAccumulationAndReplicationReductionStrategy(
         MeanReductionStrategy.Running)
     poptorch_model = poptorch.trainingModel(model, options)
@@ -884,14 +860,12 @@ def test_num_io_tiles():
 
 
 # pylint: disable=protected-access
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_options_change_after_use(trace_model):
+def test_options_change_after_use():
     model = helpers.ModelWithWeights(torch.nn.Linear(10, 10),
                                      torch.Size((5, 10)),
                                      loss_fn=torch.nn.CrossEntropyLoss())
 
     opts = poptorch.Options()
-    opts.Jit.traceModel(trace_model)
     poptorch_model = poptorch.trainingModel(model, options=opts)
 
     with pytest.raises(Exception):

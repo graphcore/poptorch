@@ -2,11 +2,9 @@
 import collections
 import copy
 import functools
-import inspect
 import itertools
 import os
 import pickle
-import re
 from typing import Callable, Dict, List, Optional
 from types import MethodType
 import weakref
@@ -146,8 +144,6 @@ class PoplarExecutor:
                 options.outputMode(enums.OutputMode.Final)
             if not optimizer:
                 optimizer = optim.SGD(self._user_model.parameters(), lr=0.01)
-            if options.Jit.trace_model:
-                model = _impl.OptimizerWrapper(model, optimizer)
         else:
             if options.defaultOutputMode():
                 # In inference it makes sense to see all the results, by default.
@@ -183,8 +179,7 @@ class PoplarExecutor:
         self._options = options
         # The args parser needs to be initilialised before the model gets wrapped
         # otherwise we will not be able to retrieve the real arguments list
-        self._args_parser = _args_parser.ArgsParser(
-            model, self._options.Jit.trace_model)
+        self._args_parser = _args_parser.ArgsParser(model)
         # Inputs used to compile the executable
         self._executable_inputs = None
         self._anchor_memory = {}
@@ -887,14 +882,7 @@ class PoplarExecutor:
         processes at the same time and they should all hit the cache.
         """
         # Compile the poplar executable based on the batchsize.
-        if self._options.Jit.trace_model:
-            (in_tensors_trace_view,
-             has_converted_any_half) = self._preprocessGraphTracing(in_tensors)
-
-            trace_args = self._trace_model_and_get_compile_args(
-                in_tensors, in_tensors_trace_view, has_converted_any_half)
-        else:
-            in_tensors_trace_view = self._preprocessGraphDispatcher(in_tensors)
+        in_tensors_trace_view = self._preprocessGraph(in_tensors)
 
         # Note: in single process execution or if the cache is disabled
         # should_compile will always be False.
@@ -902,22 +890,14 @@ class PoplarExecutor:
                                         self._options) as should_compile:
             # Only the first process should compile
             if should_compile:
-                if self._options.Jit.trace_model:
-                    self._executable = poptorch_core.compileWithTrace(
-                        *trace_args)
-                else:
-                    self._executable = self._compileWithDispatch(
-                        in_tensors_trace_view)
+                self._executable = self._compileWithDispatch(
+                    in_tensors_trace_view)
 
         # In distributed execution mode:
         # At that point only the first process will have a compiled executable:
         # trigger the compilation process in all the other processes.
         if not self.isCompiled():
-            if self._options.Jit.trace_model:
-                self._executable = poptorch_core.compileWithTrace(*trace_args)
-            else:
-                self._executable = self._compileWithDispatch(
-                    in_tensors_trace_view)
+            self._executable = self._compileWithDispatch(in_tensors_trace_view)
 
         # Load the engine and connect the streams in all the processes.
         #
@@ -946,28 +926,7 @@ class PoplarExecutor:
             self._on_device_attach()
 
     @_impl.traceMethod("graphPreprocessing")
-    def _preprocessGraphTracing(self, in_tensors):
-        in_tensors_trace_view = self._preprocessGraphCommon(in_tensors)
-        # Normal bools don't get captured in python.
-        has_converted_any_half = [False]
-
-        def possiblyConvertFromHalf(tensor):
-            if isinstance(tensor, torch.Tensor) and tensor.dtype == torch.half:
-                has_converted_any_half[0] = True
-                return tensor.float()
-            return tensor
-
-        in_tensors_trace_view.forEach(possiblyConvertFromHalf)
-        poptorch_core.processPrecisionOptions(self._options.Precision, False)
-        return in_tensors_trace_view, has_converted_any_half
-
-    @_impl.traceMethod("graphPreprocessing")
-    def _preprocessGraphDispatcher(self, in_tensors):
-        in_tensors_trace_view = self._preprocessGraphCommon(in_tensors)
-        poptorch_core.processPrecisionOptions(self._options.Precision, True)
-        return in_tensors_trace_view
-
-    def _preprocessGraphCommon(self, in_tensors):
+    def _preprocessGraph(self, in_tensors):
         self._executable_inputs = in_tensors.clone()
         in_tensors_trace_view = in_tensors.clone()
 
@@ -984,6 +943,8 @@ class PoplarExecutor:
 
         in_tensors_trace_view.forEach(self._narrow_tensor)
         in_tensors_trace_view.forEach(remove_requires_grad)
+
+        poptorch_core.processPrecisionOptions(self._options.Precision, True)
         return in_tensors_trace_view
 
     def compile(self, *args, **kwargs) -> None:
@@ -1020,22 +981,9 @@ class PoplarExecutor:
             raise _impl.createPoptorchError("Invalid file %s: %s" %
                                             (filename, e))
 
-        in_tensors_trace_view, has_converted_any_half = \
-                self._preprocessGraphTracing(
-                    data.executable_inputs)
-
-        if data.options.Jit.trace_model:
-            trace_args = self._trace_model_and_get_compile_args(
-                data.executable_inputs, in_tensors_trace_view,
-                has_converted_any_half)
-            self._executable = \
-                    poptorch_core.processTraceAndImportExecutable(
-                        *trace_args, filename)
-        else:
-            in_tensors_trace_view = self._preprocessGraphDispatcher(
-                data.executable_inputs)
-            self._executable = self._compileWithDispatch(
-                in_tensors_trace_view, executable_filename=filename)
+        in_tensors_trace_view = self._preprocessGraph(data.executable_inputs)
+        self._executable = self._compileWithDispatch(
+            in_tensors_trace_view, executable_filename=filename)
 
         self._is_attached = self.isAttachedToDevice()
 
@@ -1453,223 +1401,6 @@ class PoplarExecutor:
             raise _impl.createPoptorchError("model was never wrapped")
         _impl.unwrapModelIfNecessary(self._user_model)
 
-    def _trace_with_warning_filter(self, in_tensors_trace_view_tuple):
-        # Conditionally suppress the following jit warnings when the model
-        # contains any non-deterministic nodes (e.g. dropout)
-        rng_warnings = [
-            "Trace had nondeterministic nodes",
-            "the traced function does not match the corresponding output"
-        ]
-
-        def filterWarnings(warning):
-            return not any(m in str(warning.message) for m in rng_warnings)
-
-        warns = []
-        with warnings.catch_warnings(record=True) as caught:
-            try:
-                traced = torch.jit.trace(self._model,
-                                         in_tensors_trace_view_tuple)
-            except RuntimeError as e:
-                pattern = r'Type \'Tuple(\[.*\])\' cannot be traced'
-                match = re.match(pattern, str(e))
-                if match:
-                    types = match.group(1)
-                    forward_func_file_name = inspect.getsourcefile(
-                        self._model.forward)
-                    forward_func_lines = inspect.getsourcelines(
-                        self._model.forward)
-
-                    err_str = f"Cannot trace forward function in"\
-                              f" {forward_func_file_name}:{type(self._model)}"\
-                              f":{forward_func_lines[1]} with input types"\
-                              f" {types}. All forward function arguments used"\
-                              f" to compile and run the model must be Tensors"\
-                              f" or (possibly nested) Lists and Tuples of"\
-                              f" Tensors. \nTo resolve this error you must"\
-                              f" either convert any problem arguments to"\
-                              f" Tensor inputs or define them class"\
-                              f" attributes."
-
-                    raise TypeError(err_str).with_traceback(e.__traceback__)
-                raise e
-
-            # pylint: disable=protected-access
-            if poptorch_core.isGraphNondeterministic(traced._c):
-                warns = list(filter(filterWarnings, caught))
-
-        # Reissue remaining warnings
-        for w in warns:
-            warnings.warn_explicit(message=w.message,
-                                   category=w.category,
-                                   filename=w.filename,
-                                   lineno=w.lineno)
-
-        return traced
-
-    def _getTraceNoOutput(self, in_tensors_trace_view_tuple):
-        if not isinstance(self._model, torch.nn.Module):
-            raise _impl.createPoptorchError(
-                "Tracing a model returning no outputs is only "
-                "supported if the model is an instance of "
-                "torch.nn.Module or an instance of a subclass "
-                "of torch.nn.Module.")
-
-        class AddFakeOutput(self._model.__class__):
-            def forward(self, *args, **kwargs):
-                super().forward(*args, **kwargs)
-                return torch.tensor([0])
-
-        old_class = self._model.__class__
-        self._model.__class__ = AddFakeOutput
-        traced = self._trace_with_warning_filter(in_tensors_trace_view_tuple)
-        self._model.__class__ = old_class
-
-        return traced
-
-    @_impl.traceMethod("tracingModel")
-    def _trace_model_and_get_compile_args(self, in_tensors,
-                                          in_tensors_trace_view,
-                                          has_converted_any_half):
-        logger.info('Compiling the model using tracing')
-        # CPU tracing doens't work for half types. We need to convert all half
-        # layers to float, run tracing and revert the types to their original.
-        half_layers = set()
-        all_layers = list(self._model.named_modules())
-
-        # Iterate in reverse to process inner layers first.
-        for (name, layer) in reversed(all_layers):
-            any_is_half = False
-            for tensor in itertools.chain(layer.parameters(), layer.buffers()):
-                if tensor.dtype == torch.half:
-                    any_is_half = True
-                    break
-
-            if any_is_half:
-                layer.float()
-                half_layers.add(name)
-
-        # From this point, if in_tensors_trace_view changes in value, the input
-        # is modified in-place. To discover this, take a deep copy of the
-        # inputs.
-        in_tensors_trace_view_tuple = in_tensors_trace_view.args
-        in_tensors_backup = None
-        try:
-            in_tensors_backup = copy.deepcopy(in_tensors_trace_view_tuple)
-        # pylint: disable=bare-except
-        except:
-            # The trace should raise its own exception for invalid input types,
-            # so simply keep in_tensors_backup as None. Note that a tensors with
-            # requires_grad=True would fail here but such a tensor will have
-            # been detached already.
-            pass
-
-        # We will trace using the normal trace view.
-        # pylint: disable=protected-access
-        self._options._execution_strategy.onStartTracing()
-
-        # The CPU execution happening during trace represents the IPU codepath.
-        _impl.setIpuContext(True)
-        module_namescope = _impl.NameScopeHook(
-            self._user_model
-        ) if self.options._module_namescope_enabled else None
-
-        # Override half so users can use it in their models.
-        def internal_to(tensor, *args, **kwargs):
-            # If dtype is in args, it's either at index 0 or 1, and never both.
-            arg_dtype = [a for a in args[:2] if isinstance(a, torch.dtype)]
-            dtype = arg_dtype[0] if len(arg_dtype) > 0 else kwargs.get("dtype")
-            if dtype is torch.half:
-                # Cast is always outplace, if we don't clone, we might see the
-                # casted tensor in places where the original tensor should be used
-                # in the trace.
-                tensor = tensor.clone()
-                return _impl.internal_cast(tensor, dtype)
-            return old_to(tensor, *args, **kwargs)
-
-        # Store the old methods so they can be restored.
-        old_half = torch.Tensor.half
-        torch.Tensor.half = functools.partialmethod(internal_to,
-                                                    dtype=torch.half)
-        old_to = torch.Tensor.to
-        torch.Tensor.to = internal_to
-
-        # Trace only a copy to avoid updating original weights during compilation.
-        temp_model = copy.deepcopy(self._model.state_dict())
-
-        added_dummy_output = False
-
-        with _impl.CheckBuffersAndParamsScope(self.model):
-            try:
-                self._trace = self._trace_with_warning_filter(
-                    in_tensors_trace_view_tuple)
-            except RuntimeError as e:
-                if "didn't return any values" in str(e):
-                    self._trace = self._getTraceNoOutput(
-                        in_tensors_trace_view_tuple)
-                    added_dummy_output = True
-                else:
-                    raise e
-
-        # Restore methods to their old meanings.
-        torch.Tensor.half = old_half
-        torch.Tensor.to = old_to
-
-        # Revert the traced copy to the inital weights.
-        self._trace.load_state_dict(temp_model, strict=False)
-        self._model.load_state_dict(temp_model)
-
-        # Restore to non-IPU codepath.
-        if module_namescope:
-            module_namescope.remove()
-        _impl.setIpuContext(False)
-
-        self._options._execution_strategy.onEndTracing()
-        self._RestoreInputs(in_tensors_backup, in_tensors_trace_view_tuple)
-
-        # Some of the trace layers of type float should be of type half.
-        # The following works because the iterator is hierarchic,
-        # yielding containers before contents.
-        for name, layer in self._trace.named_modules():
-            if name in half_layers:
-                layer.half()
-
-        # Convert back the original model as well.
-        for name, layer in self._model.named_modules():
-            if name in half_layers:
-                layer.half()
-
-        # We need to track the parameters from the traced model as this is what
-        # the C++ graph sees.
-        parameters = {
-            **dict(self._trace.named_parameters()),
-            **dict(self._trace.named_buffers())
-        }
-
-        # Track the original model parameters as well.
-        model_parameters = {
-            **dict(self._model.named_parameters()),
-            **dict(self._model.named_buffers())
-        }
-
-        if has_converted_any_half[0]:
-            # Get the originals back.
-            in_tensors_as_half = in_tensors.clone()
-            in_tensors_as_half.forEach(self._narrow_tensor)
-
-            # Compile using the actual halves.
-            return (self._trace._c, parameters,
-                    in_tensors_as_half.asTuple(), has_converted_any_half[0],
-                    self._options.toDict(), self._training,
-                    self._dict_optimizer, accessAttributes, added_dummy_output,
-                    list(self._options.anchored_tensors.values()),
-                    model_parameters)
-        return (self._trace._c, parameters,
-                in_tensors_trace_view.asTuple(), has_converted_any_half[0],
-                self._options.toDict(), self._training, self._dict_optimizer,
-                accessAttributes, added_dummy_output,
-                list(self._options.anchored_tensors.values()),
-                model_parameters)
-
     def _narrow_tensor(self, tensor):
         """There are two concepts of batch size. First is the "model" batch
         size then there is the concept of batching at the popart level.
@@ -1754,24 +1485,3 @@ class PoplarExecutor:
         poptorch_core.loadEngineAndConnectStreams(self._executable)
         self._is_attached = True
         self._on_device_attach()
-
-    @classmethod
-    def _RestoreInputs(cls, backup, post_trace):
-        if isinstance(backup, torch.Tensor):
-            assert isinstance(post_trace, torch.Tensor)
-            post_trace.copy_(backup)
-            return
-
-        if isinstance(backup, (tuple, list)):
-            assert isinstance(post_trace, (tuple, list))
-            assert len(backup) == len(post_trace)
-
-            for idx, backup_val in enumerate(backup):
-                cls._RestoreInputs(backup_val, post_trace[idx])
-
-            return
-
-        # This implies that there is an input type or condition which does not
-        # cause the tracer to fail, yet is none of the above types, or
-        # alternatively, it is one of the above but the deepcopy failed.
-        raise _impl.createPoptorchError("Unsupported input type or condition.")

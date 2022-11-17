@@ -3,8 +3,8 @@
 
 import pytest
 import torch
-import poptorch
 import helpers
+import poptorch
 
 
 @pytest.mark.parametrize("trace_model", [True, False])
@@ -213,3 +213,29 @@ def test_CPU_multiple_calls_multiple_classes(trace_model):
     helpers.assert_allclose(actual=out,
                             expected=model(in1, in2),
                             equal_nan=True)
+
+
+# Just test that the dispatcher is disabled in the CPU op, and re-enabled
+# afterwards.
+def test_poptorch_op_in_cpu_op():
+    torch.manual_seed(42)
+
+    class Model(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.cpu = poptorch.CPU(self.foo, "MyCPUOp")
+
+        def foo(self, x):
+            return poptorch.identity_loss(x, reduction='sum')
+
+        def forward(self, x):
+            w = self.cpu(x)
+            return w, self.foo(x)
+
+    options = poptorch.Options()
+    options.deviceIterations(2)
+
+    dispatched_model = poptorch.inferenceModel(Model(), options)
+
+    # Just check it doesn't crash
+    dispatched_model(torch.tensor([1.0, 2.0]))
