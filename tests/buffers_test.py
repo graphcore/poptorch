@@ -3,9 +3,8 @@
 
 import torch
 import pytest
-
-import poptorch
 import helpers
+import poptorch
 
 
 class ConstantBuffer(torch.nn.Module):
@@ -19,34 +18,27 @@ class ConstantBuffer(torch.nn.Module):
         return torch.sum(x + new_stuff)
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_constant_buffer(trace_model):
+def test_constant_buffer():
     model = ConstantBuffer()
 
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
-    poptorch_model = poptorch.inferenceModel(model, options)
+    poptorch_model = poptorch.inferenceModel(model)
     assert poptorch_model(torch.tensor([2])) == 15
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_constant_buffer_repeat(trace_model):
+def test_constant_buffer_repeat():
     model = ConstantBuffer()
 
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
-    poptorch_model = poptorch.inferenceModel(model, options)
+    poptorch_model = poptorch.inferenceModel(model)
     assert poptorch_model(torch.tensor([2])) == 15
     assert poptorch_model(torch.tensor([2])) == 15
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_training_then_inference(trace_model):
+def test_training_then_inference():
     momentum = 0.1
 
     class Model(torch.nn.Module):
         def __init__(self):
-            super(Model, self).__init__()
+            super().__init__()
             self.bn = torch.nn.BatchNorm1d(10, momentum=momentum)
             self.loss = torch.nn.MSELoss()
 
@@ -59,28 +51,21 @@ def test_training_then_inference(trace_model):
     input = torch.ones([4, 10], dtype=torch.float32)
     target = torch.ones([4, 10], dtype=torch.float32) + 1
 
-    training_options = poptorch.Options()
-    training_options.Jit.traceModel(trace_model)
-
-    training_model = poptorch.trainingModel(model, options=training_options)
+    training_model = poptorch.trainingModel(model)
 
     training_model.compile(input, target)
 
-    inference_options = poptorch.Options()
-    inference_options.Jit.traceModel(trace_model)
-
-    inference_model = poptorch.inferenceModel(model, options=inference_options)
+    inference_model = poptorch.inferenceModel(model)
 
     inference_model.compile(input, target)
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_buffer_implicit_copy(trace_model):
+def test_buffer_implicit_copy():
     momentum = 0.1
 
     class Model(torch.nn.Module):
         def __init__(self):
-            super(Model, self).__init__()
+            super().__init__()
             self.bn = torch.nn.BatchNorm1d(10, momentum=momentum)
             self.loss = torch.nn.MSELoss()
 
@@ -93,10 +78,7 @@ def test_buffer_implicit_copy(trace_model):
     input = torch.ones([4, 10], dtype=torch.float32)
     target = torch.ones([4, 10], dtype=torch.float32) + 1
 
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
-
-    poptorch_model = poptorch.trainingModel(model, options=options)
+    poptorch_model = poptorch.trainingModel(model)
 
     poptorch_model(input, target)
     helpers.assert_allclose(actual=model.bn.running_mean,
@@ -107,8 +89,7 @@ def test_buffer_implicit_copy(trace_model):
                             expected=input[0, :] * momentum)
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_error_on_remove_buffer(trace_model):
+def test_error_on_remove_buffer():
     class Model(torch.nn.Module):
         def __init__(self):
             super().__init__()
@@ -122,9 +103,7 @@ def test_error_on_remove_buffer(trace_model):
 
     model = Model()
 
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
-    poptorch_model = poptorch.inferenceModel(model, options)
+    poptorch_model = poptorch.inferenceModel(model)
 
     error_msg = (r"Buffer y is removed from the model when calling the "
                  r"forward method\.")
@@ -132,8 +111,7 @@ def test_error_on_remove_buffer(trace_model):
         poptorch_model(torch.tensor([5.0]))
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_error_on_redefine_buffer(trace_model):
+def test_error_on_redefine_buffer():
     class Model(torch.nn.Module):
         def __init__(self):
             super().__init__()
@@ -146,9 +124,7 @@ def test_error_on_redefine_buffer(trace_model):
 
     model = Model()
 
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
-    poptorch_model = poptorch.inferenceModel(model, options)
+    poptorch_model = poptorch.inferenceModel(model)
     error_msg = (r"Buffer y is reassigned within the model when calling the "
                  r"forward method\. This is not supported\. Consider using "
                  r"self\.y\.copy_\(src\) to copy data "
@@ -180,9 +156,7 @@ class BufferUpdatingModel(torch.nn.Module):
 
 @pytest.mark.parametrize("device_iterations", [1, 3, 5])
 @pytest.mark.parametrize("gradient_accumulation", [1, 3, 5])
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_buffer_update_with_param(device_iterations, gradient_accumulation,
-                                  trace_model):
+def test_buffer_update_with_param(device_iterations, gradient_accumulation):
     model = BufferUpdatingModel()
     model.conv.weight.data = torch.ones_like(model.conv.weight.data)
     model.conv.bias.data = torch.ones_like(model.conv.bias.data)
@@ -222,7 +196,6 @@ def test_buffer_update_with_param(device_iterations, gradient_accumulation,
     opts = poptorch.Options()
     opts.deviceIterations(device_iterations)
     opts.Training.gradientAccumulation(gradient_accumulation)
-    opts.Jit.traceModel(trace_model)
 
     dummy_input = torch.ones(
         [2 * device_iterations * gradient_accumulation, 2, 2, 2])
@@ -243,13 +216,11 @@ def test_buffer_update_with_param(device_iterations, gradient_accumulation,
                             actual=poptorch_model.test_buff)
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_failing_on_replicas(trace_model):
+def test_failing_on_replicas():
     model = BufferUpdatingModel()
 
     opts = poptorch.Options()
     opts.replicationFactor(2)
-    opts.Jit.traceModel(trace_model)
 
     poptorch_model = poptorch.trainingModel(model,
                                             optimizer=torch.optim.SGD(
@@ -269,21 +240,18 @@ def test_failing_on_replicas(trace_model):
         poptorch_model(dummy_input, dummy_target)
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_constant_buffer_with_replicas(trace_model):
+def test_constant_buffer_with_replicas():
     # This should not have an error as the buffer is constant
     model = ConstantBuffer()
 
     opts = poptorch.Options()
     opts.replicationFactor(2)
-    opts.Jit.traceModel(trace_model)
 
     poptorch_model = poptorch.inferenceModel(model, opts)
     poptorch_model(torch.tensor([1, 2]))
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_no_input_but_one_buffer(trace_model):
+def test_no_input_but_one_buffer():
     class Model(torch.nn.Module):
         def __init__(self):
             super().__init__()
@@ -295,9 +263,7 @@ def test_no_input_but_one_buffer(trace_model):
             return self.x
 
     model = Model()
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
-    poptorch_model = poptorch.inferenceModel(model, options)
+    poptorch_model = poptorch.inferenceModel(model)
 
     assert poptorch_model() == 2.
     assert poptorch_model() == 3.
@@ -305,8 +271,7 @@ def test_no_input_but_one_buffer(trace_model):
     assert poptorch_model() == 5.
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_unsynchronised_replicated_buffers(trace_model):
+def test_unsynchronised_replicated_buffers():
     class ReplicaBufferModel(torch.nn.Module):
         def __init__(self):
             super().__init__()
@@ -323,7 +288,6 @@ def test_unsynchronised_replicated_buffers(trace_model):
     opts.replicationFactor(num_replica)
     opts.deviceIterations(1)
     opts.broadcastBuffers(False)
-    opts.Jit.traceModel(trace_model)
 
     model = ReplicaBufferModel()
     model.float()

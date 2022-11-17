@@ -10,8 +10,7 @@ import poptorch
 
 #  Test the reductions work as expected
 @pytest.mark.parametrize("reduction", ["none", "mean", "sum"])
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_non_final_loss_reductions(reduction, trace_model):
+def test_non_final_loss_reductions(reduction):
     torch.manual_seed(42)
 
     base_model = torch.nn.Linear(10, 10)
@@ -36,10 +35,8 @@ def test_non_final_loss_reductions(reduction, trace_model):
             loss = loss_fn(out, target)
             return out, loss
 
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
     model = ModelWithLoss()
-    poptorch_model = poptorch.trainingModel(model, options=options)
+    poptorch_model = poptorch.trainingModel(model)
 
     target = torch.randn(10)
     input = torch.randn(10)
@@ -70,8 +67,7 @@ def run_custom_loss_test(loss_fn,
                          base_model=None,
                          input=None,
                          target=None,
-                         test_output_vs_target=True,
-                         trace_model=True):
+                         test_output_vs_target=True):
     torch.manual_seed(42)
 
     if base_model is None:
@@ -92,10 +88,8 @@ def run_custom_loss_test(loss_fn,
             loss = self.loss_fn(out, target)
             return out, loss
 
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
     model = ModelWithLoss()
-    poptorch_model = poptorch.trainingModel(model, options=options)
+    poptorch_model = poptorch.trainingModel(model)
 
     # Pytorch native.
     native_out, loss = model(input, target)
@@ -132,8 +126,7 @@ def run_custom_loss_test(loss_fn,
     return poptorch_model
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_custom_loss(trace_model):
+def test_custom_loss():
     torch.manual_seed(42)
 
     class CustomLoss(torch.nn.Module):
@@ -145,12 +138,10 @@ def test_custom_loss(trace_model):
 
     run_custom_loss_test(loss_fn=CustomLoss(),
                          input=torch.randn(10),
-                         target=torch.randn(10),
-                         trace_model=trace_model)
+                         target=torch.randn(10))
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_custom_loss_l1(trace_model):
+def test_custom_loss_l1():
     torch.manual_seed(42)
 
     class CustomLoss(torch.nn.Module):
@@ -162,12 +153,10 @@ def test_custom_loss_l1(trace_model):
 
     run_custom_loss_test(loss_fn=CustomLoss(),
                          input=torch.randn(10),
-                         target=torch.randn(10),
-                         trace_model=trace_model)
+                         target=torch.randn(10))
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_custom_loss_nll(trace_model):
+def test_custom_loss_nll():
     torch.manual_seed(42)
 
     class CustomLoss(torch.nn.Module):
@@ -189,8 +178,7 @@ def test_custom_loss_nll(trace_model):
                                  base_model=base_model,
                                  input=input,
                                  target=target,
-                                 test_output_vs_target=False,
-                                 trace_model=trace_model)
+                                 test_output_vs_target=False)
     model.copyWeightsToHost()
 
     # Check that the pytorch native model is also returning the trained
@@ -200,8 +188,7 @@ def test_custom_loss_nll(trace_model):
     assert torch.argmax(out, dim=1) == target
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_two_custom_losses(trace_model):
+def test_two_custom_losses():
     torch.manual_seed(42)
 
     base_model = torch.nn.Sequential(torch.nn.Linear(10, 10),
@@ -218,13 +205,10 @@ def test_two_custom_losses(trace_model):
                  "Graph must have one final loss. "
                  "Wrap final graph loss in poptorch.identity_loss.")
     with pytest.raises(poptorch.Error, match=error_msg):
-        run_custom_loss_test(loss_fn=CustomLoss(),
-                             base_model=base_model,
-                             trace_model=trace_model)
+        run_custom_loss_test(loss_fn=CustomLoss(), base_model=base_model)
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_two_custom_losses_with_id_wrapper(trace_model):
+def test_two_custom_losses_with_id_wrapper():
     torch.manual_seed(42)
 
     base_model = torch.nn.Sequential(torch.nn.Linear(10, 10),
@@ -239,12 +223,10 @@ def test_two_custom_losses_with_id_wrapper(trace_model):
 
     run_custom_loss_test(loss_fn=CustomLoss(),
                          base_model=base_model,
-                         test_output_vs_target=False,
-                         trace_model=trace_model)
+                         test_output_vs_target=False)
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_no_loss(trace_model):
+def test_no_loss():
     torch.manual_seed(42)
 
     class Model(torch.nn.Module):
@@ -263,12 +245,8 @@ def test_no_loss(trace_model):
 
     model = Model()
     optimizer = optim.SGD(model.parameters(), lr=0.01)
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
 
-    poptorch_model = poptorch.trainingModel(model,
-                                            optimizer=optimizer,
-                                            options=options)
+    poptorch_model = poptorch.trainingModel(model, optimizer=optimizer)
 
     label = torch.randint(0, 10, [1])
     input = torch.randn(1, 10)

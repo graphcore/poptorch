@@ -11,8 +11,8 @@ import signal
 import torch
 import pytest
 import numpy
-import poptorch
 import helpers
+import poptorch
 
 
 class BrokenDataset(torch.utils.data.Dataset):
@@ -57,10 +57,16 @@ class IncrementIterableDataset(torch.utils.data.IterableDataset):
                              self.start + index,
                              dtype=self._dtype)
 
+    def __getitem__(self, index):
+        raise NotImplementedError("No __getitem__ for iterable datasets")
+
 
 class IncrementIterableDatasetWithLen(IncrementIterableDataset):
     def __len__(self):
         return self.length
+
+    def __getitem__(self, index):
+        raise NotImplementedError("No __getitem__ for iterable datasets")
 
 
 class IncrementDatasetWithLabels(torch.utils.data.Dataset):
@@ -109,8 +115,7 @@ class DoubleDataLabel(torch.nn.Module):
         return data * 2, label * 2
 
 
-def _run_test(trace_model,
-              shape=None,
+def _run_test(shape=None,
               num_tensors=100,
               batch_size=1,
               num_workers=0,
@@ -121,7 +126,6 @@ def _run_test(trace_model,
     opts = poptorch.Options()
     opts.deviceIterations(device_iterations)
     opts.replicationFactor(replication_factor)
-    opts.Jit.traceModel(trace_model)
 
     data = poptorch.DataLoader(opts,
                                IncrementDataset(shape, num_tensors),
@@ -143,44 +147,36 @@ def _run_test(trace_model,
     numpy.testing.assert_array_equal(diff.numpy(), [0.])
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_simple(trace_model):
-    _run_test(trace_model)
+def test_simple():
+    _run_test()
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_batch(trace_model):
-    _run_test(trace_model, batch_size=4)
+def test_batch():
+    _run_test(batch_size=4)
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_workers(trace_model):
-    _run_test(trace_model, num_workers=8)
+def test_workers():
+    _run_test(num_workers=8)
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_device_iterations(trace_model):
-    _run_test(trace_model, device_iterations=4)
+def test_device_iterations():
+    _run_test(device_iterations=4)
 
 
 @pytest.mark.ipuHardwareRequired
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_replica(trace_model):
-    _run_test(trace_model, replication_factor=4)
+def test_replica():
+    _run_test(replication_factor=4)
 
 
 @pytest.mark.ipuHardwareRequired
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_combined(trace_model):
-    _run_test(trace_model,
-              batch_size=2,
+def test_combined():
+    _run_test(batch_size=2,
               device_iterations=5,
               replication_factor=2,
               num_workers=4)
 
 
-def _run_process_test(trace_model,
-                      shape=None,
+def _run_process_test(shape=None,
                       num_tensors=100,
                       batch_size=1,
                       num_workers=0,
@@ -192,7 +188,6 @@ def _run_process_test(trace_model,
     opts = poptorch.Options()
     opts.deviceIterations(device_iterations)
     opts.replicationFactor(replication_factor)
-    opts.Jit.traceModel(trace_model)
 
     loader = poptorch.DataLoader(opts,
                                  IncrementDataset(shape, num_tensors),
@@ -218,20 +213,16 @@ def _run_process_test(trace_model,
             helpers.assert_allequal(actual=out, expected=expected)
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_multithreaded1(trace_model):
-    _run_process_test(trace_model,
-                      num_tensors=100,
+def test_multithreaded1():
+    _run_process_test(num_tensors=100,
                       batch_size=2,
                       device_iterations=1,
                       replication_factor=1,
                       num_workers=0)
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_multithreaded2(trace_model):
-    _run_process_test(trace_model,
-                      num_tensors=100,
+def test_multithreaded2():
+    _run_process_test(num_tensors=100,
                       batch_size=2,
                       device_iterations=10,
                       replication_factor=1,
@@ -239,18 +230,15 @@ def test_multithreaded2(trace_model):
 
 
 @pytest.mark.ipuHardwareRequired
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_multithreaded3(trace_model):
-    _run_process_test(trace_model,
-                      num_tensors=10,
+def test_multithreaded3():
+    _run_process_test(num_tensors=10,
                       batch_size=2,
                       device_iterations=1,
                       replication_factor=4,
                       num_workers=0)
 
 
-def _run_process_label_test(trace_model,
-                            shape=None,
+def _run_process_label_test(shape=None,
                             num_tensors=100,
                             batch_size=1,
                             num_workers=0,
@@ -261,7 +249,6 @@ def _run_process_label_test(trace_model,
     opts = poptorch.Options()
     opts.deviceIterations(device_iterations)
     opts.replicationFactor(replication_factor)
-    opts.Jit.traceModel(trace_model)
 
     loader = poptorch.DataLoader(opts,
                                  IncrementDatasetWithLabels(
@@ -290,10 +277,8 @@ def _run_process_label_test(trace_model,
     numpy.testing.assert_array_equal(label_out[0].item(), [expected])
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_multithreaded4(trace_model):
-    _run_process_label_test(trace_model,
-                            num_tensors=60,
+def test_multithreaded4():
+    _run_process_label_test(num_tensors=60,
                             batch_size=2,
                             device_iterations=10,
                             replication_factor=1,

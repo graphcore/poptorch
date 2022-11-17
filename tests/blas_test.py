@@ -7,7 +7,7 @@ import helpers
 import poptorch
 
 
-def blas_op(op, input1, input2, out, trace_model, atol=1e-04, rtol=1e-04):
+def blas_op(op, input1, input2, out, atol=1e-04, rtol=1e-04):
     class Model(torch.nn.Module):
         def __init__(self, op):
             super().__init__()
@@ -28,9 +28,7 @@ def blas_op(op, input1, input2, out, trace_model, atol=1e-04, rtol=1e-04):
         native_out = model(*args)
 
     # Run on IPU.
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
-    poptorch_model = poptorch.inferenceModel(model, options)
+    poptorch_model = poptorch.inferenceModel(model)
     poptorch_out = poptorch_model(*args)
 
     if native_out is not None:
@@ -48,18 +46,16 @@ def blas_op(op, input1, input2, out, trace_model, atol=1e-04, rtol=1e-04):
 
 
 @pytest.mark.parametrize("optional_out", [True, False])
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_matmul(optional_out, trace_model):
+def test_matmul(optional_out):
     torch.manual_seed(42)
 
     input1 = torch.randn([10, 200])
     input2 = torch.randn([200, 45])
     out = torch.randn([10, 45]) if optional_out else None
 
-    blas_op(torch.matmul, input1, input2, out, trace_model)
+    blas_op(torch.matmul, input1, input2, out)
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
 @pytest.mark.parametrize("mode",
                          (poptorch.MatMulSerializationMode.InputChannels,
                           poptorch.MatMulSerializationMode.ReducingDim,
@@ -67,7 +63,7 @@ def test_matmul(optional_out, trace_model):
                           poptorch.MatMulSerializationMode.Disabled))
 @pytest.mark.parametrize("factor", (2, 5, 10))
 @pytest.mark.parametrize("keep_precision", [True, False])
-def test_serializedMatMul(trace_model, mode, factor, keep_precision):
+def test_serializedMatMul(mode, factor, keep_precision):
     torch.manual_seed(42)
 
     input1 = torch.rand(1, 10, 200)
@@ -92,26 +88,23 @@ def test_serializedMatMul(trace_model, mode, factor, keep_precision):
                 input1,
                 input2,
                 None,
-                trace_model,
                 rtol=0.01,
                 atol=0.05)
     else:
-        blas_op(serialise_matmal_op, input1, input2, None, trace_model)
+        blas_op(serialise_matmal_op, input1, input2, None)
 
 
 @pytest.mark.parametrize("optional_out", [True, False])
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_bmm(optional_out, trace_model):
+def test_bmm(optional_out):
     input1 = torch.randn([12, 10, 200])
     input2 = torch.randn([12, 200, 33])
     out = torch.randn([12, 10, 33]) if optional_out else None
 
-    blas_op(torch.bmm, input1, input2, out, trace_model)
+    blas_op(torch.bmm, input1, input2, out)
 
 
 @pytest.mark.parametrize("bias", [True, False])
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_matmul_training(bias, trace_model):
+def test_matmul_training(bias):
     N, M, K, C = 100, 9, 7, 5
 
     class Net(torch.nn.Module):
@@ -129,12 +122,10 @@ def test_matmul_training(bias, trace_model):
 
     torch.manual_seed(42)
     model = Net()
-    opts = poptorch.Options()
-    opts.Jit.traceModel(trace_model)
 
     optimizer = torch.optim.SGD(model.parameters(), lr=0.01)
     torch.manual_seed(42)
-    poptorch_model = poptorch.trainingModel(model, opts, optimizer)
+    poptorch_model = poptorch.trainingModel(model, optimizer=optimizer)
     x = torch.randn(N, M, K)
     y = torch.randn(K, K)
     target = torch.empty(N, M, K, dtype=torch.long).random_(0, C)
@@ -165,8 +156,7 @@ def test_matmul_training(bias, trace_model):
         ((1, 7), 0.75, 1.0),
         ((1), 0.75, 0.75),
     ])
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_addmm(params, trace_model):
+def test_addmm(params):
     torch.manual_seed(42)
 
     input_shape, beta, alpha = params
@@ -184,12 +174,9 @@ def test_addmm(params, trace_model):
         def forward(self, x1, x2, x3):
             return torch.addmm(x1, x2, x3, beta=self.beta, alpha=self.alpha)
 
-    opts = poptorch.Options()
-    opts.Jit.traceModel(trace_model)
-
     model = AddmmModel(beta, alpha)
     cpu_result = model(t1, t2, t3)
-    ipu_result = poptorch.inferenceModel(model, opts)(t1, t2, t3)
+    ipu_result = poptorch.inferenceModel(model)(t1, t2, t3)
 
     helpers.assert_allclose(expected=cpu_result, actual=ipu_result)
 
@@ -203,8 +190,7 @@ def test_addmm(params, trace_model):
         ((1, 7), 0.75, 1.0),
         ((1), 0.75, 0.75),
     ])
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_baddbmm(params, trace_model):
+def test_baddbmm(params):
     torch.manual_seed(42)
 
     input_shape, beta, alpha = params
@@ -222,11 +208,8 @@ def test_baddbmm(params, trace_model):
         def forward(self, x1, x2, x3):
             return torch.baddbmm(x1, x2, x3, beta=self.beta, alpha=self.alpha)
 
-    opts = poptorch.Options()
-    opts.Jit.traceModel(trace_model)
-
     model = AddmmModel(beta, alpha)
     cpu_result = model(t1, t2, t3)
-    ipu_result = poptorch.inferenceModel(model, opts)(t1, t2, t3)
+    ipu_result = poptorch.inferenceModel(model)(t1, t2, t3)
 
     helpers.assert_allclose(expected=cpu_result, actual=ipu_result)

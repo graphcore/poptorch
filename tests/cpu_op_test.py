@@ -1,14 +1,12 @@
 #!/usr/bin/env python3
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 
-import pytest
 import torch
 import helpers
 import poptorch
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_simple_CPU(trace_model):
+def test_simple_CPU():
     torch.manual_seed(42)
 
     class Model(torch.nn.Module):
@@ -23,11 +21,8 @@ def test_simple_CPU(trace_model):
             w = self.cpu(x, y)
             return w * 3.0
 
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
-
     model = Model()
-    inference_model = poptorch.inferenceModel(model, options)
+    inference_model = poptorch.inferenceModel(model)
 
     in1 = torch.randn([5, 2, 3, 5])
     in2 = torch.tensor([2.0])
@@ -43,8 +38,7 @@ def test_simple_CPU(trace_model):
     helpers.assert_allclose(actual=out, expected=in1 * 12.0, equal_nan=True)
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_simple_CPU_multiple_outputs(trace_model):
+def test_simple_CPU_multiple_outputs():
     torch.manual_seed(42)
 
     class Model(torch.nn.Module):
@@ -59,11 +53,8 @@ def test_simple_CPU_multiple_outputs(trace_model):
             w, z = self.cpu(x, y)
             return w * 3.0, z
 
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
-
     model = Model()
-    inference_model = poptorch.inferenceModel(model, options)
+    inference_model = poptorch.inferenceModel(model)
 
     in1 = torch.randn([5, 2, 3, 5])
     in2 = torch.tensor([2.0])
@@ -82,8 +73,7 @@ def test_simple_CPU_multiple_outputs(trace_model):
     helpers.assert_allclose(actual=out2, expected=(in1 + in2), equal_nan=True)
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_CPU_reduce(trace_model):
+def test_CPU_reduce():
     torch.manual_seed(42)
 
     class Model(torch.nn.Module):
@@ -98,11 +88,8 @@ def test_CPU_reduce(trace_model):
             w = self.cpu(x)
             return w
 
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
-
     model = Model()
-    inference_model = poptorch.inferenceModel(model, options)
+    inference_model = poptorch.inferenceModel(model)
 
     in1 = torch.randn([5, 2, 3, 5])
     out = inference_model(in1)
@@ -112,8 +99,7 @@ def test_CPU_reduce(trace_model):
                             equal_nan=True)
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_CPU_matmul(trace_model):
+def test_CPU_matmul():
     torch.manual_seed(42)
 
     class Model(torch.nn.Module):
@@ -127,10 +113,8 @@ def test_CPU_matmul(trace_model):
         def forward(self, input):
             return self.cpu(input)
 
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
     model = Model()
-    inference_model = poptorch.inferenceModel(model, options)
+    inference_model = poptorch.inferenceModel(model)
 
     input = torch.randn(128, 20)
     out = inference_model(input)
@@ -140,8 +124,7 @@ def test_CPU_matmul(trace_model):
                             equal_nan=True)
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_CPU_multiple_calls(trace_model):
+def test_CPU_multiple_calls():
     torch.manual_seed(42)
 
     class Model(torch.nn.Module):
@@ -159,11 +142,8 @@ def test_CPU_multiple_calls(trace_model):
             out = self.cpu(out)
             return out
 
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
-
     model = Model()
-    inference_model = poptorch.inferenceModel(model, options)
+    inference_model = poptorch.inferenceModel(model)
 
     in1 = torch.randn([5, 2, 3, 5])
     out = inference_model(in1)
@@ -171,8 +151,7 @@ def test_CPU_multiple_calls(trace_model):
     helpers.assert_allclose(actual=out, expected=in1 * 8.0, equal_nan=True)
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_CPU_multiple_calls_multiple_classes(trace_model):
+def test_CPU_multiple_calls_multiple_classes():
     torch.manual_seed(42)
 
     class Model(torch.nn.Module):
@@ -199,11 +178,8 @@ def test_CPU_multiple_calls_multiple_classes(trace_model):
 
             return out
 
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
-
     model = Model()
-    inference_model = poptorch.inferenceModel(model, options)
+    inference_model = poptorch.inferenceModel(model)
 
     in1 = torch.randn([5])
     in2 = torch.randn([5])

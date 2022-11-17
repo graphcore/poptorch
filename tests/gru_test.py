@@ -3,14 +3,13 @@
 
 import pytest
 import torch
-import poptorch
 import helpers
+import poptorch
 
 
 @pytest.mark.parametrize("bias", [True, False])
 @pytest.mark.parametrize("batch_first", [True, False])
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_gru(bias, batch_first, trace_model):
+def test_gru(bias, batch_first):
     length = 1
     batches = 3
     input_size = 5
@@ -33,10 +32,8 @@ def test_gru(bias, batch_first, trace_model):
 
     out_fn = lambda x: x[0]
     model = helpers.ModelWithWeights(op, inp.shape, out_fn)
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
 
-    poptorch_model = poptorch.trainingModel(model, options=options)
+    poptorch_model = poptorch.trainingModel(model)
 
     (native_out, native_hn), _ = model((inp, h0))
     (poptorch_out, poptorch_hn), _ = poptorch_model((inp, h0))

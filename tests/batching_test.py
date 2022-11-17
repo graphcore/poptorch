@@ -7,8 +7,7 @@ import helpers
 import poptorch
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_inferenceBatching(trace_model):
+def test_inferenceBatching():
     torch.manual_seed(42)
 
     model = torch.nn.Linear(6, 20)
@@ -21,7 +20,6 @@ def test_inferenceBatching(trace_model):
 
     # Run on IPU batch size 1 * 10 popart batches.
     opts = poptorch.Options().deviceIterations(10)
-    opts.Jit.traceModel(trace_model)
     ipuModel = poptorch.inferenceModel(model, opts)
     poptorch_out = ipuModel(input)
 
@@ -31,8 +29,7 @@ def test_inferenceBatching(trace_model):
     helpers.assert_allclose(expected=native_output, actual=poptorch_out)
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_trainingBatching(trace_model):
+def test_trainingBatching():
     torch.manual_seed(4424242)
 
     # 10 Batches of 10.
@@ -57,7 +54,6 @@ def test_trainingBatching(trace_model):
 
     # Run on IPU batch size 1 * 10 popart batches.
     opts = poptorch.Options().deviceIterations(10)
-    opts.Jit.traceModel(trace_model)
     poptorch_model = poptorch.trainingModel(model, options=opts)
 
     # Run all 10 batches as batchsize 10.
@@ -80,8 +76,7 @@ def test_trainingBatching(trace_model):
 
 
 @pytest.mark.parametrize("mode", list(poptorch.OutputMode))
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_inferenceOutputModes(mode, trace_model):
+def test_inferenceOutputModes(mode):
     torch.manual_seed(42)
 
     model = torch.nn.Linear(6, 20)
@@ -95,7 +90,6 @@ def test_inferenceOutputModes(mode, trace_model):
     # Run on IPU batch size 1 * 10 popart batches. output_return_period ignored if not EVERYN
     opts = poptorch.Options().deviceIterations(10)
     opts.outputMode(mode, output_return_period=5)
-    opts.Jit.traceModel(trace_model)
     ipuModel = poptorch.inferenceModel(model, opts)
     poptorch_out = ipuModel(input)
 
@@ -132,8 +126,7 @@ def test_inferenceOutputModes(mode, trace_model):
 
 
 @pytest.mark.parametrize("mode", list(poptorch.OutputMode))
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_trainingOutputModes(mode, trace_model):
+def test_trainingOutputModes(mode):
     torch.manual_seed(42)
 
     # 1000 Batches of 10.
@@ -162,7 +155,6 @@ def test_trainingOutputModes(mode, trace_model):
     # Run on IPU batch size 1 * 1000 popart batches.
     opts = poptorch.Options().deviceIterations(1000)
     opts.outputMode(mode, output_return_period=20)
-    opts.Jit.traceModel(trace_model)
 
     poptorch_model = poptorch.trainingModel(model, options=opts)
 
@@ -216,8 +208,7 @@ def test_trainingOutputModes(mode, trace_model):
 
 
 def run_gradient_accumulation_test(input, target, gradient_accumulations,
-                                   accumulation_reduction_type, lr,
-                                   trace_model):
+                                   accumulation_reduction_type, lr):
     torch.manual_seed(42)
 
     class Model(torch.nn.Module):
@@ -236,7 +227,6 @@ def run_gradient_accumulation_test(input, target, gradient_accumulations,
     opts = poptorch.Options()
     opts.outputMode(poptorch.OutputMode.All)
     opts.Training.gradientAccumulation(gradient_accumulations)
-    opts.Jit.traceModel(trace_model)
 
     if accumulation_reduction_type is not None:
         opts.Training.accumulationAndReplicationReductionType(
@@ -255,8 +245,7 @@ def run_gradient_accumulation_test(input, target, gradient_accumulations,
     return poptorch_model.linear.weight.data
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_gradient_accumulation_training(trace_model):
+def test_gradient_accumulation_training():
     torch.manual_seed(42)
 
     target = torch.randn(4, 10)
@@ -265,24 +254,21 @@ def test_gradient_accumulation_training(trace_model):
     # Testing gradient accumulations 1 vs 2 and Mean reduction
     w_with_1 = run_gradient_accumulation_test(target, input, 1,
                                               poptorch.ReductionType.Mean,
-                                              0.01, trace_model)
+                                              0.01)
     w_with_2 = run_gradient_accumulation_test(target, input, 2,
                                               poptorch.ReductionType.Mean,
-                                              0.01, trace_model)
+                                              0.01)
     helpers.assert_allclose(actual=w_with_1, expected=w_with_2)
 
     # Test the default matches as well (i.e. the default is mean)
-    w_with_2 = run_gradient_accumulation_test(target, input, 2, None, 0.01,
-                                              trace_model)
+    w_with_2 = run_gradient_accumulation_test(target, input, 2, None, 0.01)
     helpers.assert_allclose(actual=w_with_1, expected=w_with_2)
 
     # Testing gradient accumulations 1 vs 2 and Sum reduction (different lr)
     w_with_1 = run_gradient_accumulation_test(target, input, 1,
-                                              poptorch.ReductionType.Sum, 0.02,
-                                              trace_model)
+                                              poptorch.ReductionType.Sum, 0.02)
     w_with_2 = run_gradient_accumulation_test(target, input, 2,
-                                              poptorch.ReductionType.Sum, 0.01,
-                                              trace_model)
+                                              poptorch.ReductionType.Sum, 0.01)
     helpers.assert_allclose(actual=w_with_1, expected=w_with_2)
 
 
@@ -330,10 +316,8 @@ class FourBlockModelNoScope(torch.nn.Module):
 
 @pytest.mark.parametrize("num_grad_accums", (4, 5, 7))
 @pytest.mark.parametrize("device_iterations", (1, 2))
-@pytest.mark.parametrize("trace_model", [True, False])
 def test_gradient_accumulation_pipelined_training(num_grad_accums,
-                                                  device_iterations,
-                                                  trace_model):
+                                                  device_iterations):
     class TrainingFourBlockModel(torch.nn.Module):
         def __init__(self):
             super().__init__()
@@ -350,7 +334,6 @@ def test_gradient_accumulation_pipelined_training(num_grad_accums,
     opts = poptorch.Options()
     opts.deviceIterations(device_iterations)
     opts.Training.gradientAccumulation(num_grad_accums)
-    opts.Jit.traceModel(trace_model)
 
     poptorch_model = poptorch.trainingModel(model, options=opts)
 

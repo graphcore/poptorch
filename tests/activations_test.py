@@ -4,8 +4,8 @@
 import pytest
 import torch
 import torch.nn as nn
-import poptorch
 import helpers
+import poptorch
 
 # Non-linear activations (Weighted activations)
 # 'torch.nn.ELU', 'torch.nn.Hardshrink', 'torch.nn.Hardtanh', 'torch.nn.LeakyReLU', 'torch.nn.LogSigmoid', 'torch.nn.MultiheadAttention', 'torch.nn.MultiheadAttention.forward',
@@ -32,8 +32,7 @@ activation_functions = [
 
 
 @pytest.mark.parametrize("op", activation_functions)
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_activations(op, trace_model):
+def test_activations(op):
     torch.manual_seed(42)
 
     input = torch.randn([2, 20])
@@ -47,9 +46,7 @@ def test_activations(op, trace_model):
     native_out, _ = model((input, ))
 
     # Run on IPU.
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
-    poptorch_model = poptorch.trainingModel(model, options=options)
+    poptorch_model = poptorch.trainingModel(model)
     poptorch_out, _ = poptorch_model((input, ))
 
     tol = [0.01, 1e-3] if op is nn.GELU else [1e-4, 1e-7]
@@ -64,14 +61,13 @@ def test_activations(op, trace_model):
     poptorch_model.assert_weights_changed()
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
 @pytest.mark.parametrize("input", [
     torch.randn((4, )),
     torch.randn((2, 2)),
     torch.randn((2, 8, 16)),
     torch.randn((2, 8, 32, 32))
 ])
-def test_prelu(trace_model, input):
+def test_prelu(input):
     num_channels = input.shape[1] if input.dim() >= 2 else 1
     model = nn.PReLU(num_channels)
 
@@ -79,9 +75,7 @@ def test_prelu(trace_model, input):
     native_out = model(input)
 
     # Run on IPU.
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
-    poptorch_model = poptorch.inferenceModel(model, options=options)
+    poptorch_model = poptorch.inferenceModel(model)
     poptorch_out = poptorch_model(input)
 
     helpers.assert_allclose(actual=poptorch_out,
@@ -92,8 +86,7 @@ def test_prelu(trace_model, input):
 
 
 @pytest.mark.parametrize("dim", range(5))
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_glu(dim, trace_model):
+def test_glu(dim):
     torch.manual_seed(42)
     N, C, M, K, L = 2, 4, 6, 8, 10
 
@@ -104,9 +97,7 @@ def test_glu(dim, trace_model):
     native_out, _ = model((input, ))
 
     # Run on IPU.
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
-    poptorch_model = poptorch.trainingModel(model, options=options)
+    poptorch_model = poptorch.trainingModel(model)
     poptorch_out, _ = poptorch_model((input, ))
 
     # Inference test - check outputs
@@ -117,8 +108,7 @@ def test_glu(dim, trace_model):
 
 
 @pytest.mark.parametrize("op", activation_functions)
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_activation_numerics(op, trace_model):
+def test_activation_numerics(op):
     enable_exceptions = True
     if op in (nn.SELU, nn.ELU, nn.CELU):
         # These activations rely on exponentials that will overflow
@@ -131,7 +121,6 @@ def test_activation_numerics(op, trace_model):
 
     options = poptorch.Options()
     options.Precision.enableFloatingPointExceptions(enable_exceptions)
-    options.Jit.traceModel(trace_model)
     poptorch_model = poptorch.inferenceModel(model, options=options)
     poptorch_out = poptorch_model(x)
 
@@ -142,10 +131,8 @@ def test_activation_numerics(op, trace_model):
 @pytest.mark.filterwarnings("ignore:Trace had nondeterministic nodes")
 @pytest.mark.filterwarnings("ignore:Output nr 1. of the traced function")
 @pytest.mark.filterwarnings("ignore:Output nr 2. of the traced function")
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_rrelu_training(trace_model):
+def test_rrelu_training():
     opts = poptorch.Options().randomSeed(0)
-    opts.Jit.traceModel(trace_model)
 
     input = torch.randn([3000])
 
@@ -174,8 +161,7 @@ def test_rrelu_training(trace_model):
     poptorch_model.assert_weights_changed()
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_rrelu_inference(trace_model):
+def test_rrelu_inference():
     torch.manual_seed(42)
     input = torch.randn([200])
 
@@ -184,8 +170,6 @@ def test_rrelu_inference(trace_model):
     # in inference there is no randomness - check results directly
     model.eval()
     native_out = model(input)
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
-    poptorch_model = poptorch.inferenceModel(model, options=options)
+    poptorch_model = poptorch.inferenceModel(model)
     poptorch_out = poptorch_model(input)
     helpers.assert_allclose(actual=poptorch_out, expected=native_out)

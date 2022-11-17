@@ -6,14 +6,13 @@ import math
 import unittest.mock
 import pytest
 import torch
-import poptorch
 import helpers
+import poptorch
 
 
 @unittest.mock.patch.dict("os.environ", {"POPTORCH_WAIT_FOR_IPU": "0"})
 @pytest.mark.ipuHardwareRequired
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_attach_detach(trace_model):
+def test_attach_detach():
     torch.manual_seed(42)
 
     target = torch.randint(0, 10, [1])
@@ -38,13 +37,11 @@ def test_attach_detach(trace_model):
     model = Model()
 
     opts = poptorch.Options()
-    opts.Jit.traceModel(trace_model)
     # Ensure that both models use the same IPU
     opts.useIpuId(1)
     training = poptorch.trainingModel(model, options=opts)
 
     opts = opts.clone()
-    opts.Jit.traceModel(trace_model)
     inference = poptorch.inferenceModel(model, options=opts)
 
     _, initial_loss = training(input, target)
@@ -89,8 +86,7 @@ def test_attach_detach(trace_model):
 
 
 @pytest.mark.ipuHardwareRequired
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_attach_detach_accuracy(trace_model):
+def test_attach_detach_accuracy():
     class TrainingModelWithLoss(torch.nn.Module):
         def __init__(self):
             super().__init__()
@@ -106,8 +102,6 @@ def test_attach_detach_accuracy(trace_model):
 
     torch.manual_seed(42)
 
-    model_opts = poptorch.Options()
-    model_opts.Jit.traceModel(trace_model)
     input_data = torch.Tensor([[1.], [-1.]])
     labels_data = torch.Tensor([0, 1]).long()
     model_with_loss = TrainingModelWithLoss()
@@ -115,9 +109,8 @@ def test_attach_detach_accuracy(trace_model):
                                    lr=0.1,
                                    use_combined_accum=False)
     training_model = poptorch.trainingModel(model_with_loss,
-                                            model_opts,
                                             optimizer=optimizer)
-    inference_model = poptorch.inferenceModel(model_with_loss, model_opts)
+    inference_model = poptorch.inferenceModel(model_with_loss)
 
     losses1 = []
     for _ in range(5):
@@ -149,16 +142,14 @@ def test_attach_detach_accuracy(trace_model):
 
 
 @pytest.mark.ipuHardwareRequired
-@pytest.mark.parametrize("trace_model", [True, False])
 @unittest.mock.patch.dict("os.environ", {"POPTORCH_WAIT_FOR_IPU": "0"})
 @helpers.printCapfdOnExit
 @helpers.overridePoptorchLogLevel("TRACE")
-def test_on_demand_attach(capfd, trace_model):
+def test_on_demand_attach(capfd):
     model = torch.nn.Linear(1, 2)
 
     opts = poptorch.Options()
     opts.connectionType(poptorch.ConnectionType.OnDemand)
-    opts.Jit.traceModel(trace_model)
 
     m = poptorch.inferenceModel(model, opts)
 

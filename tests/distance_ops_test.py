@@ -3,13 +3,12 @@
 
 import torch
 import pytest
-import poptorch
 import helpers
+import poptorch
 
 
 @pytest.mark.parametrize("norm", {1., 2., 3., 4.})
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_pairwise_distance(norm, trace_model):
+def test_pairwise_distance(norm):
     torch.manual_seed(42)
 
     size = [10, 5]
@@ -18,9 +17,7 @@ def test_pairwise_distance(norm, trace_model):
     shape = input1.shape
 
     model = helpers.ModelWithWeights(torch.nn.PairwiseDistance(norm), shape)
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
-    poptorch_model = poptorch.trainingModel(model, options=options)
+    poptorch_model = poptorch.trainingModel(model)
 
     # Run on CPU
     native_out, _ = model((input1, input2))
@@ -36,8 +33,7 @@ def test_pairwise_distance(norm, trace_model):
 
 
 @pytest.mark.parametrize("dim", {0, 1})
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_cosine_similarity(dim, trace_model):
+def test_cosine_similarity(dim):
     torch.manual_seed(42)
 
     size = [10, 5]
@@ -46,9 +42,7 @@ def test_cosine_similarity(dim, trace_model):
     shape = input1.shape
 
     model = helpers.ModelWithWeights(torch.nn.CosineSimilarity(dim), shape)
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
-    poptorch_model = poptorch.trainingModel(model, options=options)
+    poptorch_model = poptorch.trainingModel(model)
 
     # Run on CPU
     native_out, _ = model((input1, input2))

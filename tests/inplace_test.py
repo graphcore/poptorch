@@ -2,17 +2,14 @@
 # Copyright (c) 2021 Graphcore Ltd. All rights reserved.
 
 import re
-
 import torch
 import torch.nn as nn
-
 import pytest
-import poptorch
 import helpers
+import poptorch
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_inplace_add(trace_model):
+def test_inplace_add():
     class Model(nn.Module):
         def forward(self, x):
             if isinstance(x, (tuple, list)):
@@ -22,9 +19,7 @@ def test_inplace_add(trace_model):
             else:
                 x += 1
 
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
-    poptorch_model = poptorch.inferenceModel(Model(), options)
+    poptorch_model = poptorch.inferenceModel(Model())
     tensor_in = torch.Tensor([1.0])
     assert poptorch_model(tensor_in) is None
     assert tensor_in == 2.0
@@ -32,11 +27,6 @@ def test_inplace_add(trace_model):
     assert tensor_in == 3.0
     assert poptorch_model(torch.Tensor([1.0])) is None
     assert tensor_in == 3.0
-
-    if trace_model:
-        # Tracing doesn't support lists as inputs, and tuples
-        # can't be modified in-place.
-        return
 
     # We're changing the input type: must recompile
     poptorch_model.destroy()
@@ -51,15 +41,12 @@ def test_inplace_add(trace_model):
         assert list_in == cpu_in
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_inplace_add_multi_elements(trace_model):
+def test_inplace_add_multi_elements():
     class Model(nn.Module):
         def forward(self, _x, y):
             y += 1
 
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
-    poptorch_model = poptorch.inferenceModel(Model(), options)
+    poptorch_model = poptorch.inferenceModel(Model())
     nested_tuple_in = ((torch.Tensor([1.0]), torch.Tensor([1.0])),
                        (torch.Tensor([1.0])))
     tensor_in = torch.Tensor([1.0])
@@ -68,8 +55,7 @@ def test_inplace_add_multi_elements(trace_model):
     assert tensor_in == 2.0
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_inplace_sub(trace_model):
+def test_inplace_sub():
     class Model(nn.Module):
         def forward(self, x):
             if isinstance(x, (tuple, list)):
@@ -79,9 +65,7 @@ def test_inplace_sub(trace_model):
             else:
                 x -= 1
 
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
-    poptorch_model = poptorch.inferenceModel(Model(), options)
+    poptorch_model = poptorch.inferenceModel(Model())
     tensor_in = torch.Tensor([1.0])
     assert poptorch_model(tensor_in) is None
     assert tensor_in == 0.0
@@ -89,11 +73,6 @@ def test_inplace_sub(trace_model):
     assert tensor_in == -1.0
     assert poptorch_model(torch.Tensor([1.0])) is None
     assert tensor_in == -1.0
-
-    if trace_model:
-        # Tracing doesn't support lists as inputs, and tuples
-        # can't be modified in-place.
-        return
 
     # We're changing the  input type: must recompile
     poptorch_model.destroy()
@@ -108,8 +87,7 @@ def test_inplace_sub(trace_model):
         assert list_in == cpu_in
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_inplace_div(trace_model):
+def test_inplace_div():
     class Model(nn.Module):
         def forward(self, x):
             if isinstance(x, (tuple, list)):
@@ -119,9 +97,7 @@ def test_inplace_div(trace_model):
             else:
                 x /= 2
 
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
-    poptorch_model = poptorch.inferenceModel(Model(), options)
+    poptorch_model = poptorch.inferenceModel(Model())
     tensor_in = torch.Tensor([1.0])
     assert poptorch_model(tensor_in) is None
     assert tensor_in == 0.5
@@ -129,11 +105,6 @@ def test_inplace_div(trace_model):
     assert tensor_in == 0.25
     assert poptorch_model(torch.Tensor([1.0])) is None
     assert tensor_in == 0.25
-
-    if trace_model:
-        # Tracing doesn't support lists as inputs, and tuples
-        # can't be modified in-place.
-        return
 
     # We're changing the  input type: must recompile
     poptorch_model.destroy()
@@ -148,8 +119,7 @@ def test_inplace_div(trace_model):
         assert list_in == cpu_in
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_inplace_mul(trace_model):
+def test_inplace_mul():
     class Model(nn.Module):
         def forward(self, x):
             if isinstance(x, (tuple, list)):
@@ -159,9 +129,7 @@ def test_inplace_mul(trace_model):
             else:
                 x *= 2
 
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
-    poptorch_model = poptorch.inferenceModel(Model(), options)
+    poptorch_model = poptorch.inferenceModel(Model())
     tensor_in = torch.Tensor([1.0])
     assert poptorch_model(tensor_in) is None
     assert tensor_in == 2.0
@@ -169,11 +137,6 @@ def test_inplace_mul(trace_model):
     assert tensor_in == 4.0
     assert poptorch_model(torch.Tensor([1.0])) is None
     assert tensor_in == 4.0
-
-    if trace_model:
-        # Tracing doesn't support lists as inputs, and tuples
-        # can't be modified in-place.
-        return
 
     # We're changing the  input type: must recompile
     poptorch_model.destroy()
@@ -188,15 +151,12 @@ def test_inplace_mul(trace_model):
         assert list_in == cpu_in
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_inplace_masked_fill(trace_model):
+def test_inplace_masked_fill():
     class Model(nn.Module):
         def forward(self, x):
             x.masked_fill_(x > 0.5, 1.0)
 
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
-    poptorch_model = poptorch.inferenceModel(Model(), options)
+    poptorch_model = poptorch.inferenceModel(Model())
     x = torch.tensor([[0, 0.7], [0.2, 3.5]])
     poptorch_model(x)
 
@@ -206,21 +166,18 @@ def test_inplace_masked_fill(trace_model):
     assert x[1][1] == 1.0
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_chained_inplace(trace_model):
+def test_chained_inplace():
     class Model(nn.Module):
         def forward(self, x, y):
             x += y
             x += 2.0
             x += y
 
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
     model = Model()
     t1 = torch.tensor([1.])
     cpu_t1 = torch.tensor([1.])
     t2 = torch.tensor([2.])
-    poptorch_model = poptorch.inferenceModel(model, options)
+    poptorch_model = poptorch.inferenceModel(model)
     out = model(cpu_t1, t2)
     assert out is None
     out = poptorch_model(t1, t2)
@@ -229,8 +186,7 @@ def test_chained_inplace(trace_model):
     assert t1 == 7.0
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_inplace_zero(trace_model):
+def test_inplace_zero():
     class Model(nn.Module):
         def forward(self, x):
             # (Simply setting it to zero gets pruned by PopART)
@@ -238,9 +194,7 @@ def test_inplace_zero(trace_model):
             x.zero_()
             x += a
 
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
-    poptorch_model = poptorch.inferenceModel(Model(), options)
+    poptorch_model = poptorch.inferenceModel(Model())
     x = torch.tensor([[0, 0.5], [0.25, 2.0]])
     poptorch_model(x)
 
@@ -250,17 +204,14 @@ def test_inplace_zero(trace_model):
     assert x[1][1] == 2.75
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_inplace_fill(trace_model):
+def test_inplace_fill():
     class Model(nn.Module):
         def forward(self, x):
             a = torch.sum(x)
             x.fill_(1.0)
             x += a
 
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
-    poptorch_model = poptorch.inferenceModel(Model(), options)
+    poptorch_model = poptorch.inferenceModel(Model())
     x = torch.tensor([[0, 0.5], [0.25, 2.0]])
     poptorch_model(x)
 
@@ -270,17 +221,14 @@ def test_inplace_fill(trace_model):
     assert x[1][1] == 3.75
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_inplace_non_input(trace_model):
+def test_inplace_non_input():
     class Model(nn.Module):
         def forward(self, x):
             a = x + 1
             a += 1
             return a
 
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
-    poptorch_model = poptorch.inferenceModel(Model(), options)
+    poptorch_model = poptorch.inferenceModel(Model())
     x = torch.tensor([[0, 0.5], [0.25, 2.0]])
 
     y = poptorch_model(x)
@@ -296,8 +244,7 @@ def test_inplace_non_input(trace_model):
     assert y[1][1] == 4.0
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_double_underscore(trace_model):
+def test_double_underscore():
     # This tests aten::__and__ is not treated as inplace
 
     class Model(nn.Module):
@@ -306,9 +253,7 @@ def test_double_underscore(trace_model):
             return x[0].int() & l.int()
 
     model = Model()
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
-    poptorch_model = poptorch.inferenceModel(model, options)
+    poptorch_model = poptorch.inferenceModel(model)
     inp, l = torch.rand(10, 10), torch.LongTensor([10])
 
     out = model(inp, l)
@@ -317,8 +262,7 @@ def test_double_underscore(trace_model):
     helpers.assert_allclose(actual=popout, expected=out)
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_half_buffer_inplace(trace_model):
+def test_half_buffer_inplace():
     class Model(nn.Module):
         def __init__(self):
             super().__init__()
@@ -331,9 +275,7 @@ def test_half_buffer_inplace(trace_model):
             return out
 
     model = Model()
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
-    poptorch_model = poptorch.inferenceModel(model, options)
+    poptorch_model = poptorch.inferenceModel(model)
 
     x = torch.tensor([0.1, 0.2, 0.3, 0.4, 0.5], dtype=torch.float16)
     out = poptorch_model(x)
@@ -347,8 +289,7 @@ def test_half_buffer_inplace(trace_model):
                                                   dtype=torch.float16))
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_float_to_half_buffer_inplace_with_training(trace_model):
+def test_float_to_half_buffer_inplace_with_training():
     torch.manual_seed(42)
 
     # pylint: disable=attribute-defined-outside-init
@@ -369,9 +310,7 @@ def test_float_to_half_buffer_inplace_with_training(trace_model):
             return out, self.loss(out, x)
 
     model = Model().train().half()
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
-    poptorch_model = poptorch.trainingModel(model, options)
+    poptorch_model = poptorch.trainingModel(model)
 
     x = torch.rand(5, 5).half()
     native_out, native_loss = model(x)
@@ -385,8 +324,7 @@ def test_float_to_half_buffer_inplace_with_training(trace_model):
     helpers.assert_allclose(actual=native_loss, expected=poptorch_loss)
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_inplace_on_buffer_and_input(trace_model):
+def test_inplace_on_buffer_and_input():
     fill_value = 3
     shape = (1, 2)
 
@@ -404,10 +342,7 @@ def test_inplace_on_buffer_and_input(trace_model):
 
             return self.buffer, x
 
-    opts = poptorch.Options()
-    opts.Jit.traceModel(trace_model)
-
-    model = poptorch.inferenceModel(Model(), opts)
+    model = poptorch.inferenceModel(Model())
 
     buf, out = model(torch.ones(shape))
 
@@ -418,8 +353,7 @@ def test_inplace_on_buffer_and_input(trace_model):
     helpers.assert_allequal(actual=buf, expected=expected_buf)
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_two_inplace_copies(trace_model):
+def test_two_inplace_copies():
     fill_value = 3
     shape = (1, 2)
 
@@ -434,10 +368,7 @@ def test_two_inplace_copies(trace_model):
 
             return x
 
-    opts = poptorch.Options()
-    opts.Jit.traceModel(trace_model)
-
-    model = poptorch.inferenceModel(Model(), opts)
+    model = poptorch.inferenceModel(Model())
 
     out = model(torch.ones(shape))
 
@@ -446,8 +377,7 @@ def test_two_inplace_copies(trace_model):
     helpers.assert_allequal(actual=out, expected=expected_out)
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_two_inplace_copies_buffer(trace_model):
+def test_two_inplace_copies_buffer():
     fill_value = 3
     shape = (1, 2)
 
@@ -468,10 +398,7 @@ def test_two_inplace_copies_buffer(trace_model):
 
             return self.buffer, x
 
-    opts = poptorch.Options()
-    opts.Jit.traceModel(trace_model)
-
-    model = poptorch.inferenceModel(Model(), opts)
+    model = poptorch.inferenceModel(Model())
 
     buf, out = model(torch.ones(shape))
 
@@ -519,8 +446,7 @@ def modify_region(x, step):
     direct_assign, direct_assign_inplace, direct_fill, chained_slice,
     modify_before_assign, modify_region
 ])
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_inplace_modify_slice(op, step_size, trace_model):
+def test_inplace_modify_slice(op, step_size):
     t = torch.rand(4, 4)
     step = torch.tensor(step_size)
 
@@ -529,11 +455,8 @@ def test_inplace_modify_slice(op, step_size, trace_model):
 
     Model.forward = lambda _, x: op(x, step)
 
-    opts = poptorch.Options()
-    opts.Jit.traceModel(trace_model)
-
     cpu_model = Model()
-    ipu_model = poptorch.inferenceModel(cpu_model, opts)
+    ipu_model = poptorch.inferenceModel(cpu_model)
 
     if step_size == 1:
         ipu_input = t.clone()
@@ -548,8 +471,6 @@ def test_inplace_modify_slice(op, step_size, trace_model):
         try:
             ipu_model.compile(t)
         except poptorch.Error as e:
-            # Allow for the whole graph to be potentially pruned, in failing
-            # cases (only known to happen for trace_model=True).
             assert re.match(
                 r"In\-place modification of slices with step "
                 r"size other than 1 is not supported\.", e.message)

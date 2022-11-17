@@ -3,7 +3,6 @@
 import ctypes
 import pathlib
 
-import pytest
 import torch
 import torch.nn as nn
 import helpers
@@ -22,8 +21,7 @@ myop = ctypes.cdll.LoadLibrary(myso[0])
 
 
 #inference_start
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_inference(trace_model):
+def test_inference():
     class BasicNetwork(nn.Module):
         def forward(self, x, bias):
             x, y = poptorch.custom_op([x, bias],
@@ -40,9 +38,7 @@ def test_inference(trace_model):
     x = torch.full((1, 8), 2.0)
     bias = torch.full((1, 8), 4.0)
 
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
-    inference_model = poptorch.inferenceModel(model, options)
+    inference_model = poptorch.inferenceModel(model)
     out = inference_model(x, bias)
 
     expected = (torch.full((1, 8), 12.0), torch.full((1, 8), 8.0))
@@ -50,8 +46,7 @@ def test_inference(trace_model):
     helpers.assert_allclose(actual=out[1], expected=expected[1])
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_training(trace_model):
+def test_training():
     def custom_loss(model_out, labels):
         l1 = torch.nn.functional.nll_loss(model_out[0], labels)
         # Popart errors if this is unused.
@@ -87,9 +82,7 @@ def test_training(trace_model):
 
     y = torch.full([1], 42, dtype=torch.long)
 
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
-    poptorch_model = poptorch.trainingModel(model, options=options)
+    poptorch_model = poptorch.trainingModel(model)
 
     for _ in range(0, 100):
         x = torch.rand((1, 100))
@@ -99,8 +92,7 @@ def test_training(trace_model):
 
 
 # Check that the custom op not only trains but also propagates the gradient backwards.
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_training_both_sides(trace_model):
+def test_training_both_sides():
     def custom_loss(model_out, labels):
         l1 = torch.nn.functional.nll_loss(model_out[0], labels)
         # Popart errors if this is unused.
@@ -139,9 +131,7 @@ def test_training_both_sides(trace_model):
 
     weights_before = model.ln1.weight.clone()
 
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
-    poptorch_model = poptorch.trainingModel(model, options=options)
+    poptorch_model = poptorch.trainingModel(model)
 
     for _ in range(0, 100):
         x = torch.rand((1, 100))
@@ -152,8 +142,7 @@ def test_training_both_sides(trace_model):
     assert torch.argmax(out[0]) == 42
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_inference_with_an_attribute(trace_model):
+def test_inference_with_an_attribute():
     #inference_with_attribute_start
     class Model(torch.nn.Module):
         def forward(self, x):
@@ -171,9 +160,7 @@ def test_inference_with_an_attribute(trace_model):
 
     x = torch.tensor([-1.0, -0.5, 0.0, 0.5, 1.0])
 
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
-    inference_model = poptorch.inferenceModel(model, options)
+    inference_model = poptorch.inferenceModel(model)
     out = inference_model(x)
 
     helpers.assert_allclose(actual=out,

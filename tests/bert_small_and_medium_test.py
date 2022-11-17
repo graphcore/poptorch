@@ -1,15 +1,13 @@
 #!/usr/bin/env python3
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 
-import pytest
 import transformers
 import torch
-import poptorch
 import helpers
+import poptorch
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_bert_small(trace_model):
+def test_bert_small():
     torch.manual_seed(42)
 
     # Bert small.
@@ -22,7 +20,6 @@ def test_bert_small(trace_model):
     input_ids = torch.tensor([tokenizer.encode("E")])
 
     options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
     inference_model = poptorch.inferenceModel(model, options)
     poptorch_out = inference_model(input_ids)
 
@@ -35,8 +32,7 @@ def test_bert_small(trace_model):
                                 atol=1e-02)
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_bert_small_half(trace_model):
+def test_bert_small_half():
     torch.manual_seed(42)
 
     # Bert small.
@@ -50,7 +46,6 @@ def test_bert_small_half(trace_model):
 
     model.half()
     options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
     inference_model = poptorch.inferenceModel(model, options)
     poptorch_out = inference_model(input_ids)
 
@@ -58,8 +53,7 @@ def test_bert_small_half(trace_model):
     assert poptorch_out[0].dtype == torch.half
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_bert_medium_result(trace_model):
+def test_bert_medium_result():
     torch.manual_seed(42)
 
     pretrained_weights = 'mrm8488/bert-medium-finetuned-squadv2'
@@ -103,7 +97,6 @@ def test_bert_medium_result(trace_model):
 
     opts = poptorch.Options()
     opts.deviceIterations(2)
-    opts.Jit.traceModel(trace_model)
 
     model.bert.embeddings.position_embeddings = poptorch.BeginBlock(
         model.bert.embeddings.position_embeddings, ipu_id=1)

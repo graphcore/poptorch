@@ -5,8 +5,8 @@ import unittest.mock
 import re
 import torch
 import pytest
-import poptorch
 import helpers
+import poptorch
 
 # Convolutions.
 
@@ -32,12 +32,7 @@ conv_2D = [torch.nn.Conv2d, torch.nn.ConvTranspose2d]
 conv_3D = [torch.nn.Conv3d, torch.nn.ConvTranspose3d]
 
 
-def execute_and_check_wrapper(trace_model,
-                              op,
-                              input,
-                              training=True,
-                              rtol=0.01,
-                              atol=0.01):
+def execute_and_check_wrapper(op, input, training=True, rtol=0.01, atol=0.01):
     if hasattr(op, 'padding_mode') and op.padding_mode != 'zeros':
         pytest.skip("TODO(T25617): PopART does not support PadGradOp when"
                     " mode is not 'constant'")
@@ -47,19 +42,14 @@ def execute_and_check_wrapper(trace_model,
                                      loss_fn=torch.nn.L1Loss(reduction='mean'),
                                      out_fn=lambda x: (x, torch.zeros_like(x)))
 
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
     if training:
         optimizer = poptorch.optim.SGD(model.parameters(), lr=0.01)
-        poptorch_model = poptorch.trainingModel(model,
-                                                optimizer=optimizer,
-                                                options=options)
+        poptorch_model = poptorch.trainingModel(model, optimizer=optimizer)
 
         try:
-            has_own_weight = any([
+            has_own_weight = any(
                 n == 'weight'
-                for (n, p) in poptorch_model.op.named_parameters()
-            ])
+                for (n, p) in poptorch_model.op.named_parameters())
         except AttributeError:
             has_own_weight = False
 
@@ -87,7 +77,7 @@ def execute_and_check_wrapper(trace_model,
                                 rtol=rtol,
                                 atol=atol)
     else:
-        poptorch_model = poptorch.inferenceModel(model, options)
+        poptorch_model = poptorch.inferenceModel(model)
         # Run on CPU.
         native_out, _ = model((input, ))
 
@@ -102,8 +92,7 @@ def execute_and_check_wrapper(trace_model,
 @pytest.mark.parametrize("op", conv_1D)
 @pytest.mark.parametrize("padding_mode", padding_modes)
 @pytest.mark.parametrize("training", [True, False])
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_conv1D(op, padding_mode, training, trace_model):
+def test_conv1D(op, padding_mode, training):
     # This combination doesn't exist in upstream Torch:
     # ValueError: Only "zeros" padding mode is supported for ConvTranspose1d
     if (op is torch.nn.ConvTranspose1d and padding_mode != 'zeros'):
@@ -115,7 +104,7 @@ def test_conv1D(op, padding_mode, training, trace_model):
     input = torch.randn(1, C_IN, 10)
     # With square kernels and equal stride
     model = op(C_IN, C_OUT, 3, stride=2, padding_mode=padding_mode)
-    execute_and_check_wrapper(trace_model, model, input, training)
+    execute_and_check_wrapper(model, input, training)
 
     if op is torch.nn.ConvTranspose1d:
         # 'popart_exception': Non default value for dilations is not supported.
@@ -128,14 +117,13 @@ def test_conv1D(op, padding_mode, training, trace_model):
                padding=(4),
                dilation=(3),
                padding_mode=padding_mode)
-    execute_and_check_wrapper(trace_model, model, input, training)
+    execute_and_check_wrapper(model, input, training)
 
 
 @pytest.mark.parametrize("op", conv_2D)
 @pytest.mark.parametrize("padding_mode", padding_modes)
 @pytest.mark.parametrize("training", [True, False])
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_conv2D(op, padding_mode, training, trace_model):
+def test_conv2D(op, padding_mode, training):
     if (op is torch.nn.ConvTranspose2d and padding_mode != 'zeros') or \
        padding_mode == 'circular': # TODO(T31811)
         pytest.skip('skipping unsupported padding_mode')
@@ -146,12 +134,7 @@ def test_conv2D(op, padding_mode, training, trace_model):
 
     # With square kernels and equal stride
     model = op(C_IN, C_OUT, 3, stride=2, padding_mode=padding_mode)
-    execute_and_check_wrapper(trace_model,
-                              model,
-                              input,
-                              training,
-                              rtol=0.1,
-                              atol=0.1)
+    execute_and_check_wrapper(model, input, training, rtol=0.1, atol=0.1)
 
     # Grouped convolutions.
 
@@ -160,18 +143,13 @@ def test_conv2D(op, padding_mode, training, trace_model):
                stride=2,
                groups=2,
                padding_mode=padding_mode)
-    execute_and_check_wrapper(trace_model,
-                              model,
-                              input,
-                              training,
-                              rtol=0.1,
-                              atol=0.1)
+    execute_and_check_wrapper(model, input, training, rtol=0.1, atol=0.1)
 
     # Rectangular padding/stride
     if op is not torch.nn.ConvTranspose2d:
         # non-square kernels and unequal stride and with padding
         model = op(C_IN, C_OUT, (3, 5), stride=(2, 1), padding=(4, 2))
-        execute_and_check_wrapper(trace_model, model, input, training=False)
+        execute_and_check_wrapper(model, input, training=False)
 
         # non-square kernels and unequal stride and with padding and dilation
         model = op(C_IN,
@@ -180,19 +158,13 @@ def test_conv2D(op, padding_mode, training, trace_model):
                    padding=(4, 2),
                    dilation=(3),
                    padding_mode=padding_mode)
-        execute_and_check_wrapper(trace_model,
-                                  model,
-                                  input,
-                                  training,
-                                  rtol=0.01,
-                                  atol=0.05)
+        execute_and_check_wrapper(model, input, training, rtol=0.01, atol=0.05)
 
 
 @pytest.mark.parametrize("op", conv_3D)
 @pytest.mark.parametrize("padding_mode", padding_modes)
 @pytest.mark.parametrize("training", [True, False])
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_conv3D(op, padding_mode, training, trace_model):
+def test_conv3D(op, padding_mode, training):
     if (op is torch.nn.ConvTranspose3d and padding_mode != 'zeros') or \
        (op is torch.nn.Conv3d and padding_mode == 'reflect') or \
        padding_mode == 'circular': # TODO(T31811)
@@ -205,21 +177,11 @@ def test_conv3D(op, padding_mode, training, trace_model):
 
     # With square kernels and equal stride
     model = op(C_IN, C_OUT, 3, stride=2, padding_mode=padding_mode)
-    execute_and_check_wrapper(trace_model,
-                              model,
-                              input,
-                              training,
-                              rtol=0.1,
-                              atol=0.1)
+    execute_and_check_wrapper(model, input, training, rtol=0.1, atol=0.1)
 
     # Grouped convolutions.
     model = op(C_IN, C_OUT, 3, stride=2, groups=2, padding_mode=padding_mode)
-    execute_and_check_wrapper(trace_model,
-                              model,
-                              input,
-                              training,
-                              rtol=0.1,
-                              atol=0.1)
+    execute_and_check_wrapper(model, input, training, rtol=0.1, atol=0.1)
 
     if op is torch.nn.ConvTranspose3d:
         #  test output padding
@@ -229,12 +191,7 @@ def test_conv3D(op, padding_mode, training, trace_model):
                    groups=2,
                    output_padding=[1, 0, 0],
                    padding_mode=padding_mode)
-        execute_and_check_wrapper(trace_model,
-                                  model,
-                                  input,
-                                  training,
-                                  rtol=0.05,
-                                  atol=0.05)
+        execute_and_check_wrapper(model, input, training, rtol=0.05, atol=0.05)
     else:
         # non-square kernels and unequal stride and with padding
         model = op(C_IN,
@@ -243,12 +200,7 @@ def test_conv3D(op, padding_mode, training, trace_model):
                    padding=(4, 2, 0),
                    padding_mode=padding_mode)
 
-        execute_and_check_wrapper(trace_model,
-                                  model,
-                                  input,
-                                  training,
-                                  rtol=0.1,
-                                  atol=0.1)
+        execute_and_check_wrapper(model, input, training, rtol=0.1, atol=0.1)
 
         # non-square kernels and unequal stride and with padding and dilation
         model = op(C_IN,
@@ -257,12 +209,7 @@ def test_conv3D(op, padding_mode, training, trace_model):
                    padding=(4, 2, 0),
                    dilation=(3, 1, 1))
 
-        execute_and_check_wrapper(trace_model,
-                                  model,
-                                  input,
-                                  training,
-                                  rtol=0.1,
-                                  atol=0.1)
+        execute_and_check_wrapper(model, input, training, rtol=0.1, atol=0.1)
 
 
 def merge_dicts(x, y):
@@ -276,8 +223,7 @@ def merge_dicts(x, y):
 @unittest.mock.patch.dict("os.environ",
                           merge_dicts(helpers.forceSmallModel(),
                                       {"POPLIBS_LOG_LEVEL": "DEBUG"}))
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_available_memory(capfd, trace_model):
+def test_available_memory(capfd):
     seen_length = 0
 
     def get_mem_prop_for_conv(op):
@@ -292,9 +238,7 @@ def test_available_memory(capfd, trace_model):
             loss_fn=torch.nn.L1Loss(reduction='mean'),
             out_fn=lambda x: (x, torch.zeros_like(x)))
 
-        options = poptorch.Options()
-        options.Jit.traceModel(trace_model)
-        poptorch.inferenceModel(model, options).compile((input, ))
+        poptorch.inferenceModel(model).compile((input, ))
 
         _, log = capfd.readouterr()
 
@@ -320,8 +264,7 @@ def test_available_memory(capfd, trace_model):
 
 
 @pytest.mark.parametrize("mode", poptorch.MatMulSerializationMode)
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_matmul_serialization(mode, trace_model):
+def test_matmul_serialization(mode):
     torch.manual_seed(42)
 
     input_channels = 6
@@ -352,16 +295,13 @@ def test_matmul_serialization(mode, trace_model):
     # Just check we don't explode when the value is set.
     model = BasicNetwork()
     native_out = model(lhs, rhs)
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
-    poptorch_model = poptorch.inferenceModel(model, options)
+    poptorch_model = poptorch.inferenceModel(model)
     poptorch_out = poptorch_model(lhs, rhs)
 
     helpers.assert_allclose(actual=poptorch_out, expected=native_out)
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_available_memory_automatic(trace_model):
+def test_available_memory_automatic():
     torch.manual_seed(42)
 
     # Just check we don't explode when the value is set.
@@ -402,7 +342,6 @@ def test_available_memory_automatic(trace_model):
         "IPU0": 0.7,
         "IPU1": 0.2
     })
-    opts.Jit.traceModel(trace_model)
 
     poptorch_model = poptorch.inferenceModel(model, opts)
     poptorch_out = poptorch_model(input)
@@ -412,34 +351,25 @@ def test_available_memory_automatic(trace_model):
 
 @pytest.mark.parametrize("dim", range(-3, 3))
 @pytest.mark.parametrize("training", [True, False])
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_cumsum(dim, training, trace_model):
+def test_cumsum(dim, training):
     torch.manual_seed(42)
 
     op = lambda x: torch.cumsum(x, dim=dim)
     input = torch.randn(1, 5, 6, dtype=torch.float32)
 
-    execute_and_check_wrapper(trace_model,
-                              op,
-                              input,
-                              training,
-                              rtol=0.02,
-                              atol=0.02)
+    execute_and_check_wrapper(op, input, training, rtol=0.02, atol=0.02)
 
 
 @pytest.mark.parametrize("src_dtype", [torch.float, torch.int])
 @pytest.mark.parametrize("dest_dtype", [torch.float, torch.int])
 @pytest.mark.parametrize("dim", range(-1, 1))
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_cumsum_changing_types(src_dtype, dest_dtype, dim, trace_model):
+def test_cumsum_changing_types(src_dtype, dest_dtype, dim):
     class Model(torch.nn.Module):
         def forward(self, inp):
             return inp.cumsum(dim=dim, dtype=dest_dtype)
 
     cpu_model = Model()
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
-    ipu_model = poptorch.inferenceModel(cpu_model, options)
+    ipu_model = poptorch.inferenceModel(cpu_model)
 
     torch.manual_seed(42)
     inp = torch.randn(1, 5, 6).to(src_dtype)
@@ -452,17 +382,14 @@ def test_cumsum_changing_types(src_dtype, dest_dtype, dim, trace_model):
 @pytest.mark.parametrize("src_dtype", [torch.float, torch.int])
 @pytest.mark.parametrize("dest_dtype", [torch.float, torch.int])
 @pytest.mark.parametrize("dim", range(-1, 1))
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_cumsum_changing_types_out(src_dtype, dest_dtype, dim, trace_model):
+def test_cumsum_changing_types_out(src_dtype, dest_dtype, dim):
     class Model(torch.nn.Module):
         def forward(self, inp):
             res = torch.empty(inp.shape).to(dest_dtype)
             return torch.cumsum(inp, dim=dim, out=res)
 
     cpu_model = Model()
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
-    ipu_model = poptorch.inferenceModel(cpu_model, options)
+    ipu_model = poptorch.inferenceModel(cpu_model)
 
     torch.manual_seed(42)
     inp = torch.randn(1, 5, 6).to(src_dtype)
