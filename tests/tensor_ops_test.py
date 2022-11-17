@@ -110,16 +110,18 @@ def test_zeros_like_and_ones_like(dtype):
 
 def fuzzy_compare_exceptions(e_cpu, e_ipu):
     """Compares error messages from CPU and IPU implementations
-    if they do not match a fuzzy comparison (all words in the CPU exception
-    are also in the IPU exception) an error is raised.
+    if they do not match a fuzzy comparison (all words in the first line of the
+    CPU exception are also in the IPU exception) an error is raised.
     """
     e_ipu_words = {word: i for i, word in enumerate(str(e_ipu).split())}
+    # Only compare the first line (The following lines are usually a stacktrace)
+    cpu_msg = str(e_cpu).split("\n")[0]
     if not all(
             e_ipu_words.get(word, -1) >= i
-            for i, word in enumerate(str(e_cpu).split())):
+            for i, word in enumerate(cpu_msg.split())):
         raise ValueError("CPU and IPU error messages did not match: "
-                         f"'{e_cpu}' not in '{e_ipu}'") from e_ipu
-    print(f"CPU and IPU error messages did match: '{e_cpu}' in '{e_ipu}'")
+                         f"'{cpu_msg}' not in '{e_ipu}'") from e_ipu
+    print(f"CPU and IPU error messages did match: '{cpu_msg}' in '{e_ipu}'")
 
 
 def op_harness(op,

@@ -131,6 +131,7 @@ endfunction()
 file(WRITE ${CMAKE_BINARY_DIR}/tmp/test.sh "#!$ENV{SHELL}
   source ${CMAKE_BINARY_DIR}/enable.sh
   export POPTORCH_TEST_TIMEOUT=3600
+  export TORCH_SHOW_CPP_STACKTRACES=1
   ctest --output-on-failure --timeout $POPTORCH_TEST_TIMEOUT $@
   ")
 file(COPY ${CMAKE_BINARY_DIR}/tmp/test.sh
