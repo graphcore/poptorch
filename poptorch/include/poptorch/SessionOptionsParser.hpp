@@ -61,8 +61,6 @@ private:
   std::unique_ptr<popart_compiler::SessionOptions> _opts;
 };
 
-void processPrecisionOptions(const IPyValue &values_dict, bool dispatcher);
-
 typedef std::function<std::unique_ptr<IPyValue>(const std::string &)>
     AttributeAccessor;
 

@@ -402,7 +402,7 @@ Legacy PopTorch code using ``float16`` can be updated for the dispatcher fronten
 
 * Casts were not well supported by the tracing frontend. They are fully supported by the dispatcher frontend.
 
-* :py:meth:`~poptorch.options._PrecisionOptions.halfFloatCasting` was used to switch between ways of resolving ops with
+* ``opts.Precision.halfFloatCasting()`` was used to switch between ways of resolving ops with
   both ``float32`` and ``float16`` inputs (mixed-precision inputs), either by upcasting the inputs to ``float32``, or by
   downcasting them to ``float16``. This option is not supported under the dispatcher frontend: mixed precision ops are
   now always upcast to ``float32``, in accordance with normal PyTorch behaviour. To recreate the effect of
@@ -410,7 +410,7 @@ Legacy PopTorch code using ``float16`` can be updated for the dispatcher fronten
   which was the default behaviour with the tracing frontend, ``float32`` inputs to mixed-precision ops should be
   explicitly cast to ``float16`` before being passed to the op.
 
-* :py:meth:`~poptorch.options._PrecisionOptions.runningStatisticsAlwaysFloat` was used to cause the running mean and variance of certain
+* ``opts.Precision.runningStatisticsAlwaysFloat()`` was used to cause the running mean and variance of certain
   normalization ops to be calculated in ``float32`` precision, even though the normalization module itself had been cast
   to ``float16``. This option is not supported in the dispatcher frontend, as the same effect can be achieved by simply
   casting the running statistic tensors back to ``float32`` before running the model.

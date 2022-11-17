@@ -17,7 +17,7 @@ void initializeParamConstant(torch::jit::Graph *graph, torch::jit::Value *input,
                              const std::string &norm_name,
                              const std::string &input_name,
                              bool always_f32 = false) {
-  c10::ScalarType scalar_type =
+  c10::ScalarType const scalar_type =
       *input->type()->expect<c10::TensorType>()->scalarType();
   switch (scalar_type) {
   case c10::ScalarType::Int: {
@@ -75,8 +75,8 @@ void maybeInitializeRunningParamConstants(
     return;
   }
 
-  std::string norm_name = "BatchNorm";
-  bool always_f32 = runningStatisticsAlwaysFloat();
+  std::string const norm_name = "BatchNorm";
+  const bool always_f32 = false;
   initializeParamConstant(graph, input, running_mean, 0, shape, norm_name,
                           "running_mean", always_f32);
   initializeParamConstant(graph, input, running_var, 1, shape, norm_name,
@@ -106,25 +106,13 @@ torch::jit::Node *batchNormHandler(torch::jit::Graph *graph,
   torch::jit::Value *running_mean = node->input(3);
   torch::jit::Value *running_var = node->input(4);
 
-  float momentum = constantToFloat(node->input(6)->node());
-  float epsilon = constantToFloat(node->input(7)->node());
+  const float momentum = constantToFloat(node->input(6)->node());
+  const float epsilon = constantToFloat(node->input(7)->node());
 
-  if (runningStatisticsAlwaysFloat()) {
-    auto fn_ensure_float = [&](torch::jit::Value *stat_tensor) {
-      if (!isNone(stat_tensor)) {
-        // make sure the running statistics tensor is of type float
-        auto old_type = stat_tensor->type()->cast<c10::TensorType>();
-        stat_tensor->setType(old_type->withScalarType(at::ScalarType::Float));
-      }
-    };
-    fn_ensure_float(running_mean);
-    fn_ensure_float(running_var);
-  }
+  const bool training = constantToBool(node->input(5)->node());
+  const bool three_outputs = (node->kind() == c10::aten::native_batch_norm);
 
-  bool training = constantToBool(node->input(5)->node());
-  bool three_outputs = (node->kind() == c10::aten::native_batch_norm);
-
-  std::vector<int64_t> param_shape{input_shape[1]};
+  const std::vector<int64_t> param_shape{input_shape[1]};
 
   maybeInitializeAffineParamConstants(graph, input, &weight, &bias, param_shape,
                                       "BatchNorm");
@@ -180,7 +168,7 @@ torch::jit::Node *layerNormHandler(torch::jit::Graph *graph,
   auto numel_affine =
       std::accumulate(normalized_shape.begin(), normalized_shape.end(), 1,
                       std::multiplies<int64_t>{});
-  bool initialized = maybeInitializeAffineParamConstants(
+  const bool initialized = maybeInitializeAffineParamConstants(
       graph, input, &gamma, &beta, {numel_affine}, "LayerNorm");
 
   if (!initialized) {
@@ -202,9 +190,10 @@ torch::jit::Node *layerNormHandler(torch::jit::Graph *graph,
 
   // (In the event of using native_layer_norm, there will be three outputs.
   // Use only the first.)
-  std::vector<std::int64_t> output_shape = shapeFromTensor(node->output(0));
+  const std::vector<std::int64_t> output_shape =
+      shapeFromTensor(node->output(0));
 
-  std::vector<std::int64_t> input_shape = shapeFromTensor(input);
+  const std::vector<std::int64_t> input_shape = shapeFromTensor(input);
   const std::int64_t axis = input_shape.size() - normalized_shape.size();
 
   // Flatten into [M, N]
@@ -226,7 +215,7 @@ torch::jit::Node *groupNormHandler(torch::jit::Graph *graph,
 
   torch::jit::Value *input = node->input(0);
 
-  std::int64_t num_groups = constantToLong(node->input(1)->node());
+  std::int64_t const num_groups = constantToLong(node->input(1)->node());
   // Weight to multiply
   torch::jit::Value *gamma = node->input(2);
   // Bias to add
@@ -238,7 +227,7 @@ torch::jit::Node *groupNormHandler(torch::jit::Graph *graph,
   maybeInitializeAffineParamConstants(graph, input, &gamma, &beta,
                                       {num_channels}, "GroupNorm");
 
-  float epsilon = constantToFloat(node->input(4)->node());
+  const float epsilon = constantToFloat(node->input(4)->node());
 
   return createGroupnormalization(graph, {input, gamma, beta}, num_groups,
                                   epsilon);
@@ -276,9 +265,9 @@ torch::jit::Node *nativeGroupNormHandler(torch::jit::Graph *graph,
                       static_cast<int64_t>(1), std::multiplies<int64_t>());
   ERROR_ON(hx_w != constantToLong(node->input(5)->node()));
 
-  std::int64_t num_groups = constantToLong(node->input(6)->node());
+  std::int64_t const num_groups = constantToLong(node->input(6)->node());
 
-  float epsilon = constantToFloat(node->input(7)->node());
+  const float epsilon = constantToFloat(node->input(7)->node());
   return createGroupnormalization(graph, {input, gamma, beta}, num_groups,
                                   epsilon);
 }
@@ -303,7 +292,7 @@ torch::jit::Node *instanceNormHandler(torch::jit::Graph *graph,
 
   castWeightAndBias(graph, input, gamma, beta);
 
-  std::int64_t num_channels = shapeFromTensor(input)[1];
+  std::int64_t const num_channels = shapeFromTensor(input)[1];
 
   maybeInitializeAffineParamConstants(graph, input, &gamma, &beta,
                                       {num_channels}, "InstanceNorm");
@@ -311,7 +300,7 @@ torch::jit::Node *instanceNormHandler(torch::jit::Graph *graph,
   // Group normalization does not currently allow passing a momentum value,
   // nor the running mean or running variance
 
-  float epsilon = constantToFloat(node->input(7)->node());
+  const float epsilon = constantToFloat(node->input(7)->node());
 
   // Normalize per channel C, so use Group normalization with C groups
   return createGroupnormalization(graph, {input, gamma, beta}, num_channels,

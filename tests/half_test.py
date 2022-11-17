@@ -31,31 +31,6 @@ def test_half_float_default_option():
     assert outHalf.dtype == torch.float
 
 
-def test_half_float_upcast_option():
-    class SimpleAdder(torch.nn.Module):
-        def forward(self, x, y):
-            return x + y
-
-    model = SimpleAdder()
-    opts = poptorch.Options()
-    opts.Precision.halfFloatCasting(
-        poptorch.HalfFloatCastingBehavior.HalfUpcastToFloat)
-    inference_model = poptorch.inferenceModel(model, opts)
-
-    t1 = torch.tensor([1.]).half()
-    t2 = torch.tensor([2.]).float()
-
-    outFlot = inference_model(t1, t2)
-    assert outFlot.dtype == torch.float
-
-    # Refresh and try the other way
-    model = SimpleAdder()
-    inference_model = poptorch.inferenceModel(model, opts)
-
-    outFloat = inference_model(t2, t1)
-    assert outFloat.dtype == torch.float
-
-
 @unittest.mock.patch.dict("os.environ", helpers.disableSmallModel())
 def test_resnet():
     torch.manual_seed(42)
@@ -204,8 +179,6 @@ def test_buffers():
 def test_half_casts_outplace():
     torch.manual_seed(42)
     opts = poptorch.Options()
-    opts.Precision.halfFloatCasting(
-        poptorch.HalfFloatCastingBehavior.HalfUpcastToFloat)
 
     class Model(torch.nn.Module):
         def forward(self, x1, x2):

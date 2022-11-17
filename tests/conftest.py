@@ -19,7 +19,6 @@ def cleanup():
 # Documentation about markers: https://docs.pytest.org/en/6.2.x/example/markers.html
 
 hw_available = poptorch.ipuHardwareIsAvailable()
-enable_tracing_tests = False
 
 
 def pytest_make_parametrize_id(val, argname):
@@ -47,8 +46,6 @@ def pytest_configure(config):
                              "long time to run"))
     if config.getoption("collectonly"):
         helpers.is_running_tests = False
-    global enable_tracing_tests
-    enable_tracing_tests = config.getoption("enable_tracing_tests")
     helpers.running_reduced_testing = config.getoption("reduced_testing")
 
 
@@ -58,8 +55,8 @@ def pytest_runtest_setup(item):
         # Does it have a trace_model parameter ?
         trace_model = item.callspec.params.get("trace_model")
         if trace_model is not None:
-            if trace_model and not enable_tracing_tests:
-                pytest.skip("Tracing is deprecated: not testing.")
+            if trace_model:
+                pytest.skip("Tracing is no longer supported: skipping.")
 
     if any(item.iter_markers("ipuHardwareRequired")):
         if not hw_available:
@@ -116,10 +113,6 @@ def pytest_addoption(parser):
                      action="store_true",
                      default=False,
                      help="Only run HW tests")
-    parser.addoption("--enable-tracing-tests",
-                     action="store_true",
-                     default=False,
-                     help="Enable deprecated tracing tests")
     parser.addoption("--no-hw-tests",
                      action="store_true",
                      default=False,

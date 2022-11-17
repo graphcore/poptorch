@@ -20,7 +20,7 @@ from ._utils import isOnIpu, getIpuTensorId
 # divergent IPU/CPU codepaths within one model.
 _is_ipu_context = False
 
-# A flag to tell if the dispatch mechanism (or jit tracing) is used to obtain
+# A flag to tell if the dispatch mechanism is used to obtain
 # a graph.
 _dispatch_tracing = False
 
@@ -449,21 +449,3 @@ def errorOnBufferOrParameterAddressChanges(old_addresses, new_addresses):
                     "a source tensor, where src is the name of the source "
                     "tensor.")
                 raise createPoptorchError(err_msg)
-
-
-# Wrapper to make sure that the buffers and parameters do not change during
-# tracing (which would give wrong results in a Jit trace)
-class CheckBuffersAndParamsScope:
-    def __init__(self, model: 'torch.nn.Module'):
-        self._model = model
-        self._old_addresses = {}
-
-    def __enter__(self):
-        if self._model:
-            self._old_addresses = getBufferAndParameterAddresses(self._model)
-
-    def __exit__(self, exc_type, value, traceback):
-        if self._model:
-            new_addresses = getBufferAndParameterAddresses(self._model)
-            errorOnBufferOrParameterAddressChanges(self._old_addresses,
-                                                   new_addresses)

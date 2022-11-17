@@ -10,7 +10,7 @@ import torch.nn as nn
 import pytest
 import helpers
 import poptorch
-from poptorch.enums import OutputMode, HalfFloatCastingBehavior, MeanReductionStrategy
+from poptorch.enums import OutputMode, MeanReductionStrategy
 
 
 def test_set_options():
@@ -53,10 +53,10 @@ class TestSetOptionsFromEnvironment:
     def test_dotted_access(self):
         ref = poptorch.Options()
         opts = poptorch.Options()
-        opts.Precision.runningStatisticsAlwaysFloat(False)
+        opts.Precision.enableFloatingPointExceptions(True)
         try:
             os.environ["POPTORCH_DEFAULT_OPTIONS"] = (
-                '{"Precision.runningStatisticsAlwaysFloat":false}')
+                '{"Precision.enableFloatingPointExceptions":true}')
             init_set = poptorch.Options()
         finally:
             del os.environ["POPTORCH_DEFAULT_OPTIONS"]
@@ -451,9 +451,8 @@ def test_tensor_location():
 
 @helpers.printCapfdOnExit
 @pytest.mark.parametrize("dtype", [torch.half, torch.float])
-@pytest.mark.parametrize("setting", [True, False, None])
 @helpers.overridePoptorchLogLevel("TRACE")
-def test_running_statistics(capfd, dtype, setting):
+def test_running_statistics(capfd, dtype):
     x = torch.randn((16, 16), dtype=dtype)
 
     model = torch.nn.Sequential()
@@ -463,62 +462,16 @@ def test_running_statistics(capfd, dtype, setting):
     if dtype == torch.half:
         model.half()
 
-    opts = poptorch.Options()
-    if setting is not None:
-        opts.Precision.runningStatisticsAlwaysFloat(setting)
-    poptorch_model = poptorch.inferenceModel(model, opts)
-
-    if setting:
-        err_msg = "runningStatisticsAlwaysFloat is deprecated"
-        with pytest.raises(poptorch.Error, match=err_msg):
-            poptorch_model(x)
-        return
+    poptorch_model = poptorch.inferenceModel(model)
 
     poptorch_model(x)
 
     log = helpers.LogChecker(capfd)
-    if setting:
-        log.assert_contains(
-            "poptorch.Options set runningStatisticsAlwaysFloat to true")
-    else:
-        log.assert_contains(
-            "poptorch.Options set runningStatisticsAlwaysFloat to false")
-
-    dtype_str = "Float" if dtype == torch.float or \
-        setting else "Half"
-
+    dtype_str = "Float" if dtype == torch.float else "Half"
     device = "ipu:0"
 
     log.assert_contains(
         f" : {dtype_str}(16, strides=[1], requires_grad=0, device={device}) "
-        "-> bn.running_var")
-
-
-@helpers.printCapfdOnExit
-@helpers.overridePoptorchLogLevel("TRACE")
-def test_running_statistics_dispatch(capfd):
-    x = torch.randn((16, 16), dtype=torch.half)
-
-    model = torch.nn.Sequential()
-    model.add_module('lin', torch.nn.Linear(16, 16))
-    model.add_module('bn', torch.nn.BatchNorm1d(16))
-
-    model.half()
-
-    model.bn.running_mean = model.bn.running_mean.to(torch.float)
-    model.bn.running_var = model.bn.running_var.to(torch.float)
-
-    opts = poptorch.Options()
-    opts.Jit.traceModel(False)
-    poptorch_model = poptorch.inferenceModel(model, opts)
-    poptorch_model(x)
-
-    log = helpers.LogChecker(capfd)
-    log.assert_contains(
-        "poptorch.Options set runningStatisticsAlwaysFloat to false")
-
-    log.assert_contains(
-        " : Float(16, strides=[1], requires_grad=0, device=ipu:0) "
         "-> bn.running_var")
 
 
@@ -537,8 +490,6 @@ def test_copying_options():
     opts._Popart.set("dummyKey", 5)
     opts.Training.gradientAccumulation(4)
     opts.TensorLocations.setWeightLocation(locationOnChip)
-    opts.Precision.halfFloatCasting(HalfFloatCastingBehavior.HalfUpcastToFloat)
-    opts.Precision.runningStatisticsAlwaysFloat(False)
     deep_copy = copy.deepcopy(opts)
 
     opts.deviceIterations(4)
@@ -546,8 +497,6 @@ def test_copying_options():
     opts.anchorTensor("t2", "tensor2", OutputMode.Final)
     opts._Popart.set("autoRecomputation", 2)
     opts.TensorLocations.setWeightLocation(locationOutsideChip)
-    opts.Precision.halfFloatCasting(
-        HalfFloatCastingBehavior.FloatDowncastToHalf)
 
     assert opts.device_iterations != deep_copy.device_iterations
     assert opts.anchored_tensors != deep_copy.anchored_tensors
@@ -560,11 +509,6 @@ def test_copying_options():
     assert opts.sync_pattern == deep_copy.sync_pattern
     assert (opts.available_memory_proportion ==
             deep_copy.available_memory_proportion)
-
-    assert (opts.Precision.half_float_casting !=
-            deep_copy.Precision.half_float_casting)
-    assert (opts.Precision.running_statistics_always_float ==
-            deep_copy.Precision.running_statistics_always_float)
 
     assert (opts.Distributed.distributed_process_id !=
             deep_copy.Distributed.distributed_process_id)

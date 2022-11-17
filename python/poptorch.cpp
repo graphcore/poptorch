@@ -995,12 +995,6 @@ getTimestamps(const std::shared_ptr<poptorch::PoplarExecutable> &executable) {
   return {input, input_complete, output, output_complete};
 }
 
-void processPrecisionOptions(py::handle h, bool dispatcher) {
-  poptorch::logging::Tracepoint tp{__FUNCTION__};
-  poptorch::processPrecisionOptions(
-      PybindValue(h.attr("_values").cast<py::dict>()), dispatcher);
-}
-
 bool pyIsGraphNondeterministic(py::handle h) {
   auto *module = asModule(h);
   auto forward = module->get_method("forward");
@@ -1132,8 +1126,6 @@ PYBIND11_MODULE(poptorch_core, m) { // NOLINT
           "This is helpful to get the IR to trace back to user code rather"
           "than some function inside a framework.");
 
-  m.def("processPrecisionOptions",
-        PTC(poptorch::bindings::processPrecisionOptions));
   m.def("isGraphNondeterministic",
         PTC(poptorch::bindings::pyIsGraphNondeterministic));
   m.def("saveExecutableToFile", PTC(poptorch::bindings::saveExecutableToFile));

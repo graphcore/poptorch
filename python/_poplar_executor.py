@@ -943,8 +943,6 @@ class PoplarExecutor:
 
         in_tensors_trace_view.forEach(self._narrow_tensor)
         in_tensors_trace_view.forEach(remove_requires_grad)
-
-        poptorch_core.processPrecisionOptions(self._options.Precision, True)
         return in_tensors_trace_view
 
     def compile(self, *args, **kwargs) -> None:

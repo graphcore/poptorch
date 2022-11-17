@@ -75,84 +75,44 @@ class _PrecisionOptions(_options_impl.OptionsDict):
     Can be accessed via :py:attr:`poptorch.Options.Precision`:
 
     >>> opts = poptorch.Options()
-    >>> opts.Precision.halfFloatCasting(
-    ...   poptorch.HalfFloatCastingBehavior.HalfUpcastToFloat)
+    >>> opts.Precision.enableFloatingPointExceptions(True)
     """
 
     def __init__(self,
                  popart_options: "poptorch.options._PopartOptions") -> None:
         self._popart_options = popart_options
-        super().__init__(
-            half_float_casting=enums.HalfFloatCastingBehavior.Default)
+        super().__init__()
 
     def halfFloatCasting(
-            self, half_float_casting: "poptorch.HalfFloatCastingBehavior"
+            self,
+            half_float_casting: "poptorch.HalfFloatCastingBehavior"  # pylint: disable=unused-argument
     ) -> "poptorch.options._PrecisionOptions":
-        """ Changes the casting behaviour for ops involving a float16 (half) and
-            a float32
-
-        The default option, ``Default``, is interpreted differently depending
-        whether tracing is enabled or not.
-
-        With tracing disabled, mixed precision casting always follows PyTorch's
-        scheme, wherein all parameters are upcast to the type of the highest
-        precision input. The exception to this is inplace ops, which cast
-        to the precision of the output. This behaviour can also be specified
-        explicitly using ``HalfUpcastToFloat``.
-
-        With tracing enabled, ``Default`` will cause mixed precision ops to
-        downcast their inputs to float16. This behaviour can also be obtained
-        with the explicit setting ``FloatDowncastToHalf``. The alternative is
-        to set the option as ``HalfUpcastToFloat``, which will give the PyTorch
-        default behaviour outlined above.
-
-        ``FloatDowncastToHalf`` is only valid with tracing enabled.
-
-        :param half_float_casting:
-            * ``FloatDowncastToHalf``:  Any op with operands (inputs) which are
-              a mix of float32 and float16 (half) will cast all operands to
-              half.
-            * ``HalfUpcastToFloat``: Implicit casting will follow PyTorch's
-              rules, promoting float16 (half) inputs to float32 if another input
-              is float32.
-            * ``Default``: Interpreted as ``FloatDowncastToHalf`` if tracing is
-              enabled, or ``HalfUpcastToFloat`` if tracing is disabled.
         """
+        DO NOT USE: about to be removed.
+        """
+        logger.warning("[Deprecated] Do not call "
+                       "options.Precision.halfFloatCasting(): "
+                       "HalfUpcastToFloat is now the only supported option "
+                       "and matches PyTorch's behaviour so you don't need "
+                       "to explicitly set it.")
 
-        if not isinstance(half_float_casting, enums.HalfFloatCastingBehavior):
-            raise ValueError(
-                "halfFloatCasting must be set to "
-                "poptorch.HalfFloatCastingBehavior.FloatDowncastToHalf or "
-                "poptorch.HalfFloatCastingBehavior.HalfUpcastToFloat or "
-                "poptorch.Default")
-
-        self.set(half_float_casting=half_float_casting)
         return self
 
     def runningStatisticsAlwaysFloat(self, value: bool
                                      ) -> "poptorch.options._PrecisionOptions":
-        """Controls whether the running mean and variance tensors of batch
-        normalisation layers should be float32 regardless of input type.
-
-        A batch normalisation layer stores a running estimate of the means and
-        variances of each channel during training, for use at inference in lieu
-        of batch statistics. Storing the values as half (float16) can result in
-        poor performance due to the low precision. Enabling this option yields
-        more reliable estimates by forcing all running estimates of variances to
-        be stored as float32, at the cost of extra memory use.
-
-        :param value:
-            * True: Always store running estimates of mean and variance as
-              float32.
-            * False: Store running estimates of mean and variance as the same
-              type as the layer input.
+        """
+        DO NOT USE: about to be removed.
         """
 
         if not isinstance(value, bool):
             raise ValueError(
                 "runningStatisticsAlwaysFloat needs to be set to a bool")
 
-        self.createOrSet(running_statistics_always_float=value)
+        logger.warning("[Deprecated] Do not call "
+                       "options.Precision.runningStatisticsAlwaysFloat(): "
+                       "False is now the only supported option "
+                       "and matches PyTorch's behaviour so you don't need "
+                       "to explicitly set it.")
         return self
 
     def enableFloatingPointExceptions(

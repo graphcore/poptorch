@@ -19,40 +19,6 @@
 namespace poptorch {
 
 namespace {
-
-HalfFloatCasting &getHalfFloatCastingBehavior() {
-  static HalfFloatCasting behavior = HalfFloatCasting::Default;
-
-  return behavior;
-}
-
-bool &getRunningStatisticsAlwaysFloat() {
-  static bool always_float = true;
-
-  return always_float;
-}
-
-} // namespace
-
-void setHalfFloatCastingBehavior(const HalfFloatCasting behavior) {
-  getHalfFloatCastingBehavior() = behavior;
-}
-
-HalfFloatCasting halfFloatCastingBehavior() {
-  return getHalfFloatCastingBehavior();
-}
-
-void setRunningStatisticsAlwaysFloat(bool value) {
-  logging::debug("poptorch.Options set runningStatisticsAlwaysFloat to {}",
-                 value);
-  getRunningStatisticsAlwaysFloat() = value;
-}
-
-bool runningStatisticsAlwaysFloat() {
-  return getRunningStatisticsAlwaysFloat();
-}
-
-namespace {
 bool skipInput(const ImplicitCast implicit_cast, const unsigned int input_num) {
   ERROR_ON(implicit_cast == ImplicitCast::None);
 
@@ -76,17 +42,6 @@ bool skipInput(const ImplicitCast implicit_cast, const unsigned int input_num) {
 c10::ScalarType promoteTypes(c10::ScalarType t1, c10::ScalarType t2) {
   ERROR_ON_MSG(isCompilingWithDispatcher(),
                "promoteTypes() shouldn't be called in the dispatcher");
-  auto hf_behavior = halfFloatCastingBehavior();
-  if (hf_behavior == HalfFloatCasting::FloatDowncastToHalf ||
-      hf_behavior == HalfFloatCasting::Default) {
-    if ((t1 == c10::ScalarType::Half && t2 == c10::ScalarType::Float) ||
-        (t1 == c10::ScalarType::Float && t2 == c10::ScalarType::Half)) {
-      return c10::ScalarType::Half;
-    }
-  } else {
-    ERROR_ON(hf_behavior != HalfFloatCasting::HalfUpcastToFloat);
-  }
-
   auto type = c10::promoteTypes(t1, t2);
 
   // Ensure we don't promote to a type the IPU doesn't support

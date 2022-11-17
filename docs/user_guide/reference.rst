@@ -211,9 +211,6 @@ Enumerations
 .. autoclass:: poptorch.ReductionType
    :members:
 
-.. autoclass:: poptorch.HalfFloatCastingBehavior
-   :members:
-
 .. autoclass:: poptorch.ConnectionType
    :members:
 

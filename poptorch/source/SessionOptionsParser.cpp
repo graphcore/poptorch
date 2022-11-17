@@ -102,28 +102,4 @@ SessionOptionsParser::SessionOptionsParser(const IPyValue &py_opts)
   });
 }
 
-void processPrecisionOptions(const IPyValue &values_dict, bool dispatcher) {
-  auto hf_casting = static_cast<HalfFloatCasting>(
-      values_dict.getFromDict("half_float_casting")->toInt64());
-
-  ERROR_ON_MSG(
-      dispatcher && hf_casting == HalfFloatCasting::FloatDowncastToHalf,
-      "FloatDowncastToHalf is deprecated and not supported in the dispatcher");
-
-  poptorch::setHalfFloatCastingBehavior(hf_casting);
-
-  bool running_statistics_always_float;
-  auto run_stats = values_dict.getFromDict("running_statistics_always_float");
-  if (!run_stats) {
-    running_statistics_always_float = !dispatcher;
-  } else {
-    running_statistics_always_float = run_stats->toBoolean();
-  }
-  ERROR_ON_MSG(dispatcher && running_statistics_always_float,
-               "runningStatisticsAlwaysFloat is deprecated and not supported "
-               "in the dispatcher. Simply cast the running statistics tensors "
-               "to float at the pytorch level.");
-  poptorch::setRunningStatisticsAlwaysFloat(running_statistics_always_float);
-}
-
 } // namespace poptorch
