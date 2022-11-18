@@ -16,20 +16,16 @@ import poptorch
 # 'torch.nn.InstanceNorm1d', 'torch.nn.InstanceNorm2d', 'torch.nn.InstanceNorm3d', 'torch.nn.LayerNorm', 'torch.nn.LocalResponseNorm',
 
 batch_norm_params = [
-    # Norm, affine, running_stats, training, trace_model
-    (nn.BatchNorm1d, False, False, False, True),
-    (nn.BatchNorm1d, False, False, False, False),
-    (nn.BatchNorm2d, True, True, True, True),
-    (nn.BatchNorm2d, True, True, False, False),
-    (nn.BatchNorm3d, False, True, True, True),
+    # Norm, affine, running_stats, training
+    (nn.BatchNorm1d, False, False, False),
+    (nn.BatchNorm2d, True, True, False),
 ]
 
 
-@pytest.mark.parametrize(
-    "batch_norm, affine, running_stats, training, trace_model",
-    batch_norm_params)
+@pytest.mark.parametrize("batch_norm, affine, running_stats, training",
+                         batch_norm_params)
 @unittest.mock.patch.dict("os.environ", helpers.disableSmallModel())
-def test_batchNorm(batch_norm, affine, running_stats, training, trace_model):
+def test_batchNorm(batch_norm, affine, running_stats, training):
     torch.manual_seed(42)
     C = 4
     input_shape = [3, C, 5]
@@ -48,12 +44,9 @@ def test_batchNorm(batch_norm, affine, running_stats, training, trace_model):
 
     model = helpers.ModelWithWeights(norm, input.shape)
 
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
     ipumodel = deepcopy(model)
     poptorch_model = poptorch.trainingModel(
-        ipumodel, options) if training else poptorch.inferenceModel(
-            ipumodel, options)
+        ipumodel) if training else poptorch.inferenceModel(ipumodel)
 
     # Run pytorch native on CPU.
     native_out, _ = model((input, ))
@@ -74,7 +67,7 @@ def test_batchNorm_typing():
 
     class Model(torch.nn.Module):
         def __init__(self):
-            super(Model, self).__init__()
+            super().__init__()
             self.bn = nn.BatchNorm1d(100)
 
         def forward(self, x, y):
@@ -89,13 +82,12 @@ def test_batchNorm_typing():
     ipu_model(x, y)
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_batchNorm_eval_during_training(trace_model):
+def test_batchNorm_eval_during_training():
     torch.manual_seed(42)
 
     class Model(torch.nn.Module):
         def __init__(self):
-            super(Model, self).__init__()
+            super().__init__()
             self.bn = nn.BatchNorm1d(100)
             self.loss = torch.nn.MSELoss()
 
@@ -117,9 +109,7 @@ def test_batchNorm_eval_during_training(trace_model):
     # Run pytorch native on CPU.
     native_out, _ = model(input, target)
     # Run on IPU.
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
-    ipu_model = poptorch.trainingModel(model, options=options)
+    ipu_model = poptorch.trainingModel(model)
     poptorch_out, _ = ipu_model(input, target)
     # TODO: T38684
     # Implicit copy only happens when we touch the params so copy explicitly.
@@ -133,8 +123,7 @@ def test_batchNorm_eval_during_training(trace_model):
 
 
 @pytest.mark.parametrize("norm_dim", range(4))
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_layerNorm(norm_dim, trace_model):
+def test_layerNorm(norm_dim):
     torch.manual_seed(42)
 
     elementwise_affine = norm_dim % 2 == 1
@@ -148,9 +137,7 @@ def test_layerNorm(norm_dim, trace_model):
     # Run pytorch native on CPU.
     native_out, _ = model((input, ))
 
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
-    poptorch_model = poptorch.trainingModel(model, options=options)
+    poptorch_model = poptorch.trainingModel(model)
     # Run on IPU.
     poptorch_out, _ = poptorch_model((input, ))
 
@@ -164,13 +151,12 @@ def test_layerNorm(norm_dim, trace_model):
     poptorch_model.assert_weights_changed()
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_layerNormPretrainedWeights(trace_model):
+def test_layerNormPretrainedWeights():
     torch.manual_seed(42)
 
     class Model(nn.Module):
         def __init__(self):
-            super(Model, self).__init__()
+            super().__init__()
             self.conv = nn.Conv2d(5, 5, kernel_size=(1, 1))
             self.norm = nn.LayerNorm((5, 3, 10))
 
@@ -186,9 +172,7 @@ def test_layerNormPretrainedWeights(trace_model):
     modelOut = model(input)
 
     # Run on IPU.
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
-    ipuModel = poptorch.inferenceModel(model, options)
+    ipuModel = poptorch.inferenceModel(model)
     poptorch_out = ipuModel(input)
 
     # Marginally more leeway.
@@ -211,7 +195,7 @@ def test_layerNormPretrainedWeights(trace_model):
 
     model.eval()
     # Run on IPU with trained weights.
-    ipuModel = poptorch.inferenceModel(model, options)
+    ipuModel = poptorch.inferenceModel(model)
     poptorch_out = ipuModel(input)
 
     # Run on CPU again with trained weights.
@@ -224,8 +208,7 @@ def test_layerNormPretrainedWeights(trace_model):
 
 
 @pytest.mark.parametrize("dims", {2, 3, 4, 5})
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_groupNorm(dims, trace_model):
+def test_groupNorm(dims):
     if dims == 2:
         # TODO(T49073): Match torch 1.10 GroupNorm implementation
         pytest.skip("Numerical differences between PyTorch and PopTorch")
@@ -247,9 +230,7 @@ def test_groupNorm(dims, trace_model):
     native_out, _ = model((input, ))
 
     # Run on IPU.
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
-    poptorch_model = poptorch.trainingModel(model, options=options)
+    poptorch_model = poptorch.trainingModel(model)
     poptorch_out, _ = poptorch_model((input, ))
 
     # Inference test - check outputs
@@ -259,8 +240,7 @@ def test_groupNorm(dims, trace_model):
     poptorch_model.assert_weights_changed()
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_groupNorm_exfail(trace_model):
+def test_groupNorm_exfail():
     torch.manual_seed(42)
 
     shape = [3, 10]
@@ -273,7 +253,6 @@ def test_groupNorm_exfail(trace_model):
 
     opts = poptorch.Options()
     opts._Popart.set("groupNormStridedChannelGrouping", True)  # pylint: disable=protected-access
-    opts.Jit.traceModel(trace_model)
 
     # Run on IPU.
     ipuModel = poptorch.inferenceModel(groupNorm, opts)
@@ -291,7 +270,7 @@ def test_groupNorm_typing():
 
     class Model(torch.nn.Module):
         def __init__(self):
-            super(Model, self).__init__()
+            super().__init__()
             self.gn = torch.nn.GroupNorm(4, 16)
 
         def forward(self, x):
@@ -314,15 +293,14 @@ instance_norm_params = [
 
 
 @pytest.mark.parametrize("instance_norm, d", instance_norm_params)
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_instanceNorm(instance_norm, d, trace_model):
+def test_instanceNorm(instance_norm, d):
     torch.manual_seed(42)
 
     affine = d % 2 == 1
 
     class Model(nn.Module):
         def __init__(self):
-            super(Model, self).__init__()
+            super().__init__()
             self.norm = instance_norm(6, affine=affine)
             self.fc1 = nn.Linear(6 * 2**d, 10)
             self.loss = nn.CrossEntropyLoss()
@@ -338,11 +316,7 @@ def test_instanceNorm(instance_norm, d, trace_model):
     for _ in range(3):
         model = Model()
         opt = optim.AdamW(model.parameters(), lr=0.01)
-        options = poptorch.Options()
-        options.Jit.traceModel(trace_model)
-        poptorch_model = poptorch.trainingModel(model,
-                                                options=options,
-                                                optimizer=opt)
+        poptorch_model = poptorch.trainingModel(model, optimizer=opt)
 
         shape = [5, 6]
         shape.extend([2 for _ in range(d)])
@@ -364,8 +338,7 @@ def test_instanceNorm(instance_norm, d, trace_model):
                                 expected=label)
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_batchnorm_statistics(trace_model):
+def test_batchnorm_statistics():
     torch.manual_seed(42)
 
     input_data = [torch.randn([4, 4, 3, 3]) for _ in range(10)]
@@ -388,11 +361,7 @@ def test_batchnorm_statistics(trace_model):
     model1 = Model()
     model1.train()
     optimizer = optim.SGD(model1.parameters(), lr=0.0)
-    model_opts = poptorch.Options()
-    model_opts.Jit.traceModel(trace_model)
-    training_model = poptorch.trainingModel(model1,
-                                            model_opts,
-                                            optimizer=optimizer)
+    training_model = poptorch.trainingModel(model1, optimizer=optimizer)
 
     for data in input_data:
         training_model(data, label)

@@ -35,7 +35,7 @@ else:
         pass
 
 
-def torch_scatter_harness(trace_model, func, src, index):
+def torch_scatter_harness(func, src, index):
 
     # We do the shape inference from scatter here because we don't support
     # dynamic shaped tensors on the ipu
@@ -46,31 +46,27 @@ def torch_scatter_harness(trace_model, func, src, index):
             return func(src, index, dim_size=dim_size)
 
     model = Model()
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
-    poptorch_model = poptorch.inferenceModel(model, options=options)
+    poptorch_model = poptorch.inferenceModel(model)
 
     native_out = func(src, index, dim_size=dim_size)
     ipu_out = poptorch_model(src, index)
     helpers.assert_allclose(actual=ipu_out, expected=native_out)
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
 @pytest.mark.parametrize("reduce", ['sum', 'mean', 'max', 'min'])
-def test_scatter(trace_model, reduce):
+def test_scatter(reduce):
     func = partial(scatter, reduce=reduce)
     src = torch.tensor([1, 3, 2, 4, 5, 6]).float()
     index = torch.tensor([0, 1, 0, 1, 1, 3]).long()
-    torch_scatter_harness(trace_model, func, src, index)
+    torch_scatter_harness(func, src, index)
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
 @pytest.mark.parametrize("func",
                          [scatter_log_softmax, scatter_softmax, scatter_std])
-def test_composites(trace_model, func):
+def test_composites(func):
     src = torch.tensor([1, 3, 2, 4, 5, 6]).float()
     index = torch.tensor([0, 1, 0, 1, 1, 3]).long()
-    torch_scatter_harness(trace_model, func, src, index)
+    torch_scatter_harness(func, src, index)
 
 
 @helpers.printCapfdOnExit
@@ -78,7 +74,7 @@ def test_composites(trace_model, func):
 def test_scatter_add_zeros_optimized(capfd):
     src = torch.tensor([1, 3, 2, 4, 5, 6]).float()
     index = torch.tensor([0, 1, 0, 1, 1, 3]).long()
-    torch_scatter_harness(True, scatter_add, src, index)
+    torch_scatter_harness(scatter_add, src, index)
 
     it = helpers.LogChecker(capfd).createIterator()
     it.findNext("Removing zeros output to scatter_add")
@@ -91,7 +87,7 @@ def test_scatter_add_nd_expand_removed(capfd):
     src = torch.randn(10, 6, 16)
     index = torch.tensor([0, 1, 0, 1, 1, 3]).long()
     func = partial(scatter_add, dim=1)
-    torch_scatter_harness(True, func, src, index)
+    torch_scatter_harness(func, src, index)
 
     it = helpers.LogChecker(capfd).createIterator()
     it.findNext("Removing index expansion node:")
@@ -103,4 +99,4 @@ def test_scatter_max(shape):
     x = torch.rand(shape)
     ind = torch.randint(3, shape)
 
-    torch_scatter_harness(True, scatter_max, x, ind)
+    torch_scatter_harness(scatter_max, x, ind)

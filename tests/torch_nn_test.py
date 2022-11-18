@@ -427,8 +427,7 @@ def assert_allclose(native_out, poptorch_out, rtol, atol):
 
 @pytest.mark.parametrize("test_name", all_tests.keys())
 @pytest.mark.parametrize("use_half", [False, True])
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_pytorch_nn(test_name, use_half, trace_model):
+def test_pytorch_nn(test_name, use_half):
     reason = EXPECTED_FAILURES.get(test_name)
     if reason is None:
         reason = HALF_EXPECTED_FAILURES.get(
@@ -460,9 +459,7 @@ def test_pytorch_nn(test_name, use_half, trace_model):
     else:
         rtol, atol = FLOAT_PRECISION_EXCEPTIONS.get(test_name, (None, None))
 
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
-    poptorch_model = poptorch.inferenceModel(model, options)
+    poptorch_model = poptorch.inferenceModel(model)
     poptorch_out = poptorch_model(*inputs)
 
     assert_allclose(ref, poptorch_out, rtol, atol)
@@ -476,14 +473,13 @@ if __name__ == "__main__":
     HALF_EXPECTED_FAILURES.clear()
 
     if len(sys.argv) == 2:
-        test_pytorch_nn(sys.argv[1], os.environ.get("HALF", "0") == "1", False)
+        test_pytorch_nn(sys.argv[1], os.environ.get("HALF", "0") == "1")
         sys.exit(0)
 
     fails = []
     for testname in sys.argv[1:]:
         try:
-            test_pytorch_nn(testname,
-                            os.environ.get("HALF", "0") == "1", False)
+            test_pytorch_nn(testname, os.environ.get("HALF", "0") == "1")
         except (RuntimeError, AssertionError, poptorch.Error):
             fails.append(testname)
 

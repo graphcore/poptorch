@@ -30,11 +30,6 @@ def type_out_harness(inputs, forward_op):
 
 ones_zeros = [torch.ones, torch.zeros]
 
-
-# Tracing: input dtype always resolves to float32, because it is traced as float32,
-# and the input itself is not used standalone.
-#
-# Dispatcher: The dtype will match what was requested.
 @pytest.mark.parametrize("op", ones_zeros)
 def test_ones_zeros_default_resolved(op):
     def fw_op(input):
@@ -245,8 +240,6 @@ def test_constant_add_float16():
     type_out_harness(torch.tensor([3, 4, 8], dtype=torch.float32), fw_op)
 
 
-# The type will resolve to the input rather than float32 because of the
-# ambiguity betwen tracing with a float and a half converted to a float.
 def test_constant_always_float32():
     def fw_op(input):
         return torch.tensor([1, 2, 3], dtype=torch.float32) + input

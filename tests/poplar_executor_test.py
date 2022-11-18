@@ -18,8 +18,7 @@ import poptorch
 @pytest.mark.ipuHardwareRequired
 @helpers.printCapfdOnExit
 @helpers.overridePoptorchLogLevel("DEBUG")
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_ExecutableCaching(capfd, trace_model):
+def test_ExecutableCaching(capfd):
     class Model(torch.nn.Module):
         def forward(self, x):
             return x * 6
@@ -27,7 +26,6 @@ def test_ExecutableCaching(capfd, trace_model):
     with tempfile.TemporaryDirectory() as cache:
         opts = poptorch.Options()
         opts.enableExecutableCaching(cache)
-        opts.Jit.traceModel(trace_model)
         m = poptorch.inferenceModel(Model(), opts)
         m.compile(torch.rand(2, 3))
         m.destroy()
@@ -44,8 +42,7 @@ def test_ExecutableCaching(capfd, trace_model):
 @pytest.mark.ipuHardwareRequired
 @helpers.printCapfdOnExit
 @helpers.overridePoptorchLogLevel("DEBUG")
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_ExecutableCaching_env(capfd, trace_model):
+def test_ExecutableCaching_env(capfd):
     class Model(torch.nn.Module):
         def forward(self, x):
             return x * 6
@@ -53,7 +50,6 @@ def test_ExecutableCaching_env(capfd, trace_model):
     with tempfile.TemporaryDirectory() as cache:
         os.environ["POPTORCH_CACHE_DIR"] = cache
         opts = poptorch.Options()
-        opts.Jit.traceModel(trace_model)
         m = poptorch.inferenceModel(Model(), opts)
         m.compile(torch.rand(2, 3))
         m.destroy()
@@ -84,11 +80,9 @@ def _create_model_and_export(opts, filename):
 
 
 @unittest.mock.patch.dict("os.environ", helpers.disableAllModels())
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_offline_ipu_compileAndExport_file(trace_model, filename=None):
+def test_offline_ipu_compileAndExport_file(filename=None):
     # Force-disable the IPU model
     opts = poptorch.Options().useOfflineIpuTarget()
-    opts.Jit.traceModel(trace_model)
 
     with tempfile.TemporaryDirectory() as tmp:
         filename = os.path.join(tmp, "model.poptorch")
@@ -96,11 +90,9 @@ def test_offline_ipu_compileAndExport_file(trace_model, filename=None):
 
 
 @pytest.mark.ipuHardwareRequired
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_precompile_then_load(trace_model):
+def test_precompile_then_load():
     opts = poptorch.Options().useOfflineIpuTarget(
         poptorch.ipuHardwareVersion())
-    opts.Jit.traceModel(trace_model)
     with tempfile.TemporaryDirectory() as tmp:
         filename = os.path.join(tmp, "model.poptorch")
         _create_model_and_export(opts, filename)
@@ -117,8 +109,7 @@ def test_precompile_then_load(trace_model):
 
 
 @unittest.mock.patch.dict("os.environ", helpers.disableAllModels())
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_offline_ipu_compileAndExport_dir(trace_model):
+def test_offline_ipu_compileAndExport_dir():
     class Network(torch.nn.Module):
         def forward(self, x, y):
             return x + y
@@ -126,7 +117,6 @@ def test_offline_ipu_compileAndExport_dir(trace_model):
     model = Network()
     # Force-disable the IPU model
     opts = poptorch.Options().useOfflineIpuTarget()
-    opts.Jit.traceModel(trace_model)
     poptorch.inferenceModel(model, opts)
 
     inference_model = poptorch.inferenceModel(model, opts)
@@ -142,8 +132,7 @@ def test_offline_ipu_compileAndExport_dir(trace_model):
         assert len(files) == 1, "Expected exactly 1 file"
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_inference_attributes(trace_model):
+def test_inference_attributes():
     class Model(torch.nn.Module):
         def __init__(self, attr):
             super().__init__()
@@ -155,9 +144,7 @@ def test_inference_attributes(trace_model):
         def forward(self, x, y):
             return x + y + 5
 
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
-    poptorch_model = poptorch.inferenceModel(Model("MyAttr"), options)
+    poptorch_model = poptorch.inferenceModel(Model("MyAttr"))
 
     t1 = torch.tensor([1.])
     t2 = torch.tensor([2.])
@@ -168,8 +155,7 @@ def test_inference_attributes(trace_model):
     assert poptorch_model.attr == "MyAttr"
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_training_attributes(trace_model):
+def test_training_attributes():
     def custom_loss(output, target):
         # Mean squared error with a scale
         loss = output - target
@@ -193,9 +179,7 @@ def test_training_attributes(trace_model):
     model = Model("MyAttr")
     input = torch.tensor([1.0, 2.0, 3.0])
     target = torch.tensor([30.0, 40.0, 50.0])
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
-    poptorch_model = poptorch.trainingModel(model, options=options)
+    poptorch_model = poptorch.trainingModel(model)
 
     poptorch_model(input, target)
 
@@ -205,8 +189,7 @@ def test_training_attributes(trace_model):
 
 @pytest.mark.ipuHardwareRequired
 @pytest.mark.parametrize("use_half", [False])
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_explicit_destroy(use_half, trace_model):
+def test_explicit_destroy(use_half):
     class ExampleModel(torch.nn.Module):
         def __init__(self):
             super().__init__()
@@ -238,7 +221,6 @@ def test_explicit_destroy(use_half, trace_model):
             return out
 
     opts = poptorch.Options()
-    opts.Jit.traceModel(trace_model)
     # Both models will use the same IPU device.
     opts.useIpuId(1)
 
@@ -264,7 +246,7 @@ def test_explicit_destroy(use_half, trace_model):
     inference_model(input)
 
 
-def _compile_model_offline(trace_model, cache, pid, num_processes):
+def _compile_model_offline(cache, pid, num_processes):
     poptorch.setLogLevel("DEBUG")  # Force debug logging in worker process
     opts = poptorch.Options().useOfflineIpuTarget()
     opts.enableExecutableCaching(cache)
@@ -272,7 +254,6 @@ def _compile_model_offline(trace_model, cache, pid, num_processes):
     opts.showCompilationProgressBar(False)
     opts.deviceIterations(10)
     opts.Distributed.configureProcessId(pid, num_processes)
-    opts.Jit.traceModel(trace_model)
 
     class ModelWithLoss(torch.nn.Module):
         def __init__(self):
@@ -300,8 +281,7 @@ def _compile_model_offline(trace_model, cache, pid, num_processes):
 # Force-disable the IPU model
 @unittest.mock.patch.dict("os.environ", helpers.disableAllModels())
 @helpers.printCapfdOnExit
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_distributed_compile(capfd, trace_model):
+def test_distributed_compile(capfd):
     num_processes = 6
     with tempfile.TemporaryDirectory() as tmp:
         cache = os.path.join(tmp, "poptorch_cache")
@@ -309,7 +289,7 @@ def test_distributed_compile(capfd, trace_model):
         ctx = mp.get_context('spawn')
         processes = [
             ctx.Process(target=_compile_model_offline,
-                        args=(trace_model, cache, pid, num_processes))
+                        args=(cache, pid, num_processes))
             for pid in range(num_processes)
         ]
         for p in processes:
@@ -340,7 +320,7 @@ def test_distributed_compile(capfd, trace_model):
         includes_compilation = False
 
 
-def test_dispatcher_cpu_output():
+def test_cpu_output():
     const1 = torch.tensor([1, 2])
     const2 = torch.tensor([3, 4])
 
@@ -350,11 +330,8 @@ def test_dispatcher_cpu_output():
                                                          const2]), const2)
 
     model = Model()
-    options = poptorch.Options()
-    options.Jit.traceModel(False)
-
     with warnings.catch_warnings(record=True) as filtered_warnings:
-        poptorch.inferenceModel(model, options).compile()
+        poptorch.inferenceModel(model).compile()
 
     pop_warns = set(str(w.message) for w in filtered_warnings)
 
@@ -366,15 +343,12 @@ def test_dispatcher_cpu_output():
 
 
 @pytest.mark.ipuHardwareRequired
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_get_cycles_error_msgs(trace_model):
+def test_get_cycles_error_msgs():
     class Model(torch.nn.Module):
         def forward(self, x, y):
             return x + y
 
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
-    inference_model = poptorch.inferenceModel(Model(), options)
+    inference_model = poptorch.inferenceModel(Model())
 
     error_msg = (r"Cycle count logging is disabled. Please set option "
                  r"logCycleCount to True to enable.")
@@ -383,7 +357,6 @@ def test_get_cycles_error_msgs(trace_model):
 
     opts = poptorch.Options()
     opts.logCycleCount(True)
-    opts.Jit.traceModel(trace_model)
 
     inference_model = poptorch.inferenceModel(Model(), options=opts)
 
@@ -405,19 +378,15 @@ def test_get_cycles_error_msgs(trace_model):
 
 @pytest.mark.skipif(poptorch.ipuHardwareIsAvailable(),
                     reason="Test error message when no hardware")
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_get_cycles_no_hw(trace_model):
+def test_get_cycles_no_hw():
     class Model(torch.nn.Module):
         def forward(self, x, y):
             return x + y
 
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
-    inference_model = poptorch.inferenceModel(Model(), options)
+    inference_model = poptorch.inferenceModel(Model())
 
     opts = poptorch.Options()
     opts.logCycleCount(True)
-    opts.Jit.traceModel(trace_model)
 
     inference_model = poptorch.inferenceModel(Model(), options=opts)
 
@@ -428,8 +397,7 @@ def test_get_cycles_no_hw(trace_model):
 
 
 @pytest.mark.parametrize("rewrap_executor", [True, False])
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_rewrap_model(rewrap_executor, trace_model):
+def test_rewrap_model(rewrap_executor):
     class Model(torch.nn.Module):
         def __init__(self):
             super().__init__()
@@ -444,13 +412,11 @@ def test_rewrap_model(rewrap_executor, trace_model):
 
     model = Model()
 
-    opts = poptorch.Options()
-    opts.Jit.traceModel(trace_model)
-
     # Normal running
     torch.nn.init.ones_(model.fc.weight)
     torch.nn.init.zeros_(model.fc.bias)
 
+    opts = poptorch.Options()
     opts.deviceIterations(10)
     poptorch_model = poptorch.trainingModel(model, options=opts)
 

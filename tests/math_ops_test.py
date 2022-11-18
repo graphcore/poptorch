@@ -12,18 +12,11 @@ non_differentiable_ops = [
 ]
 
 
-def op_harness(trace_model,
-               op,
-               inputs,
-               assert_func,
-               test_training=False,
-               out_fn=None):
+def op_harness(op, inputs, assert_func, test_training=False, out_fn=None):
     is_unary = len(inputs) == 1
     if not is_unary:
         assert len(inputs) == 2
 
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
     if test_training and not op in non_differentiable_ops:
         model = helpers.ModelWithWeights(op, inputs[0].shape, out_fn)
 
@@ -35,9 +28,7 @@ def op_harness(trace_model,
         optim = torch.optim.AdamW(model.parameters(), lr=0.1)
 
         # Run on IPU.
-        poptorch_model = poptorch.trainingModel(model,
-                                                options=options,
-                                                optimizer=optim)
+        poptorch_model = poptorch.trainingModel(model, optimizer=optim)
         poptorch_out, _ = poptorch_model(tuple(inputs))
 
         # Training test - check weights have changed
@@ -60,7 +51,7 @@ def op_harness(trace_model,
         native_out = model(*inputs)
 
         # Run on IPU.
-        poptorch_model = poptorch.inferenceModel(model, options)
+        poptorch_model = poptorch.inferenceModel(model)
         poptorch_out = poptorch_model(*inputs)
 
     assert_func(native_out, poptorch_out)
@@ -110,8 +101,7 @@ unary_ops_float = [
 
 
 @pytest.mark.parametrize("op", unary_ops_float)
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_unary_ops_float(op, trace_model):
+def test_unary_ops_float(op):
     torch.manual_seed(42)
 
     input = torch.randn([1, 2, 10, 10])
@@ -123,13 +113,12 @@ def test_unary_ops_float(op, trace_model):
                                 rtol=1e-03,
                                 equal_nan=True)
 
-    op_harness(trace_model, op, [input], assert_, test_training=True)
+    op_harness(op, [input], assert_, test_training=True)
 
 
 @pytest.mark.parametrize("inplace", [True, False])
 @pytest.mark.parametrize("exponent", [4.0, 3, 2.5])
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_binary_pow(inplace, exponent, trace_model):
+def test_binary_pow(inplace, exponent):
     torch.manual_seed(42)
     input = torch.randn([1, 2, 10, 200])
 
@@ -146,7 +135,7 @@ def test_binary_pow(inplace, exponent, trace_model):
             return x.pow_(exponent)
         return torch.pow(x, exponent)
 
-    op_harness(trace_model, op, [input], assert_)
+    op_harness(op, [input], assert_)
 
 
 unary_ops_int = [
@@ -155,8 +144,7 @@ unary_ops_int = [
 
 
 @pytest.mark.parametrize("op", unary_ops_int)
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_unary_ops_int(op, trace_model):
+def test_unary_ops_int(op):
     torch.manual_seed(42)
 
     input = torch.randint(-1000, 1000, [1, 2, 10, 200])
@@ -164,7 +152,7 @@ def test_unary_ops_int(op, trace_model):
     def assert_(native_out, poptorch_out):
         helpers.assert_allequal(actual=poptorch_out, expected=native_out)
 
-    op_harness(trace_model, op, [input], assert_)
+    op_harness(op, [input], assert_)
 
 
 unary_ops_bool = [
@@ -173,8 +161,7 @@ unary_ops_bool = [
 
 
 @pytest.mark.parametrize("op", unary_ops_bool)
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_unary_ops_bool(op, trace_model):
+def test_unary_ops_bool(op):
     torch.manual_seed(42)
 
     input = torch.randint(2, [1, 2, 10, 200]) > 0
@@ -182,7 +169,7 @@ def test_unary_ops_bool(op, trace_model):
     def assert_(native_out, poptorch_out):
         helpers.assert_allequal(actual=poptorch_out, expected=native_out)
 
-    op_harness(trace_model, op, [input], assert_)
+    op_harness(op, [input], assert_)
 
 
 # Parameterize torch.clamp unit tests for different supported overloads
@@ -200,8 +187,7 @@ clamp_inputs = [{
 
 
 @pytest.mark.parametrize("args", clamp_inputs)
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_clamp(args, trace_model):
+def test_clamp(args):
     torch.manual_seed(42)
 
     input = torch.randn([1, 2, 10, 10])
@@ -212,12 +198,11 @@ def test_clamp(args, trace_model):
     def assert_(native_out, poptorch_out):
         helpers.assert_allclose(actual=poptorch_out, expected=native_out)
 
-    op_harness(trace_model, op_clamp, [input], assert_, test_training=True)
+    op_harness(op_clamp, [input], assert_, test_training=True)
 
 
 @pytest.mark.parametrize("args", clamp_inputs)
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_clamp_(args, trace_model):
+def test_clamp_(args):
     torch.manual_seed(42)
 
     input = torch.randn([1, 2, 10, 10])
@@ -228,14 +213,13 @@ def test_clamp_(args, trace_model):
     def assert_(native_out, poptorch_out):
         helpers.assert_allclose(actual=poptorch_out, expected=native_out)
 
-    op_harness(trace_model, op_clamp_, [input], assert_, test_training=True)
+    op_harness(op_clamp_, [input], assert_, test_training=True)
 
 
 @pytest.mark.parametrize(
     "op",
     [torch.clamp_min, torch.clamp_min_, torch.clamp_max, torch.clamp_max_])
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_clamp_min_max(op, trace_model):
+def test_clamp_min_max(op):
     torch.manual_seed(42)
 
     magnitude = 1
@@ -247,14 +231,13 @@ def test_clamp_min_max(op, trace_model):
     def assert_(native_out, poptorch_out):
         helpers.assert_allclose(actual=poptorch_out, expected=native_out)
 
-    op_harness(trace_model, op_clamp, [input], assert_, test_training=True)
+    op_harness(op_clamp, [input], assert_, test_training=True)
 
 
 @pytest.mark.parametrize(
     "op",
     [torch.clamp_min, torch.clamp_min_, torch.clamp_max, torch.clamp_max_])
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_clamp_min_max_tensor(op, trace_model):
+def test_clamp_min_max_tensor(op):
     torch.manual_seed(42)
 
     magnitude = 1
@@ -266,7 +249,7 @@ def test_clamp_min_max_tensor(op, trace_model):
     def assert_(native_out, poptorch_out):
         helpers.assert_allclose(actual=poptorch_out, expected=native_out)
 
-    op_harness(trace_model, op_clamp, [input], assert_, test_training=True)
+    op_harness(op_clamp, [input], assert_, test_training=True)
 
 
 clamp_int_inputs = [
@@ -316,8 +299,7 @@ binary_ops_float = [
 
 
 @pytest.mark.parametrize("op", binary_ops_float)
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_binary_ops_float(op, trace_model):
+def test_binary_ops_float(op):
     torch.manual_seed(42)
 
     input1 = torch.randn([1, 2, 5, 1]) * 100.0
@@ -330,7 +312,7 @@ def test_binary_ops_float(op, trace_model):
                                 rtol=1e-05,
                                 equal_nan=True)
 
-    op_harness(trace_model, op, [input1, input2], assert_, test_training=True)
+    op_harness(op, [input1, input2], assert_, test_training=True)
 
 
 binary_ops_basic_element_wise_float = [
@@ -342,8 +324,7 @@ binary_ops_basic_element_wise_float = [
 
 
 @pytest.mark.parametrize("op", binary_ops_basic_element_wise_float)
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_binary_ops_elementwise_edgecases(op, trace_model):
+def test_binary_ops_elementwise_edgecases(op):
     torch.manual_seed(42)
     input1 = torch.randn([1, 2, 10, 10])
     input2 = torch.randn([1])
@@ -362,31 +343,19 @@ def test_binary_ops_elementwise_edgecases(op, trace_model):
 
     # Constant on LHS
     Model.forward = lambda self, x, _y: self.op(x, 4.0)
-    op_harness(trace_model,
-               Model(op), [input1, input2],
-               assert_,
-               test_training=True)
+    op_harness(Model(op), [input1, input2], assert_, test_training=True)
 
     # Constant on RHS
     Model.forward = lambda self, x, _y: self.op(2.5, x)
-    op_harness(trace_model,
-               Model(op), [input1, input2],
-               assert_,
-               test_training=True)
+    op_harness(Model(op), [input1, input2], assert_, test_training=True)
 
     # Constant on LHS wrong type.
     Model.forward = lambda self, x, _y: self.op(x, 4)
-    op_harness(trace_model,
-               Model(op), [input1, input2],
-               assert_,
-               test_training=True)
+    op_harness(Model(op), [input1, input2], assert_, test_training=True)
 
     # Constant on RHS wrong type
     Model.forward = lambda self, x, _y: self.op(134, x)
-    op_harness(trace_model,
-               Model(op), [input1, input2],
-               assert_,
-               test_training=True)
+    op_harness(Model(op), [input1, input2], assert_, test_training=True)
 
 
 binary_ops_basic_element_wise_bool = [
@@ -396,8 +365,7 @@ binary_ops_basic_element_wise_bool = [
 
 
 @pytest.mark.parametrize("op", binary_ops_basic_element_wise_bool)
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_binary_ops_elementwise_bools(op, trace_model):
+def test_binary_ops_elementwise_bools(op):
     input1 = torch.tensor([False, True, False, True])
     input2 = torch.tensor([False, False, True, True])
 
@@ -411,28 +379,27 @@ def test_binary_ops_elementwise_bools(op, trace_model):
 
     # Both bools
     Model.forward = lambda self, x, y: self.op(x, y)
-    op_harness(trace_model, Model(op), [input1, input2], assert_)
+    op_harness(Model(op), [input1, input2], assert_)
 
     # Float on LHS
     Model.forward = lambda self, x, y: self.op(x.to(torch.float) + 1.0, y)
-    op_harness(trace_model, Model(op), [input1, input2], assert_)
+    op_harness(Model(op), [input1, input2], assert_)
 
     # Float on RHS
     Model.forward = lambda self, x, y: self.op(x, y.to(torch.float) + 1.0)
-    op_harness(trace_model, Model(op), [input1, input2], assert_)
+    op_harness(Model(op), [input1, input2], assert_)
 
     # Int on LHS
     Model.forward = lambda self, x, y: self.op(x.to(torch.int) + 1, y)
-    op_harness(trace_model, Model(op), [input1, input2], assert_)
+    op_harness(Model(op), [input1, input2], assert_)
 
     # Int on RHS
     Model.forward = lambda self, x, y: self.op(x, y.to(torch.int) + 1)
-    op_harness(trace_model, Model(op), [input1, input2], assert_)
+    op_harness(Model(op), [input1, input2], assert_)
 
 
 @pytest.mark.parametrize("op", [torch.fmod, torch.remainder])
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_modulo_mixed_sign(op, trace_model):
+def test_modulo_mixed_sign(op):
     input1 = torch.tensor([-4.3, 7.2, 5.0, 4.3, -7.2, 8.0])
     input2 = torch.tensor([2.1, -3.4, 8.0, -2.1, 3.4, 5.0])
 
@@ -443,7 +410,7 @@ def test_modulo_mixed_sign(op, trace_model):
                                 rtol=1e-05,
                                 equal_nan=True)
 
-    op_harness(trace_model, op, [input1, input2], assert_)
+    op_harness(op, [input1, input2], assert_)
 
 
 def __and__(x, y):
@@ -465,8 +432,7 @@ binary_op_int = [
 
 
 @pytest.mark.parametrize("op", binary_op_int)
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_binary_int_ops(op, trace_model):
+def test_binary_int_ops(op):
     input1 = torch.tensor([-4, 7, 5, 4, -7, 8], dtype=torch.int)
     input2 = torch.tensor([2, -3, 8, -2, 3, 5], dtype=torch.int)
 
@@ -477,14 +443,13 @@ def test_binary_int_ops(op, trace_model):
                                 rtol=1e-05,
                                 equal_nan=True)
 
-    op_harness(trace_model, op, [input1, input2], assert_)
+    op_harness(op, [input1, input2], assert_)
 
 
 # Poplar doesn't support binary ops on 8-bit integral types, but test we can
 # pass the rest of them.
 @pytest.mark.parametrize("dtype", [torch.int16, torch.int32, torch.int64])
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_binary_int_op_types(dtype, trace_model):
+def test_binary_int_op_types(dtype):
     input1 = torch.tensor([-4, 7, 5, 4, -7, 8], dtype=dtype)
     input2 = torch.tensor([2, -3, 8, -2, 3, 5], dtype=dtype)
 
@@ -495,7 +460,7 @@ def test_binary_int_op_types(dtype, trace_model):
                                 rtol=1e-05,
                                 equal_nan=True)
 
-    op_harness(trace_model, torch.bitwise_and, [input1, input2], assert_)
+    op_harness(torch.bitwise_and, [input1, input2], assert_)
 
 
 binary_op_bool = [
@@ -509,8 +474,7 @@ binary_op_bool = [
 
 
 @pytest.mark.parametrize("op", binary_op_bool)
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_binary_bool_ops(op, trace_model):
+def test_binary_bool_ops(op):
     input1 = torch.tensor([-4, 7, 5, 4, -7, 8]) > 0
     input2 = torch.tensor([2, -3, 8, -2, 3, 5]) > 0
 
@@ -521,7 +485,7 @@ def test_binary_bool_ops(op, trace_model):
                                 rtol=1e-05,
                                 equal_nan=True)
 
-    op_harness(trace_model, op, [input1, input2], assert_)
+    op_harness(op, [input1, input2], assert_)
 
 
 # These functions support API 1 - op(input)
@@ -565,8 +529,7 @@ reduction_ops_api2 = [
 
 
 @pytest.mark.parametrize("op", reduction_ops_api1)
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_reduction_ops_float(op, trace_model):
+def test_reduction_ops_float(op):
     torch.manual_seed(42)
 
     input = torch.randn([1, 2, 10, 10])
@@ -582,14 +545,13 @@ def test_reduction_ops_float(op, trace_model):
         else:
             helpers.assert_allequal(actual=poptorch_out, expected=native_out)
 
-    op_harness(trace_model, op, [input], assert_, test_training=True)
+    op_harness(op, [input], assert_, test_training=True)
 
 
 @pytest.mark.parametrize("op", reduction_ops_api2)
 @pytest.mark.parametrize("dim", range(4))
 @pytest.mark.parametrize("keepdim", [False, True])
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_reduction_ops_float_api2(op, dim, keepdim, trace_model):
+def test_reduction_ops_float_api2(op, dim, keepdim):
     torch.manual_seed(42)
 
     input = torch.randn([1, 2, 10, 10])
@@ -619,8 +581,7 @@ def test_reduction_ops_float_api2(op, dim, keepdim, trace_model):
     # wrap the function otherwise it won't match in the test harness
     test_training = not op in non_differentiable_ops
     out_fn = (lambda x: x.values) if returns_tuple else None
-    op_harness(trace_model,
-               operation, [input],
+    op_harness(operation, [input],
                assert_,
                test_training=test_training,
                out_fn=out_fn)
@@ -629,8 +590,7 @@ def test_reduction_ops_float_api2(op, dim, keepdim, trace_model):
 @pytest.mark.parametrize("op", [torch.min, torch.max])
 @pytest.mark.parametrize("dim", range(3))
 @pytest.mark.parametrize("keepdim", [False, True])
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_minmax_tuple_out(op, dim, keepdim, trace_model):
+def test_minmax_tuple_out(op, dim, keepdim):
     torch.manual_seed(42)
 
     input = torch.randn([1, 2, 10, 10])
@@ -646,11 +606,7 @@ def test_minmax_tuple_out(op, dim, keepdim, trace_model):
             helpers.assert_allclose(actual=poptorch_out[i], expected=native)
 
     out_fn = lambda x: x.values
-    op_harness(trace_model,
-               operation, [input],
-               assert_,
-               test_training=True,
-               out_fn=out_fn)
+    op_harness(operation, [input], assert_, test_training=True, out_fn=out_fn)
 
 
 # Interesting p-values for testing torch.linalg.norm(X, p=<>)
@@ -662,8 +618,7 @@ norm_pvals = [
 
 
 @pytest.mark.parametrize("p", norm_pvals)
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_norm_p_values(p, trace_model):
+def test_norm_p_values(p):
     pytest.skip("TODO(T71314) adding support for aten::linalg_norm")
 
     torch.manual_seed(42)
@@ -675,11 +630,10 @@ def test_norm_p_values(p, trace_model):
     def assert_(native_out, poptorch_out):
         helpers.assert_allclose(actual=poptorch_out, expected=native_out)
 
-    op_harness(trace_model, operation, [input], assert_, test_training=True)
+    op_harness(operation, [input], assert_, test_training=True)
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_norm_dtype(trace_model):
+def test_norm_dtype():
     pytest.skip("TODO(T71314) adding support for aten::linalg_norm")
 
     torch.manual_seed(42)
@@ -691,7 +645,7 @@ def test_norm_dtype(trace_model):
     def assert_(native_out, poptorch_out):
         helpers.assert_allclose(actual=poptorch_out, expected=native_out)
 
-    op_harness(trace_model, operation, [input], assert_, test_training=True)
+    op_harness(operation, [input], assert_, test_training=True)
 
 
 comparison_ops = [
@@ -712,8 +666,7 @@ comparison_ops = [
 
 
 @pytest.mark.parametrize("op", comparison_ops)
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_compare_operations(op, trace_model):
+def test_compare_operations(op):
     torch.manual_seed(42)
 
     lhs = torch.randn([1, 2, 10, 200])
@@ -728,11 +681,11 @@ def test_compare_operations(op, trace_model):
     def assert_(native_out, poptorch_out):
         helpers.assert_allequal(actual=poptorch_out, expected=native_out)
 
-    op_harness(trace_model, op, [lhs, rhs], assert_)
+    op_harness(op, [lhs, rhs], assert_)
 
     if op not in (torch.min, torch.max):
         constant_rhs = lambda x: op(x, 0.34)
-        op_harness(trace_model, constant_rhs, [lhs], assert_)
+        op_harness(constant_rhs, [lhs], assert_)
 
 
 comparison_unity_nan_inf_ops = [
@@ -742,8 +695,7 @@ comparison_unity_nan_inf_ops = [
 
 
 @pytest.mark.parametrize("op", comparison_unity_nan_inf_ops)
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_compare_unity_nan_inf_ops(op, trace_model):
+def test_compare_unity_nan_inf_ops(op):
     torch.manual_seed(42)
 
     input = torch.tensor([
@@ -757,15 +709,14 @@ def test_compare_unity_nan_inf_ops(op, trace_model):
     def assert_(native_out, poptorch_out):
         helpers.assert_allequal(actual=poptorch_out, expected=native_out)
 
-    op_harness(trace_model, op, [input], assert_)
+    op_harness(op, [input], assert_)
 
 
 comparison_unity = [torch.max, torch.min]
 
 
 @pytest.mark.parametrize("op", comparison_unity)
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_compare_unity_operations(op, trace_model):
+def test_compare_unity_operations(op):
     torch.manual_seed(42)
     input = torch.randn([1, 2, 10, 10])
 
@@ -775,12 +726,11 @@ def test_compare_unity_operations(op, trace_model):
     def assert_(native_out, poptorch_out):
         helpers.assert_allclose(actual=poptorch_out, expected=native_out)
 
-    op_harness(trace_model, operation, [input], assert_, test_training=True)
+    op_harness(operation, [input], assert_, test_training=True)
 
 
 # Support other arguments. TODO(T23319)
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_topk(trace_model):
+def test_topk():
     torch.manual_seed(42)
 
     input = torch.randn([1, 2, 10, 10])
@@ -795,19 +745,14 @@ def test_topk(trace_model):
                                 expected=native_out.indices)
 
     out_fn = lambda x: x.values
-    op_harness(trace_model,
-               operation, [input],
-               assert_,
-               test_training=True,
-               out_fn=out_fn)
+    op_harness(operation, [input], assert_, test_training=True, out_fn=out_fn)
 
 
 types = [torch.float32, torch.int32]
 
 
 @pytest.mark.parametrize("ty", types)
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_constant_arrays(ty, trace_model):
+def test_constant_arrays(ty):
     torch.manual_seed(42)
 
     input = torch.randn([10]).to(ty)
@@ -820,12 +765,11 @@ def test_constant_arrays(ty, trace_model):
     def assert_(native_out, poptorch_out):
         helpers.assert_allequal(actual=poptorch_out, expected=native_out)
 
-    op_harness(trace_model, operation, [input], assert_)
+    op_harness(operation, [input], assert_)
 
 
 @pytest.mark.parametrize("ty", types)
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_big_constant_arrays_sliced(ty, trace_model):
+def test_big_constant_arrays_sliced(ty):
     torch.manual_seed(42)
 
     input = torch.randn([1]).to(ty)
@@ -859,7 +803,7 @@ def test_big_constant_arrays_sliced(ty, trace_model):
     def assert_(native_out, poptorch_out):
         helpers.assert_allequal(actual=poptorch_out, expected=native_out)
 
-    op_harness(trace_model, operation, [input], assert_)
+    op_harness(operation, [input], assert_)
 
 
 # Parametrize input tensor shapes for addcdiv to make sure broadcasting works.
@@ -873,8 +817,7 @@ broadcastable_shapes = [
 
 @pytest.mark.parametrize("shapes", broadcastable_shapes)
 @pytest.mark.parametrize("scale", [0.35, 4.91, 12.0, -0.53, -3.45, -9.0, 0.0])
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_addcdiv(shapes, scale, trace_model):
+def test_addcdiv(shapes, scale):
     torch.manual_seed(42)
 
     class Model(torch.nn.Module):
@@ -893,9 +836,7 @@ def test_addcdiv(shapes, scale, trace_model):
     model = Model()
     native_out = model(t0, t1, t2)
 
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
-    poptorch_model = poptorch.inferenceModel(model, options)
+    poptorch_model = poptorch.inferenceModel(model)
     poptorch_out = poptorch_model(t0, t1, t2)
 
     helpers.assert_allclose(actual=poptorch_out, expected=native_out)
@@ -906,8 +847,7 @@ cross_shapes = [(3, 4, 5, 6), (4, 3, 5, 6), (4, 5, 3, 6), (4, 5, 6, 3),
 
 
 @pytest.mark.parametrize("shape", cross_shapes)
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_cross_shape(shape, trace_model):
+def test_cross_shape(shape):
     torch.manual_seed(42)
 
     x = torch.randn(shape)
@@ -916,12 +856,11 @@ def test_cross_shape(shape, trace_model):
     def assert_(native_out, poptorch_out):
         helpers.assert_allclose(actual=poptorch_out, expected=native_out)
 
-    op_harness(trace_model, torch.cross, [x, y], assert_, test_training=True)
+    op_harness(torch.cross, [x, y], assert_, test_training=True)
 
 
 @pytest.mark.parametrize("axis", range(0, 4))
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_cross_axis(axis, trace_model):
+def test_cross_axis(axis):
     torch.manual_seed(42)
 
     class Model(torch.nn.Module):
@@ -938,22 +877,20 @@ def test_cross_axis(axis, trace_model):
     def assert_(native_out, poptorch_out):
         helpers.assert_allclose(actual=poptorch_out, expected=native_out)
 
-    op_harness(trace_model, Model(axis), [x, y], assert_, test_training=True)
+    op_harness(Model(axis), [x, y], assert_, test_training=True)
 
 
 @pytest.mark.parametrize(
-    "trace_model, params",
+    "params",
     [
-        # trace_model, dims?, unbiased
-        (True, (True, )),
-        (False, (False, )),
-        (True, ([2], False)),
-        (False, ([0, 1], True)),
-        (True, ([0, 2], False)),
+        # dims?, unbiased
+        (
+            False, ),
+        ([0, 1], True)
     ])
 @pytest.mark.parametrize(
     "op", [torch.var, torch.var_mean, torch.std, torch.std_mean])
-def test_var_std(op, trace_model, params):
+def test_var_std(op, params):
     torch.manual_seed(42)
 
     x = torch.randn(3, 4, 5)
@@ -962,13 +899,12 @@ def test_var_std(op, trace_model, params):
     def assert_(native_out, poptorch_out):
         helpers.assert_allclose(actual=poptorch_out, expected=native_out)
 
-    op_harness(trace_model, model, [x], assert_)
+    op_harness(model, [x], assert_)
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
 @pytest.mark.parametrize("axis", range(0, 4))
 @pytest.mark.parametrize("descending", [True, False])
-def test_argsort(trace_model, axis, descending):
+def test_argsort(axis, descending):
     torch.manual_seed(42)
     input = torch.randn([3, 4, 5, 5])
 
@@ -978,4 +914,4 @@ def test_argsort(trace_model, axis, descending):
     def assert_(native_out, poptorch_out):
         helpers.assert_allclose(actual=poptorch_out, expected=native_out)
 
-    op_harness(trace_model, operation, [input], assert_)
+    op_harness(operation, [input], assert_)

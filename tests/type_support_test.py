@@ -5,8 +5,8 @@ import numpy as np
 import torch
 import torch.nn as nn
 import pytest
-import poptorch
 import helpers
+import poptorch
 
 MANY_TYPES = (torch.float16, torch.float32, torch.float64, torch.int32,
               torch.int64)
@@ -14,21 +14,18 @@ MANY_TYPES = (torch.float16, torch.float32, torch.float64, torch.int32,
 DEMOTED_ON_IPU = (torch.float64, torch.int64)
 
 
-def get_simple_adder(return_type, trace_model):
+def get_simple_adder(return_type):
     class SimpleAdder(nn.Module):
         def forward(self, x, y):
             return (x + y).type(return_type)
 
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
-    return poptorch.inferenceModel(SimpleAdder(), options)
+    return poptorch.inferenceModel(SimpleAdder())
 
 
 @pytest.mark.parametrize("input_type", MANY_TYPES)
 @pytest.mark.parametrize("output_type", MANY_TYPES)
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_many_input_output_types(input_type, output_type, trace_model):
-    model = get_simple_adder(output_type, trace_model)
+def test_many_input_output_types(input_type, output_type):
+    model = get_simple_adder(output_type)
     t1 = torch.tensor([1.0, 25, -1.0, 83], dtype=input_type)
     t2 = torch.tensor([2.0, 35, 1.0, 32.4], dtype=input_type)
 
@@ -47,11 +44,9 @@ def test_many_input_output_types(input_type, output_type, trace_model):
 @pytest.mark.parametrize("input_1_type", MANY_TYPES)
 @pytest.mark.parametrize("input_2_type", MANY_TYPES)
 @pytest.mark.parametrize("output_type", MANY_TYPES)
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_many_implicit_cast(input_1_type, input_2_type, output_type,
-                            trace_model):
+def test_many_implicit_cast(input_1_type, input_2_type, output_type):
 
-    model = get_simple_adder(output_type, trace_model)
+    model = get_simple_adder(output_type)
     t1 = torch.tensor([1.0, 25., -1.0, 83.], dtype=input_1_type)
     t2 = torch.tensor([2.0, 35., 1.0, 32.4], dtype=input_2_type)
 
@@ -61,21 +56,18 @@ def test_many_implicit_cast(input_1_type, input_2_type, output_type,
                             rtol=0)
 
 
-def get_unpack_clamp(trace_model):
+def get_unpack_clamp():
     class UnpackClamp(nn.Module):
         def forward(self, x):
             i, _ = x
             return i.clamp(-1, 1)
 
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
-    return poptorch.inferenceModel(UnpackClamp(), options)
+    return poptorch.inferenceModel(UnpackClamp())
 
 
 @pytest.mark.parametrize("input_type", MANY_TYPES)
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_clamp_many_types(input_type, trace_model):
-    model = get_unpack_clamp(trace_model)
+def test_clamp_many_types(input_type):
+    model = get_unpack_clamp()
     x = torch.tensor([[-2, -1, 0, 1, 2], [0, 0, 0, 0, 0]], dtype=input_type)
 
     y = model(x)
@@ -83,20 +75,17 @@ def test_clamp_many_types(input_type, trace_model):
     np.testing.assert_allclose(y.numpy(), np.array([-1, -1, 0, 1, 1]))
 
 
-def get_simple_add_two(trace_model):
+def get_simple_add_two():
     class GetSimpleAddTwo(nn.Module):
         def forward(self, x):
             return x + 2
 
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
-    return poptorch.inferenceModel(GetSimpleAddTwo(), options)
+    return poptorch.inferenceModel(GetSimpleAddTwo())
 
 
 @pytest.mark.parametrize("input_type", MANY_TYPES)
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_add_two_many_types(input_type, trace_model):
-    model = get_simple_add_two(trace_model)
+def test_add_two_many_types(input_type):
+    model = get_simple_add_two()
 
     t = torch.tensor([1.0, 25., -1.0, 83.], dtype=input_type)
     helpers.assert_allclose(actual=model(t),
@@ -105,27 +94,23 @@ def test_add_two_many_types(input_type, trace_model):
                             rtol=0)
 
 
-def get_simple_incrementer(constant_type, return_type, trace_model):
+def get_simple_incrementer(constant_type, return_type):
     class SimpleIncrementer(nn.Module):
         def forward(self, x):
             return (x + torch.tensor(1, dtype=constant_type)).type(return_type)
 
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
-    return poptorch.inferenceModel(SimpleIncrementer(), options)
+    return poptorch.inferenceModel(SimpleIncrementer())
 
 
 @pytest.mark.parametrize("input_type", MANY_TYPES)
 @pytest.mark.parametrize("constant_type", MANY_TYPES)
 @pytest.mark.parametrize("output_type", MANY_TYPES)
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_many_constant_implicit_cast(input_type, constant_type, output_type,
-                                     trace_model):
+def test_many_constant_implicit_cast(input_type, constant_type, output_type):
     #Will not trace
     if constant_type == torch.float16:
         return
 
-    model = get_simple_incrementer(constant_type, output_type, trace_model)
+    model = get_simple_incrementer(constant_type, output_type)
     t = torch.tensor([1.0, 25., -1.0, 83.], dtype=input_type)
 
     helpers.assert_allclose(actual=model(t),
@@ -136,16 +121,12 @@ def test_many_constant_implicit_cast(input_type, constant_type, output_type,
 
 @pytest.mark.parametrize("input_1_type", MANY_TYPES)
 @pytest.mark.parametrize("input_2_type", MANY_TYPES)
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_many_implicit_cast_greater_than(input_1_type, input_2_type,
-                                         trace_model):
+def test_many_implicit_cast_greater_than(input_1_type, input_2_type):
     class GreaterThan(nn.Module):
         def forward(self, x, y):
             return x > y
 
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
-    model = poptorch.inferenceModel(GreaterThan(), options)
+    model = poptorch.inferenceModel(GreaterThan())
 
     t1 = torch.tensor([1, -1, 2.0, 550.4], dtype=input_1_type)
     t2 = torch.tensor([2.4, 2, 1.0, 32.4], dtype=input_2_type)
@@ -155,15 +136,12 @@ def test_many_implicit_cast_greater_than(input_1_type, input_2_type,
 
 
 @pytest.mark.parametrize("input_type", MANY_TYPES)
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_many_implicit_cast_greater_than_one(input_type, trace_model):
+def test_many_implicit_cast_greater_than_one(input_type):
     class GreaterThanOne(nn.Module):
         def forward(self, x):
             return x > 1
 
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
-    model = poptorch.inferenceModel(GreaterThanOne(), options)
+    model = poptorch.inferenceModel(GreaterThanOne())
 
     t = torch.tensor([2.5, -1, 2.0, 550.4], dtype=input_type)
 
@@ -173,15 +151,12 @@ def test_many_implicit_cast_greater_than_one(input_type, trace_model):
 
 @pytest.mark.parametrize("input_1_type", MANY_TYPES)
 @pytest.mark.parametrize("input_2_type", MANY_TYPES)
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_many_implicit_cast_equals(input_1_type, input_2_type, trace_model):
+def test_many_implicit_cast_equals(input_1_type, input_2_type):
     class Equals(nn.Module):
         def forward(self, x, y):
             return x == y
 
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
-    model = poptorch.inferenceModel(Equals(), options)
+    model = poptorch.inferenceModel(Equals())
 
     t1 = torch.tensor([1, -1, 2.0, 550.4], dtype=input_1_type)
     t2 = torch.tensor([2.4, 2, 2.0, 550.4], dtype=input_2_type)
@@ -190,13 +165,6 @@ def test_many_implicit_cast_equals(input_1_type, input_2_type, trace_model):
 
     if (input_1_type == torch.float16 and input_2_type == torch.float16):
         depends = True
-
-    if (input_1_type == torch.float16 or input_2_type == torch.float16):
-        if (input_1_type in (torch.float32, torch.float64)
-                or input_2_type in (torch.float32, torch.float64)):
-            # This will return a different result between the IPU model and
-            # hardware so assume it runs on hardware if available.
-            depends = poptorch.ipuHardwareIsAvailable() and trace_model
 
     if (input_1_type in (torch.float32, torch.float64)
             and input_2_type in (torch.float32, torch.float64)):
@@ -212,15 +180,12 @@ def test_many_implicit_cast_equals(input_1_type, input_2_type, trace_model):
 
 
 @pytest.mark.parametrize("input_type", MANY_TYPES)
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_many_implicit_cast_equals_one(input_type, trace_model):
+def test_many_implicit_cast_equals_one(input_type):
     class EqualsOne(nn.Module):
         def forward(self, x):
             return x == 1
 
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
-    model = poptorch.inferenceModel(EqualsOne(), options)
+    model = poptorch.inferenceModel(EqualsOne())
 
     t = torch.tensor([2.5, 1, 2.0, 550.4], dtype=input_type)
 
@@ -230,15 +195,12 @@ def test_many_implicit_cast_equals_one(input_type, trace_model):
 
 @pytest.mark.parametrize("input_1_type", MANY_TYPES)
 @pytest.mark.parametrize("input_2_type", MANY_TYPES)
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_many_implicit_cast_less_than(input_1_type, input_2_type, trace_model):
+def test_many_implicit_cast_less_than(input_1_type, input_2_type):
     class LessThan(nn.Module):
         def forward(self, x, y):
             return x < y
 
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
-    model = poptorch.inferenceModel(LessThan(), options)
+    model = poptorch.inferenceModel(LessThan())
 
     t1 = torch.tensor([1, -1, 2.0, 550.4], dtype=input_1_type)
     t2 = torch.tensor([2.4, 2, 1.0, 32.4], dtype=input_2_type)
@@ -248,15 +210,12 @@ def test_many_implicit_cast_less_than(input_1_type, input_2_type, trace_model):
 
 
 @pytest.mark.parametrize("input_type", MANY_TYPES)
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_many_implicit_cast_less_than_one(input_type, trace_model):
+def test_many_implicit_cast_less_than_one(input_type):
     class LessThanOne(nn.Module):
         def forward(self, x):
             return x < 1
 
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
-    model = poptorch.inferenceModel(LessThanOne(), options)
+    model = poptorch.inferenceModel(LessThanOne())
 
     t = torch.tensor([2.5, -1, 2.0, 550.4], dtype=input_type)
 
@@ -265,15 +224,12 @@ def test_many_implicit_cast_less_than_one(input_type, trace_model):
 
 
 @pytest.mark.parametrize("input_type", MANY_TYPES)
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_many_implicit_cast_one_less_than(input_type, trace_model):
+def test_many_implicit_cast_one_less_than(input_type):
     class OneLessThan(nn.Module):
         def forward(self, x):
             return 1 < x  # pylint: disable=misplaced-comparison-constant
 
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
-    model = poptorch.inferenceModel(OneLessThan(), options)
+    model = poptorch.inferenceModel(OneLessThan())
 
     t = torch.tensor([2.5, -1, 2.0, 550.4], dtype=input_type)
 
@@ -282,8 +238,7 @@ def test_many_implicit_cast_one_less_than(input_type, trace_model):
 
 
 @pytest.mark.parametrize("input_type", [torch.int8, torch.uint8, torch.int16])
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_small_int(input_type, trace_model):
+def test_small_int(input_type):
     class Model(nn.Module):
         def forward(self, x):
             return x.float()
@@ -293,9 +248,7 @@ def test_small_int(input_type, trace_model):
     # Convert to desired input type
     input = input.to(input_type)
 
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
-    model = poptorch.inferenceModel(Model(), options)
+    model = poptorch.inferenceModel(Model())
 
     output = model(input)
 
@@ -304,8 +257,7 @@ def test_small_int(input_type, trace_model):
 
 
 @pytest.mark.parametrize("input_type", [torch.int8, torch.uint8, torch.int16])
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_small_int_return(input_type, trace_model):
+def test_small_int_return(input_type):
     class Model(nn.Module):
         def forward(self, x):
             return x, x.float() + x.float()
@@ -315,9 +267,7 @@ def test_small_int_return(input_type, trace_model):
     # Convert to desired input/output type
     input = input.to(input_type)
 
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
-    model = poptorch.inferenceModel(Model(), options)
+    model = poptorch.inferenceModel(Model())
 
     output, _ = model(input)
 
@@ -325,8 +275,7 @@ def test_small_int_return(input_type, trace_model):
     helpers.assert_allequal(actual=output, expected=input)
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_tuple_and_list_constant(trace_model):
+def test_tuple_and_list_constant():
     class Model(torch.nn.Module):
         def forward(self):
             const1 = torch.tensor([1., 2.])
@@ -335,17 +284,14 @@ def test_tuple_and_list_constant(trace_model):
             return torch.tensor(1), const1 + const2, [const1, const2]
 
     model = Model()
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
-    inference_model = poptorch.inferenceModel(model, options)
+    inference_model = poptorch.inferenceModel(model)
 
     poptorch_out = inference_model()
     native = model()
     helpers.assert_allclose(actual=poptorch_out, expected=native)
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_tuple_and_list_constant_double_nested(trace_model):
+def test_tuple_and_list_constant_double_nested():
     class Model(torch.nn.Module):
         def forward(self):
             const1 = torch.tensor([1., 2.])
@@ -355,9 +301,7 @@ def test_tuple_and_list_constant_double_nested(trace_model):
                     ([const1, const2], [const1, const2]), const2)
 
     model = Model()
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
-    inference_model = poptorch.inferenceModel(model, options)
+    inference_model = poptorch.inferenceModel(model)
 
     poptorch_out = inference_model()
     native = model()

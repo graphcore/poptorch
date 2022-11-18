@@ -8,7 +8,7 @@ import poptorch
 
 # Reduce Ops Harness
 # Checks that the IPU reduce ops match the CPU version.
-def reduce_harness(trace_model, func, input, dim=None):
+def reduce_harness(func, input, dim=None):
     # dim must be passed this way to avoid named tensor errors
     kwargs = {"dim": dim} if dim else {}
 
@@ -28,9 +28,7 @@ def reduce_harness(trace_model, func, input, dim=None):
     model = Model()
 
     # Run on IPU and check that the result has the correct type
-    opts = poptorch.Options()
-    opts.Jit.traceModel(trace_model)
-    pop_model = poptorch.inferenceModel(model, opts)
+    pop_model = poptorch.inferenceModel(model)
     pop_out = pop_model(input)
     native_out = model(input)
 
@@ -43,23 +41,20 @@ def reduce_harness(trace_model, func, input, dim=None):
 # torch.all, torch.any
 @pytest.mark.parametrize("dim", [None, 0, -1])
 @pytest.mark.parametrize("func", [torch.all, torch.any])
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_any_all(trace_model, func, dim):
+def test_any_all(func, dim):
     input = torch.randint(low=0, high=3, size=(32, 128))
-    reduce_harness(trace_model, func, input, dim)
+    reduce_harness(func, input, dim)
 
 
 @pytest.mark.parametrize("dim", [None, 0, -1])
 @pytest.mark.parametrize("func", [torch.sum, torch.mean])
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_sum_mean(trace_model, func, dim):
+def test_sum_mean(func, dim):
     input = torch.rand(32, 128)
-    reduce_harness(trace_model, func, input, dim)
+    reduce_harness(func, input, dim)
 
 
 @pytest.mark.parametrize("dim", (None, 0, -1, [1, 2]))
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_count_nonzero(trace_model, dim):
+def test_count_nonzero(dim):
     torch.manual_seed(42)
     input = torch.randint(10, (2, 3, 4, 5))
-    reduce_harness(trace_model, torch.count_nonzero, input, dim)
+    reduce_harness(torch.count_nonzero, input, dim)

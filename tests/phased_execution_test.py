@@ -3,8 +3,8 @@
 import torch
 import torch.nn.functional as F
 import pytest
-import poptorch
 import helpers
+import poptorch
 
 # Model: 2x2 S1 ExecutionPhase, repeated N times:
 # _____________________________________________________________________________
@@ -235,7 +235,7 @@ class LogChecker(helpers.LogChecker):
             "IdentityLoss:0 [float32(), mode(Phased), ipu(3), phase(1)]")
         # pylint: enable=line-too-long
 
-    def validate_serial_tensor_liveness(self, liveness, trace_model):
+    def validate_serial_tensor_liveness(self, liveness):
         # 'phases' does not include the bwd pass, so to calculate,
         # sum the number of phases in the fwd pass, plus any phase
         # gap between the end of the fwd and start of the bwd pass
@@ -282,18 +282,12 @@ class LogChecker(helpers.LogChecker):
             self.assert_matches(
                 (r'(MatMul|Gemm){} \[(float32\({}{}\)|undefined\(shape '
                  r'inference failed\)), mode\(Phased\), ipu\(0\), phase\({}\)]'
-                 ).format(op_label, "" if trace_model else "1, ", 7 - phase,
-                          phase * stride))
-            if trace_model:
-                self.assert_contains(
-                    'Add{} [float32({}), mode(Phased), ipu(0), phase({})]'.
-                    format(op_label, 7 - phase, phase * stride))
+                 ).format(op_label, "1, ", 7 - phase, phase * stride))
 
 
 @helpers.printCapfdOnExit
 @helpers.overridePoptorchLogLevel("DEBUG")
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_2x2_parallel_phased_execution_inline(capfd, trace_model):
+def test_2x2_parallel_phased_execution_inline(capfd):
     N = 3
     size = 10
 
@@ -333,11 +327,10 @@ def test_2x2_parallel_phased_execution_inline(capfd, trace_model):
     target = torch.rand(size, 1)
 
     model = Model()
-    opts = poptorch.Options()
-    opts.Jit.traceModel(trace_model)
 
     phases = []
     phases = [f"{n}" for n in range(2 * N)]
+    opts = poptorch.Options()
     opts.setExecutionStrategy(poptorch.ParallelPhasedExecution(*phases))
     poptorch_model = poptorch.trainingModel(model, opts)
     poptorch_model.compile(input, target)
@@ -348,8 +341,7 @@ def test_2x2_parallel_phased_execution_inline(capfd, trace_model):
 
 @helpers.printCapfdOnExit
 @helpers.overridePoptorchLogLevel("DEBUG")
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_2x2_parallel_phased_execution_opts(capfd, trace_model):
+def test_2x2_parallel_phased_execution_opts(capfd):
     N = 3
     size = 10
 
@@ -386,8 +378,6 @@ def test_2x2_parallel_phased_execution_opts(capfd, trace_model):
     input = torch.rand(size * 2, 1)
     target = torch.rand(size, 1)
     model = Model()
-    opts = poptorch.Options()
-    opts.Jit.traceModel(trace_model)
     phases = []
     # Alternate between 0-2 and 1-3
     for n in range(N):
@@ -399,6 +389,7 @@ def test_2x2_parallel_phased_execution_opts(capfd, trace_model):
             poptorch.Stage(f"phase{2*n+1}_ipu0").ipu(1),
             poptorch.Stage(f"phase{2*n+1}_ipu1").ipu(3)
         ])
+    opts = poptorch.Options()
     opts.setExecutionStrategy(poptorch.ParallelPhasedExecution(*phases))
     poptorch_model = poptorch.trainingModel(model, opts)
     poptorch_model.compile(input, target)
@@ -409,8 +400,7 @@ def test_2x2_parallel_phased_execution_opts(capfd, trace_model):
 
 @helpers.printCapfdOnExit
 @helpers.overridePoptorchLogLevel("DEBUG")
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_2x2_parallel_phased_execution_small_opts(capfd, trace_model):
+def test_2x2_parallel_phased_execution_small_opts(capfd):
     size = 10
 
     class Model(torch.nn.Module):
@@ -467,8 +457,6 @@ def test_2x2_parallel_phased_execution_small_opts(capfd, trace_model):
     input = torch.rand(size * 2, 1)
     target = torch.rand(size, 1)
     model = Model()
-    opts = poptorch.Options()
-    opts.Jit.traceModel(trace_model)
     strategy = poptorch.ParallelPhasedExecution(
         [poptorch.Stage("0"), poptorch.Stage("1")],
         [poptorch.Stage("2", "4"),
@@ -477,6 +465,7 @@ def test_2x2_parallel_phased_execution_small_opts(capfd, trace_model):
     strategy.phase(0).ipus(0, 2)
     strategy.phase(1).ipus(1, 3)
 
+    opts = poptorch.Options()
     opts.setExecutionStrategy(strategy)
     poptorch_model = poptorch.trainingModel(model, opts)
     poptorch_model.compile(input, target)
@@ -488,11 +477,10 @@ def test_2x2_parallel_phased_execution_small_opts(capfd, trace_model):
 @pytest.mark.parametrize("liveness", list(poptorch.Liveness))
 @helpers.printCapfdOnExit
 @helpers.overridePoptorchLogLevel("DEBUG")
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_serial_tensor_liveness(capfd, liveness, trace_model):
+def test_serial_tensor_liveness(capfd, liveness):
     class Model(torch.nn.Module):
         def __init__(self):
-            super(Model, self).__init__()
+            super().__init__()
             self.fc1 = torch.nn.Linear(8, 7)
             self.fc2 = torch.nn.Linear(7, 6)
             self.fc3 = torch.nn.Linear(6, 5)
@@ -513,7 +501,6 @@ def test_serial_tensor_liveness(capfd, liveness, trace_model):
     strategy.setTensorsLiveness(liveness)
     opts = poptorch.Options()
     opts.setExecutionStrategy(strategy)
-    opts.Jit.traceModel(trace_model)
 
     model = Model()
     model = poptorch.inferenceModel(model, opts)
@@ -522,7 +509,7 @@ def test_serial_tensor_liveness(capfd, liveness, trace_model):
     model.compile(input)
 
     testlog = LogChecker(capfd)
-    testlog.validate_serial_tensor_liveness(liveness, trace_model)
+    testlog.validate_serial_tensor_liveness(liveness)
 
 
 def test_phased_api():

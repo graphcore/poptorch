@@ -6,8 +6,8 @@ import unittest.mock
 import pytest
 import torch
 import torchvision.models as models
-import poptorch
 import helpers
+import poptorch
 
 # Torchvision models.
 # AlexNet
@@ -64,7 +64,7 @@ untested_models = [
 ]
 
 
-def inference_harness(imagenet_model, trace_model):
+def inference_harness(imagenet_model):
     torch.manual_seed(42)
 
     image_input = torch.randn([1, 3, 224, 224])
@@ -76,10 +76,7 @@ def inference_harness(imagenet_model, trace_model):
     # Run on CPU.
     native_out = model(image_input)
 
-    opts = poptorch.Options()
-    opts.Jit.traceModel(trace_model)
-
-    poptorch_model = poptorch.inferenceModel(model, opts)
+    poptorch_model = poptorch.inferenceModel(model)
 
     poptorch_out = poptorch_model(image_input)
 
@@ -99,9 +96,8 @@ def inference_harness(imagenet_model, trace_model):
 
 @unittest.mock.patch.dict("os.environ", helpers.disableSmallModel())
 @pytest.mark.parametrize("model", tested_models + untested_models)
-@pytest.mark.parametrize("trace_model", [True, False])
 @pytest.mark.extendedTestingOnly
-def test_model(model, trace_model):
+def test_model(model):
     if model in untested_models:
         pytest.skip("Model not currently tested")
-    inference_harness(model, trace_model)
+    inference_harness(model)

@@ -338,8 +338,6 @@ def process_to_generate_profiling_data():
 
     opts = poptorch.Options()
     opts.useOfflineIpuTarget()
-    # Profiling information is incomplete when using JIT.
-    opts.Jit.traceModel(False)
     training_model = poptorch.trainingModel(model, opts, optimizer=optimizer)
 
     training_model.compile(input)

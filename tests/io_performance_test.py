@@ -5,8 +5,8 @@ import unittest.mock
 import numpy as np
 import pytest
 import torch
-import poptorch
 import helpers
+import poptorch
 
 IMAGE_SIZE = (3, 512, 512)
 DATASET_SIZE = 1000
@@ -25,7 +25,7 @@ class ImageDataset(torch.utils.data.Dataset):
         return torch.randint(0, 256, IMAGE_SIZE).to(self.io_dtype)
 
 
-def get_mean_cycle_count(trace_model, io_dtype, capfd):
+def get_mean_cycle_count(io_dtype, capfd):
     class Model(torch.nn.Module):
         def forward(self, x):
             x = x.to(torch.float32)
@@ -34,7 +34,6 @@ def get_mean_cycle_count(trace_model, io_dtype, capfd):
 
     opts = poptorch.Options()
     opts.logCycleCount(True)
-    opts.Jit.traceModel(trace_model)
     data_loader = poptorch.DataLoader(
         opts,
         ImageDataset(io_dtype),
@@ -68,10 +67,9 @@ def get_mean_cycle_count(trace_model, io_dtype, capfd):
 @helpers.printCapfdOnExit
 @unittest.mock.patch.dict("os.environ", helpers.disableAllModels())
 @helpers.overridePoptorchLogLevel("DEBUG")
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_compare_io_performance(capfd, io_dtype1, io_dtype2, trace_model):
-    cycle_count_1 = get_mean_cycle_count(trace_model, io_dtype1, capfd)
-    cycle_count_2 = get_mean_cycle_count(trace_model, io_dtype2, capfd)
+def test_compare_io_performance(capfd, io_dtype1, io_dtype2):
+    cycle_count_1 = get_mean_cycle_count(io_dtype1, capfd)
+    cycle_count_2 = get_mean_cycle_count(io_dtype2, capfd)
     # We only log the resulting cycle counts and ratios due to high variance
     # between the runs.
     print("test_compare_io_performance[{},{}],"

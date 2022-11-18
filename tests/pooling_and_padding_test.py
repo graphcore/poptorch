@@ -3,8 +3,8 @@
 
 import pytest
 import torch
-import poptorch
 import helpers
+import poptorch
 
 # Pools
 pool_operators = [
@@ -40,7 +40,7 @@ ops_grad_unsupported = (
 )
 
 
-def execute_and_check_wrapper(trace_model, op, input, check_shape_only=False):
+def execute_and_check_wrapper(op, input, check_shape_only=False):
 
     model = helpers.ModelWithWeights(op, input.shape)
     # Run on CPU.
@@ -48,12 +48,9 @@ def execute_and_check_wrapper(trace_model, op, input, check_shape_only=False):
 
     test_training = not isinstance(op, ops_grad_unsupported)
 
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
     # Run on IPU.
     poptorch_model = poptorch.trainingModel(
-        model, options=options) if test_training else poptorch.inferenceModel(
-            model, options=options)
+        model) if test_training else poptorch.inferenceModel(model)
 
     poptorch_out, _ = poptorch_model((input, ))
 
@@ -70,37 +67,35 @@ def execute_and_check_wrapper(trace_model, op, input, check_shape_only=False):
 
 
 @pytest.mark.parametrize("op", pool_2D)
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_pool2D(op, trace_model):
+def test_pool2D(op):
     torch.manual_seed(42)
 
     input = torch.randn(1, 2, 10, 10)
 
     # pool of square window of size=3, stride=2
     model = op(3, stride=2)
-    execute_and_check_wrapper(trace_model, model, input)
+    execute_and_check_wrapper(model, input)
 
     # pool of square window of size=3, stride=2, ceil_mode=True
     model = op(3, stride=2, ceil_mode=True)
-    execute_and_check_wrapper(trace_model, model, input)
+    execute_and_check_wrapper(model, input)
 
     #  pool of non-square window
     model = op((3, 2), stride=(2, 1))
-    execute_and_check_wrapper(trace_model, model, input)
+    execute_and_check_wrapper(model, input)
 
     # pool of square window of size=3, stride=2, padding=1
     model = op(3, stride=2, padding=1)
-    execute_and_check_wrapper(trace_model, model, input)
+    execute_and_check_wrapper(model, input)
 
     if op == torch.nn.AvgPool2d:
         # pool of square window of size=3, stride=2, padding=1, pool excludes padding
         model = op(3, stride=2, padding=1, count_include_pad=False)
-        execute_and_check_wrapper(trace_model, model, input)
+        execute_and_check_wrapper(model, input)
 
 
 @pytest.mark.parametrize("op, n_output_dims", adaptive_avg_pool)
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_adaptive_avg_pool(op, n_output_dims, trace_model):
+def test_adaptive_avg_pool(op, n_output_dims):
     torch.manual_seed(42)
     # AdaptiveAvgPool1d: [1, 2, 4]       -> [1, 2, 2]
     # AdaptiveAvgPool2d: [1, 2, 4, 6]    -> [1, 2, 2, 3]
@@ -116,7 +111,7 @@ def test_adaptive_avg_pool(op, n_output_dims, trace_model):
 
     model = op(output_size)
 
-    execute_and_check_wrapper(trace_model, model, input)
+    execute_and_check_wrapper(model, input)
 
 
 # Padding
@@ -127,8 +122,7 @@ one_d_pads = [
 
 
 @pytest.mark.parametrize("op", one_d_pads)
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_1D_pads(op, trace_model):
+def test_1D_pads(op):
     torch.manual_seed(42)
 
     # torch.nn.ConstantPad1d, 'torch.nn.ConstantPad2d', 'torch.nn.ConstantPad3d',
@@ -141,14 +135,14 @@ def test_1D_pads(op, trace_model):
         model = op(2, 4.7)
     else:
         model = op(3)
-    execute_and_check_wrapper(trace_model, model, oneDTensor)
+    execute_and_check_wrapper(model, oneDTensor)
 
     # Pad unevenly in both directions.
     if op == torch.nn.ConstantPad1d:
         model = op((3, 2), 0.12456)
     else:
         model = op((3, 2))
-    execute_and_check_wrapper(trace_model, model, oneDTensor)
+    execute_and_check_wrapper(model, oneDTensor)
 
 
 two_d_pads = [
@@ -158,8 +152,7 @@ two_d_pads = [
 
 
 @pytest.mark.parametrize("op", two_d_pads)
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_2D_pads(op, trace_model):
+def test_2D_pads(op):
     # 2D Case
     twoDTensor = torch.randn(1, 2, 4, 4)
 
@@ -169,7 +162,7 @@ def test_2D_pads(op, trace_model):
         model = op(6, 2.3)
     else:
         model = op(2)
-    execute_and_check_wrapper(trace_model, model, twoDTensor)
+    execute_and_check_wrapper(model, twoDTensor)
 
     # Pad unevenly in all directions.
     if op == torch.nn.ConstantPad2d:
@@ -177,15 +170,14 @@ def test_2D_pads(op, trace_model):
     else:
         model = op((3, 2, 1, 3))
 
-    execute_and_check_wrapper(trace_model, model, twoDTensor)
+    execute_and_check_wrapper(model, twoDTensor)
 
 
 three_d_pads = [torch.nn.ReplicationPad3d, torch.nn.ConstantPad3d]
 
 
 @pytest.mark.parametrize("op", three_d_pads)
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_3D_pads(op, trace_model):
+def test_3D_pads(op):
     # 3D Case
     threeDTensor = torch.randn(1, 2, 4, 4, 4)
 
@@ -194,18 +186,17 @@ def test_3D_pads(op, trace_model):
         model = op(2, 6.4)
     else:
         model = op(3)
-    execute_and_check_wrapper(trace_model, model, threeDTensor)
+    execute_and_check_wrapper(model, threeDTensor)
 
     # Pad unevenly in all directions.
     if op == torch.nn.ConstantPad3d:
         model = op((3, 2, 1, 5, 3, 4), 7.2)
     else:
         model = op((3, 2, 1, 5, 3, 4))
-    execute_and_check_wrapper(trace_model, model, threeDTensor)
+    execute_and_check_wrapper(model, threeDTensor)
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_constant_pad_less_dims(trace_model):
+def test_constant_pad_less_dims():
     torch.manual_seed(42)
 
     class Model(torch.nn.Module):
@@ -215,11 +206,10 @@ def test_constant_pad_less_dims(trace_model):
 
     x = torch.randn(1, 2, 3, 4)
 
-    execute_and_check_wrapper(trace_model, Model(), x)
+    execute_and_check_wrapper(Model(), x)
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_constant_pad_n_dims(trace_model):
+def test_constant_pad_n_dims():
     torch.manual_seed(42)
 
     class Model(torch.nn.Module):
@@ -229,4 +219,4 @@ def test_constant_pad_n_dims(trace_model):
 
     x = torch.randn(1, 2, 3, 4)
 
-    execute_and_check_wrapper(trace_model, Model(), x)
+    execute_and_check_wrapper(Model(), x)

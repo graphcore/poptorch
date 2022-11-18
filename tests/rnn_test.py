@@ -3,14 +3,13 @@
 import pytest
 import torch
 import torch.nn as nn
-import poptorch
 import helpers
+import poptorch
 
 
 @pytest.mark.parametrize("nonlinearity", ['tanh', 'relu'])
 @pytest.mark.parametrize("batch_first", [True, False])
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_rnn(nonlinearity, batch_first, trace_model):
+def test_rnn(nonlinearity, batch_first):
     torch.manual_seed(42)
     num_batches = 10
     sequence_length = 5
@@ -35,9 +34,7 @@ def test_rnn(nonlinearity, batch_first, trace_model):
         batch_first=batch_first,
     )
     model = helpers.ModelWithWeights(rnn, inputs[0].shape, lambda x: x[0])
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
-    ipu_model = poptorch.trainingModel(model, options=options)
+    ipu_model = poptorch.trainingModel(model)
 
     for input in inputs:
         (out_cpu, h_cpu), _ = model((input, h))

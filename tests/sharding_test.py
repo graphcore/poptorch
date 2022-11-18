@@ -1,13 +1,11 @@
 #!/usr/bin/env python3
 # Copyright (c) 2021 Graphcore Ltd. All rights reserved.
-import pytest
 import torch
-import poptorch
 import helpers
+import poptorch
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_sharded_execution(trace_model):
+def test_sharded_execution():
     class Model(torch.nn.Module):
         def forward(self, x):
             with poptorch.Block("0", ipu_id=0):
@@ -26,7 +24,6 @@ def test_sharded_execution(trace_model):
 
     opts = poptorch.Options()
     opts.setExecutionStrategy(strategy)
-    opts.Jit.traceModel(trace_model)
     ipu = poptorch.inferenceModel(native, opts)
 
     torch.manual_seed(42)

@@ -5,9 +5,8 @@ import re
 
 import torch
 import pytest
-
-import poptorch
 import helpers
+import poptorch
 
 torch.manual_seed(42)
 params_einsum = [
@@ -23,11 +22,9 @@ params_einsum = [
 ]
 
 
-def op_harness(trace_model, op, *inputs, assert_fn=None, out_fn=None):
+def op_harness(op, *inputs, assert_fn=None, out_fn=None):
     model = helpers.ModelWithWeights(op, inputs[0].shape, out_fn=out_fn)
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
-    poptorch_model = poptorch.trainingModel(model, options=options)
+    poptorch_model = poptorch.trainingModel(model)
 
     # Run on CPU
     native_out, _ = model(inputs)
@@ -54,17 +51,15 @@ def op_harness(trace_model, op, *inputs, assert_fn=None, out_fn=None):
 
 @pytest.mark.parametrize("params", params_einsum)
 @pytest.mark.parametrize("implicit_rhs", {True, False})
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_einsum(params, implicit_rhs, trace_model):
+def test_einsum(params, implicit_rhs):
 
     eq = params[0].split('->')[0] if implicit_rhs else params[0]
 
     op = lambda *xs: torch.einsum(eq, *xs)
-    op_harness(trace_model, op, *params[1])
+    op_harness(op, *params[1])
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_einsum_chained(trace_model):
+def test_einsum_chained():
     torch.manual_seed(42)
 
     def op(x, y, z):
@@ -79,11 +74,10 @@ def test_einsum_chained(trace_model):
                                 rtol=1e-3,
                                 atol=1e-3)
 
-    op_harness(trace_model, op, *inputs, assert_fn=assert_fn)
+    op_harness(op, *inputs, assert_fn=assert_fn)
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_einsum_transpose(trace_model):
+def test_einsum_transpose():
     torch.manual_seed(42)
 
     def op(x):
@@ -97,34 +91,31 @@ def test_einsum_transpose(trace_model):
                                 rtol=1e-3,
                                 atol=1e-3)
 
-    op_harness(trace_model, op, *inputs, assert_fn=assert_fn)
+    op_harness(op, *inputs, assert_fn=assert_fn)
 
 
 @pytest.mark.parametrize("arr_lengths",
                          ([3], [3, 3], [2, 4], [3, 2, 4], [5, 2, 3, 4]))
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_meshgrid(arr_lengths, trace_model):
+def test_meshgrid(arr_lengths):
     torch.manual_seed(42)
 
     inputs = [torch.randn(arr_length) for arr_length in arr_lengths]
 
-    op_harness(trace_model, torch.meshgrid, *inputs, out_fn=lambda x: x[0])
+    op_harness(torch.meshgrid, *inputs, out_fn=lambda x: x[0])
 
 
 @pytest.mark.parametrize("arr_lengths",
                          ([3], [3, 3], [2, 4], [3, 2, 4], [5, 2, 3, 4]))
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_cartesian_prod(arr_lengths, trace_model):
+def test_cartesian_prod(arr_lengths):
     torch.manual_seed(42)
 
     inputs = [torch.randn(arr_length) for arr_length in arr_lengths]
 
-    op_harness(trace_model, torch.cartesian_prod, *inputs)
+    op_harness(torch.cartesian_prod, *inputs)
 
 
 @pytest.mark.parametrize("dims", (2, ([2], [0]), ([2, 3], [0, 1])))
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_tensordot(dims, trace_model):
+def test_tensordot(dims):
     torch.manual_seed(42)
 
     op = lambda a, b: torch.tensordot(a, b, dims)
@@ -132,13 +123,12 @@ def test_tensordot(dims, trace_model):
     x = torch.randn(2, 3, 5, 4)
     y = torch.randn(5, 4, 1)
 
-    op_harness(trace_model, op, x, y)
+    op_harness(op, x, y)
 
 
 @pytest.mark.parametrize("inplace", [True, False])
 @pytest.mark.parametrize("dim", range(-3, 3))
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_scatter_add(inplace, dim, trace_model):
+def test_scatter_add(inplace, dim):
     class Model(torch.nn.Module):
         def __init__(self, dim, dim_size):
             super().__init__()
@@ -161,7 +151,7 @@ def test_scatter_add(inplace, dim, trace_model):
     dim_size = x.shape[dim] // 2
     index = torch.randint_like(x, high=dim_size).long()
 
-    op_harness(trace_model, Model(dim, dim_size), x, index)
+    op_harness(Model(dim, dim_size), x, index)
 
 
 @helpers.printCapfdOnExit
@@ -308,8 +298,7 @@ def test_gather_with_index_expansion(capfd, expand_as, params):
 
 @helpers.printCapfdOnExit
 @helpers.overridePoptorchLogLevel("TRACE")
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_available_memory_scatter_add(capfd, trace_model):
+def test_available_memory_scatter_add(capfd):
     class Model(torch.nn.Module):
         def __init__(self, dim, dim_size):
             super().__init__()
@@ -331,9 +320,7 @@ def test_available_memory_scatter_add(capfd, trace_model):
     index = torch.randint_like(x, high=dim_size).long()
 
     model = Model(dim, dim_size)
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
-    poptorch_model = poptorch.inferenceModel(model, options)
+    poptorch_model = poptorch.inferenceModel(model)
     poptorch_model(x, index)
 
     log = helpers.LogChecker(capfd)

@@ -7,14 +7,12 @@ import poptorch
 
 
 @pytest.mark.ipuHardwareRequired
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_weight_update_replicas(trace_model, process_id=0, num_processes=1):
+def test_weight_update_replicas(process_id=0, num_processes=1):
     localReplicationFactor = 2
 
     opts = poptorch.Options()
     opts.replicationFactor(localReplicationFactor)
     opts.Distributed.configureProcessId(process_id, num_processes)
-    opts.Jit.traceModel(trace_model)
 
     replicationFactor = localReplicationFactor * opts.Distributed.numProcesses
 
@@ -101,17 +99,15 @@ def test_weight_update_replicas(trace_model, process_id=0, num_processes=1):
 
 
 @pytest.mark.ipuHardwareRequired
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_too_many_ipus(trace_model):
+def test_too_many_ipus():
     localReplicationFactor = 128
 
     opts = poptorch.Options()
     opts.replicationFactor(localReplicationFactor)
-    opts.Jit.traceModel(trace_model)
 
     class Model(torch.nn.Module):
         def __init__(self):
-            super(Model, self).__init__()
+            super().__init__()
             self.layer = torch.nn.Linear(128, 4)
             self.loss = torch.nn.L1Loss(reduction="mean")
 

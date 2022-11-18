@@ -40,14 +40,11 @@ def assert_latency_values(model):
     check(round_trip)
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_simple(trace_model):
+def test_simple():
     x = torch.randn(100, 100)
     y = torch.randn(100, 100)
     model = Model()
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
-    poptorch_model = poptorch.inferenceModel(model, options)
+    poptorch_model = poptorch.inferenceModel(model)
     poptorch_model(x, y)
 
     perf = poptorch_model.getPerfCounters()
@@ -55,13 +52,11 @@ def test_simple(trace_model):
     assert_latency_values(poptorch_model)
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_steps(trace_model):
+def test_steps():
     x = torch.randn(10, 100, 100)
     y = torch.randn(10, 100, 100)
     model = Model()
     opts = poptorch.Options().deviceIterations(10)
-    opts.Jit.traceModel(trace_model)
     poptorch_model = poptorch.inferenceModel(model, opts)
     poptorch_model(x, y)
 
@@ -71,13 +66,11 @@ def test_steps(trace_model):
 
 
 @pytest.mark.ipuHardwareRequired
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_replicas(trace_model):
+def test_replicas():
     x = torch.randn(4, 100, 100)
     y = torch.randn(4, 100, 100)
     model = Model()
     opts = poptorch.Options().replicationFactor(4)
-    opts.Jit.traceModel(trace_model)
     poptorch_model = poptorch.inferenceModel(model, opts)
     poptorch_model(x, y)
 
@@ -93,14 +86,12 @@ def test_replicas(trace_model):
 @pytest.mark.parametrize("steps", [2, 4])
 @pytest.mark.parametrize("replicas", [1, 2])
 @pytest.mark.ipuHardwareRequired
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_inference(mode, period, steps, replicas, trace_model):
+def test_inference(mode, period, steps, replicas):
     model = Model()
     opts = poptorch.Options()
     opts.outputMode(mode, period)
     opts.deviceIterations(steps)
     opts.replicationFactor(replicas)
-    opts.Jit.traceModel(trace_model)
     poptorch_model = poptorch.inferenceModel(model, opts)
 
     torch.manual_seed(42)
@@ -126,8 +117,7 @@ def test_inference(mode, period, steps, replicas, trace_model):
 @pytest.mark.parametrize("accums", [1, 2])
 @pytest.mark.parametrize("replicas", [1, 2])
 @pytest.mark.ipuHardwareRequired
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_training(mode, period, steps, accums, replicas, trace_model):
+def test_training(mode, period, steps, accums, replicas):
     torch.manual_seed(42)
     inputs = torch.randn(16, 100)
     targets = torch.randn(16, 100)
@@ -137,7 +127,6 @@ def test_training(mode, period, steps, accums, replicas, trace_model):
     opts.deviceIterations(steps)
     opts.Training.gradientAccumulation(accums)
     opts.replicationFactor(replicas)
-    opts.Jit.traceModel(trace_model)
 
     class Model(torch.nn.Module):
         def __init__(self):
@@ -166,13 +155,11 @@ def test_training(mode, period, steps, accums, replicas, trace_model):
     assert_latency_values(poptorch_model)
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_synthetic_data(trace_model):
+def test_synthetic_data():
     model = Model()
     opts = poptorch.Options()
     opts.deviceIterations(16)
     opts.enableSyntheticData(True)
-    opts.Jit.traceModel(trace_model)
     poptorch_model = poptorch.inferenceModel(model, opts)
 
     torch.manual_seed(42)

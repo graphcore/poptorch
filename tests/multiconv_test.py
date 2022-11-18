@@ -5,8 +5,8 @@ import json
 import pytest
 import torch
 from torch import nn
-import poptorch
 import helpers
+import poptorch
 
 
 def getPopartMultiConvs(poptorch_model):
@@ -30,8 +30,7 @@ def assert_contains_multiconv(poptorch_model, expected_num=1):
 
 
 @pytest.mark.parametrize("num_layers", [1, 2, 3])
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_multiconv_basic(num_layers, trace_model):
+def test_multiconv_basic(num_layers):
     class Model(torch.nn.Module):
         def __init__(self):
             super().__init__()
@@ -52,9 +51,7 @@ def test_multiconv_basic(num_layers, trace_model):
 
     native = m(input)
 
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
-    poptorch_model = poptorch.inferenceModel(m, options)
+    poptorch_model = poptorch.inferenceModel(m)
     poptorch_out = poptorch_model(input)
     assert_contains_multiconv(poptorch_model, num_layers)
 
@@ -62,7 +59,7 @@ def test_multiconv_basic(num_layers, trace_model):
         helpers.assert_allclose(expected=cpu, actual=pop)
 
 
-def multiconv_harness(multiconv, trace_model):
+def multiconv_harness(multiconv):
     class Model(torch.nn.Module):
         def __init__(self):
             super().__init__()
@@ -84,38 +81,33 @@ def multiconv_harness(multiconv, trace_model):
     x = torch.randn(2, 1, 28, 28)
 
     native = m(x)
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
-    poptorch_model = poptorch.inferenceModel(m, options)
+    poptorch_model = poptorch.inferenceModel(m)
     poptorch_out = poptorch_model(x)
     helpers.assert_allclose(expected=native, actual=poptorch_out)
     assert_contains_multiconv(poptorch_model)
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_multiconv_options_broadcast(trace_model):
+def test_multiconv_options_broadcast():
     multiconv = (
         poptorch.MultiConv().availableMemoryProportions(0.8).partialsTypes(
             torch.float).planType(
                 poptorch.MultiConvPlanType.Parallel).perConvReservedTiles(
                     100).cycleBackOff(0.3)).enableConvDithering(True)
 
-    multiconv_harness(multiconv, trace_model)
+    multiconv_harness(multiconv)
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_multiconv_options_per_conv(trace_model):
+def test_multiconv_options_per_conv():
     partials_types = [torch.float, torch.float]
     multiconv = (poptorch.MultiConv().availableMemoryProportions(
         (0.8, 0.7)).partialsTypes(partials_types).planType(
             poptorch.MultiConvPlanType.Parallel).perConvReservedTiles(
                 120).cycleBackOff(0.4)).enableConvDithering(True)
 
-    multiconv_harness(multiconv, trace_model)
+    multiconv_harness(multiconv)
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_multiconv_layers(trace_model):
+def test_multiconv_layers():
     class Network(nn.Module):
         def __init__(self):
             super().__init__()
@@ -150,17 +142,14 @@ def test_multiconv_layers(trace_model):
     # Run on CPU.
     input = torch.randn(2, 1, 28, 28)
     native_out = model(input)
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
-    poptorch_model = poptorch.inferenceModel(model, options)
+    poptorch_model = poptorch.inferenceModel(model)
     poptorch_out = poptorch_model(input)
 
     assert_contains_multiconv(poptorch_model)
     helpers.assert_allclose(actual=poptorch_out, expected=native_out)
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_invalid_multiconv_nested(trace_model):
+def test_invalid_multiconv_nested():
     class Model(torch.nn.Module):
         def __init__(self):
             super().__init__()
@@ -172,26 +161,21 @@ def test_invalid_multiconv_nested(trace_model):
                     return self.conv(x)
 
     m = Model()
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
-    poptorch_model = poptorch.inferenceModel(m, options)
+    poptorch_model = poptorch.inferenceModel(m)
     msg = "Nested poptorch.MultiConv is not supported"
 
     with pytest.raises(poptorch.Error, match=msg):
         poptorch_model(torch.zeros(2, 1, 32, 32))
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_invalid_multiconv_empty(trace_model):
+def test_invalid_multiconv_empty():
     class Model(torch.nn.Module):
         def forward(self, x):
             with poptorch.MultiConv():
                 return torch.pow(x, 2)
 
     m = Model()
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
-    poptorch_model = poptorch.inferenceModel(m, options)
+    poptorch_model = poptorch.inferenceModel(m)
     msg = "Unexpected end_multi_conv"
 
     with pytest.raises(poptorch.Error, match=msg):

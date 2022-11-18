@@ -32,8 +32,7 @@ def test_set_log_level():
 
 @helpers.printCapfdOnExit
 @helpers.overridePopartLogLevel()
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_set_popart_log_level(capfd, trace_model):
+def test_set_popart_log_level(capfd):
     # Only strings are allowed
     with pytest.raises(ValueError, match="Level must be one of"):
         poptorch._logging.setPopartLogLevel(0)  # pylint: disable=protected-access
@@ -48,9 +47,7 @@ def test_set_popart_log_level(capfd, trace_model):
 
     model = torch.nn.Linear(2, 2)
 
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
-    inference_model = poptorch.inferenceModel(model, options)
+    inference_model = poptorch.inferenceModel(model)
     inference_model(torch.randn([2, 2]))
 
     log = helpers.LogChecker(capfd)
@@ -64,7 +61,7 @@ def test_set_popart_log_level(capfd, trace_model):
     poptorch._logging.setPopartLogLevel("OFF")  # pylint: disable=protected-access
     poptorch._logging.setPopartLogLevel("TRACE")  # pylint: disable=protected-access
 
-    inference_model = poptorch.inferenceModel(model, options)
+    inference_model = poptorch.inferenceModel(model)
     inference_model(torch.randn([2, 2]))
 
     log = helpers.LogChecker(capfd)
@@ -75,8 +72,7 @@ def test_set_popart_log_level(capfd, trace_model):
     log.assert_matches(r"popart:popart \d+\.\d+ T:")
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_zero_size_tensor_error(trace_model):
+def test_zero_size_tensor_error():
     class Model(torch.nn.Module):
         def forward(self, x):
             # The operation doesn't matter, we just want to produce the
@@ -85,9 +81,7 @@ def test_zero_size_tensor_error(trace_model):
             return torch.nn.functional.interpolate(x, size=(10, 10))
 
     x = torch.randn(0, 2, 5, 5)
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
-    poptorch_model = poptorch.inferenceModel(Model(), options)
+    poptorch_model = poptorch.inferenceModel(Model())
 
     with pytest.raises(
             poptorch.Error,
@@ -97,13 +91,10 @@ def test_zero_size_tensor_error(trace_model):
         poptorch_model(x)
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_torch_backward_error(trace_model):
+def test_torch_backward_error():
     x = torch.Tensor([5.0])
     model = helpers.ModelWithWeights(lambda x: x, x.shape)
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
-    poptorch_model = poptorch.trainingModel(model, options=options)
+    poptorch_model = poptorch.trainingModel(model)
     poptorch_out, poptorch_loss = poptorch_model((x, ))
 
     error_message = (
@@ -175,8 +166,7 @@ def test_specific_error_handling():
 @helpers.printCapfdOnExit
 @helpers.overridePoptorchLogLevel("DEBUG")
 @helpers.overridePopartLogLevel("DEBUG")
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_outline_attribute(capfd, trace_model):
+def test_outline_attribute(capfd):
     class Model(torch.nn.Module):
         def __init__(self):
             super().__init__()
@@ -190,9 +180,7 @@ def test_outline_attribute(capfd, trace_model):
 
     input = torch.randn(3, 8)
 
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
-    poptorch_model = poptorch.inferenceModel(Model(), options)
+    poptorch_model = poptorch.inferenceModel(Model())
 
     poptorch_model(input)
 

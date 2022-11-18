@@ -18,20 +18,18 @@ import poptorch
 include_bias = [True, False]
 
 
-def op_harness(trace_model, op, inputs, inference_test_fn=None):
+def op_harness(op, inputs, inference_test_fn=None):
     if inference_test_fn is None:
         inference_test_fn = lambda native_out, poptorch_out: helpers.assert_allclose(
             expected=native_out, actual=poptorch_out)
 
-    opts = poptorch.Options().randomSeed(42)
-    opts.Jit.traceModel(trace_model)
     model = helpers.ModelWithWeights(op, inputs[0].shape)
 
     # Run on CPU.
     native_out, _ = model(tuple(inputs))
 
     # Run on IPU.
-    poptorch_model = poptorch.trainingModel(model, opts)
+    poptorch_model = poptorch.trainingModel(model)
     poptorch_out, _ = poptorch_model(tuple(inputs))
 
     # Inference test - check outputs
@@ -44,54 +42,48 @@ def op_harness(trace_model, op, inputs, inference_test_fn=None):
 @pytest.mark.parametrize("scale_factor", [2, 3.5, 5.00001, 5.12498])
 @pytest.mark.parametrize("input_shape", [(1, 2, 8), (2, 2, 2, 8),
                                          (2, 3, 4, 2, 8)])
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_upsample_nearest(scale_factor, input_shape, trace_model):
+def test_upsample_nearest(scale_factor, input_shape):
     torch.manual_seed(42)
     op = torch.nn.Upsample(scale_factor=scale_factor, mode="nearest")
     x = torch.randn(*input_shape)
-    op_harness(trace_model, op, [x])
+    op_harness(op, [x])
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_downsample_nearest(trace_model):
+def test_downsample_nearest():
     torch.manual_seed(42)
     # test case from T44610
     op = torch.nn.Upsample(scale_factor=0.435714, mode="nearest")
     x = torch.randn(1, 2, 14, 14)
-    op_harness(trace_model, op, [x])
+    op_harness(op, [x])
 
 
 # TODO(T43375): replace scale factor 5 with 3.5
 @pytest.mark.parametrize("scale_factor", [2, 5])
 @pytest.mark.parametrize("input_shape", [(1, 2, 3, 4), (2, 2, 2, 8)])
-@pytest.mark.parametrize("trace_model", [True, False])
 @pytest.mark.parametrize("align_corners", [True, False])
-def test_upsample_bilinear_factor(scale_factor, input_shape, trace_model,
-                                  align_corners):
+def test_upsample_bilinear_factor(scale_factor, input_shape, align_corners):
     torch.manual_seed(42)
     op = torch.nn.Upsample(scale_factor=scale_factor,
                            mode="bilinear",
                            align_corners=align_corners)
     x = torch.randn(*input_shape)
-    op_harness(trace_model, op, [x])
+    op_harness(op, [x])
 
 
 @pytest.mark.parametrize("shapes", [[(1, 2, 3, 4),
                                      (6, 8)], [(2, 2, 2, 8), (7, 28)]])
-@pytest.mark.parametrize("trace_model", [True, False])
 @pytest.mark.parametrize("align_corners", [True, False])
-def test_upsample_bilinear_factor_shapes(shapes, trace_model, align_corners):
+def test_upsample_bilinear_factor_shapes(shapes, align_corners):
     torch.manual_seed(42)
     op = torch.nn.Upsample(size=shapes[1],
                            mode="bilinear",
                            align_corners=align_corners)
     x = torch.randn(*shapes[0])
-    op_harness(trace_model, op, [x])
+    op_harness(op, [x])
 
 
 @pytest.mark.parametrize("shape", [(2, 2, 14, 14)])
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_upsample_bicubic(shape, trace_model):
+def test_upsample_bicubic(shape):
     torch.manual_seed(42)
     model = torch.nn.Upsample(scale_factor=0.4357, mode='bicubic')
     x = torch.randn(*shape)
@@ -100,9 +92,7 @@ def test_upsample_bicubic(shape, trace_model):
     native_out = model(x)
 
     # Run on IPU.
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
-    poptorch_model = poptorch.inferenceModel(model, options)
+    poptorch_model = poptorch.inferenceModel(model)
     poptorch_out = poptorch_model(x)
 
     helpers.assert_allclose(expected=native_out, actual=poptorch_out)
@@ -110,23 +100,19 @@ def test_upsample_bicubic(shape, trace_model):
 
 @pytest.mark.parametrize("mode, input_shape", [("linear", (1, 2, 3)),
                                                ("trilinear", (1, 2, 3, 4, 5))])
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_unsupported_upsample(mode, input_shape, trace_model):
+def test_unsupported_upsample(mode, input_shape):
     torch.manual_seed(42)
     scale_factor = 2
     model = torch.nn.Upsample(scale_factor=scale_factor, mode=mode)
     x = torch.randn(*input_shape)
 
     # Run on IPU.
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
-    poptorch_model = poptorch.inferenceModel(model, options)
+    poptorch_model = poptorch.inferenceModel(model)
     with pytest.raises(poptorch.Error, match="only 'nearest' is supported"):
         poptorch_model(x)
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_linear(trace_model):
+def test_linear():
     torch.manual_seed(42)
     model = torch.nn.Linear(20, 30)
     x = torch.randn(128, 20)
@@ -135,9 +121,7 @@ def test_linear(trace_model):
     native_out = model(x)
 
     # Run on IPU.
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
-    poptorch_model = poptorch.inferenceModel(model, options)
+    poptorch_model = poptorch.inferenceModel(model)
     poptorch_out = poptorch_model(x)
 
     assert native_out.size() == poptorch_out.size()
@@ -146,29 +130,26 @@ def test_linear(trace_model):
 
 @pytest.mark.parametrize("include_bias", include_bias)
 @pytest.mark.parametrize("input_feature_shape", [(), (3, 4)])
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_bilinear(include_bias, input_feature_shape, trace_model):
+def test_bilinear(include_bias, input_feature_shape):
     torch.manual_seed(42)
     op = torch.nn.Bilinear(10, 20, 30, bias=include_bias)
     x1 = torch.randn(8, *input_feature_shape, 10)
     x2 = torch.randn(8, *input_feature_shape, 20)
-    op_harness(trace_model, op, [x1, x2])
+    op_harness(op, [x1, x2])
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_identity(trace_model):
+def test_identity():
     torch.manual_seed(42)
     op = torch.nn.Identity(20, 30, 40)
     x = torch.randn(128, 20)
-    op_harness(trace_model, op, [x])
+    op_harness(op, [x])
 
 
 dropout_ops = [torch.nn.Dropout, torch.nn.Dropout2d, torch.nn.Dropout3d]
 
 
 @pytest.mark.parametrize("dropout_op", dropout_ops)
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_dropout_inference(dropout_op, trace_model):
+def test_dropout_inference(dropout_op):
     torch.manual_seed(42)
     model = dropout_op()
     model.eval()
@@ -179,9 +160,7 @@ def test_dropout_inference(dropout_op, trace_model):
     native_out = model(x)
 
     # Run on IPU.
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
-    poptorch_model = poptorch.inferenceModel(model, options)
+    poptorch_model = poptorch.inferenceModel(model)
     poptorch_out = poptorch_model(x)
 
     msg = f"{dropout_op.__name__} in inference session should equal identity."
@@ -189,8 +168,7 @@ def test_dropout_inference(dropout_op, trace_model):
 
 
 @pytest.mark.parametrize("dropout_op", dropout_ops)
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_dropout_eval_during_training(dropout_op, trace_model):
+def test_dropout_eval_during_training(dropout_op):
     torch.manual_seed(42)
     dropout = dropout_op()
     dropout.eval()
@@ -204,9 +182,6 @@ def test_dropout_eval_during_training(dropout_op, trace_model):
 
     # Create a poptorch training model with a fixed random seed for deterministic runs
     # Note that the loss is irrelevant and ignored.
-    opts = poptorch.Options().randomSeed(8)
-    opts.Jit.traceModel(trace_model)
-
     class ModelWithLoss(torch.nn.Module):
         def __init__(self):
             super().__init__()
@@ -219,7 +194,7 @@ def test_dropout_eval_during_training(dropout_op, trace_model):
             return out, loss
 
     model = ModelWithLoss()
-    poptorch_model = poptorch.trainingModel(model, options=opts)
+    poptorch_model = poptorch.trainingModel(model)
     dummy_label = torch.zeros_like(x)
     poptorch_out, _ = poptorch_model(x, dummy_label)
 
@@ -229,8 +204,7 @@ def test_dropout_eval_during_training(dropout_op, trace_model):
 
 
 @pytest.mark.ipuHardwareRequired
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_dropout_training(trace_model):
+def test_dropout_training():
     drop_ratio = 0.8
     dropout_op = torch.nn.Dropout(drop_ratio)
 
@@ -246,12 +220,11 @@ def test_dropout_training(trace_model):
                                 rtol=0.01,
                                 atol=0.01)
 
-    op_harness(trace_model, dropout_op, [x], check_ratio)
+    op_harness(dropout_op, [x], check_ratio)
 
 
 @pytest.mark.ipuHardwareRequired
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_dropout2d_training(trace_model):
+def test_dropout2d_training():
     drop_ratio = 0.8
     dropout_op = torch.nn.Dropout2d(drop_ratio)
 
@@ -270,12 +243,11 @@ def test_dropout2d_training(trace_model):
                                 rtol=0.01,
                                 atol=0.01)
 
-    op_harness(trace_model, dropout_op, [x], check_ratio)
+    op_harness(dropout_op, [x], check_ratio)
 
 
 @pytest.mark.ipuHardwareRequired
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_dropout3d_training(trace_model):
+def test_dropout3d_training():
     drop_ratio = 0.6
     dropout_op = torch.nn.Dropout3d(drop_ratio)
 
@@ -294,11 +266,10 @@ def test_dropout3d_training(trace_model):
                                 rtol=0.01,
                                 atol=0.01)
 
-    op_harness(trace_model, dropout_op, [x], check_ratio)
+    op_harness(dropout_op, [x], check_ratio)
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_embedding(trace_model):
+def test_embedding():
     model = torch.nn.Embedding(10, 3)
     x = torch.LongTensor([[1, 2, 4, 5], [4, 3, 2, 9]])
 
@@ -306,9 +277,7 @@ def test_embedding(trace_model):
     native_out = model(x)
 
     # Run on IPU.
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
-    poptorch_model = poptorch.inferenceModel(model, options)
+    poptorch_model = poptorch.inferenceModel(model)
     poptorch_out = poptorch_model(x)
 
     assert native_out.size() == poptorch_out.size()
@@ -316,8 +285,7 @@ def test_embedding(trace_model):
 
 
 # pylint: disable=unsubscriptable-object
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_embedding_padding_idx(trace_model):
+def test_embedding_padding_idx():
     class TestEmbedding(torch.nn.Module):
         def __init__(self):
             super().__init__()
@@ -337,10 +305,7 @@ def test_embedding_padding_idx(trace_model):
     grad = model.embedding.weight.grad
 
     options = poptorch.Options()
-    prefix = "model." if trace_model else ""
-    options.anchorTensor("grad_embedding",
-                         f"Gradient___{prefix}embedding.weight")
-    options.Jit.traceModel(trace_model)
+    options.anchorTensor("grad_embedding", "Gradient___embedding.weight")
     pop_model = poptorch.trainingModel(TestEmbedding(), options=options)
     pop_y, pop_loss = pop_model(x)
     pop_grad = pop_model.getAnchoredTensor("grad_embedding")
@@ -351,24 +316,20 @@ def test_embedding_padding_idx(trace_model):
 
 
 @pytest.mark.parametrize("mode", ["max", "mean", "sum"])
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_embedding_bag(mode, trace_model):
+def test_embedding_bag(mode):
     torch.manual_seed(0)
     model = torch.nn.EmbeddingBag(10, 3, mode=mode)
     x = torch.LongTensor([[1, 2, 4, 5], [4, 3, 2, 9]])
     cpu_out = model(x)
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
-    pop_model = poptorch.inferenceModel(model, options)
+    pop_model = poptorch.inferenceModel(model)
     pop_out = pop_model(x)
     helpers.assert_allclose(actual=pop_out, expected=cpu_out)
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_embedding_bag_per_sample_weights(trace_model):
+def test_embedding_bag_per_sample_weights():
     class Model(torch.nn.Module):
         def __init__(self):
-            super(Model, self).__init__()
+            super().__init__()
             # per_sample_weights are only supported for mode="sum"
             self.embedding_bag = torch.nn.EmbeddingBag(10, 3, mode="sum")
 
@@ -380,16 +341,13 @@ def test_embedding_bag_per_sample_weights(trace_model):
     x = torch.LongTensor([[1, 2, 4, 5], [4, 3, 2, 9]])
     p = torch.randn(2, 4)
     cpu_out = model(x, p)
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
-    pop_model = poptorch.inferenceModel(model, options)
+    pop_model = poptorch.inferenceModel(model)
     pop_out = pop_model(x, p)
     helpers.assert_allclose(actual=pop_out, expected=cpu_out)
 
 
 @pytest.mark.parametrize("mode", ["max", "mean", "sum"])
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_embedding_bag_include_last_offset(mode, trace_model):
+def test_embedding_bag_include_last_offset(mode):
     class Model(torch.nn.Module):
         def __init__(self):
             super().__init__()
@@ -410,28 +368,24 @@ def test_embedding_bag_include_last_offset(mode, trace_model):
     model = Model()
     x = torch.LongTensor([[1, 2, 4, 5], [4, 3, 2, 9]])
     cpu_out = model(x)
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
-    pop_model = poptorch.inferenceModel(model, options)
+    pop_model = poptorch.inferenceModel(model)
     pop_out = pop_model(x)
     helpers.assert_allclose(actual=pop_out, expected=cpu_out)
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_pixel_shuffle(trace_model):
+def test_pixel_shuffle():
     torch.manual_seed(42)
     op = torch.nn.PixelShuffle(3)
     x = torch.randn(2, 18, 4, 4)
-    op_harness(trace_model, op, [x])
+    op_harness(op, [x])
 
 
 @pytest.mark.parametrize("params", [(2, 2, 1, 1, 1, 1), (3, 2, 1, 1, 1, 1),
                                     (2, 4, 1, 1, 1, 1), (2, 2, 2, 1, 1, 1),
                                     (2, 2, 1, 3, 1, 1), (2, 2, 1, 1, 3, 1),
                                     (2, 2, 1, 1, 1, 4)])
-@pytest.mark.parametrize("trace_model", [True, False])
 # Tests aten::im2col
-def test_unfold(params, trace_model):
+def test_unfold(params):
     (kernel_size_x, kernel_size_y, dilation_x, dilation_y, stride_x,
      stride_y) = params
     padding = 2
@@ -454,7 +408,7 @@ def test_unfold(params, trace_model):
 
     inputs = [torch.rand(1, 1, y_in, x_in)]
 
-    op_harness(trace_model, combined, inputs)
+    op_harness(combined, inputs)
 
 
 @pytest.mark.parametrize("params", [(2, 2, 1, 1, 1, 1), (3, 2, 1, 1, 1, 1),
@@ -462,8 +416,7 @@ def test_unfold(params, trace_model):
                                     (2, 2, 1, 3, 1, 1), (2, 2, 1, 1, 3, 1),
                                     (2, 2, 1, 1, 1, 3)])
 # Tests aten::col2im
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_fold(params, trace_model):
+def test_fold(params):
     (kernel_size_x, kernel_size_y, dilation_x, dilation_y, stride_x,
      stride_y) = params
 
@@ -483,14 +436,13 @@ def test_fold(params, trace_model):
     unfold_args["output_size"] = orig_input.shape[2:]
 
     op = torch.nn.Fold(**unfold_args)
-    op_harness(trace_model, op, [unfolded])
+    op_harness(op, [unfolded])
 
 
 # Tests aten::col2im with padding
 @pytest.mark.parametrize("stride_x", [1, 3])
 @pytest.mark.parametrize("stride_y", [1, 3])
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_fold_with_padding(stride_x, stride_y, trace_model):
+def test_fold_with_padding(stride_x, stride_y):
     torch.manual_seed(42)
 
     orig_input = torch.rand(2, 2, 11, 13)
@@ -511,12 +463,11 @@ def test_fold_with_padding(stride_x, stride_y, trace_model):
     unfold_args["output_size"] = orig_input.shape[2:]
 
     op = torch.nn.Fold(**unfold_args)
-    op_harness(trace_model, op, [unfolded])
+    op_harness(op, [unfolded])
 
 
 @pytest.mark.parametrize("dim", [0, 1, None])
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_weight_norm(trace_model, dim):
+def test_weight_norm(dim):
 
     torch.manual_seed(42)
 
@@ -540,9 +491,7 @@ def test_weight_norm(trace_model, dim):
 
     native_out, _ = model(x)
 
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
-    poptorch_model = poptorch.trainingModel(model, options)
+    poptorch_model = poptorch.trainingModel(model)
 
     poptorch_out, _ = poptorch_model(x)
 
@@ -551,21 +500,17 @@ def test_weight_norm(trace_model, dim):
     tensor_names = poptorch_model.getTensorNames()
     decomposed_tensors = ["weight_v", "weight_g"]
 
-    # The dispatcher doesn't use OptimizerWrapper, so this prefix doesn't
-    # appear.
-    prefix = "model." if trace_model else ""
-
     # Check that both decomposed tensors exist in the graph
-    assert all(f"{prefix}lin.{t}" in tensor_names for t in decomposed_tensors)
+    assert all(f"lin.{t}" in tensor_names for t in decomposed_tensors)
     # Check that they also exist in the backward graph
-    assert all(f"UpdatedVar___{prefix}lin.{t}" in tensor_names
+    assert all(f"UpdatedVar___lin.{t}" in tensor_names
                for t in decomposed_tensors)
 
     # Ensure that the original weight tensor does NOT exist -
     # autograd should be performed with respect to the decomposed tensors
     # only
-    assert f"{prefix}lin.weight" not in tensor_names
-    assert f"UpdatedVar___{prefix}lin.weight" not in tensor_names
+    assert "lin.weight" not in tensor_names
+    assert "UpdatedVar___lin.weight" not in tensor_names
 
     n = 3
     # Run a few more times to ensure that the decomposed weights are being

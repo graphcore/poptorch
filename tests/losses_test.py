@@ -13,8 +13,7 @@ import helpers
 import poptorch
 
 
-def loss_harness(trace_model,
-                 loss,
+def loss_harness(loss,
                  inputs,
                  target,
                  reduction,
@@ -58,11 +57,8 @@ def loss_harness(trace_model,
 
     model = helpers.ModelWithWeights(op, inputs[0].shape, loss_fn=loss_fn)
 
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
     poptorch_model = poptorch.trainingModel(
-        model, options) if training else poptorch.inferenceModel(
-            model, options)
+        model) if training else poptorch.inferenceModel(model)
 
     native_out, _ = model(tuple(inputs))
     poptorch_out, poptorch_loss = poptorch_model(tuple(inputs))
@@ -80,15 +76,14 @@ def loss_harness(trace_model,
 
 
 @pytest.mark.parametrize("reduction", ["mean", "sum"])
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_L1Loss(reduction, trace_model):
+def test_L1Loss(reduction):
     torch.manual_seed(42)
 
     target = torch.randn(10)
     input = torch.randn(10)
 
     poptorch_model, original, original_loss = loss_harness(
-        trace_model, F.l1_loss, [input], target, reduction)
+        F.l1_loss, [input], target, reduction)
 
     # Make sure the first run doesn't already pass the test.
     assert original_loss > 0.1
@@ -118,15 +113,14 @@ def test_L1Loss(reduction, trace_model):
 
 
 @pytest.mark.parametrize("reduction", ["mean", "sum"])
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_MSELoss(reduction, trace_model):
+def test_MSELoss(reduction):
     torch.manual_seed(42)
 
     target = torch.randn(10)
     input = torch.randn(10)
 
     poptorch_model, original, original_loss = loss_harness(
-        trace_model, F.mse_loss, [input], target, reduction)
+        F.mse_loss, [input], target, reduction)
 
     # Make sure the first run doesn't already pass the test
     assert original_loss > 0.1
@@ -152,8 +146,7 @@ cross_entropy_params = [
 
 
 @pytest.mark.parametrize("input_shape, reduction", cross_entropy_params)
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_CrossEntropy(input_shape, reduction, trace_model):
+def test_CrossEntropy(input_shape, reduction):
     torch.manual_seed(42)
 
     input = torch.randn(input_shape)
@@ -162,8 +155,7 @@ def test_CrossEntropy(input_shape, reduction, trace_model):
         label_shape.extend(input_shape[2:])
     label = torch.randint(0, 10, label_shape)
 
-    poptorch_model, _, original_loss = loss_harness(trace_model,
-                                                    F.cross_entropy, [input],
+    poptorch_model, _, original_loss = loss_harness(F.cross_entropy, [input],
                                                     label, reduction)
 
     for _ in range(0, 100):
@@ -175,15 +167,13 @@ def test_CrossEntropy(input_shape, reduction, trace_model):
 
 
 # Test softmax and logsoftmax for dimensions more than 2
-def op_withdim(trace_model, op, input):
+def op_withdim(op, input):
 
     # Run on CPU.
     native_out = op(input)
 
     # Run on IPU.
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
-    poptorch_model = poptorch.inferenceModel(op, options)
+    poptorch_model = poptorch.inferenceModel(op)
     poptorch_out = poptorch_model(input)
 
     helpers.assert_allclose(expected=native_out, actual=poptorch_out)
@@ -198,31 +188,28 @@ ops_float = [
 @unittest.mock.patch.dict("os.environ", helpers.disableSmallModel())
 @pytest.mark.parametrize("op", ops_float)
 @pytest.mark.parametrize("dim", range(-4, 3))
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_op_withdim_4d(op, dim, trace_model):
+def test_op_withdim_4d(op, dim):
     N, C = 11, 22
     M, K = 33, 44
     torch.manual_seed(42)
     x = torch.randn(N, C, M, K)
 
-    op_withdim(trace_model, op(dim=dim), x)
+    op_withdim(op(dim=dim), x)
 
 
 @pytest.mark.parametrize("op", ops_float)
 @pytest.mark.parametrize("dim", range(-2, 1))
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_op_withdim_2d(op, dim, trace_model):
+def test_op_withdim_2d(op, dim):
     N, C = 17, 13
     torch.manual_seed(42)
     x = torch.randn(N, C)
 
-    op_withdim(trace_model, op(dim=dim), x)
+    op_withdim(op(dim=dim), x)
 
 
 # Test NLL loss by using it to match a target label.
 @pytest.mark.parametrize("reduction", ["mean", "sum"])
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_NLLLoss(reduction, trace_model):
+def test_NLLLoss(reduction):
     torch.manual_seed(42)
 
     op = lambda x: F.log_softmax(x, dim=1)
@@ -230,9 +217,8 @@ def test_NLLLoss(reduction, trace_model):
     label = torch.randint(0, 10, [1])
     input = torch.randn(1, 10)
 
-    poptorch_model, _, original_loss = loss_harness(trace_model, F.nll_loss,
-                                                    [input], label, reduction,
-                                                    op)
+    poptorch_model, _, original_loss = loss_harness(F.nll_loss, [input], label,
+                                                    reduction, op)
 
     for _ in range(0, 100):
         out, loss = poptorch_model((input, ))
@@ -244,8 +230,7 @@ def test_NLLLoss(reduction, trace_model):
 
 # Test NLL loss 2d by using it to match a target label.
 @pytest.mark.parametrize("reduction", ["mean", "sum"])
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_NLLLoss2d(reduction, trace_model):
+def test_NLLLoss2d(reduction):
 
     torch.manual_seed(42)
     N, C, M = 3, 2, 5
@@ -255,8 +240,8 @@ def test_NLLLoss2d(reduction, trace_model):
     y = torch.empty(N, M, M, dtype=torch.long).random_(0, C)
     x = torch.randn(N, C, M, M)
 
-    poptorch_model, _, original_loss = loss_harness(trace_model, F.nll_loss,
-                                                    [x], y, reduction, op)
+    poptorch_model, _, original_loss = loss_harness(F.nll_loss, [x], y,
+                                                    reduction, op)
 
     for _ in range(0, 100):
         out, loss = poptorch_model((x, ))
@@ -268,15 +253,13 @@ def test_NLLLoss2d(reduction, trace_model):
 
 # This also servees as the NLL loss test as it uses NLL under the hood.
 @pytest.mark.parametrize("reduction", ["mean", "sum"])
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_BCE(reduction, trace_model):
+def test_BCE(reduction):
     torch.manual_seed(42)
 
     target = torch.empty(10).uniform_()
     input = torch.randn(10)
 
-    poptorch_model, _, original_loss = loss_harness(trace_model,
-                                                    F.binary_cross_entropy,
+    poptorch_model, _, original_loss = loss_harness(F.binary_cross_entropy,
                                                     [input],
                                                     target,
                                                     reduction,
@@ -321,33 +304,26 @@ def test_BCE(reduction, trace_model):
 
 @pytest.mark.parametrize("reduction", {"mean", "sum", "batchmean"})
 @pytest.mark.parametrize("log_target", {True, False})
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_KLDiv(reduction, log_target, trace_model):
+def test_KLDiv(reduction, log_target):
     torch.manual_seed(42)
 
     # 2D Tensors to test batchmean
     target = torch.empty(3, 10).uniform_(-1, 1)
     input = torch.randn(3, 10)
 
-    loss_harness(trace_model,
-                 F.kl_div, [input],
-                 target,
-                 reduction,
-                 log_target=log_target)
+    loss_harness(F.kl_div, [input], target, reduction, log_target=log_target)
 
 
 @pytest.mark.parametrize("reduction", {"mean", "sum"})
 @pytest.mark.parametrize("log_input", {True, False})
 @pytest.mark.parametrize("full", {True, False})
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_PoissonNLLLoss(reduction, log_input, full, trace_model):
+def test_PoissonNLLLoss(reduction, log_input, full):
     torch.manual_seed(42)
 
     target = torch.poisson(torch.rand(10) * 5)
     input = torch.empty(10).uniform_()
 
-    loss_harness(trace_model,
-                 F.poisson_nll_loss, [input],
+    loss_harness(F.poisson_nll_loss, [input],
                  target,
                  reduction,
                  full=full,
@@ -355,8 +331,7 @@ def test_PoissonNLLLoss(reduction, log_input, full, trace_model):
 
 
 @pytest.mark.parametrize("reduction", {"mean", "sum"})
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_HingeEmbeddingLoss(reduction, trace_model):
+def test_HingeEmbeddingLoss(reduction):
     torch.manual_seed(42)
 
     delta = torch.rand(1) + 0.5
@@ -365,8 +340,7 @@ def test_HingeEmbeddingLoss(reduction, trace_model):
     target = torch.randint(2, [10]) * 2 - 1
     input = torch.empty(10).uniform_()
 
-    loss_harness(trace_model,
-                 F.hinge_embedding_loss, [input],
+    loss_harness(F.hinge_embedding_loss, [input],
                  target,
                  reduction,
                  margin=delta.item())
@@ -388,12 +362,9 @@ params_bcewithlogits = [
 @pytest.mark.parametrize("reduction", {"mean", "sum"})
 @pytest.mark.parametrize("input, target, weight, pos_weight",
                          params_bcewithlogits)
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_BCEWithLogitsLoss(reduction, input, target, weight, pos_weight,
-                           trace_model):
+def test_BCEWithLogitsLoss(reduction, input, target, weight, pos_weight):
 
-    loss_harness(trace_model,
-                 F.binary_cross_entropy_with_logits, [input],
+    loss_harness(F.binary_cross_entropy_with_logits, [input],
                  target,
                  reduction,
                  weight=weight,
@@ -401,34 +372,31 @@ def test_BCEWithLogitsLoss(reduction, input, target, weight, pos_weight,
 
 
 @pytest.mark.parametrize("reduction", {"mean", "sum"})
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_SmoothL1Loss(reduction, trace_model):
+def test_SmoothL1Loss(reduction):
     torch.manual_seed(42)
 
     input = torch.randn(10)
     target = torch.empty(10).uniform_()
 
-    loss_harness(trace_model, F.smooth_l1_loss, [input], target, reduction)
+    loss_harness(F.smooth_l1_loss, [input], target, reduction)
 
 
 @pytest.mark.parametrize("reduction", {"mean", "sum"})
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_SoftMarginLoss(reduction, trace_model):
+def test_SoftMarginLoss(reduction):
     torch.manual_seed(42)
 
     input = torch.empty(10).uniform_()
     # Generate random set of 1s and -1s for labels
     target = torch.randint(2, [10]) * 2 - 1
 
-    loss_harness(trace_model, F.soft_margin_loss, [input], target, reduction)
+    loss_harness(F.soft_margin_loss, [input], target, reduction)
 
 
 # TODO(T30688): Support MultiLabelSoftMarginLoss
 @pytest.mark.skip()
 @pytest.mark.parametrize("reduction", {"mean", "sum"})
 @pytest.mark.parametrize("specify_weight", {True, False})
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_MultiLabelSoftMarginLoss(reduction, specify_weight, trace_model):
+def test_MultiLabelSoftMarginLoss(reduction, specify_weight):
     torch.manual_seed(42)
 
     weight = torch.randn(3, 10) if specify_weight else None
@@ -437,18 +405,16 @@ def test_MultiLabelSoftMarginLoss(reduction, specify_weight, trace_model):
     # Generate random set of 0s and 1s for labels
     target = torch.randint(2, [3, 10])
 
-    loss_harness(trace_model,
-                 F.multilabel_soft_margin_loss, [input],
+    loss_harness(F.multilabel_soft_margin_loss, [input],
                  target,
                  reduction,
                  weight=weight)
 
 
 @pytest.mark.parametrize("reduction", {"mean", "sum"})
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_CosineEmbeddingLoss(reduction, trace_model):
-    if not trace_model:
-        pytest.skip("TODO(T66165): Fails due to detach op pass")
+def test_CosineEmbeddingLoss(reduction):
+    pytest.skip("TODO(T66165): Fails due to detach op pass")
+
     torch.manual_seed(42)
 
     # Margin should be between -1 and 1
@@ -460,16 +426,14 @@ def test_CosineEmbeddingLoss(reduction, trace_model):
     # Generate random set of 1s and -1s for labels
     target = torch.randint(2, [10]) * 2 - 1
 
-    loss_harness(trace_model,
-                 F.cosine_embedding_loss, [input1, input2],
+    loss_harness(F.cosine_embedding_loss, [input1, input2],
                  target,
                  reduction,
                  margin=margin.item())
 
 
 @pytest.mark.parametrize("reduction", {"mean", "sum"})
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_MarginRankingLoss(reduction, trace_model):
+def test_MarginRankingLoss(reduction):
     torch.manual_seed(42)
 
     # Margin should be between -1 and 1
@@ -482,8 +446,7 @@ def test_MarginRankingLoss(reduction, trace_model):
     # Generate random set of 1s and -1s for labels
     target = torch.randint(2, [10, 10]) * 2 - 1
 
-    loss_harness(trace_model,
-                 F.margin_ranking_loss, [input1, input2],
+    loss_harness(F.margin_ranking_loss, [input1, input2],
                  target,
                  reduction,
                  margin=margin.item())
@@ -492,8 +455,7 @@ def test_MarginRankingLoss(reduction, trace_model):
 @pytest.mark.parametrize("p", {2., 3.})
 @pytest.mark.parametrize("swap", {True, False})
 @pytest.mark.parametrize("reduction", {"mean", "sum"})
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_TripletMarginLoss(p, swap, reduction, trace_model):
+def test_TripletMarginLoss(p, swap, reduction):
     torch.manual_seed(42)
 
     # Between 0 and 2
@@ -503,8 +465,7 @@ def test_TripletMarginLoss(p, swap, reduction, trace_model):
     positive = torch.randn(10, 5)
     negative = torch.randn(10, 5)
 
-    loss_harness(trace_model,
-                 F.triplet_margin_loss, [anchor, positive, negative],
+    loss_harness(F.triplet_margin_loss, [anchor, positive, negative],
                  None,
                  reduction,
                  margin=margin.item(),
@@ -516,9 +477,7 @@ def test_TripletMarginLoss(p, swap, reduction, trace_model):
 @pytest.mark.parametrize("reduction", {"mean", "sum"})
 @pytest.mark.parametrize("zero_infinity", [True, False])
 @pytest.mark.parametrize("lengths_are_tensors", [True, False])
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_CTCLoss(blank, reduction, zero_infinity, lengths_are_tensors,
-                 trace_model):
+def test_CTCLoss(blank, reduction, zero_infinity, lengths_are_tensors):
     T = 10  # Input sequence length
     N = 4  # Batch size
     C = 5  # Number of classes
@@ -544,8 +503,7 @@ def test_CTCLoss(blank, reduction, zero_infinity, lengths_are_tensors,
     target = torch.randint(low=0, high=C - 1, size=(N, S), dtype=torch.long)
     target[target > blank] += 1
 
-    loss_harness(trace_model,
-                 F.ctc_loss, [input],
+    loss_harness(F.ctc_loss, [input],
                  target,
                  reduction,
                  input_lengths=input_lengths,
@@ -555,8 +513,7 @@ def test_CTCLoss(blank, reduction, zero_infinity, lengths_are_tensors,
 
 
 @pytest.mark.parametrize("reduction", ("mean", "sum"))
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_identity_with_linear_out_returned(reduction, trace_model):
+def test_identity_with_linear_out_returned(reduction):
     torch.manual_seed(42)
 
     el_in = 2
@@ -576,9 +533,7 @@ def test_identity_with_linear_out_returned(reduction, trace_model):
     model = Model()
     native_loss, native_out = model(x)
 
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
-    poptorch_model = poptorch.trainingModel(model, options=options)
+    poptorch_model = poptorch.trainingModel(model)
     poptorch_loss, poptorch_out = poptorch_model(x)
 
     helpers.assert_allclose(actual=poptorch_loss, expected=native_loss)

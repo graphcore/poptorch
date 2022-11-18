@@ -1,19 +1,17 @@
 #!/usr/bin/env python3
 # Copyright (c) 2021 Graphcore Ltd. All rights reserved.
 
-import pytest
 import torch
-import poptorch
 import helpers
+import poptorch
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_requires_grad_false_simple(trace_model):
+def test_requires_grad_false_simple():
     torch.manual_seed(42)
 
     class Model(torch.nn.Module):
         def __init__(self, a, b, c, d):
-            super(Model, self).__init__()
+            super().__init__()
             self.a = torch.nn.Parameter(a)
             self.b = torch.nn.Parameter(b)
             self.c = torch.nn.Parameter(c, requires_grad=False)
@@ -36,9 +34,7 @@ def test_requires_grad_false_simple(trace_model):
     model = Model(a.clone(), b.clone(), c.clone(), d.clone())
     native_out = model(target)
 
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
-    poptorch_model = poptorch.trainingModel(model, options=options)
+    poptorch_model = poptorch.trainingModel(model)
     poptorch_out = poptorch_model(target)
     helpers.assert_allclose(actual=poptorch_out, expected=native_out)
 

@@ -69,8 +69,7 @@ def get_model(num_mat_muls,
 
 
 @pytest.mark.ipuHardwareRequired
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_io_input(trace_model):
+def test_io_input():
     num_mat_muls = 20
     model = get_model(num_mat_muls,
                       poptorch.OverlapMode.OverlapAccumulationLoop,
@@ -86,7 +85,6 @@ def test_io_input(trace_model):
     opts.TensorLocations.numIOTiles(32)
 
     opts.Training.gradientAccumulation(num_grad_accumulations)
-    opts.Jit.traceModel(trace_model)
     poptorch_model = poptorch.trainingModel(model, options=opts)
 
     total_batch_size = num_grad_accumulations * num_device_iterations
@@ -99,8 +97,7 @@ def test_io_input(trace_model):
 
 
 @pytest.mark.ipuHardwareRequired
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_input_error_messages(trace_model):
+def test_input_error_messages():
     class DoubleInputUseModel(torch.nn.Module):
         def forward(self, x):
             y = x + 1
@@ -109,11 +106,9 @@ def test_input_error_messages(trace_model):
             return y, x2
 
     model = DoubleInputUseModel()
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
-    poptorch_model = poptorch.inferenceModel(model, options)
+    poptorch_model = poptorch.inferenceModel(model)
 
-    label = r"x" if trace_model else r"[0-9]+"
+    label = r"[0-9]+"
     err_msg = (r"poptorch.set_overlap_for_input must be the only op applied "
                r"to an input. This is not the case for input " + label +
                r" to the model.")
@@ -128,7 +123,7 @@ def test_input_error_messages(trace_model):
             return y, y2
 
     model = NotOnInputModel()
-    poptorch_model = poptorch.inferenceModel(model, options)
+    poptorch_model = poptorch.inferenceModel(model)
 
     err_msg = (r"poptorch.set_overlap_for_input applied on a node which is "
                r"not a tensor input to the model.")
@@ -143,7 +138,7 @@ def test_input_error_messages(trace_model):
             return y
 
     model = NormalModel()
-    poptorch_model = poptorch.inferenceModel(model, options)
+    poptorch_model = poptorch.inferenceModel(model)
 
     err_msg = (r"Overlapped IO is not supported with poptorch.Pipelined"
                r"Execution. If you are using only one IPU, please switch to "
@@ -153,7 +148,6 @@ def test_input_error_messages(trace_model):
 
     opts = poptorch.Options()
     opts.setExecutionStrategy(poptorch.ShardedExecution())
-    opts.Jit.traceModel(trace_model)
     poptorch_model = poptorch.inferenceModel(model, options=opts)
 
     err_msg = (r"No IO tiles allocated. You must allocate at least 32 IO tiles"
@@ -168,8 +162,7 @@ def test_input_error_messages(trace_model):
 
 
 @pytest.mark.ipuHardwareRequired
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_overlap_host_io_output(trace_model):
+def test_overlap_host_io_output():
     num_mat_muls = 20
     model = get_model(num_mat_muls, poptorch.OverlapMode.NoOverlap,
                       poptorch.OverlapMode.NoOverlap,
@@ -187,7 +180,6 @@ def test_overlap_host_io_output(trace_model):
     opts.TensorLocations.numIOTiles(32)
 
     opts.Training.gradientAccumulation(num_grad_accumulations)
-    opts.Jit.traceModel(trace_model)
     poptorch_model = poptorch.trainingModel(model, options=opts)
 
     total_batch_size = num_grad_accumulations * num_device_iterations
@@ -200,8 +192,7 @@ def test_overlap_host_io_output(trace_model):
 
 
 @pytest.mark.ipuHardwareRequired
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_output_error_messages(trace_model):
+def test_output_error_messages():
     class DoubleOutputUseModel(torch.nn.Module):
         def forward(self, x):
             y = x + 1
@@ -210,9 +201,7 @@ def test_output_error_messages(trace_model):
             return y, y2
 
     model = DoubleOutputUseModel()
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
-    poptorch_model = poptorch.inferenceModel(model, options)
+    poptorch_model = poptorch.inferenceModel(model)
 
     err_msg = (
         r"poptorch.set_overlap_for_output cannot be used with a tensor that "
@@ -223,7 +212,6 @@ def test_output_error_messages(trace_model):
 
     opts = poptorch.Options()
     opts.setExecutionStrategy(poptorch.ShardedExecution())
-    opts.Jit.traceModel(trace_model)
 
     opts.TensorLocations.numIOTiles(32)
 
@@ -270,8 +258,7 @@ def test_output_error_messages(trace_model):
         poptorch_model(torch.tensor([1.0]))
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_overlap_both_non_input_marked(trace_model):
+def test_overlap_both_non_input_marked():
     class NotOnInputModel(torch.nn.Module):
         def forward(self, x):
             x = poptorch.set_overlap_for_input(
@@ -283,7 +270,6 @@ def test_overlap_both_non_input_marked(trace_model):
 
     opts = poptorch.Options()
     opts.setExecutionStrategy(poptorch.ShardedExecution())
-    opts.Jit.traceModel(trace_model)
     opts.TensorLocations.numIOTiles(32)
 
     model = NotOnInputModel()
@@ -295,8 +281,7 @@ def test_overlap_both_non_input_marked(trace_model):
         poptorch_model(torch.tensor([1.0]))
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_overlap_both_non_output_marked(trace_model):
+def test_overlap_both_non_output_marked():
     class OutputBeforeLoss(torch.nn.Module):
         def forward(self, x):
             x = poptorch.set_overlap_for_input(
@@ -310,7 +295,6 @@ def test_overlap_both_non_output_marked(trace_model):
 
     opts = poptorch.Options()
     opts.setExecutionStrategy(poptorch.ShardedExecution())
-    opts.Jit.traceModel(trace_model)
     opts.TensorLocations.numIOTiles(32)
 
     inference_model = poptorch.inferenceModel(model, opts)
@@ -334,10 +318,6 @@ def test_overlap_tuple():
 
     opts = poptorch.Options()
     opts.setExecutionStrategy(poptorch.ShardedExecution())
-    # This only works with the dispatcher, because tracing inserts
-    # ListConstruct/TupleConstruct which are not compatible with
-    # the overlapped IO pass
-    opts.Jit.traceModel(False)
     opts.TensorLocations.numIOTiles(32)
     model = poptorch.inferenceModel(Model(), opts)
 
