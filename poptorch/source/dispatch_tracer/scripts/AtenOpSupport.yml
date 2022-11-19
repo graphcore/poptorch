@@ -732,6 +732,19 @@
   UnusedOutputArguments: {out: null}
   native_func: scatter.value_reduce_out(Tensor self, int dim, Tensor index, Scalar value, *, str reduce, Tensor(a!) out) -> Tensor(a!)
 
+- func: scatter_reduce.two
+  PopTorchDirect: scatter_reduce_two
+  native_func: scatter_reduce.two(Tensor self, int dim, Tensor index, Tensor src, str reduce, *, bool include_self=True) -> Tensor
+
+- func: scatter_reduce_.two
+  PopTorchDirect: scatter_reduce_two
+  native_func: scatter_reduce_.two(Tensor(a!) self, int dim, Tensor index, Tensor src, str reduce, *, bool include_self=True) -> Tensor(a!)
+
+- func: scatter_reduce.two_out
+  PopTorchDirect: scatter_reduce_two
+  UnusedOutputArguments: {out}
+  native_func: scatter_reduce.two_out(Tensor self, int dim, Tensor index, Tensor src, str reduce, *, bool include_self=True, Tensor(a!) out) -> Tensor(a!)
+
 - func: scatter.value_reduce
   PopTorchDirect: scatter_value_reduce_out
   native_func: scatter.value_reduce(Tensor self, int dim, Tensor index, Scalar value, *, str reduce) -> Tensor

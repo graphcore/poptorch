@@ -63,6 +63,7 @@ PyTorch functions
 * ``torch.roll``
 * ``torch.scatter``
 * ``torch.scatter_add``
+* ``torch.scatter_reduce``
 * ``torch.stack``
 * ``torch.split``
 * ``torch.squeeze``

@@ -220,6 +220,76 @@ torch::jit::Node *scatterAddHandler(torch::jit::Graph *graph,
   return add;
 }
 
+enum class ScatterReduction { Sum = 0, Max, Min, None };
+
+std::int32_t getReductionMethod(torch::jit::Node *node) {
+  const auto reduce = constantToString(node);
+  if (reduce == "sum") {
+    return static_cast<std::int32_t>(ScatterReduction::Sum);
+  }
+  if (reduce == "amax") {
+    return static_cast<std::int32_t>(ScatterReduction::Max);
+  }
+  if (reduce == "amin") {
+    return static_cast<std::int32_t>(ScatterReduction::Min);
+  }
+
+  ERROR("Unsupported reduction type for scatter_reduce: " << reduce);
+}
+
+float getReductionInitValue(int32_t reduce) {
+  float init_val;
+  switch (reduce) {
+  case static_cast<std::int32_t>(ScatterReduction::Sum):
+    init_val = 0.0;
+    break;
+  case static_cast<std::int32_t>(ScatterReduction::Max):
+    init_val = -std::numeric_limits<float>::infinity();
+    break;
+  case static_cast<std::int32_t>(ScatterReduction::Min):
+    init_val = std::numeric_limits<float>::infinity();
+    break;
+  default:
+    ERROR("Unsupported reduction type for scatter_reduce: " << reduce);
+    break;
+  }
+  return init_val;
+}
+
+torch::jit::Node *scatterReduceHandler(torch::jit::Graph *graph,
+                                       torch::jit::Node *node) {
+  // Signature for scatter_reduce
+  // (Tensor src, int dim, Tensor index, Tensor src, string reduce,
+  //  bool include_self)
+  auto *self = node->input(0);
+  auto *dim = node->input(1);
+  auto *index = node->input(2);
+  auto *src = node->input(3);
+  auto reduce = getReductionMethod(node->input(4)->node());
+  auto include_self = constantToBool(node->input(5)->node());
+
+  auto t = src->type()->expect<c10::TensorType>();
+  auto axis = handleDimensionParam(dim, t);
+  auto outshape = shapeFromTensor(node->output(0));
+  auto axissize = outshape.at(axis);
+
+  torch::jit::Node *sr;
+  if (!include_self) {
+    // Mask those indices in `self` that are specified by `index`
+    auto *init = createConstantFloat32(graph, {getReductionInitValue(reduce)},
+                                       shapeFromTensor(src));
+    const auto none_reduce = static_cast<std::int32_t>(ScatterReduction::None);
+    auto *masked_self = createScatterreduce(
+        graph, {init->output(), index, self}, axissize, axis, none_reduce);
+    sr = createScatterreduce(graph, {src, index, masked_self->output()},
+                             axissize, axis, reduce);
+  } else {
+    sr = createScatterreduce(graph, {src, index, self}, axissize, axis, reduce);
+  }
+
+  return sr;
+}
+
 torch::jit::Node *weightNormHandler(torch::jit::Graph *graph,
                                     torch::jit::Node *node) {
   // aten::_weight_norm(Tensor v, Tensor g, int dim) -> Tensor
@@ -316,6 +386,7 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::cartesian_prod, cartesianProdHandler);
   registerHandler(c10::aten::tensordot, tensordotHandler);
   registerHandler(c10::aten::scatter_add, scatterAddHandler);
+  registerHandler(c10::aten::scatter_reduce, scatterReduceHandler);
   registerHandler(c10::aten::_weight_norm, weightNormHandler);
   registerHandler(c10::aten::randint, randintHandler);
   registerHandler(c10::aten::random_, randomHandler);

@@ -132,6 +132,10 @@ TORCH_LIBRARY_IMPL(aten, IPU, m) {
   m.impl("scatter_add", PTC_BOXED(poptorch::fallback));
   m.impl("scatter_add.out", PTC_BOXED(poptorch::fallback));
   m.impl("scatter_add_", PTC_BOXED(poptorch::fallback));
+
+  m.impl("scatter_reduce.two", PTC_BOXED(poptorch::fallback));
+  m.impl("scatter_reduce.two_out", PTC_BOXED(poptorch::fallback));
+  m.impl("scatter_reduce_.two", PTC_BOXED(poptorch::fallback));
 }
 
 TORCH_LIBRARY_IMPL(torch_scatter, IPU, m) {

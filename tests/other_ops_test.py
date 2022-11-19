@@ -154,6 +154,80 @@ def test_scatter_add(inplace, dim):
     op_harness(Model(dim, dim_size), x, index)
 
 
+@pytest.mark.parametrize("dim", range(-3, 3))
+@pytest.mark.parametrize("reduce", ['sum', 'amin', 'amax'])
+@pytest.mark.parametrize("include_self", [True, False])
+def test_scatter_reduce(dim, reduce, include_self):
+    class Model(torch.nn.Module):
+        def __init__(self, dim, reduce, include_self):
+            super().__init__()
+            self.dim = dim
+            self.reduce = reduce
+            self.include_self = include_self
+
+        def forward(self, inp, index, src):
+            output = inp.scatter_reduce(self.dim,
+                                        index,
+                                        src,
+                                        reduce=self.reduce,
+                                        include_self=self.include_self)
+            return output
+
+    torch.manual_seed(42)
+    src = torch.randn(4, 8, 16)
+    dim_size = src.shape[dim] // 2
+    sz = list(src.shape)
+    sz[dim] = dim_size
+    inp = torch.randn(sz)
+    index = torch.randint_like(src, high=dim_size).long()
+
+    op_harness(Model(dim, reduce, include_self), inp, index, src)
+
+
+@helpers.printCapfdOnExit
+@helpers.overridePoptorchLogLevel("TRACE")
+@pytest.mark.parametrize("reduce", ['sum', 'amin', 'amax'])
+@pytest.mark.parametrize("expand_as", [True, False])
+@pytest.mark.parametrize("include_self", [True, False])
+def test_2d_scatter_reduce_with_index_expansion(capfd, reduce, expand_as,
+                                                include_self):
+    class Model(torch.nn.Module):
+        def __init__(self, reduce, include_self):
+            super().__init__()
+            self.reduce = reduce
+            self.include_self = include_self
+
+        def forward(self, inp, index, src):
+            if expand_as:
+                index = index.expand_as(src)
+            else:
+                index = index.expand(src.shape)
+            output = inp.scatter_reduce(-2,
+                                        index,
+                                        src,
+                                        reduce=self.reduce,
+                                        include_self=self.include_self)
+            return output
+
+    model = Model(reduce, include_self)
+    poptorch_model = poptorch.inferenceModel(model)
+
+    torch.manual_seed(0)
+    index = torch.randint(0, 5, (6, 1), dtype=torch.long)
+    src = torch.rand((6, 3))
+    inp = torch.randn((5, 3))
+    out = model(inp, index, src)
+    poptorch_out = poptorch_model(inp, index, src)
+    helpers.assert_allclose(actual=poptorch_out, expected=out)
+
+    # Make sure the expand op is removed.
+    look_for = "aten::expand_as" if expand_as else "aten::expand"
+    log = helpers.LogChecker(capfd)
+    it = log.createIterator()
+    it.findNext("Removing index expansion node:")
+    it.assert_not_contains(look_for)
+
+
 @helpers.printCapfdOnExit
 @helpers.overridePoptorchLogLevel("TRACE")
 @pytest.mark.parametrize("expand_as", [True, False])

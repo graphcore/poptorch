@@ -13,13 +13,15 @@
 namespace poptorch {
 
 void removeScatterAddIndexExpansion(torch::jit::Graph *graph) {
-  logging::LogContext ctx{"ScatterAddOptimization"};
+  const logging::LogContext ctx{"ScatterAddOptimization"};
 
   std::vector<torch::jit::Node *> to_delete;
 
   for (auto *node : graph->nodes()) {
     if (node->kind() != c10::aten::scatter_add &&
-        node->kind() != c10::aten::scatter_add_) {
+        node->kind() != c10::aten::scatter_add_ &&
+        node->kind() != c10::aten::scatter_reduce &&
+        node->kind() != c10::aten::scatter_reduce_) {
       continue;
     }
 
@@ -27,6 +29,11 @@ void removeScatterAddIndexExpansion(torch::jit::Graph *graph) {
     //                   Tensor src) -> Tensor
     // aten::scatter_add_(Tensor(a!) self, int dim, Tensor index,
     //                    Tensor src) -> Tensor(a!)
+    // aten::scatter_reduce(Tensor self, int dim, Tensor index,
+    //                      Tensor src, str reduce, bool include_self) -> Tensor
+    // aten::scatter_reduce_(Tensor(a!) self, int dim, Tensor index,
+    //                       Tensor src, str reduce, bool include_self)
+    //                      -> Tensor(a!)
     auto *index = node->input(2);
     auto *index_producer = index->node();
 

@@ -499,6 +499,31 @@ def Poptorch_scatter_reduce_out : Poptorch_NotImplementedOp<"scatter_reduce_out"
     ];
 }
 
+def Poptorch_scatter_reduce_two : Poptorch_NotImplementedOp<"scatter_reduce_two", []> {
+    let arguments = (ins Poptorch_tensor:$self,
+                         I64Attr:$dim,
+                         Poptorch_tensor:$index,
+                         Poptorch_tensor:$src,
+                         StrAttr:$reduce,
+                         BoolAttr:$include_self
+                         );
+    let results = (outs Poptorch_tensor:$result);
+
+    let builders = [OpBuilder<(ins "mlir::Value":$self,
+                                   "std::int64_t":$dim,
+                                   "mlir::Value":$index,
+                                   "mlir::Value":$src,
+                                   "std::string":$reduce,
+                                   "bool":$include_self),[{
+        $_state.addOperands({self, index, src});
+        $_state.addAttribute("dim", $_builder.getI64IntegerAttr(dim));
+        $_state.addAttribute("reduce", $_builder.getStringAttr(reduce));
+        $_state.addAttribute("include_self", $_builder.getBoolAttr(include_self));
+        $_state.addTypes(self.getType());
+      }]>
+    ];
+}
+
 def Poptorch_scatter_value_reduce_out : Poptorch_NotImplementedOp<"scatter_value_reduce_out", []> {
     let arguments = (ins Poptorch_tensor:$self,
                          I64Attr:$dim,
@@ -593,7 +618,7 @@ def Poptorch_count_nonzero : Poptorch_NotImplementedOp<"count_nonzero", []> {
         auto sorted_dims = dim;
         std::sort(sorted_dims.begin(), sorted_dims.end(), std::greater<>{});
 
-        ERROR_ON_MSG(std::adjacent_find(sorted_dims.begin(), sorted_dims.end()) != sorted_dims.end(), 
+        ERROR_ON_MSG(std::adjacent_find(sorted_dims.begin(), sorted_dims.end()) != sorted_dims.end(),
                      "The dimensions to count must be unique");
 
         for (auto d : sorted_dims) {
