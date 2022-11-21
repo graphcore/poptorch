@@ -568,77 +568,6 @@ void identifyZeroSizedTensors(const std::vector<at::Tensor> &tensors) {
   }
 }
 
-poptorch::LowerToPopart lowerToPopartFromTrace(
-    py::handle h, const pybind11::dict &python_traced_params,
-    const pybind11::tuple &inputs, bool has_converted_any_half,
-    const pybind11::dict &options, bool training,
-    const py::dict &optimizer_dict, const py::function &attribute_accessor,
-    const bool added_dummy_output, const py::list &anchors,
-    const py::dict &model_parameters) {
-
-  auto cleanup = CallOnExit([] {
-    // Clear the callbacks after compilation.
-    callbacks.clear();
-  });
-  auto *module = asModule(h);
-
-  auto forward = module->get_method("forward");
-  auto graph_and_tensors =
-      torch::jit::LowerGraph(*forward.graph(), module->_ivalue());
-  auto graph = graph_and_tensors.first;
-
-  // If we added a dummy output to make tracing work (no output case), remove
-  // it
-  if (added_dummy_output) {
-    ERROR_ON(graph->outputs().size() != 1);
-    graph->eraseOutput(0);
-  }
-
-  // Create a jit stack from the incoming pytorch tensors.
-  torch::jit::Stack input_stack = jit::toTraceableStack(inputs);
-
-  // And turn convert them into at tensors which we can then resolve the
-  // address of.
-  std::vector<at::Tensor> input_tensors;
-  for (const torch::jit::IValue &value : input_stack) {
-    buildTensorList(value, &input_tensors);
-  }
-
-  // This is subset of "parameters_tensors", but only those actually used.
-  // The order matches the that of graph inputs, and the last
-  // traced_parameter_tensors.size() graph inputs matches these, while those
-  // which come before are the "actual" inputs.
-  std::vector<at::Tensor> traced_parameter_tensors;
-  for (const torch::jit::IValue &value : graph_and_tensors.second) {
-    buildTensorList(value, &traced_parameter_tensors, true);
-  }
-
-  identifyZeroSizedTensors(input_tensors);
-  identifyZeroSizedTensors(traced_parameter_tensors);
-
-  std::vector<std::string> parameters =
-      getParameterNames(python_traced_params, traced_parameter_tensors);
-
-  traced_parameter_tensors = remapTensors(
-      python_traced_params, model_parameters, traced_parameter_tensors);
-
-  std::vector<popart_compiler::Optimizer> optimizers =
-      parseOptimizers(optimizer_dict);
-
-  SessionOptionsParser options_parser{PybindValue(options)};
-  AnchorList anchors_list = parseAnchors(anchors);
-
-  return lowerToPopartFromTrace(
-      options_parser, graph, has_converted_any_half, training, input_tensors,
-      parameters, traced_parameter_tensors, std::move(anchors_list),
-      []() { initCallbackBuffers(); }, std::move(optimizers),
-      [&attribute_accessor](const std::string &attributes_id_str) {
-        return std::make_unique<PybindValue>(
-            attribute_accessor(attributes_id_str));
-      },
-      callbacks);
-}
-
 poptorch::LowerToPopart
 lowerToPopartFromDispatch(const pybind11::dict &options,
                           const py::function &attribute_accessor, bool training,
@@ -1028,44 +957,12 @@ cycleCount(const std::shared_ptr<poptorch::PoplarExecutable> &executable) {
   return executable->getCompiler().getCycleCount();
 }
 
-std::shared_ptr<poptorch::PoplarExecutable> processTraceAndImportExecutable(
-    py::handle h, const pybind11::dict &python_traced_params,
-    const pybind11::tuple &inputs, bool has_converted_any_half,
-    const pybind11::dict &options, bool training,
-    const py::dict &optimizer_dict, const py::function &attribute_accessor,
-    const bool added_dummy_output, const py::list &anchors,
-    const py::dict &model_parameters, const std::string &import_filename) {
-  poptorch::logging::Tracepoint tp{__FUNCTION__};
-  auto lower = lowerToPopartFromTrace(
-      h, python_traced_params, inputs, has_converted_any_half, options,
-      training, optimizer_dict, attribute_accessor, added_dummy_output, anchors,
-      model_parameters);
-  return lower.loadExecutableFromFile(import_filename);
-}
-
 py::bytes importPoptorchMetadataFromFile(const std::string &import_filename) {
   poptorch::logging::Tracepoint tp{__FUNCTION__};
   std::vector<char> metadata_buffer =
       popart_compiler::Compiler::importPoptorchMetadataFromFile(
           import_filename.c_str());
   return py::bytes(metadata_buffer.data(), metadata_buffer.size());
-}
-
-std::shared_ptr<poptorch::PoplarExecutable>
-compileWithTrace(py::handle h, const pybind11::dict &python_traced_params,
-                 const pybind11::tuple &inputs, bool has_converted_any_half,
-                 const pybind11::dict &options, bool training,
-                 const py::dict &optimizer_dict,
-                 const py::function &attribute_accessor,
-                 const bool added_dummy_output, const py::list &anchors,
-                 const py::dict &model_parameters) {
-  poptorch::logging::Tracepoint tp{__FUNCTION__};
-  auto lower = lowerToPopartFromTrace(
-      h, python_traced_params, inputs, has_converted_any_half, options,
-      training, optimizer_dict, attribute_accessor, added_dummy_output, anchors,
-      model_parameters);
-  py::gil_scoped_release release;
-  return lower.compile();
 }
 
 std::shared_ptr<poptorch::PoplarExecutable> processDispatchAndImportExecutable(
@@ -1131,10 +1028,7 @@ PYBIND11_MODULE(poptorch_core, m) { // NOLINT
   m.def("saveExecutableToFile", PTC(poptorch::bindings::saveExecutableToFile));
   m.def("appendPoptorchMetadataToFile",
         PTC(poptorch::bindings::appendPoptorchMetadataToFile));
-  m.def("compileWithTrace", PTC(poptorch::bindings::compileWithTrace));
   m.def("cycleCount", PTC(poptorch::bindings::cycleCount));
-  m.def("processTraceAndImportExecutable",
-        PTC(poptorch::bindings::processTraceAndImportExecutable));
   m.def("importPoptorchMetadataFromFile",
         PTC(poptorch::bindings::importPoptorchMetadataFromFile));
   m.def("execute", PTC(poptorch::bindings::execute));

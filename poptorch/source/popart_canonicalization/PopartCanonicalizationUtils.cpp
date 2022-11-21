@@ -317,42 +317,6 @@ bool isMarkedForDeletion(torch::jit::Node *node) {
 }
 
 void replaceOutputUse(torch::jit::Value *old_val, torch::jit::Value *new_val) {
-  // Take the type of the old value.
-  auto old_type = old_val->type()->cast<c10::TensorType>();
-  auto new_type = new_val->type()->cast<c10::TensorType>();
-
-  // With the dispatcher always use the old type and shape (as it comes from
-  // the MLIR shape inference) otherwise, if both types are defined, check if
-  // the new_val types needs adjusting (to work around some tracing
-  // limitations).
-  if (!isCompilingWithDispatcher() && static_cast<bool>(old_type) &&
-      static_cast<bool>(new_type)) {
-    ERROR_ON(!(old_type->scalarType()));
-    ERROR_ON_MSG(!(new_type->scalarType()), "New output has no scalar type.");
-
-    if (old_type->scalarType() != new_type->scalarType()) {
-      if (old_type->scalarType() == at::ScalarType::Float &&
-          new_type->scalarType() == at::ScalarType::Half) {
-        // This occurs because we have to trace with Float so we can switch
-        // to Half here
-        new_val->setType(old_type->withScalarType(at::ScalarType::Half));
-        old_val->replaceAllUsesWith(new_val);
-        return;
-      }
-      if (old_type->scalarType() == at::ScalarType::Float &&
-          new_type->scalarType() == HALF_OR_FLOAT) {
-        // At this stage, we do not know whether it is a float16 or float32
-        new_val->setType(old_type->withScalarType(HALF_OR_FLOAT));
-
-        old_val->replaceAllUsesWith(new_val);
-        return;
-      }
-
-      old_val->replaceAllUsesWith(new_val);
-      return;
-    }
-  }
-
   // Make sure the new value matches the type of the original value.
   new_val->setType(old_val->type());
 

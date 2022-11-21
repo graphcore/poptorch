@@ -13,17 +13,6 @@
 
 namespace poptorch {
 
-poptorch::LowerToPopart lowerToPopartFromTrace(
-    SessionOptionsParser &parser,
-    const std::shared_ptr<torch::jit::Graph> &graph,
-    bool has_converted_any_half, bool training,
-    std::vector<at::Tensor> &input_tensors,
-    std::vector<std::string> &parameters,
-    std::vector<at::Tensor> &traced_parameter_tensors,
-    AnchorList &&anchors_list, const std::function<void()> &initCallbackBuffers,
-    std::vector<popart_compiler::Optimizer> &&optimizers,
-    const AttributeAccessor &attribute_accessor, CPUCallbackMap &callbacks);
-
 poptorch::LowerToPopart lowerToPopartFromDispatch(
     SessionOptionsParser &parser, bool training, AnchorList &&anchors_list,
     const std::function<void()> &initCallbackBuffers,

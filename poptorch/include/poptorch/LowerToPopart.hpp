@@ -48,18 +48,6 @@ struct InplaceGraphInfo;
 
 class LowerToPopart {
 public:
-  // JIT trace entry point: we manually provide the parameters.
-  LowerToPopart(torch::jit::Graph *graph,
-                const std::vector<at::Tensor> &parameters,
-                const std::vector<std::string> &parameter_names,
-                InplaceGraphInfo &&inplace_info, bool training,
-                std::vector<popart_compiler::Optimizer> &&opt,
-                const popart_compiler::SessionOptions &options,
-                const AttributeAccessor &attribute_accessor,
-                CPUCallbackMap callback, AnchorList &&anchors,
-                std::vector<std::size_t> &&input_index_map);
-
-  // Dispatcher entry point: the parameters are embedded in the jit::Graph.
   LowerToPopart(torch::jit::Graph *graph, InplaceGraphInfo &&inplace_info,
                 bool training, std::vector<popart_compiler::Optimizer> &&opt,
                 const popart_compiler::SessionOptions &options,
@@ -69,7 +57,7 @@ public:
   LowerToPopart(LowerToPopart &&lower);
   ~LowerToPopart();
 
-  void lower(std::vector<at::Tensor> *in_tensors);
+  void lower();
   std::shared_ptr<poptorch::PoplarExecutable> compile();
   std::shared_ptr<poptorch::PoplarExecutable>
   loadExecutableFromFile(const std::string &input_filename);

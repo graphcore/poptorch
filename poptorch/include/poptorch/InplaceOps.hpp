@@ -51,30 +51,6 @@ struct InplaceGraphInfo {
   std::vector<std::size_t> input_output_mapping{};
 };
 
-// A replacement for and modification to
-// torch/csrc/jit/passes/remove_inplace_ops.cpp.
-// In addition to replacing inplace ops with their outplace variants,
-// the modified algorithm returns as an output any tensors which, in the
-// original lowered graph, would correspond to an input tensor modified in
-// place. As a result, PopTorch can use returned outputs to update the input
-// tensors and, in doing so, emulate inplace op behaviour.
-//
-// num_parameters: the number of elements in graph.inputs() which are
-// parameters.
-//
-// num_anchors: the number of tensors which are not model outputs but which
-//              should be returned to the user. Not affected by inplacing
-//              rules.
-//
-// replicas_needing_broadcast: whether or not there is at least one replica:
-//                             this is relevant in the case of buffers
-//                             modified in place, which is not supported
-//                             with replicas.
-InplaceGraphInfo handleInplaceOpsInGraph(torch::jit::Graph &graph,
-                                         size_t num_parameters,
-                                         size_t num_anchors,
-                                         bool replicas_needing_broadcast);
-
 // Get the NodeKind corresponding to the outplace version of the given
 // inplace op NodeKind
 torch::jit::NodeKind outplaceKind(torch::jit::NodeKind kind);

@@ -121,9 +121,4 @@ void moveSetAvailableMemoryIfRequired(
   set_available_memory_node->replaceInput(0, new_input);
 }
 
-void setAvailableMemoryOnGraphFinalized() {
-  logging::trace("Clearing list of possible inputs ops to AMP");
-  amp_possible_input_nodes.clear();
-}
-
 } // namespace poptorch

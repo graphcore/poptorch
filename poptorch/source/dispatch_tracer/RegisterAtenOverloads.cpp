@@ -730,6 +730,8 @@ void callCpuOp(const c10::OperatorHandle &op, c10::Stack *stack) {
 }
 
 void endCpuOp(const c10::OperatorHandle &op, c10::Stack *stack) {
+  // This op might have been called as part of a CPU model in which case we
+  // don't want to re-start the dispatcher.
   if (poptorch::isCompilingWithDispatcher()) {
     poptorch::startDispatch();
   }

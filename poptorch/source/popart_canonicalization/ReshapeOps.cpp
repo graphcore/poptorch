@@ -766,11 +766,6 @@ torch::jit::Node *toHandler(torch::jit::Graph *graph, torch::jit::Node *node) {
   }
 
   if (cast_to.has_value()) {
-    // In this case, the original dtype may have been half
-    if (*cast_to == at::ScalarType::Float && !isCompilingWithDispatcher()) {
-      cast_to = HALF_OR_FLOAT;
-    }
-
     // Avoid promoting to an unsupported type
     cast_to = coerceToSupportedType(*cast_to);
   }

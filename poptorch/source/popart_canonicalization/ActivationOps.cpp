@@ -73,14 +73,8 @@ torch::jit::Node *rreluHandler(torch::jit::Graph *graph,
   torch::jit::Value *x = node->input(0);
   int64_t next_idx = 1;
   if (node->kind() == c10::aten::rrelu_with_noise) {
-    torch::jit::Value *noise = node->input(next_idx++);
-    if (isCompilingWithDispatcher()) {
-      logging::warn("Noise parameter not supported for aten::rrelu_with_noise");
-    } else {
-      ERROR_ON_MSG(noise->node()->kind() != c10::prim::Uninitialized,
-                   "Internal error: noise parameter not supported for "
-                   "aten::rrelu_with_noise");
-    }
+    next_idx++; // skip noise parameter
+    logging::warn("Noise parameter not supported for aten::rrelu_with_noise");
   }
   const float lower = constantToFloat(node->input(next_idx++)->node());
   const float upper = constantToFloat(node->input(next_idx++)->node());

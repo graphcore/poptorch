@@ -102,21 +102,11 @@ UseOfNode getUseOfNode(torch::jit::Node *n,
 void replaceWithConstantTensor(torch::jit::Graph *graph, torch::jit::Node *n,
                                const at::Tensor &t) {
   ERROR_ON(n->kind() != c10::prim::Constant);
-  const bool is_dispatcher_active = isCompilingWithDispatcher();
   torch::jit::WithInsertPoint const insert_point(n);
   const WithNodeMetadata meta(n);
 
   poptorch::UseOfNode const use_of_node = getUseOfNode(n);
   auto *new_node = tensorToConstant(graph, t, use_of_node);
-
-  if (!is_dispatcher_active) {
-    // Due to tracing ambiguity, a float tensor here could be either
-    // float or half
-    auto new_type = new_node->output()->type()->expect<c10::TensorType>();
-    if (new_type->scalarType() == at::ScalarType::Float) {
-      new_node->output()->setType(new_type->withScalarType(HALF_OR_FLOAT));
-    }
-  }
 
   for (size_t use_idx = 0; use_idx < n->output()->uses().size(); use_idx++) {
     auto u = n->output()->uses()[use_idx];
@@ -662,12 +652,10 @@ void canonicaliseConstants(torch::jit::Graph *graph,
   logging::LogContext const ctx_func("CanonicaliseConstants");
   std::unordered_set<torch::jit::Node *> to_delete;
 
-  if (isCompilingWithDispatcher()) {
-    // If any inputs are simply returned as outputs, replace
-    // those inputs with host-side-only constants so that they
-    // aren't lowered to PopART
-    convertReturnedInputsToConstants(graph, input_index_map);
-  }
+  // If any inputs are simply returned as outputs, replace
+  // those inputs with host-side-only constants so that they
+  // aren't lowered to PopART
+  convertReturnedInputsToConstants(graph, input_index_map);
 
   for (auto *node : graph->nodes()) {
     canonicaliseIfConstant(graph, node, &to_delete);

@@ -224,16 +224,8 @@ void setNodeOutputsTypes(torch::jit::Node *node,
         const auto &onnx_dtype = node->s(c10::attr::dtype);
         resolved_output_type = onnxStrToScalarType(onnx_dtype.c_str());
       }
-
-      if (resolved_output_type == at::ScalarType::Float &&
-          !isCompilingWithDispatcher()) {
-        // Due to tracing not supporting Float16, the original type could be
-        // either half or float 16.
-        resolved_output_type = HALF_OR_FLOAT;
-      }
     } else {
-      // Without dtype, the input will be the correct type (or possibly
-      // HALF_OR_FLOAT)
+      // Without dtype, the input will be the correct type
       resolved_output_type = scalarTypeFromInput(node, 0);
       // This may be needed in the lower to popart stage
       node->s_(c10::attr::dtype, scalarTypeToOnnxString(resolved_output_type));

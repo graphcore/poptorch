@@ -902,7 +902,7 @@ class PoplarExecutor:
         # Load the engine and connect the streams in all the processes.
         #
         # Note: no sync point was added because we expect the above
-        # compileWithTrace call to be quick as all the processes should
+        # compileWithDispatch call to be quick as all the processes should
         # hit the cache.
         #
         # If the cache is disabled then we expect the compilation process
@@ -917,7 +917,7 @@ class PoplarExecutor:
         self._is_attached = self.isAttachedToDevice()
 
         # PopTorch might have attached to a device either during
-        # compileWithTrace (if connection type is set to Always) or
+        # compileWithDispatch (if connection type is set to Always) or
         # during loadEngineAndConnectStreams (if OnDemand is used),
         # either way this will have occurred in the C++ backend, *not* using
         # PoplarExecutor.attachToDevice(), therefore we need to manually

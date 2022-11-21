@@ -19,11 +19,11 @@ void attributiseOverlappedInputs(
     torch::jit::Graph *graph,
     std::set<torch::jit::Node *> *to_erase_output_and_delete,
     std::vector<torch::jit::Node *> *to_delete) {
-  logging::LogContext ctx("attributiseOverlappedInputs");
+  logging::LogContext const ctx("attributiseOverlappedInputs");
 
   int64_t input_num = -1;
   for (auto *input : graph->inputs()) {
-    if (isCompilingWithDispatcher() && isParameter(input)) {
+    if (isParameter(input)) {
       continue;
     }
 
@@ -67,7 +67,7 @@ void attributiseOverlappedInputs(
 }
 
 void errorOnDoubleReturnOfOutput(torch::jit::Node *node) {
-  logging::LogContext ctx("check double return of" + nodeToString(node));
+  logging::LogContext const ctx("check double return of" + nodeToString(node));
   uint32_t return_count = 0;
 
   std::function<void(torch::jit::Value *)> count_returns;
@@ -100,7 +100,7 @@ void attributiseOverlappedOutputs(
     torch::jit::Graph *graph,
     std::set<torch::jit::Node *> *to_erase_output_and_delete,
     std::vector<torch::jit::Node *> *to_delete) {
-  logging::LogContext ctx("attributiseOverlappedOutputs");
+  logging::LogContext const ctx("attributiseOverlappedOutputs");
 
   int64_t output_num = 0;
 

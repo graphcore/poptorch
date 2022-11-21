@@ -805,7 +805,7 @@ class CPU:
         # Mark all subsquent ops as happening on the host.
         torch.ops.poptorch.call_cpu_op([*input], self._ID)
 
-        if poptorch_core.isCompilingWithDispatcher():
+        if _impl.isRunningOnIpu():
             cpu_input = [
                 torch.zeros_like(i,
                                  device="cpu",
@@ -831,7 +831,7 @@ class CPU:
         self.in_shapes = [i.shape for i in input]
         self.out_shapes = [o.shape for o in cpu_outputs]
 
-        if poptorch_core.isCompilingWithDispatcher():
+        if _impl.isRunningOnIpu():
             outputs = [
                 torch.zeros_like(o,
                                  device="ipu",
