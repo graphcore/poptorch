@@ -25,13 +25,17 @@ void fixRequiresGradFromDispatch(torch::jit::Graph *graph) {
       if (device->type() != at::DeviceType::IPU) {
         continue;
       }
-      // If the output is an IPU tensor, check if any of the inputs has
-      // requires_grad set. and update the Value if needed.
+      // If the output is an IPU floating-point tensor, check if any
+      // of the inputs has requires_grad set, and update the Value if
+      // needed.
       bool requires_grad = false;
-      for (auto *input : node->inputs()) {
-        if (input->requires_grad()) {
-          requires_grad = true;
-          break;
+      if (tensor_type->scalarType().has_value() &&
+          c10::isFloatingType(tensor_type->scalarType().value())) {
+        for (auto *input : node->inputs()) {
+          if (input->requires_grad()) {
+            requires_grad = true;
+            break;
+          }
         }
       }
       if (requires_grad != output->requires_grad()) {
