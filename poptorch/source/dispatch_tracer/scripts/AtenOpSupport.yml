@@ -1067,6 +1067,15 @@
   UnusedOutputArguments: {out: null}
   native_func: cumsum.out(Tensor self, int dim, *, ScalarType? dtype=None, Tensor(a!) out) -> Tensor(a!)
 
+- func: nansum
+  PopTorchDirect: nansum
+  native_func: nansum(Tensor self, int[1]? dim=None, bool keepdim=False, *, ScalarType? dtype=None) -> Tensor
+
+- func: nansum.out
+  PopTorchDirect: nansum
+  UnusedOutputArguments: {out: null}
+  native_func: nansum.out(Tensor self, int[1]? dim=None, bool keepdim=False, *, ScalarType? dtype=None, Tensor(a!) out) -> Tensor(a!)
+
 - func: mean.out
   PopTorchDirect: reducemean
   UnusedOutputArguments: {out: null}

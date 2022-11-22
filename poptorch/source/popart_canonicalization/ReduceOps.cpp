@@ -405,6 +405,42 @@ torch::jit::Node *countNonzeroHandler(torch::jit::Graph *graph,
   return createReducesum(graph, {where->output()}, dim, /*keepdims=*/0);
 }
 
+torch::jit::Node *nanSumHandler(torch::jit::Graph *graph,
+                                torch::jit::Node *node) {
+  // isNan -> where -> sum -> cast (if applicable) -> out
+  torch::jit::Value *in_tensor = node->input(0);
+
+  auto *is_nan = createIsnan(graph, {in_tensor});
+  auto *zeros = createConstantFloatLike(graph, in_tensor, {0},
+                                        shapeFromTensor(in_tensor));
+  auto *non_nans =
+      createWhere(graph, {is_nan->output(0), zeros->output(0), in_tensor});
+
+  std::vector<int64_t> dims;
+  auto *dim = node->input(1);
+  if (auto *n = dim->node(); n->kind() == c10::prim::ListConstruct) {
+    dims = constantToLongVec(n);
+  } else if (isNone(dim)) {
+    // We only get a node with Constant kind if `dim` is not
+    // provided, so preform the sum over all the dimensions.
+    auto in_dim_count = shapeFromTensor(in_tensor).size();
+    dims.resize(in_dim_count);
+    std::iota(dims.begin(), dims.end(), 0);
+  } else {
+    ERROR("Popart Canonicalisation: UNREACHABLE reached in nansum handler.");
+  }
+
+  auto keepdim = constantToLong(node->input(2)->node());
+  auto *sum = createReducesum(graph, {non_nans->output(0)}, dims, keepdim);
+
+  auto *dtype = node->input(3);
+  if (!isNone(dtype)) {
+    auto type = constantToScalarType(dtype->node());
+    return createCast(graph, sum->output(0), type);
+  }
+  return sum;
+}
+
 } // namespace
 
 __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
@@ -427,5 +463,6 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::any, reduceHandler);
   registerHandler(c10::aten::all, reduceHandler);
   registerHandler(c10::aten::count_nonzero, countNonzeroHandler);
+  registerHandler(c10::aten::nansum, nanSumHandler);
 }
 } // namespace poptorch

@@ -17,6 +17,7 @@ add_mlir_dialect_library(poptorch_dialect
     PoptorchDialect.cpp
     ops/ElementWise.cpp
     ops/NormOpsHelpers.cpp
+    ops/ReductionsHelpers.cpp
     ops/Poptorch.cpp
   DEPENDS
     MLIRPoptorchIncGen

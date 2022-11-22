@@ -19,7 +19,7 @@ class Poptorch_reduce<string name> : Poptorch_Op<name, []> {
 
         const auto actual_axes = dim.value_or(std::vector<std::int64_t> {});
 
-        auto dims = parseDims(actual_axes, in_shape.size());
+        auto dims = parseReductionDimArgument(actual_axes, in_shape.size());
 
         if (dim.has_value()) {
             $_state.addAttribute("dim", $_builder.getI64ArrayAttr(dims));
@@ -48,60 +48,9 @@ class Poptorch_reduce<string name> : Poptorch_Op<name, []> {
                     ? $_builder.getIntegerType(32, true)
                     : in_element_type);
 
-        $_state.addTypes(mlir::RankedTensorType::get(inferShape(std::move(dims), in_shape, keepdim), out_element_type));
+        $_state.addTypes(mlir::RankedTensorType::get(inferShapeOfReductionOutput(std::move(dims), in_shape, keepdim), out_element_type));
      }]>
     ];
-
-    let extraClassDeclaration = [{
-        static std::vector<std::int64_t> parseDims(const std::vector<std::int64_t>& dim,
-                                                   std::size_t in_dim_count) {
-            auto dims = convertToPositiveDim(dim, in_dim_count);
-
-            // NOTE: an empty list of dimensions means we're reducing over all the dimensions
-            if (dims.empty()) {
-                dims.resize(in_dim_count);
-                std::iota(dims.begin(), dims.end(), 0);
-            }
-
-            // If we are dealing with a scalar value don't reduce at all
-            if (in_dim_count == 0) {
-                dims.clear();
-            }
-
-            return dims;
-        }
-        static llvm::SmallVector<std::int64_t, 4> inferShape(std::vector<std::int64_t> dims,
-                                                             llvm::ArrayRef<std::int64_t> in_shape,
-                                                             bool keepdim) {
-            llvm::SmallVector<std::int64_t, 4> shape {in_shape.begin(), in_shape.end()};
-
-            // Optimization for when we are reducing over all the dimensions or the input is a scalar
-            if (in_shape.size() == dims.size() || in_shape.empty()) {
-                if (!keepdim) {
-                    return {};
-                } else {
-                    std::fill(shape.begin(), shape.end(), 1);
-
-                    return shape;
-                }
-            }
-
-            // Sort in descending order so erasing elements doesn't invalidate future erases
-            std::sort(dims.begin(), dims.end(), std::greater<>{});
-
-            // Flatten those dims.
-            for (std::int64_t dim : dims) {
-                // Dim reduced to 1 or zero depending on keep dim.
-                if (keepdim) {
-                    shape[dim] = 1;
-                } else {
-                    shape.erase(shape.begin() + dim);
-                }
-            }
-
-            return shape;
-        }
-    }];
 }
 
 def Poptorch_reducemean : Poptorch_reduce<"reducemean"> {}
@@ -160,7 +109,7 @@ def Poptorch_prod_dim : Poptorch_reduce<"prod_dim"> {
             $_state.addAttribute("dtype", mlir::TypeAttr::get(*dtype));
         }
 
-        const auto shape = inferShape({dim}, ref, keepdim);
+        const auto shape = inferShapeOfReductionOutput({dim}, ref, keepdim);
 
         const auto in_element_type = tensor.getElementType();
         // TODO(T62262): This will need to be updated when we can have int64 inputs
@@ -238,7 +187,7 @@ class Poptorch_binary_reduction_out<string name> : Poptorch_reduce<name> {
         $_state.addAttribute("dim", $_builder.getI64IntegerAttr(dim));
         $_state.addAttribute("keepdim", $_builder.getBoolAttr(keepdim));
 
-        const auto shape = inferShape({dim}, ref, keepdim);
+        const auto shape = inferShapeOfReductionOutput({dim}, ref, keepdim);
 
         const auto in_element_type = tensor.getElementType();
         const auto out_element_type = in_element_type.isUnsignedInteger(8)
@@ -270,14 +219,14 @@ class Poptorch_std_var_correction<string name> : Poptorch_reduce<name> {
         mlir::RankedTensorType tensor = self.getType().cast<mlir::RankedTensorType>();
         auto in_shape = tensor.getShape();
 
-        dim = parseDims(dim.value_or(std::vector<std::int64_t>{}), in_shape.size());
+        dim = parseReductionDimArgument(dim.value_or(std::vector<std::int64_t>{}), in_shape.size());
 
         $_state.addAttribute("dim", $_builder.getI64ArrayAttr(*dim));
         // Note: correction is always in {0, 1} and corresponds to whether to apply Bessel's correction
         $_state.addAttribute("correction", $_builder.getI64IntegerAttr(correction.value_or(1)));
         $_state.addAttribute("keepdim", $_builder.getBoolAttr(keepdim));
 
-        const auto shape = inferShape(std::move(*dim), in_shape, keepdim);
+        const auto shape = inferShapeOfReductionOutput(std::move(*dim), in_shape, keepdim);
 
         $_state.addTypes(mlir::RankedTensorType::get(shape, tensor.getElementType()));
      }]>
@@ -299,14 +248,14 @@ class Poptorch_std_var_mean_correction<string name> : Poptorch_std_var_correctio
         mlir::RankedTensorType tensor = self.getType().cast<mlir::RankedTensorType>();
         auto in_shape = tensor.getShape();
 
-        dim = parseDims(dim.value_or(std::vector<std::int64_t>{}), in_shape.size());
+        dim = parseReductionDimArgument(dim.value_or(std::vector<std::int64_t>{}), in_shape.size());
 
         $_state.addAttribute("dim", $_builder.getI64ArrayAttr(*dim));
         // Note: correction is always in {0, 1} and corresponds to whether to apply Bessel's correction
         $_state.addAttribute("correction", $_builder.getI64IntegerAttr(correction.value_or(1)));
         $_state.addAttribute("keepdim", $_builder.getBoolAttr(keepdim));
 
-        const auto shape = inferShape(std::move(*dim), in_shape, keepdim);
+        const auto shape = inferShapeOfReductionOutput(std::move(*dim), in_shape, keepdim);
 
         $_state.addTypes({
                 mlir::RankedTensorType::get(shape, tensor.getElementType()),
@@ -517,3 +466,38 @@ class Poptorch_multi_dim_reduction<string name> : Poptorch_NotImplementedOp<name
 
 def Poptorch_amax : Poptorch_multi_dim_reduction<"amax"> {}
 def Poptorch_amin : Poptorch_multi_dim_reduction<"amin"> {}
+
+def Poptorch_nansum : Poptorch_NotImplementedOp<"nansum", []> {
+    let arguments = (ins Poptorch_tensor:$self, 
+                         OptionalAttr<I64ArrayAttr>:$dim, 
+                         BoolAttr:$keepdim, 
+                         OptionalAttr<TypeAttr>:$dtype);
+    let results = (outs Poptorch_tensor:$result);
+
+    let builders = [OpBuilder<(ins "mlir::Value":$self,
+                                   "const std::optional<std::vector<std::int64_t>>&":$dim,
+                                   "bool":$keepdim,
+                                   "std::optional<mlir::Type>":$dtype),[{
+        $_state.addOperands(self);
+
+        mlir::RankedTensorType tensor = asTensor(self);
+        auto in_shape = tensor.getShape();
+
+        auto dims = parseReductionDimArgument(dim.value_or(std::vector<std::int64_t> {}), 
+                              in_shape.size());
+
+        $_state.addAttribute("dim", $_builder.getI64ArrayAttr(dims));
+        $_state.addAttribute("keepdim", $_builder.getBoolAttr(keepdim));
+
+        mlir::Type out_type;
+        if(dtype.has_value()) {
+            out_type = *dtype;
+            $_state.addAttribute("dtype", mlir::TypeAttr::get(out_type));
+        } else {
+            out_type =  tensor.getElementType();
+        }
+
+        $_state.addTypes(mlir::RankedTensorType::get(inferShapeOfReductionOutput(std::move(dims), in_shape, keepdim), out_type));
+     }]>
+    ];
+}
