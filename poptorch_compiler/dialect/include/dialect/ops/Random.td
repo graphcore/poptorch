@@ -7,16 +7,16 @@
 def Poptorch_normal_ : Poptorch_Op<"normal_", [SameOperandsAndResultShape]> {
   let arguments = (ins Poptorch_tensor:$self,
                        F32Attr:$mean,
-                       F32Attr:$stdv);
+                       F32Attr:$std);
 
   let results = (outs Poptorch_tensor:$result);
 
   let builders = [OpBuilder<(ins "mlir::Value":$self,
-                                    "float":$mean,
-                                    "float":$stdv), [{
+                                 "float":$mean,
+                                 "float":$std), [{
         $_state.addOperands({self});
         $_state.addAttribute("mean", $_builder.getF32FloatAttr(mean));
-        $_state.addAttribute("stdv", $_builder.getF32FloatAttr(stdv));
+        $_state.addAttribute("std", $_builder.getF32FloatAttr(std));
         $_state.addTypes({self.getType()});
   }]>];
 }
@@ -141,14 +141,14 @@ def Poptorch_bernoulli : Poptorch_Op<"bernoulli", [SameOperandsAndResultShape]> 
 
 def Poptorch_bernoulli__float : Poptorch_Op<"bernoulli__float", [SameOperandsAndResultShape]> {
   let arguments = (ins Poptorch_tensor:$input,
-                       F32Attr:$prob);
+                       F32Attr:$p);
 
   let results = (outs Poptorch_tensor:$result);
 
   let builders = [OpBuilder<(ins "mlir::Value":$input,
-                                    "float":$prob), [{
+                                    "float":$p), [{
         $_state.addOperands({input});
-        $_state.addAttribute("prob", $_builder.getF32FloatAttr(prob));
+        $_state.addAttribute("p", $_builder.getF32FloatAttr(p));
 
         mlir::RankedTensorType input_tensor = input.getType().cast<mlir::RankedTensorType>();
         llvm::SmallVector<std::int64_t, 4> input_shape {input_tensor.getShape().begin(), input_tensor.getShape().end()};

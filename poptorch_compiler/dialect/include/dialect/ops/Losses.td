@@ -70,7 +70,11 @@ def Poptorch_nll_loss : Poptorch_Op<"nll_loss", []> {
         ERROR_ON_MSG(!target_t.getElementType().isIntOrIndex(),
                      "An NLLLoss target must be an integer type.");
 
-        $_state.addOperands({self, target});
+        llvm::SmallVector<mlir::Value, 3> operands = {self, target};
+        if (weight) {
+            operands.push_back(weight);
+        }
+        $_state.addOperands(operands);
         $_state.addAttribute("reduction",$_builder.getI64IntegerAttr(reduction));
         $_state.addAttribute("ignore_index",$_builder.getI64IntegerAttr(ignore_index));
         mlir::RankedTensorType tensor = self.getType().cast<mlir::RankedTensorType>();
@@ -112,7 +116,12 @@ def Poptorch_nll_loss_backward : Poptorch_Op<"nll_loss_backward", []> {
                                       "std::int64_t":$reduction,
                                       "std::int64_t":$ignore_index,
                                       "mlir::Value":$total_weight),[{
-        $_state.addOperands({grad_output, self, target, total_weight});
+        llvm::SmallVector<mlir::Value, 5> operands = {grad_output, self, target};
+        if (weight) {
+            operands.push_back(weight);
+        }
+        operands.push_back(total_weight);
+        $_state.addOperands(operands);
         $_state.addAttribute("reduction",$_builder.getI64IntegerAttr(reduction));
         $_state.addAttribute("ignore_index",$_builder.getI64IntegerAttr(ignore_index));
         $_state.addTypes(self.getType());

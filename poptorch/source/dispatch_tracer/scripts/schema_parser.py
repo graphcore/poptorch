@@ -64,9 +64,9 @@ class ValueInfo:
 
         arg = value_schema.split('=')
 
-        has_default = '=' in value_schema
+        self.has_default = '=' in value_schema
         self.default = None
-        if has_default:
+        if self.has_default:
             if arg[-1] == 'Mean':
                 self.default = 0
             else:
@@ -100,7 +100,7 @@ class ValueInfo:
                     and args_to_ignore[self.name] is not None):
                 self.ignored_default = ast.literal_eval(
                     args_to_ignore[self.name])
-            elif has_default:
+            elif self.has_default:
                 self.ignored_default = self.default
             else:
                 print(f'No default value for {self.name} in {aten_name}. You '

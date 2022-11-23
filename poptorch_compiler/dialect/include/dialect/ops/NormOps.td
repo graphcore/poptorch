@@ -160,7 +160,7 @@ def Poptorch_batch_norm_backward: Poptorch_Op<"batch_norm_backward",
                        Optional<Poptorch_tensor>:$running_var,
                        Optional<Poptorch_tensor>:$save_mean,
                        Optional<Poptorch_tensor>:$save_invstd,
-                       BoolAttr:$training,
+                       BoolAttr:$train,
                        F32Attr:$eps,
                        I64ArrayAttr:$output_mask);
   let results = (outs Optional<Poptorch_tensor>:$grad_input,
@@ -173,7 +173,7 @@ def Poptorch_batch_norm_backward: Poptorch_Op<"batch_norm_backward",
                                  "mlir::Value":$running_var,
                                  "mlir::Value":$save_mean,
                                  "mlir::Value":$save_invstd,
-                                 "bool":$training,
+                                 "bool":$train,
                                  "float":$eps,
                                  "const std::vector<std::int64_t>":$output_mask), [{
     // Weight would ordinarily be optional but we always populate it in the
@@ -208,7 +208,7 @@ def Poptorch_batch_norm_backward: Poptorch_Op<"batch_norm_backward",
     }
     $_state.addOperands(operands);
 
-    $_state.addAttribute("training",$_builder.getBoolAttr(training));
+    $_state.addAttribute("train",$_builder.getBoolAttr(train));
     $_state.addAttribute("eps",$_builder.getF32FloatAttr(eps));
     $_state.addAttribute("output_mask",
                          $_builder.getI64ArrayAttr(output_mask));
