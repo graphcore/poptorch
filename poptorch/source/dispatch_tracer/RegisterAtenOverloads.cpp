@@ -620,6 +620,30 @@ void weightNormInterface(const c10::OperatorHandle &op, c10::Stack *stack) {
   torch::jit::push(stack, at::empty_like(g));
 }
 
+at::Tensor &transposeInplace(at::Tensor &self, int64_t dim0, int64_t dim1) {
+  logging::debug("[DISPATCHER] Re-dispatching aten::transpose_ as outplace");
+  auto res = self.transpose(dim0, dim1);
+  // Overwrite self with res
+  setTensorDetails(self, getTensorDetails(res));
+  return self;
+}
+
+at::Tensor &squeezeInplace(at::Tensor &self) {
+  logging::debug("[DISPATCHER] Re-dispatching aten::squeeze_ as outplace");
+  auto res = self.squeeze();
+  // Overwrite self with res
+  setTensorDetails(self, getTensorDetails(res));
+  return self;
+}
+
+at::Tensor &squeezeDimInplace(at::Tensor &self, int64_t dim0) {
+  logging::debug("[DISPATCHER] Re-dispatching aten::squeeze_.dim as outplace");
+  auto res = self.squeeze(dim0);
+  // Overwrite self with res
+  setTensorDetails(self, getTensorDetails(res));
+  return self;
+}
+
 void replaceValueDispatcher(torch::jit::Value *v_old,
                             torch::jit::Value *v_new) {
   if (!getContext().hasActiveDispatch()) {
