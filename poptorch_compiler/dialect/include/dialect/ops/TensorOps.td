@@ -298,11 +298,11 @@ def Poptorch_where : Poptorch_Op<"where", [SameOperandsAndResultShape]> {
       const auto self_shape = getShape(self);
       const auto other_shape = getShape(other);
 
-      ERROR_ON_MSG((!self_shape.empty() && cond_shape != self_shape) ||
-                   (!other_shape.empty() && cond_shape != other_shape),
-                   "Poptorch does not support broadcasting with torch.where.");
+      const auto output_shape = broadcast(broadcast(cond_shape, self_shape), other_shape);
+      const auto output_type = asTensor(self).getElementType();
+
       $_state.addOperands({condition, self, other});
-      $_state.addTypes({self.getType()});
+      $_state.addTypes(mlir::RankedTensorType::get(output_shape, output_type));
   }]>];
 }
 

@@ -796,6 +796,35 @@ def test_triu_in_constexpr():
     op_harness(triu_out, x, test_training=False)
 
 
+@pytest.mark.parametrize("input_shapes", [
+    ((10, 10), (10, 10), (10, 10)),
+    ((10, 1, 10), (10, 10), (10, 10, 1)),
+    ((), (), ()),
+    ((10, 1, 10), (), (10, 10, 1)),
+    ((), (10, 10), ()),
+])
+def test_where_broadcast(input_shapes):
+    torch.manual_seed(42)
+
+    cond_shape = input_shapes[0]
+    x_shape = input_shapes[1]
+    y_shape = input_shapes[2]
+
+    class Model(torch.nn.Module):
+        def forward(self, cond, x, y):
+            return torch.where(cond, x, y)
+
+    cond = torch.empty(cond_shape).bernoulli_().to(torch.bool)
+    x = torch.randn(x_shape)
+    y = torch.randn(y_shape)
+
+    cpu_mod = Model()
+    ipu_mod = poptorch.inferenceModel(cpu_mod)
+
+    torch.testing.assert_close(actual=ipu_mod(cond, x, y),
+                               expected=cpu_mod(cond, x, y))
+
+
 @pytest.mark.parametrize("input_shapes", input_shapes)
 @pytest.mark.parametrize("value", [0.666, -4.32, float("Inf"), float("-Inf")])
 def test_masked_fill(input_shapes, value):
