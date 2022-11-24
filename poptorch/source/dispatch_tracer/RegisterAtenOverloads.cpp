@@ -601,26 +601,23 @@ void detach(const c10::OperatorHandle &op, c10::Stack *stack) {
 // NOTE: This gets called by _weight_norm's handler, if certain conditions are
 // met. However, those conditions never used to be met, and so we never had to
 // implement this handler. Now we do, so for now just emulate the old behaviour.
-//
-// This is not fully robust, since strictly speaking the schema of
-// `_weight_norm_interface` returns a (Tensor, Tensor); in its sole usage in
-// `_weight_norm`, only the first member is used.
 void weightNormInterface(const c10::OperatorHandle &op, c10::Stack *stack) {
   const auto num_arguments = op.schema().arguments().size();
   auto arguments = torch::jit::last(stack, num_arguments);
 
-  const auto v_in = arguments.at(0).toTensor();
-  const auto g_in = arguments.at(1).toTensor();
+  const auto v = arguments.at(0).toTensor();
+  const auto g = arguments.at(1).toTensor();
   const std::int64_t dim = arguments.at(2).toInt();
 
   torch::jit::drop(stack, num_arguments);
 
-  auto v = v_in.contiguous();
-  auto g = g_in.contiguous();
-
   const auto out = v * (g / at::norm_except_dim(v, 2, dim));
 
   torch::jit::push(stack, out);
+  // Strictly speaking the schema of `_weight_norm_interface` returns a
+  // (Tensor, Tensor); in its sole usage in `_weight_norm`, only the first
+  // member is used, so just return something empty of the right shape.
+  torch::jit::push(stack, at::empty_like(g));
 }
 
 void replaceValueDispatcher(torch::jit::Value *v_old,
