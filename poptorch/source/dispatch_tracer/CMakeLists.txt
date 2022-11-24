@@ -1,8 +1,6 @@
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-find_package(pybind11 REQUIRED)
-
 # Generates the C++ interface to add each pytorch op.
 add_subdirectory(scripts)
 
@@ -26,7 +24,6 @@ add_library(dispatch_tracer STATIC
 target_link_libraries(dispatch_tracer
   PUBLIC
     torch
-    pybind11::pybind11
   PRIVATE
     poptorch_internal_headers
     poptorch_logging

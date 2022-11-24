@@ -3,9 +3,6 @@ project(poptorch_err)
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-# Packages provided by Poplar
-find_package(pybind11 REQUIRED)
-
 add_library(poptorch_exception_info INTERFACE)
 
 target_include_directories(poptorch_exception_info
@@ -28,7 +25,6 @@ target_link_libraries(poptorch_err
                       torch
                       poptorch_exception_info
                       PRIVATE
-                      pybind11::module
                       popart_compiler
                       poptorch_logging)
 

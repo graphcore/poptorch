@@ -38,6 +38,14 @@
 
 #include "pytorch_bridge/CompilerOptions.hpp"
 
+// The functions in this file are called via Torch's dispatcher, therefore
+// we should only catch the exceptions which are not handled by
+// the dispatcher.
+#define PTC(f)                                                                 \
+  PoptorchCatchWrapperImpl<poptorch::throwPoptorchError, /*catch_all=*/false,  \
+                           decltype(&(f)), f>::wrap
+#define PTC_BOXED(f) torch::CppFunction::makeFromBoxedFunction<PTC(f)>()
+
 namespace poptorch {
 
 namespace {
@@ -106,6 +114,12 @@ struct GlobalTracerContext {
     }
   }
 
+  void throwPoptorchError(const PoptorchErrorInfo &info) {
+    if (_poptorch_error_thrower) {
+      _poptorch_error_thrower(info);
+    }
+  }
+
   // A simple guard to stop us from redispatching when we are already in a
   // dispatch context.
   bool dispatch_on{false};
@@ -137,10 +151,15 @@ struct GlobalTracerContext {
     _python_traceback_accessor = std::move(accessor);
   }
 
+  void setPoptorchErrorThrower(PoptorchErrorThrower thrower) {
+    _poptorch_error_thrower = std::move(thrower);
+  }
+
 private:
   // The active dispatcher. Created once upon dispatch start.
   std::unique_ptr<IDispatch> _active_dispatch;
   PythonTracebackAccessor _python_traceback_accessor;
+  PoptorchErrorThrower _poptorch_error_thrower;
 };
 
 std::unique_ptr<GlobalTracerContext> context =
@@ -335,6 +354,14 @@ void startDispatch() { getContext().dispatch_on = true; }
 
 void setPythonTracebackAccessor(PythonTracebackAccessor accessor) {
   getContext().setPythonTracebackAccessor(std::move(accessor));
+}
+
+void setPoptorchErrorThrower(PoptorchErrorThrower thrower) {
+  getContext().setPoptorchErrorThrower(std::move(thrower));
+}
+
+void throwPoptorchError(const PoptorchErrorInfo &info) {
+  getContext().throwPoptorchError(info);
 }
 
 // Turn off.

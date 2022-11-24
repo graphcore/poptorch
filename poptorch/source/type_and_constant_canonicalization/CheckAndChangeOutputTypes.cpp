@@ -1,7 +1,5 @@
 // Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 
-#include <torch/csrc/Dtype.h>
-#include <torch/csrc/DynamicTypes.h>
 #include <torch/csrc/jit/ir/ir.h>
 
 #include <sstream>
@@ -158,9 +156,8 @@ void checkAndChangeOutputTypesForOutput(torch::jit::Node *node,
                "Returning an unknown tensor dtype is not supported.\n");
 
   ERROR_ON_MSG(!supportedType(*tensor_type->scalarType()),
-               "Returning a torch."
-                   << torch::getTHPDtype(*tensor_type->scalarType())->name
-                   << " is not supported.\n");
+               "Returning a torch." << c10::toString(*tensor_type->scalarType())
+                                    << " is not supported.\n");
 
   maybeReplaceOutputType(node, output, tensor_type.get(),
                          at::ScalarType::Double, at::ScalarType::Float,
@@ -174,17 +171,17 @@ void checkAndChangeOutputTypesForOutput(torch::jit::Node *node,
 } // namespace
 
 void checkAndChangeOutputTypes(torch::jit::Graph *graph) {
-  logging::LogContext ctx_func("CheckAndChangeOutputTypes");
+  logging::LogContext const ctx_func("CheckAndChangeOutputTypes");
   for (auto *n : graph->nodes()) {
     // Some unpacks will happen before the host side cast, so ignore them here
     if (isBeforeHostSideCast(n)) {
       continue;
     }
 
-    logging::LogContext ctx("processing " + nodeToString(n));
+    logging::LogContext const ctx("processing " + nodeToString(n));
 
     for (auto *output : n->outputs()) {
-      logging::LogContext ctx_2(output->debugName());
+      logging::LogContext const ctx_2(output->debugName());
 
       checkAndChangeOutputTypesForOutput(n, output);
     }

@@ -25,6 +25,7 @@ namespace poptorch {
 
 struct CompilerOptions;
 struct InplaceGraphInfo;
+struct PoptorchErrorInfo;
 
 // Toggled by the user in python to choose which backend to target when tracing.
 // CPU and SENTINEL will only be toggled by us.
@@ -117,8 +118,19 @@ std::uint64_t getIpuTensorId(const at::Tensor &tensor);
 
 using PythonTracebackAccessor =
     std::function<std::vector<torch::jit::StackEntry>()>;
+
+using PoptorchErrorThrower = std::function<void(const PoptorchErrorInfo &info)>;
+
 // Set the function that will access and return the current python stacktrace
 void setPythonTracebackAccessor(PythonTracebackAccessor accessor);
+
+// Set the function to use to throw python PoptorchError exceptions.
+void setPoptorchErrorThrower(PoptorchErrorThrower thrower);
+
+// Throw an exception using the poptorch error thrower.
+// Note: used by RegisterAtenOverloads.cpp in a template, that's why it needs
+// to be declared publicly.
+void throwPoptorchError(const PoptorchErrorInfo &info);
 
 } // namespace poptorch
 

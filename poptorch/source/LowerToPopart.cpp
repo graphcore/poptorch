@@ -2,7 +2,6 @@
 #include "poptorch/LowerToPopart.hpp"
 
 #include <experimental/filesystem>
-#include <pybind11/pybind11.h>
 
 #include <cstdlib>
 #include <ctime>

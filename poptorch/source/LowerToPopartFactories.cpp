@@ -6,7 +6,6 @@
 #include <torch/csrc/jit/passes/lower_graph.h>
 #include <torch/csrc/jit/passes/lower_tuples.h>
 #include <torch/csrc/jit/passes/peephole.h>
-#include <torch/csrc/jit/python/pybind_utils.h>
 #include <torch/script.h>
 
 #include "popart_compiler/Compiler.hpp"

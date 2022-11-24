@@ -20,7 +20,6 @@
 #include "poptorch/PopartCanonicalization.hpp"
 #include "poptorch/TypeAndConstantCanonicalization.hpp"
 #include "poptorch/Utils.hpp"
-#include "poptorch_err/ExceptionHandling.hpp"
 #include "poptorch_logging/Logging.hpp"
 #include "poptorch_logging/Tracepoint.hpp"
 

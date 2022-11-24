@@ -1,8 +1,6 @@
 // Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 
 #include <ATen/ATen.h>
-#include <torch/csrc/Dtype.h>
-#include <torch/csrc/DynamicTypes.h>
 
 #include <iostream>
 #include <sstream>
@@ -101,8 +99,7 @@ PoplarExecutable::run(std::vector<at::Tensor> &inTensors) {
           popart_dims);
       break;
     default:
-      ERROR("Unsupported input type torch."
-            << torch::getTHPDtype(elem_type)->name);
+      ERROR("Unsupported input type torch." << c10::toString(elem_type));
     }
   }
 
