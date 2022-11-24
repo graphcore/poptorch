@@ -71,10 +71,31 @@ def isOnIpu(x):
 custom_arg_parsers = dict()
 
 
+def getCustomParser(custom_type_instance):
+    if len(custom_arg_parsers) == 0:
+        return None
+
+    # direct lookup for exact type inside custom_arg_parsers
+    parser = custom_arg_parsers.get(type(custom_type_instance), None)
+    if parser is not None:
+        return parser
+
+    # search for registered parser for base class of custom_type_instance,
+    # iterate over entire dict
+    for custom_type, parser in custom_arg_parsers.items():
+        if isinstance(custom_type_instance, custom_type):
+            return parser
+
+    return None
+
+
 # Returns the structure `tensors` as a list of its torch.Tensor contents.
 def flattenTensorStructure(tensors, canonical_structure=None):
     def flatten(x, c):
-        if isinstance(x, dict):
+        parser = getCustomParser(x)
+        if parser is not None:
+            yield from parser.yieldTensors(x)
+        elif isinstance(x, dict):
             keys = x.keys() if c is None else c.keys()
             for k in keys:
                 yield from flatten(x[k], None if c is None else c[k])
@@ -84,9 +105,6 @@ def flattenTensorStructure(tensors, canonical_structure=None):
                 yield from flatten(t, ct)
         elif isinstance(x, torch.Tensor):
             yield x
-        for custom_type, parser in custom_arg_parsers.items():
-            if isinstance(x, custom_type):
-                yield from parser.yieldTensors(x)
         # If it's not a dict/list/tuple or tensor, just ignore it
 
     return list(flatten(tensors, canonical_structure))
@@ -102,15 +120,15 @@ def reconstructTensorStructure(structure, values, filter_fn=lambda t: True):
     # Copy the original structure but replace all the tensors by values from the
     # passed iterator.
     def copy_structure(x, it):
+        parser = getCustomParser(x)
+        if parser is not None:
+            return parser.reconstruct(x, it)
         if isinstance(x, dict):
             return type(x)({k: copy_structure(x[k], it) for k in x.keys()})
         if isinstance(x, (tuple, list)):
             return type(x)(copy_structure(e, it) for e in x)
         if isinstance(x, torch.Tensor) and filter_fn(x):
             return next(it)
-        for custom_type, parser in custom_arg_parsers.items():
-            if isinstance(x, custom_type):
-                return parser.reconstruct(x, it)
         return x
 
     return copy_structure(structure, iter(values))

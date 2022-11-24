@@ -51,14 +51,9 @@ class ArgsParser:
             return clone
 
         def _forEach(self, data, fn):
-            if isinstance(data, (tuple, list)):
-                return type(data)(self._forEach(d, fn) for d in data)
-            if isinstance(data, dict):
-                return {
-                    key: self._forEach(value, fn)
-                    for key, value in data.items()
-                }
-            return fn(data)
+            tensors = _utils.flattenTensorStructure(data)
+            return _utils.reconstructTensorStructure(
+                data, [fn(tensor) for tensor in tensors])
 
         def validateInputs(self, inputs):
             end = (

@@ -323,6 +323,54 @@ def test_nested_dict_input():
         helpers.assert_allclose(expected=native_out, actual=poptorch_out)
 
 
+@pytest.mark.parametrize("device_iterations", [1, 3])
+def test_custom_input(device_iterations):
+    batch_size = 2
+    combined_batch_size = device_iterations * batch_size
+
+    class MyArg:
+        def __init__(self, **kwargs):
+            for key, value in kwargs.items():
+                self.__setattr__(key, value)
+
+    class MyArgParser(poptorch.ICustomArgParser):
+        def yieldTensors(self, struct):
+            keys = sorted(struct.__dict__.keys())
+            for key in keys:
+                maybe_tensor = struct.__dict__[key]
+                if isinstance(maybe_tensor, torch.Tensor):
+                    yield maybe_tensor
+
+        def reconstruct(self, structure, tensor_iterator):
+            data = {}
+            keys = sorted(structure.__dict__.keys())
+            for key in keys:
+                data[key] = next(tensor_iterator)
+            return MyArg(**data)
+
+    poptorch.registerCustomArgParser(MyArg, MyArgParser())
+
+    class SimpleAdder(torch.nn.Module):
+        def forward(self, custom_input):
+            assert custom_input.tensor.shape[0] == batch_size
+            custom_input.result = custom_input.tensor + custom_input.tensor
+            return custom_input
+
+    adder_model = SimpleAdder()
+    adder_model.eval()
+    opts = poptorch.Options()
+    opts.deviceIterations(device_iterations=device_iterations)
+
+    ipu_adder_model = poptorch.inferenceModel(adder_model, opts)
+
+    for i in range(4):
+        input = torch.full((combined_batch_size, 1), i)
+        result = ipu_adder_model(MyArg(tensor=input))
+        assert torch.equal(result.tensor, input)
+        assert torch.equal(result.result,
+                           torch.full((combined_batch_size, 1), i + i))
+
+
 torch.manual_seed(42)
 ones = torch.ones(5, 5)
 x = torch.randn(5, 5)
