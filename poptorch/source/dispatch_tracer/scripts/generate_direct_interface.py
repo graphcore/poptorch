@@ -2,7 +2,6 @@
 
 import sys
 import warnings
-import itertools
 from typing import List
 from schema_parser import ValueInfo, TypeInfo
 from helpers import addScope
@@ -105,8 +104,7 @@ schemaToCppType = {
 }
 
 
-def add_output(self: TypeInfo, index, named_tensors, args: List[ValueInfo],
-               cpp_func: str):
+def add_output(self: TypeInfo, index, named_tensors, output_view, aten_name):
     assert self.is_tensor
 
     # We will get a list of tensor IDs, which could be zero for optional
@@ -118,24 +116,15 @@ auto requires_grad = requiresGrad(mlir_output.at({str(index)}).requires_grad_typ
         outputs_code += "auto t_id = getSingleOptionalTensorId(t_ids);\n"
 
     output_view_var = 'nullptr'
-
     # If the output is a view we need to add the view information
-    if self.is_view:
-        class_name = cpp_func + 'TensorView'
-        tensor_details_params = (f'getTensorDetails({x.name}_pytorch)'
-                                 if x.type.is_tensor else x.name for x in args
-                                 if not x.should_ignore)
-        output_view = f'auto output_view = std::make_shared<{class_name}>('
-        output_view += (',\n' + ' ' *
-                        len(output_view)).join(tensor_details_params) + ");\n"
-
-        if self.is_list:
-            print(f"In {cpp_func} tensor lists cannot be views")
-            #TODO(T71271): silently ignore for now.
-            #sys.exit(1)
-
+    if output_view != '':
         outputs_code += output_view
         output_view_var = 'output_view'
+
+    if output_view != '' and self.is_list:
+        print(f"In {aten_name} tensor lists cannot be views")
+        #TODO(T71271): silently ignore for now.
+        #sys.exit(1)
 
     # For each output tensor return it to pytorch in a different way
     # depending on what the schema tells us.
@@ -247,14 +236,13 @@ def fill_requires_grad(self: ValueInfo):
     return ''
 
 
-def add_op(cpp_func, args: List[ValueInfo], outputs, named_tensors):
+def add_op(function, parameters, outputs, named_tensors, output_view):
     return_type = "poptorch_ir::ODSTensorResults mlir_output =\n"
     return_type += "    "
 
     # Generate the call to the compiler function.
     function_decl = f"{return_type} _compiler."
-    function_decl += cpp_func + "(" + ', '.join(
-        arg.name for arg in args if not arg.should_ignore) + ");\n\n"
+    function_decl += function + "(" + ', '.join(parameters) + ");\n\n"
 
     # Clear the stack and add the outputs.
     function_decl += "// Pop pytorch inputs from stack\n"
@@ -265,18 +253,24 @@ def add_op(cpp_func, args: List[ValueInfo], outputs, named_tensors):
         # Note we are passing the same output view information to all the
         # outputs. This information is non-empty only when there is a single
         # output
-        function_decl += add_output(output, index, named_tensors, args,
-                                    cpp_func)
+        function_decl += add_output(output, index, named_tensors, output_view,
+                                    function)
 
     return function_decl
 
 
+def filter_ignored_args(args: List[ValueInfo]):
+    return [arg for arg in args if not arg.should_ignore]
+
+
 # Generate the c++ function which handles this operation.
-def generate_cpp(cpp_func, args: List[ValueInfo], outputs, named_tensors,
-                 aten_name):
+def generate_cpp(cpp_func, canonicalised_args: List[ValueInfo], outputs,
+                 named_tensors, aten_name, output_view):
     function_decl = ""
 
-    for arg_index, arg in enumerate(args):
+    parameters = []
+
+    for arg_index, arg in enumerate(canonicalised_args):
         stack_at_index = "stack.at(" + str(arg_index) + ")"
 
         # If the argument is in args_to_ignore we skip it
@@ -291,15 +285,18 @@ def generate_cpp(cpp_func, args: List[ValueInfo], outputs, named_tensors,
             function_decl += convert_to_tensor_id(arg)
             function_decl += fill_requires_grad(arg)
 
+            parameters.append(arg.name)
+
     function_decl = ("[[maybe_unused]] bool requires_grad_or = false;\n" +
                      function_decl)
 
-    function_decl += add_op(cpp_func, args, outputs, named_tensors)
+    function_decl += add_op(cpp_func, parameters, outputs, named_tensors,
+                            output_view)
 
     return function_decl
 
 
-def generate_view(function_name, args, outputs):
+def generate_view(args, outputs, function_name):
     if len(args) == 0:
         print(function_name + ": Views must have arguments")
         sys.exit(1)
@@ -318,6 +315,9 @@ def generate_view(function_name, args, outputs):
 
     find_tensors = map(get_tensors_from_dispatch, args)
     params = map(lambda x: x.name, args)
+    tensor_details_params = map(
+        lambda x: f'getTensorDetails({x.name}_pytorch)'
+        if x.type.is_tensor else x.name, args)
 
     if len(outputs) != 1:
         print("Views with multiple outputs aren't handled")
@@ -358,7 +358,11 @@ poptorch_ir::TensorId MLIRDispatch::{class_name}::addViewToGraph(
 }}
 """)
 
-    return header, cpp
+    view_construct = f'auto output_view = std::make_shared<{class_name}>('
+    view_construct += (
+        ',\n' + ' ' * len(view_construct)).join(tensor_details_params) + ");\n"
+
+    return header, cpp, view_construct
 
 
 class DirectMLIRGenerator:
@@ -370,59 +374,6 @@ class DirectMLIRGenerator:
         self.lookup = lookup_file
         self.namespace = namespace
 
-    def gen_views(self, ops_to_generate_dict):
-        def is_view(args):
-            return any(value.type.is_view for value in args)
-
-        # Find all of the python view ops
-        view_functions = {
-            function_name: schema
-            for function_name, schema in ops_to_generate_dict.items()
-            if is_view(schema[1])
-        }
-
-        views = {}
-
-        # Find all the unique cpp views
-        for python_name, (cpp_func, args, kwargs,
-                          outputs) in view_functions.items():
-            filtered_args = [
-                arg for arg in itertools.chain(args, kwargs)
-                if not arg.should_ignore
-            ]
-            # Check multiple references to the same cpp view have the same
-            # arguments and outputs
-            if cpp_func in views:
-                if (filtered_args, outputs) != views[cpp_func]:
-                    print('The arguments and outputs for the view '
-                          f'{python_name} do not match the previously found '
-                          f'values for {cpp_func}.')
-            else:
-                views[cpp_func] = (filtered_args, outputs)
-
-        # Check that if a cpp function is marked as a view in one context it as
-        # always marked as a view
-        for python_name, (cpp_func, args, kwargs,
-                          outputs) in ops_to_generate_dict.items():
-            if (cpp_func in views
-                    and not is_view(itertools.chain(args, kwargs))):
-                print(f'{cpp_func} was previously used as a view function '
-                      'whereas it is being used without view semantics in '
-                      f'{python_name}.')
-
-        header = ''
-        cpp = ''
-        for cpp_func, (args, outputs) in views.items():
-            temp_header, temp_cpp = generate_view(cpp_func, args, outputs)
-            header += temp_header
-            cpp += temp_cpp
-
-        # Print the C++ impl.
-        print(cpp, file=self.cpp)
-
-        # Generate the C++ header.
-        print(header, file=self.header)
-
     def gen_function(self, function_name, cpp_func, arguments, outputs):
         # Tensors which have been marked as being inplace/views will have an ID.
         named_tensors = {
@@ -430,12 +381,20 @@ class DirectMLIRGenerator:
             for value in arguments if value.type.tensor_id != ''
         }
 
+        is_view = any(value.type.is_view for value in arguments)
+
         header = ''
         cpp = ''
+        output_view = ''
 
         aten_name = function_name
         function_name = function_name.replace('.', '_')
         function_name = "{}_{}".format(self.namespace, function_name)
+
+        if is_view:
+            non_ignored_args = filter_ignored_args(arguments)
+            header, cpp, output_view = generate_view(non_ignored_args, outputs,
+                                                     cpp_func)
 
         header += f'void {function_name}(c10::Stack& stack);\n'
 
@@ -444,7 +403,7 @@ class DirectMLIRGenerator:
         cpp += "(c10::Stack& stack) {\n"
         cpp += addScope(
             generate_cpp(cpp_func, arguments, outputs, named_tensors,
-                         aten_name))
+                         aten_name, output_view))
         cpp += "}\n"
 
         # Print the C++ impl.

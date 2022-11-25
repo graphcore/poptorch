@@ -51,8 +51,6 @@ if __name__ == "__main__":
                                      parse_args.gen_lookup,
                                      parse_args.namespace)
 
-    direct_gen.gen_views(op_dict.ops_to_generate_dict)
-
     def gen_function(function_name, op_target, arguments, kwargs, outputs):
         global direct_gen
         # Parse the arguments and generate the C++ function

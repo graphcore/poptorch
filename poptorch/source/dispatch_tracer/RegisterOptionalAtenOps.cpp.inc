@@ -56,14 +56,14 @@ TORCH_LIBRARY_IMPL(aten, IPU, m) {
   // as_strided which is harder to handle.
   m.impl("slice.Tensor", PTC_BOXED(poptorch::fallback));
   m.impl("squeeze", PTC_BOXED(poptorch::fallback));
+  m.impl("squeeze_", PTC_BOXED(poptorch::fallback));
   m.impl("squeeze.dim", PTC_BOXED(poptorch::fallback));
+  m.impl("squeeze_.dim", PTC_BOXED(poptorch::fallback));
   m.impl("unsqueeze", PTC_BOXED(poptorch::fallback));
   m.impl("permute", PTC_BOXED(poptorch::fallback));
   m.impl("select.int", PTC_BOXED(poptorch::fallback));
+  m.impl("transpose_", PTC_BOXED(poptorch::fallback));
   m.impl("split_with_sizes", PTC_BOXED(poptorch::fallback));
-  m.impl("squeeze_", PTC(poptorch::squeezeInplace));
-  m.impl("squeeze_.dim", PTC(poptorch::squeezeDimInplace));
-  m.impl("transpose_", PTC(poptorch::transposeInplace));
 
   // If we don't intercept this op, it will be decomposed into
   // _index_put_impl_, which exposes unnecessary implementation

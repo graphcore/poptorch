@@ -5,16 +5,12 @@
 # Basic format is:
 # - func: {ATEN_NODE}
 #    PopTorchDirect: {POPTORCH_NODE}
-#    native_func: schema...
-
-# Note the schema in native_func can be set and updated from
-# native_functions/native_functions.{pytorch_version}.yml by running
-#     $ ninja update_schemas
-# in the build directory.
 
 # More attributes can be added as need be. Currently we have:
 
 # PopTorchDirect : FUNC     The mlir implementation of this class with the name
+
+# The two above can be used together when the op may or may not be inplace or individually.
 
 # * IgnoreArgs: Ignore these arguments on the schema
 
@@ -23,8 +19,6 @@
 #                        this is common as many operations will have an argument
 #                        (!out) which is the storage location of the output. If
 #                        it matches an input it is inplace.
-
-# * schema_override: Overrides the pytorch schema with a new value.
 
 #
 
@@ -180,6 +174,10 @@
   PopTorchDirect: transpose
   native_func: transpose.int(Tensor(a) self, int dim0, int dim1) -> Tensor(a)
 
+- func: transpose_
+  PopTorchDirect: transpose
+  native_func: transpose_(Tensor(a!) self, int dim0, int dim1) -> Tensor(a!)
+
 # View differs from reshape ordinarily in that reshape may be a view or a copy
 # but view must always be a view. Because there is no concept of striding or
 # contiguous vs not contiguous tensor in poplar, a rehshape can always be a
@@ -188,12 +186,9 @@
   PopTorchDirect: view
   native_func: view(Tensor(a) self, SymInt[] size) -> Tensor(a)
 
-# Note: despite the native_func schema marking _unsafe_view as a non-view op it
-# actually produces a view of the original tensor
 - func: _unsafe_view
   PopTorchDirect: view
   native_func: _unsafe_view(Tensor self, SymInt[] size) -> Tensor
-  schema_override: _unsafe_view(Tensor(a) self, SymInt[] size) -> Tensor(a)
 
 - func: cat.out
   PopTorchDirect: concat
@@ -204,9 +199,17 @@
   PopTorchDirect: squeeze
   native_func: squeeze(Tensor(a) self) -> Tensor(a)
 
+- func: squeeze_
+  PopTorchDirect: squeeze
+  native_func: squeeze_(Tensor(a!) self) -> Tensor(a!)
+
 - func: squeeze.dim
   PopTorchDirect: squeeze_dim
   native_func: squeeze.dim(Tensor(a) self, int dim) -> Tensor(a)
+
+- func: squeeze_.dim
+  PopTorchDirect: squeeze_dim
+  native_func: squeeze_.dim(Tensor(a!) self, int dim) -> Tensor(a!)
 
 - func: select.int
   PopTorchDirect: select

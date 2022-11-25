@@ -118,8 +118,7 @@ def _process_schema(function_name, op_target):
 
     # In some cases there are more than 1 '->', make sure to match the one before the outputs.
     # e.g split_with_sizes(Tensor(a -> *) self, int[] split_sizes, int dim=0) -> Tensor(a)[]
-    schema = op_target.get('schema_override', op_target['native_func'])
-    signature, outputs = schema.rsplit(' -> ', 1)
+    signature, outputs = op_target['native_func'].rsplit(' -> ', 1)
 
     # Some operations return multiple outputs, e.g: (Tensor(a!) values, Tensor(b!) indices)
     is_multiple_outputs = outputs.startswith('(')
