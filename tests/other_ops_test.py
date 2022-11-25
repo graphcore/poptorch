@@ -155,7 +155,7 @@ def test_scatter_add(inplace, dim):
 
 
 @pytest.mark.parametrize("dim", range(-3, 3))
-@pytest.mark.parametrize("reduce", ['sum', 'amin', 'amax'])
+@pytest.mark.parametrize("reduce", ['sum', 'amin', 'amax', 'mean'])
 @pytest.mark.parametrize("include_self", [True, False])
 def test_scatter_reduce(dim, reduce, include_self):
     class Model(torch.nn.Module):
@@ -186,7 +186,7 @@ def test_scatter_reduce(dim, reduce, include_self):
 
 @helpers.printCapfdOnExit
 @helpers.overridePoptorchLogLevel("TRACE")
-@pytest.mark.parametrize("reduce", ['sum', 'amin', 'amax'])
+@pytest.mark.parametrize("reduce", ['sum', 'amin', 'amax', 'mean'])
 @pytest.mark.parametrize("expand_as", [True, False])
 @pytest.mark.parametrize("include_self", [True, False])
 def test_2d_scatter_reduce_with_index_expansion(capfd, reduce, expand_as,

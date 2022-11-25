@@ -220,7 +220,7 @@ torch::jit::Node *scatterAddHandler(torch::jit::Graph *graph,
   return add;
 }
 
-enum class ScatterReduction { Sum = 0, Max, Min, None };
+enum class ScatterReduction { Sum = 0, Max, Min, None, Mean };
 
 std::int32_t getReductionMethod(torch::jit::Node *node) {
   const auto reduce = constantToString(node);
@@ -233,6 +233,9 @@ std::int32_t getReductionMethod(torch::jit::Node *node) {
   if (reduce == "amin") {
     return static_cast<std::int32_t>(ScatterReduction::Min);
   }
+  if (reduce == "mean") {
+    return static_cast<std::int32_t>(ScatterReduction::Mean);
+  }
 
   ERROR("Unsupported reduction type for scatter_reduce: " << reduce);
 }
@@ -241,6 +244,7 @@ float getReductionInitValue(int32_t reduce) {
   float init_val;
   switch (reduce) {
   case static_cast<std::int32_t>(ScatterReduction::Sum):
+  case static_cast<std::int32_t>(ScatterReduction::Mean):
     init_val = 0.0;
     break;
   case static_cast<std::int32_t>(ScatterReduction::Max):
@@ -254,6 +258,48 @@ float getReductionInitValue(int32_t reduce) {
     break;
   }
   return init_val;
+}
+
+torch::jit::Node *
+meanScatterReduceHandler(torch::jit::Graph *graph, torch::jit::Value *self,
+                         torch::jit::Value *index, torch::jit::Value *src,
+                         std::int64_t axis, std::int64_t axissize,
+                         bool include_self) {
+  const auto sum_reduce = static_cast<std::int32_t>(ScatterReduction::Sum);
+  auto *ones_self = createConstantFloat32(graph, {1.0}, shapeFromTensor(self));
+  auto *ones_src = createConstantFloat32(graph, {1.0}, shapeFromTensor(src));
+  torch::jit::Node *count;
+  if (include_self) {
+    // Count the number of elements reduced to each index.
+    count = createScatterreduce(
+        graph, {ones_src->output(), index, ones_self->output()}, axissize, axis,
+        sum_reduce);
+  } else {
+    const auto none_reduce = static_cast<std::int32_t>(ScatterReduction::None);
+    auto *zeros_src = createConstantFloat32(graph, {0.0}, shapeFromTensor(src));
+
+    // Tensor with zeros where the indices are updated and ones otherwise.
+    auto *count_mask = createScatterreduce(
+        graph, {zeros_src->output(), index, ones_self->output()}, axissize,
+        axis, none_reduce);
+
+    // Count the number of elements reduced to each index.
+    count = createScatterreduce(
+        graph, {ones_src->output(), index, count_mask->output()}, axissize,
+        axis, sum_reduce);
+
+    // Put zeros in those indices in self tensor that are not updated,
+    // so that they don't impact the reduction result (include_self=False).
+    auto *masked_self = createScatterreduce(
+        graph, {zeros_src->output(), index, self}, axissize, axis, none_reduce);
+    self = masked_self->output();
+  }
+
+  // Sum reduction and then division to calculate `mean`.
+  auto *sr = createScatterreduce(graph, {src, index, self}, axissize, axis,
+                                 sum_reduce);
+  auto *out = createDiv(graph, {sr->output(), count->output()});
+  return out;
 }
 
 torch::jit::Node *scatterReduceHandler(torch::jit::Graph *graph,
@@ -272,6 +318,12 @@ torch::jit::Node *scatterReduceHandler(torch::jit::Graph *graph,
   auto axis = handleDimensionParam(dim, t);
   auto outshape = shapeFromTensor(node->output(0));
   auto axissize = outshape.at(axis);
+
+  if (reduce == static_cast<std::int32_t>(ScatterReduction::Mean)) {
+    // `Mean` is decomposed as two scatter_reduce sums.
+    return meanScatterReduceHandler(graph, self, index, src, axis, axissize,
+                                    include_self);
+  }
 
   torch::jit::Node *sr;
   if (!include_self) {
