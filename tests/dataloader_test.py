@@ -1,6 +1,8 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 import itertools
+import functools
 import math
+import random
 import time
 import subprocess
 import marshal
@@ -1198,3 +1200,273 @@ fn({iterate_over_data})
     ]
     assert not unexpected_lines, "Unexpected lines in output:\n%s" % "".join(
         unexpected_lines)
+
+
+class DynamicBatchSampler(torch.utils.data.Sampler):
+    def __init__(self, sampler, batch_size):
+        super().__init__(None)
+        self.sampler = sampler
+        self.batch_size = batch_size
+
+    def __iter__(self):
+
+        indices = []
+
+        idx = 0
+        reset = 1
+        for sample in self.sampler:
+            if idx == reset:
+                yield indices
+                indices = []
+                idx = 0
+                reset += 1
+                if reset == self.batch_size + 1:
+                    reset = 1
+
+            indices.append(sample)
+            idx += 1
+
+        if indices:
+            yield indices
+
+    @functools.lru_cache(None)
+    def __len__(self):
+        sampler_len = len(self.sampler)
+        bins = 0
+        bins_elems = ((2 + (self.batch_size - 1)) * self.batch_size) // 2
+        bins += (sampler_len // bins_elems) * (self.batch_size)
+
+        sampler_len = sampler_len % bins_elems
+
+        if not sampler_len:
+            return bins
+
+        bins_elems -= self.batch_size
+
+        for bin_size in reversed(range(1, self.batch_size)):
+            if sampler_len == bins_elems:
+                return bins + bin_size
+            if sampler_len > bins_elems:
+                return bins + bin_size + 1
+
+            bins_elems -= bin_size
+
+        return bins
+
+
+class DynamicRandomBatchSampler(torch.utils.data.Sampler):
+    def __init__(self, sampler, batch_size):
+        super().__init__(None)
+        self.sampler = sampler
+        self.batch_size = batch_size
+
+    def __iter__(self):
+        random.seed(self.batch_size)
+        length = len(self.sampler)
+        iterator = self.sampler.__iter__()
+
+        while length:
+            batch_length = random.randint(1, min(length, self.batch_size))
+            indices = [iterator.__next__() for _ in range(batch_length)]
+            yield indices
+            length -= batch_length
+
+
+class CustomBatch:
+    def __init__(self, data, label):
+        self.data = data
+        self.label = label
+
+
+class CustomBatchParser(poptorch.ICustomArgParser):
+    def yieldTensors(self, struct) -> None:
+        yield struct.data
+        yield struct.label
+
+    def reconstruct(self, struct, tensor_iterator):
+        return type(struct)(*tensor_iterator)
+
+
+poptorch.registerCustomArgParser(CustomBatch, CustomBatchParser())
+
+
+class DynamicPadCollateFunction():
+    def __init__(self, batch_size, return_type=None):
+        self.batch_size = batch_size
+        self.return_type = return_type
+
+    def __call__(self, collate_data_list):
+        if isinstance(collate_data_list[0], tuple):
+            pad_data_len = self.batch_size - len(collate_data_list)
+            batch = []
+            for index in range(len(collate_data_list[0])):
+                elem_shape = collate_data_list[0][index].shape
+                tensors = [data[index] for data in collate_data_list]
+                tensors.extend([
+                    torch.full(elem_shape, 0, dtype=torch.float32)
+                    for _ in range(pad_data_len)
+                ])
+                batch.append(torch.stack(tensors))
+
+            if self.return_type not in [None, tuple]:
+                return self.return_type(*batch)
+            return tuple(batch)
+        raise NotImplementedError()
+
+
+@pytest.mark.parametrize("batch_size", [2, 3])
+@pytest.mark.parametrize("device_iteration", [1, 4, 5])
+@pytest.mark.parametrize("drop_last", [True, False])
+@pytest.mark.parametrize("num_workers", [1, 10])
+def test_batch_sampler_basic(batch_size, device_iteration, drop_last,
+                             num_workers):
+    combined_batch_size = batch_size * device_iteration
+    shape = [2, 3]
+    dataset_size = 100
+    dtype = torch.float32
+    exepected_num_batches = dataset_size // combined_batch_size
+    last_batch_incomplete_size = dataset_size % combined_batch_size
+    last_incomplete = last_batch_incomplete_size != 0 and not drop_last
+    if last_incomplete:
+        exepected_num_batches += 1
+
+    dataset = IncrementDataset(shape, dataset_size, dtype)
+    simple_batch_sampler = torch.utils.data.BatchSampler(
+        torch.utils.data.SequentialSampler(dataset),
+        batch_size=batch_size,
+        drop_last=drop_last)
+    opts = poptorch.Options().deviceIterations(device_iteration)
+    loader = poptorch.DataLoader(opts,
+                                 dataset,
+                                 batch_sampler=simple_batch_sampler,
+                                 drop_last=drop_last,
+                                 num_workers=num_workers)
+
+    def expected_batch(batch_id, expected_batch_size):
+        nonlocal combined_batch_size
+        nonlocal shape
+        nonlocal dtype
+        index_base = batch_id * combined_batch_size
+        return torch.stack([
+            torch.full(shape, index_base + index, dtype=dtype)
+            for index in range(expected_batch_size)
+        ])
+
+    batches = list(loader)
+    assert len(batches) == exepected_num_batches
+    expected_full_batch = functools.partial(
+        expected_batch, expected_batch_size=combined_batch_size)
+
+    full_batches = itertools.islice(
+        batches,
+        len(batches) - 1 if last_incomplete else None)
+
+    batch_id = -1
+    for batch_id, batch in enumerate(full_batches):
+        assert torch.equal(batch, expected_full_batch(batch_id))
+
+    if last_incomplete:
+        assert torch.equal(
+            batches[-1],
+            expected_batch(batch_id + 1, last_batch_incomplete_size))
+
+
+def get_item(batch, item, return_type):
+    if return_type == tuple:
+        if item == "data":
+            return batch[0]
+        return batch[1]
+
+    if return_type == CustomBatch:
+        return getattr(batch, item)
+
+    return None
+
+
+@pytest.mark.parametrize("batch_size", [4, 11])
+@pytest.mark.parametrize("device_iteration", [1, 5])
+@pytest.mark.parametrize("num_workers", [0, 3])
+@pytest.mark.parametrize("return_type", [tuple, CustomBatch])
+@pytest.mark.parametrize("drop_last", [True, False])
+def test_custom_batch_sampler(batch_size, device_iteration, num_workers,
+                              return_type, drop_last):
+
+    shape = [3, 1]
+    dataset_size = 149
+
+    dataset = IncrementDatasetWithLabels(shape, dataset_size)
+    dynamic_batch_sampler = DynamicBatchSampler(
+        torch.utils.data.SequentialSampler(dataset), batch_size=batch_size)
+
+    sampler_len = len(dynamic_batch_sampler)
+    expected_num_batches = sampler_len // device_iteration
+    incomplete_batches = sampler_len % device_iteration
+
+    last_incomplete = not drop_last and incomplete_batches != 0
+    if last_incomplete:
+        expected_num_batches += 1
+
+    collate_fn = DynamicPadCollateFunction(batch_size, return_type)
+    opts = poptorch.Options().deviceIterations(device_iteration)
+    loader = poptorch.DataLoader(opts,
+                                 dataset,
+                                 batch_sampler=dynamic_batch_sampler,
+                                 collate_fn=collate_fn,
+                                 num_workers=num_workers,
+                                 drop_last=drop_last)
+
+    batches = list(loader)
+    assert len(batches) == expected_num_batches
+
+    combined_batch_size = batch_size * device_iteration
+    expected_data_full_size = torch.Size([combined_batch_size] + shape)
+    expected_labels_full_size = torch.Size([combined_batch_size, 1])
+
+    full_batches = itertools.islice(
+        batches,
+        len(batches) - 1 if last_incomplete else None)
+
+    for batch in full_batches:
+        assert get_item(batch, "data",
+                        return_type).shape == expected_data_full_size
+        assert get_item(batch, "label",
+                        return_type).shape == expected_labels_full_size
+
+    if last_incomplete:
+        combined_tail_batch_size = incomplete_batches * batch_size
+        assert get_item(batches[-1], "data", return_type).shape  == \
+            torch.Size([combined_tail_batch_size] + shape)
+        assert get_item(batches[-1], "label", return_type).shape  == \
+            torch.Size([combined_tail_batch_size, 1])
+
+
+@pytest.mark.parametrize("device_iteration", [1, 5])
+@pytest.mark.parametrize("num_workers", [0, 3])
+def test_custom_batch_sampler_non_deterministic_len(device_iteration,
+                                                    num_workers):
+    shape = [2, 1]
+    dataset_size = 111
+    batch_size = 13
+
+    dataset = IncrementDatasetWithLabels(shape, dataset_size)
+    dynamic_batch_sampler = DynamicRandomBatchSampler(
+        torch.utils.data.SequentialSampler(dataset), batch_size=batch_size)
+
+    collate_fn = DynamicPadCollateFunction(batch_size, CustomBatch)
+    opts = poptorch.Options().deviceIterations(device_iteration)
+    loader = poptorch.DataLoader(opts,
+                                 dataset,
+                                 batch_sampler=dynamic_batch_sampler,
+                                 collate_fn=collate_fn,
+                                 num_workers=num_workers)
+
+    batches = list(loader)
+    assert len(batches) > 0
+
+    combined_batch_size = batch_size * device_iteration
+    expected_data_full_size = torch.Size([combined_batch_size] + shape)
+    expected_labels_full_size = torch.Size([combined_batch_size, 1])
+
+    for batch in batches:
+        assert batch.data.shape == expected_data_full_size
+        assert batch.label.shape == expected_labels_full_size

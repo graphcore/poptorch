@@ -6,6 +6,8 @@ import inspect
 import itertools
 import json
 
+from typing import List
+
 import torch
 
 from . import poptorch_core  # type: ignore
@@ -132,6 +134,43 @@ def reconstructTensorStructure(structure, values, filter_fn=lambda t: True):
         return x
 
     return copy_structure(structure, iter(values))
+
+
+# Wraps DataLoader iterator. Generates combined batches by concatenating next
+# batch tensors from dataloader_iterator over dim=0.
+def combined_batch_generator(dataloader_iterator,
+                             num_batches_to_combine,
+                             drop_last=True):
+
+    tensors_to_concatenate = []
+
+    def concat(tensors_to_concatenate: List[List[torch.Tensor]]
+               ) -> List[torch.Tensor]:
+        batch_len = len(tensors_to_concatenate[0])
+        for tensor_idx in range(batch_len):
+            yield torch.concat([
+                tensors_to_concatenate[batch_idx][tensor_idx]
+                for batch_idx in range(len(tensors_to_concatenate))
+            ],
+                               dim=0)
+
+    batch = None
+    # iterate over next data batches
+    for batch in dataloader_iterator:
+        # append batch tensors to concatenate list
+        if len(tensors_to_concatenate) < num_batches_to_combine:
+            tensors_to_concatenate.append(flattenTensorStructure(batch))
+        else:
+            # concatenate all tensors from concatenate list - create combined batch
+            yield reconstructTensorStructure(batch,
+                                             concat(tensors_to_concatenate))
+            tensors_to_concatenate = [flattenTensorStructure(batch)]
+
+    if tensors_to_concatenate and len(tensors_to_concatenate) > 0 and \
+        len(tensors_to_concatenate) == num_batches_to_combine or \
+        not drop_last:
+        # concatenate all tensors from concatenate list - create combined batch
+        yield reconstructTensorStructure(batch, concat(tensors_to_concatenate))
 
 
 def getIpuTensorId(x: torch.Tensor):

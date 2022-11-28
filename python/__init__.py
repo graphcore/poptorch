@@ -3,11 +3,11 @@ import abc
 import atexit
 import copy
 import copyreg
+import functools
 import os
-from typing import Any, Callable, Dict, Iterator, Optional, Union, Type
+from typing import Any, Callable, Dict, Iterator, Optional, Union, Type, Sequence, Iterable
 import pickle
 import pkg_resources
-
 import torch
 
 # These are needed before the assert
@@ -210,6 +210,21 @@ class _SubDataset:
         return self._dataset[global_index]
 
 
+def _batch_sampler_len(
+        batch_sampler: Union[torch.utils.data.
+                             Sampler[Sequence], Iterable[Sequence]]):
+    if hasattr(batch_sampler, "__len__"):
+        try:
+            length = len(batch_sampler)
+            if length == NotImplemented:
+                return None
+            return length
+        except NotImplementedError:
+            return None
+
+    return None
+
+
 class DataLoader(torch.utils.data.DataLoader):
     """ Thin wrapper around the traditional `torch.utils.data.DataLoader` to
     abstract away some of the batch sizes calculations.
@@ -220,19 +235,22 @@ class DataLoader(torch.utils.data.DataLoader):
     across all hosts.
     """
 
-    def __init__(self,
-                 options: 'poptorch.Options',
-                 dataset: 'torch.utils.data.Dataset',
-                 batch_size: int = 1,
-                 shuffle: bool = False,
-                 num_workers: int = 0,
-                 drop_last: bool = True,
-                 persistent_workers: Optional[bool] = None,
-                 auto_distributed_partitioning: bool = True,
-                 mode: 'poptorch.DataLoaderMode' = DataLoaderMode.Sync,
-                 async_options: Optional[Dict[str, Any]] = None,
-                 rebatched_worker_size: Optional[int] = None,
-                 **kwargs):
+    def __init__(
+            self,
+            options: 'poptorch.Options',
+            dataset: 'torch.utils.data.Dataset',
+            batch_size: int = 1,
+            shuffle: bool = None,
+            num_workers: int = 0,
+            drop_last: bool = True,
+            persistent_workers: Optional[bool] = None,
+            auto_distributed_partitioning: bool = True,
+            mode: 'poptorch.DataLoaderMode' = DataLoaderMode.Sync,
+            async_options: Optional[Dict[str, Any]] = None,
+            rebatched_worker_size: Optional[int] = None,
+            batch_sampler: Optional[Union[torch.utils.data.Sampler[Sequence],
+                                          Iterable[Sequence]]] = None,
+            **kwargs):
         """
         :param options: Options that will be used to compile
             and run the model.
@@ -262,24 +280,56 @@ class DataLoader(torch.utils.data.DataLoader):
             Default to the combined batch size.
             If specified the ``rebatched_worker_size`` must be less than
             or equal to the combined batch size.
+        :param batch_sampler: Defines the strategy to draw samples from the
+            dataset. Returns a batch of indices at a time. Mutually exclusive
+            with `batch_size`, `shuffle`.
         :param kwargs: Other options to pass to PyTorch's ``DataLoader``
             constructor.
         """
+
+        self._is_user_batch_sampler_set = batch_sampler is not None
+
+        if self._is_user_batch_sampler_set:
+            if batch_size != 1 or shuffle:
+                raise createPoptorchError(
+                    '`batch_sampler` option is mutually '
+                    'exclusive with batch_size, shuffle.')
+            if options.Distributed.numProcesses > 1 and \
+                    auto_distributed_partitioning:
+                raise createPoptorchError(
+                    '`batch_sampler` option is mutually '
+                    'exclusive with auto_distributed_partitioning=True.')
+            if mode != DataLoaderMode.Sync:
+                raise createPoptorchError('batch_sampler is not supported in '
+                                          'Async mode')
+            if hasattr(batch_sampler, "batch_size"):
+                batch_size = batch_sampler.batch_size
+            self.batch_sampler_drop_last = drop_last
+            drop_last = None
+        else:
+            if shuffle is None:
+                shuffle = False
+
         assert isinstance(options, Options)
         options._freeze()  # pylint: disable=protected-access
         if persistent_workers is None:
             persistent_workers = num_workers > 0
 
         self._combined_batch_size: Optional[int]
+        self._num_batches_to_combine: Optional[int]
+
         if batch_size is None:
             self._combined_batch_size = None
+            self._num_batches_to_combine = None
         else:
             input_group_count = options.replication_factor // \
                                 options.input_group_size
-            self._combined_batch_size = batch_size * \
-                options.device_iterations * \
+            self._num_batches_to_combine = options.device_iterations * \
                 input_group_count * \
                 options.Training.gradient_accumulation
+
+            self._combined_batch_size = batch_size * \
+                self._num_batches_to_combine
             self._options = options
 
         # Iterable datasets need to be handled differently: they don't have
@@ -303,20 +353,49 @@ class DataLoader(torch.utils.data.DataLoader):
                     num_workers)
         else:
             num_elts = len(dataset)
-            if not drop_last and self._combined_batch_size is not None and \
-                num_elts % (self._combined_batch_size *
-                            options.Distributed.numProcesses) != 0:
-                logger.warning(
-                    "The number of elements in the dataset "
-                    "(%d) is not divisible by the number of"
-                    " elements processed per step (%d)"
-                    " and drop_last=False. The last tensor will have "
-                    "a batch size of %d. To avoid having to handle "
-                    "this special case switch to drop_last=True", num_elts,
-                    self._combined_batch_size *
-                    options.Distributed.numProcesses,
+            if not drop_last:
+                if self._is_user_batch_sampler_set:
+                    batch_sampler_len = _batch_sampler_len(batch_sampler)
+
+                    if batch_sampler_len is not None:
+                        num_incomplete_batches = batch_sampler_len % \
+                            self._num_batches_to_combine
+
+                        if num_incomplete_batches != 0:
+                            logger.warning(
+                                "The number of batches generated by the batch"
+                                " sampler (%d) is not divisible by the number"
+                                " of batches elements processed per step (%d)"
+                                " and drop_last=False. The last tensor will"
+                                " have a batch size of %d. To avoid having to "
+                                " handle this special case switch to "
+                                " drop_last=True. Batch size = %d,"
+                                " combined batch size = %d .",
+                                batch_sampler_len,
+                                self._num_batches_to_combine,
+                                num_incomplete_batches * batch_size,
+                                batch_size, self._combined_batch_size)
+                    else:
+                        logger.warning(
+                            "The `batch_sampler` __len__ method is not"
+                            " implemented and drop_last=False. The last tensor"
+                            " may be incomplete - batch size < %d. To avoid"
+                            " having to handle this special case switch to"
+                            " drop_last=True.", self._num_batches_to_combine)
+                elif self._combined_batch_size is not None and \
                     num_elts % (self._combined_batch_size *
-                                options.Distributed.numProcesses))
+                                options.Distributed.numProcesses) != 0:
+                    logger.warning(
+                        "The number of elements in the dataset "
+                        "(%d) is not divisible by the number of"
+                        " elements processed per step (%d)"
+                        " and drop_last=False. The last tensor will have "
+                        "a batch size of %d. To avoid having to handle "
+                        "this special case switch to drop_last=True", num_elts,
+                        self._combined_batch_size *
+                        options.Distributed.numProcesses,
+                        num_elts % (self._combined_batch_size *
+                                    options.Distributed.numProcesses))
 
             if options.Distributed.numProcesses > 1:
                 if auto_distributed_partitioning:
@@ -342,7 +421,9 @@ class DataLoader(torch.utils.data.DataLoader):
                 dataset, "__getitem__")
 
         rebatched_size = None
-        dataset_batch_size = self._combined_batch_size
+        dataset_batch_size = 1 if self._is_user_batch_sampler_set \
+                                else self._combined_batch_size
+
         if mode == DataLoaderMode.AsyncRebatched:
             mode = DataLoaderMode.Async
             rebatched_size = self._combined_batch_size
@@ -356,9 +437,11 @@ class DataLoader(torch.utils.data.DataLoader):
                     " must be <= to the combined batch size ("
                     f"{self._combined_batch_size})")
                 dataset_batch_size = rebatched_worker_size
+
         super().__init__(dataset,
                          batch_size=dataset_batch_size,
                          shuffle=shuffle,
+                         batch_sampler=batch_sampler,
                          num_workers=num_workers,
                          drop_last=drop_last,
                          persistent_workers=persistent_workers,
@@ -422,6 +505,12 @@ class DataLoader(torch.utils.data.DataLoader):
             self.dataset.swap_range()
         if self._accessor is not None:
             return self._accessor.__iter__()
+
+        if self._is_user_batch_sampler_set and \
+            self._num_batches_to_combine != 1:
+            return _utils.combined_batch_generator(
+                super().__iter__(), self._num_batches_to_combine,
+                self.batch_sampler_drop_last)
 
         return super().__iter__()
 
