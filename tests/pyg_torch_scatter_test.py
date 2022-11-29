@@ -8,10 +8,6 @@ import pytest
 import helpers
 import poptorch
 
-pytest.skip(
-    "TODO(T71104): to torch_scatter / geometric available for 1.13 yet",
-    allow_module_level=True)
-
 if helpers.is_running_tests:
     from torch_scatter import scatter, scatter_log_softmax, scatter_softmax, scatter_std, scatter_add, scatter_max
 else:
