@@ -17,4 +17,3 @@ PyTorch for the IPU: User Guide
     experimental
     reference
     legal
-    changelog
