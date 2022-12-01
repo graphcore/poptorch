@@ -623,8 +623,13 @@ void canonicaliseIfConstant(torch::jit::Graph *graph, torch::jit::Node *node,
 void convertReturnedInputsToConstants(
     torch::jit::Graph *graph, std::vector<std::size_t> &input_index_map) {
   std::stack<std::size_t> to_erase;
+  std::size_t params_ignored = 0;
   for (auto i = 0u; i < graph->inputs().size(); i++) {
     auto *input = graph->inputs()[i];
+    if (isParameter(input)) {
+      params_ignored++;
+      continue;
+    }
     if (input->uses().size() == 1 &&
         input->uses()[0].user->kind() == c10::prim::Return) {
       const WithNodeMetadata meta(input->node());
@@ -635,7 +640,7 @@ void convertReturnedInputsToConstants(
     } else {
       // Save the mapping from PopART input indices to user input indices,
       // so that the returned-only inputs can be ignored by PopART
-      input_index_map.push_back(i);
+      input_index_map.push_back(i - params_ignored);
     }
   }
 

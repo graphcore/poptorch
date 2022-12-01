@@ -758,3 +758,25 @@ def test_returned_only_inputs():
 
     for cpu_out, ipu_out in zip(m(x, y, z), p(x, y, z)):
         helpers.assert_allclose(actual=ipu_out, expected=cpu_out)
+
+
+def test_returned_only_inputs_with_params():
+    class Model(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            # Add parameter to ensure they're handled correctly
+            self.lin = torch.nn.Linear(2, 1)
+
+        def forward(self, z, x, y):
+            # x and y will be erased as inputs and converted to
+            # host-side-only constants
+            return x, y, self.lin(z)
+
+    m = Model()
+    p = poptorch.inferenceModel(m)
+    x = torch.tensor([1, 2])
+    y = torch.tensor([3, 4])
+    z = torch.tensor([1.2, 3.4])
+
+    for cpu_out, ipu_out in zip(m(z, x, y), p(z, x, y)):
+        helpers.assert_allclose(actual=ipu_out, expected=cpu_out)
