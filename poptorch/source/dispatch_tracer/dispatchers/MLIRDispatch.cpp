@@ -289,18 +289,6 @@ void MLIRDispatch::setCurrentCodeLocation(
   }
 }
 
-std::string getSchemaKey(const c10::FunctionSchema &schema) {
-  std::string schema_key;
-  // Unfortunately we can't overload based only on the schema symbol as it does
-  // not contain the overload info.
-  if (schema.overload_name().empty()) {
-    schema_key = schema.name();
-  } else {
-    schema_key = schema.name() + "." + schema.overload_name();
-  }
-  return schema_key;
-}
-
 std::string MLIRDispatch::handleOp(const c10::OperatorHandle &op,
                                    c10::Stack *stack) {
   auto schema_key = getSchemaKey(op.schema());

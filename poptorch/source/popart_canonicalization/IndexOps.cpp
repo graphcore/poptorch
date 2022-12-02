@@ -52,14 +52,6 @@ IndexInfo processIndex(torch::jit::Graph *graph, torch::jit::Value *x,
       }
       pad++;
     } else {
-      auto index_dtype = getNodeScalarType(index);
-      ERROR_ON_MSG(
-          index_dtype == c10::ScalarType::Bool ||
-              index_dtype == c10::ScalarType::Byte,
-          "Indexing using boolean or byte tensor masks is unsupported because "
-          "it would produce dynamic output shapes based on the mask values. "
-          "The IPU cannot support dynamic output shapes.");
-
       auto s = shapeFromTensor(index);
       if (s.size() > index_shape.size()) {
         index_shape = s;

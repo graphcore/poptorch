@@ -689,7 +689,10 @@ TORCH_LIBRARY_IMPL(_, AutogradIPU, m) {
 
   RegisterOptionalAtenOps.cpp.inc registers the optional ops that our backend
   intercepts.
+  RegisterMetaOps.cpp.inc registers the meta implementations of operations
+  that are used for type inference
 */
+#include "RegisterMetaOps.cpp.inc"
 #include "RegisterOptionalAtenOps.cpp.inc"
 
 // This is required to intercept detach calls when
@@ -729,15 +732,11 @@ c10::IValue getNthArgument(const c10::OperatorHandle &op, c10::Stack *stack,
 
 void opReturningFirstArgument(const c10::OperatorHandle &op,
                               c10::Stack *stack) {
-  if (poptorch::isDispatcherOn()) {
-    poptorch::fallback(op, stack);
-  } else {
-    const auto front = getNthArgument(op, stack, 0);
-    updateStack(op, stack, {front});
-  }
+  const auto front = getNthArgument(op, stack, 0);
+  updateStack(op, stack, {front});
 }
 
-void opWithNoReturn(const c10::OperatorHandle &op, c10::Stack *stack) {
+void opWithoutOutputs(const c10::OperatorHandle &op, c10::Stack *stack) {
   if (poptorch::isDispatcherOn()) {
     poptorch::fallback(op, stack);
   } else {
@@ -746,7 +745,7 @@ void opWithNoReturn(const c10::OperatorHandle &op, c10::Stack *stack) {
 }
 
 void callCpuOp(const c10::OperatorHandle &op, c10::Stack *stack) {
-  opWithNoReturn(op, stack);
+  opWithoutOutputs(op, stack);
 
   if (poptorch::isDispatcherOn()) {
     poptorch::endDispatch();
@@ -758,21 +757,13 @@ void endCpuOp(const c10::OperatorHandle &op, c10::Stack *stack) {
   // don't want to re-start the dispatcher.
   if (poptorch::isCompilingWithDispatcher()) {
     poptorch::startDispatch();
+    poptorch::fallback(op, stack);
   }
 
   opReturningFirstArgument(op, stack);
 }
 
-// at::Tensor castOp(at::Tensor tensor, std::string type)
-void castOp(const c10::OperatorHandle &op, c10::Stack *stack) {
-  if (poptorch::isDispatcherOn()) {
-    poptorch::fallback(op, stack);
-    return;
-  }
-
-  auto type = getNthArgument(op, stack, 1).toString()->string();
-  auto tensor = getNthArgument(op, stack, 0).toTensor();
-
+at::Tensor castOp(const at::Tensor &tensor, const std::string &type) {
   // If the type to cast to is f16 then we need to cast to f32. The reason being
   // is that by default we will just ignore the type, however this will only
   // work if the original type was f32.
@@ -785,10 +776,9 @@ void castOp(const c10::OperatorHandle &op, c10::Stack *stack) {
     out = conv(MyTensor) # This would be an illegal INT8 convolution.
   */
   if (type == "FLOAT16" || type == "FLOAT32") {
-    updateStack(op, stack, {tensor.to(at::ScalarType::Float)});
-  } else {
-    updateStack(op, stack, {tensor});
+    return tensor.to(at::ScalarType::Float);
   }
+  return tensor;
 }
 
 // c10::List<at::Tensor>
@@ -800,58 +790,33 @@ void castOp(const c10::OperatorHandle &op, c10::Stack *stack) {
 //   return example_outputs;
 //  }
 void customOperation(const c10::OperatorHandle &op, c10::Stack *stack) {
-  if (poptorch::isDispatcherOn()) {
-    // NB treated as inplace due to use of example_outputs
-    poptorch::fallback(op, stack);
-    return;
-  }
-
   auto out = getNthArgument(op, stack, 5);
   updateStack(op, stack, {out});
 }
 
 // dynamic_slice(Tensor self, int dim, Tensor start, int size, int step) ->
 // Tensor
-void dynamicSlice(const c10::OperatorHandle &op, c10::Stack *stack) {
-  if (poptorch::isDispatcherOn()) {
-    poptorch::fallback(op, stack);
+at::Tensor dynamicSlice(const at::Tensor &self, int64_t dim,
+                        const at::Tensor &start, int64_t size, int64_t step) {
+  auto st = start.scalar_type();
+  std::int64_t start_int;
+  if (st == torch::kInt64) {
+    start_int = start.data_ptr<std::int64_t>()[0];
+  } else if (st == torch::kInt32) {
+    start_int = start.data_ptr<std::int32_t>()[0];
+  } else if (st == torch::kInt16) {
+    start_int = start.data_ptr<std::int16_t>()[0];
   } else {
-    const auto self = getNthArgument(op, stack, 0).toTensor();
-    auto dim = getNthArgument(op, stack, 1).toInt();
-    auto t_start = getNthArgument(op, stack, 2).toTensor();
-    auto st = t_start.scalar_type();
-    std::int64_t start;
-    if (st == torch::kInt64) {
-      start = t_start.data_ptr<std::int64_t>()[0];
-    } else if (st == torch::kInt32) {
-      start = t_start.data_ptr<std::int32_t>()[0];
-    } else if (st == torch::kInt16) {
-      start = t_start.data_ptr<std::int16_t>()[0];
-    } else {
-      ERROR("Expected integer typed start tensor");
-    }
-
-    auto size = getNthArgument(op, stack, 3).toInt();
-    auto step = getNthArgument(op, stack, 4).toInt();
-
-    auto result = at::slice(self, dim, {start}, {start + size}, step);
-
-    updateStack(op, stack, {result});
+    ERROR("Expected integer typed start tensor");
   }
+
+  return at::slice(self, dim, {start_int}, {start_int + size}, step);
 }
 
-// c10::List<at::Tensor> ctcBeamSearchDecoder(const at::Tensor &log_probs,
-//                                            const at::Tensor &lengths,
-//                                            int64_t blank, int64_t width,
-//                                            int64_t top_paths)
-void ctcBeamSearchDecoder(const c10::OperatorHandle &op, c10::Stack *stack) {
-  if (poptorch::isDispatcherOn()) {
-    poptorch::fallback(op, stack);
-    return;
-  }
-
-  auto log_probs = getNthArgument(op, stack, 0).toTensor();
-  auto top_paths = getNthArgument(op, stack, 3).toInt();
+std::tuple<at::Tensor, at::Tensor, at::Tensor>
+ctcBeamSearchDecoder(const at::Tensor &log_probs,
+                     const at::Tensor & /*lengths*/, int64_t /*blank*/,
+                     int64_t /*width*/, int64_t top_paths) {
   ERROR_ON_MSG(log_probs.sizes().size() != 3,
                "Incorrect shape for first input to CTC beam search decoder.");
   const unsigned input_len = log_probs.sizes()[0];
@@ -862,150 +827,105 @@ void ctcBeamSearchDecoder(const c10::OperatorHandle &op, c10::Stack *stack) {
   const at::Tensor decoded_paths =
       at::zeros({batch_size, top_paths, input_len});
 
-  updateStack(op, stack, {path_probs, path_lens, decoded_paths});
+  return {path_probs, path_lens, decoded_paths};
 }
 
 // at::Tensor identityLoss(const at::Tensor &t, int64_t reduction)
-void identityLoss(const c10::OperatorHandle &op, c10::Stack *stack) {
-  if (poptorch::isDispatcherOn()) {
-    poptorch::fallback(op, stack);
-    return;
-  }
-
-  auto t = getNthArgument(op, stack, 0).toTensor();
-  auto reduction = getNthArgument(op, stack, 1).toInt();
+at::Tensor identityLoss(const at::Tensor &t, int64_t reduction) {
   constexpr int64_t sum = 0;
   constexpr int64_t mean = 1;
   constexpr int64_t none = 2;
 
-  popArgumentsFromStack(op, stack);
   switch (reduction) {
   case sum:
-    pushResultsToStack(stack, {at::sum(t)});
-    return;
+    return at::sum(t);
   case mean:
-    pushResultsToStack(stack, {at::mean(t)});
-    return;
+    return at::mean(t);
   case none:
-    pushResultsToStack(stack, {t.clone()});
-    return;
+    return t.clone();
   default:
     ERROR("reduction must be sum (0), mean (1) or none (2)");
   }
 }
 
-// TODO(T64770) This method is the old way of registering custom functions. The
-// new way would look like this:
-//
-// TORCH_LIBRARY(poptorch, m) {
-//  m.def("begin_ipu_block(int stage_id, int phase_id, int ipu_id) -> ()",
-//        PTC_BOXED(opWithNoReturn));
-//  // ...
-// }
-//
-// Unfortunately, with this the trace doesn't pick up on functions that don't
-// take a tensor as an input and output a tensor meaning that several of our ops
-// don't appear in the traced graph.
-static auto registry =
-    torch::RegisterOperators()
-        .op(torch::RegisterOperators::options()
-                .schema("poptorch::begin_ipu_block(int stage_id, int phase_id, "
-                        "int ipu_id) -> ()")
-                .catchAllKernel<PTC(opWithNoReturn)>())
-        .op(torch::RegisterOperators::options()
-                .schema("poptorch::end_ipu_block() -> ()")
-                .catchAllKernel<PTC(opWithNoReturn)>())
-        .op(torch::RegisterOperators::options()
-                .schema("poptorch::ipu_print_tensor(Tensor self, str? title) "
-                        "-> Tensor")
-                .catchAllKernel<PTC(opReturningFirstArgument)>())
-        .op(torch::RegisterOperators::options()
-                .schema(
-                    "poptorch::internal_cast(Tensor self, str dtype) -> Tensor")
-                .catchAllKernel<PTC(castOp)>())
-        .op(torch::RegisterOperators::options()
-                .schema("poptorch::nop(Tensor self) -> Tensor")
-                .catchAllKernel<PTC(opReturningFirstArgument)>())
-        .op(torch::RegisterOperators::options()
-                .schema("poptorch::dynamic_slice(Tensor self, int dim, "
-                        "Tensor start, int size, int step) -> Tensor")
-                .catchAllKernel<PTC(dynamicSlice)>())
-        .op(torch::RegisterOperators::options()
-                .schema("poptorch::custom_operation(Tensor[] inputs, str name, "
-                        "str domain, int domain_version, int num_outputs, "
-                        "Tensor[] outputs, str attributes) -> Tensor[]")
-                .catchAllKernel<PTC(customOperation)>())
-        .op(torch::RegisterOperators::options()
-                .schema("poptorch::ctc_beam_search_decoder(Tensor probs, "
-                        "Tensor lengths, int blank, int beam_width, int "
-                        "top_paths) -> (Tensor, Tensor, Tensor)")
-                .catchAllKernel<PTC(ctcBeamSearchDecoder)>())
-        .op(torch::RegisterOperators::options()
-                .schema("poptorch::identity_loss(Tensor x, int reduction) -> "
-                        "Tensor")
-                .catchAllKernel<PTC(identityLoss)>())
-        .op(torch::RegisterOperators::options()
-                .schema("poptorch::start_for_loop(Tensor[] inputs) -> ()")
-                .catchAllKernel<PTC(opWithNoReturn)>())
-        .op(torch::RegisterOperators::options()
-                .schema("poptorch::end_for_loop(Tensor[] outputs, Tensor[] "
-                        "inputs, int trip_count) -> Tensor[]")
-                .catchAllKernel<PTC(opReturningFirstArgument)>())
-        .op(torch::RegisterOperators::options()
-                .schema("poptorch::optimizer_group(int group, Tensor[] inputs) "
-                        "-> ()")
-                .catchAllKernel<PTC(opWithNoReturn)>())
-        .op(torch::RegisterOperators::options()
-                .schema("poptorch::set_matmul_serialization(Tensor matmul, str "
-                        "mode, int factor, bool keep_precision) -> Tensor")
-                .catchAllKernel<PTC(opReturningFirstArgument)>())
-        .op(torch::RegisterOperators::options()
-                .schema("poptorch::set_overlap_for_input(Tensor t, str mode) "
-                        "-> Tensor")
-                .catchAllKernel<PTC(opReturningFirstArgument)>())
-        .op(torch::RegisterOperators::options()
-                .schema("poptorch::set_overlap_for_output(Tensor t, str mode) "
-                        "-> Tensor")
-                .catchAllKernel<PTC(opReturningFirstArgument)>())
-        .op(torch::RegisterOperators::options()
-                .schema(
-                    "poptorch::recomputation_checkpoint(Tensor self) -> Tensor")
-                .catchAllKernel<PTC(opReturningFirstArgument)>())
-        .op(torch::RegisterOperators::options()
-                .schema("poptorch::set_available_memory(Tensor t, float mem) "
-                        "-> Tensor")
-                .catchAllKernel<PTC(opReturningFirstArgument)>())
-        .op(torch::RegisterOperators::options()
-                .schema("poptorch::begin_multi_conv() -> ()")
-                .catchAllKernel<PTC(opWithNoReturn)>())
-        .op(torch::RegisterOperators::options()
-                .schema(
-                    "poptorch::end_multi_conv(float[]? "
-                    "available_memory_proportions, int[]? partials_types, int? "
-                    "plan_type, int? per_conv_reserved_tiles, float? "
-                    "cycle_back_off, int[]? enableConvDithering) -> ()")
-                .catchAllKernel<PTC(opWithNoReturn)>())
-        .op(torch::RegisterOperators::options()
-                .schema("poptorch::push_name_scope(str name) -> ()")
-                .catchAllKernel<PTC(opWithNoReturn)>())
-        .op(torch::RegisterOperators::options()
-                .schema("poptorch::pop_name_scope() -> ()")
-                .catchAllKernel<PTC(opWithNoReturn)>())
-        .op(torch::RegisterOperators::options()
-                .schema("poptorch::end_cpu_op(Tensor[] output) -> Tensor[]")
-                .catchAllKernel<PTC(endCpuOp)>())
-        .op(torch::RegisterOperators::options()
-                .schema(
-                    "poptorch::call_cpu_op(Tensor[] inputs, str name) -> ()")
-                .catchAllKernel<PTC(callCpuOp)>())
-        .op(torch::RegisterOperators::options()
-                .schema("poptorch::set_attribute(str attribute, str key, str "
-                        "value) -> ()")
-                .catchAllKernel<PTC(opWithNoReturn)>())
-        .op(torch::RegisterOperators::options()
-                .schema(
-                    "poptorch::clear_attribute(str attribute, str key) -> ()")
-                .catchAllKernel<PTC(opWithNoReturn)>());
+#define OP_WITHOUT_OUTPUTS(signature)                                          \
+  torch::schema(signature, c10::AliasAnalysisKind::CONSERVATIVE),              \
+      PTC_BOXED(opWithoutOutputs)
+
+TORCH_LIBRARY(poptorch, m) {
+  // These operations have no outputs, and so are registered with side-effects
+  // to prevent being pruned by dead-code elimination
+  m.def(OP_WITHOUT_OUTPUTS(
+      "begin_ipu_block(int stage_id, int phase_id, int ipu_id) -> ()"));
+  m.def(OP_WITHOUT_OUTPUTS("end_ipu_block() -> ()"));
+  m.def(OP_WITHOUT_OUTPUTS("start_for_loop(Tensor[] inputs) -> ()"));
+  m.def(
+      OP_WITHOUT_OUTPUTS("optimizer_group(int group, Tensor[] inputs) -> ()"));
+  m.def(OP_WITHOUT_OUTPUTS("begin_multi_conv() -> ()"));
+  m.def(OP_WITHOUT_OUTPUTS(
+      "end_multi_conv(float[]? "
+      "available_memory_proportions, int[]? partials_types, int? "
+      "plan_type, int? per_conv_reserved_tiles, float? "
+      "cycle_back_off, int[]? enableConvDithering) -> ()"));
+  m.def(OP_WITHOUT_OUTPUTS("push_name_scope(str name) -> ()"));
+  m.def(OP_WITHOUT_OUTPUTS("pop_name_scope() -> ()"));
+  m.def(OP_WITHOUT_OUTPUTS(
+      "set_attribute(str attribute, str key, str value) -> ()"));
+  m.def(OP_WITHOUT_OUTPUTS("clear_attribute(str attribute, str key) -> ()"));
+
+  // Operations returning the first argument
+  m.def("ipu_print_tensor(Tensor self, str? title) -> Tensor");
+  m.def("nop(Tensor self) -> Tensor");
+  m.def("end_for_loop(Tensor[] outputs, Tensor[] "
+        "inputs, int trip_count) -> Tensor[]");
+  m.def("set_matmul_serialization(Tensor matmul, str "
+        "mode, int factor, bool keep_precision) -> Tensor");
+  m.def("set_overlap_for_input(Tensor t, str mode) -> Tensor");
+  m.def("set_overlap_for_output(Tensor t, str mode) -> Tensor");
+  m.def("recomputation_checkpoint(Tensor self) -> Tensor");
+  m.def("set_available_memory(Tensor t, float mem) -> Tensor");
+
+  m.def("custom_operation(Tensor[] inputs, str name, str domain, int "
+        "domain_version, int num_outputs, Tensor[] outputs, str attributes) -> "
+        "Tensor[]");
+  m.def("ctc_beam_search_decoder(Tensor probs, "
+        "Tensor lengths, int blank, int beam_width, int "
+        "top_paths) -> (Tensor, Tensor, Tensor)");
+  m.def("dynamic_slice(Tensor self, int dim, Tensor start, int size, int step) "
+        "-> Tensor");
+  m.def("identity_loss(Tensor x, int reduction) -> Tensor");
+  m.def("internal_cast(Tensor self, str dtype) -> Tensor");
+
+  // call_cpu_op and end_cpu_op are special cases because they must
+  // immediately switch the dispatcher on/off so the default poptorch
+  // fallback cannot be used. They are also registered with side-effects
+  // to ensure they are not reintercepted during constexpr evaluation
+  m.def(torch::schema("end_cpu_op(Tensor[] output) -> Tensor[]",
+                      c10::AliasAnalysisKind::CONSERVATIVE),
+        PTC_BOXED(endCpuOp));
+  m.def(torch::schema("call_cpu_op(Tensor[] inputs, str name) -> ()",
+                      c10::AliasAnalysisKind::CONSERVATIVE),
+        PTC_BOXED(callCpuOp));
+}
+
+TORCH_LIBRARY_IMPL(poptorch, CPU, m) {
+  // Operations returning the first argument
+  m.impl("end_for_loop", PTC_BOXED(opReturningFirstArgument));
+  m.impl("ipu_print_tensor", PTC_BOXED(opReturningFirstArgument));
+  m.impl("nop", PTC_BOXED(opReturningFirstArgument));
+  m.impl("recomputation_checkpoint", PTC_BOXED(opReturningFirstArgument));
+  m.impl("set_available_memory", PTC_BOXED(opReturningFirstArgument));
+  m.impl("set_matmul_serialization", PTC_BOXED(opReturningFirstArgument));
+  m.impl("set_overlap_for_input", PTC_BOXED(opReturningFirstArgument));
+  m.impl("set_overlap_for_output", PTC_BOXED(opReturningFirstArgument));
+
+  // Operations with their own CPU implementations
+  m.impl("ctc_beam_search_decoder", PTC(ctcBeamSearchDecoder));
+  m.impl("custom_operation", PTC_BOXED(customOperation));
+  m.impl("dynamic_slice", PTC(dynamicSlice));
+  m.impl("identity_loss", PTC(identityLoss));
+  m.impl("internal_cast", PTC(castOp));
+}
 
 // By default, if we don't register anything for autograd, the the outputs of
 // `poptorch::` ops will have no `grad_fn` (making them leaves). For PopART it's

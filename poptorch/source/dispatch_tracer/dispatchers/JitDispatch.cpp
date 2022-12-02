@@ -62,7 +62,7 @@ std::string truncateGraphString(torch::jit::Graph &graph) {
 JITDispatch::JITDispatch(const CompilerOptions &options,
                          TensorStore *tensor_store)
     : IDispatch(tensor_store), graph(std::make_shared<torch::jit::Graph>()),
-      _mlir_dispatch(options, tensor_store) {}
+      _opts(options), _type_inference_handler(tensor_store) {}
 
 void JITDispatch::addConstant(const at::Tensor &cpu_tensor,
                               const at::Tensor &ipu_tensor) {
@@ -222,7 +222,7 @@ void JITDispatch::detach(const c10::OperatorHandle &op, c10::Stack *stack,
 
 const std::vector<std::vector<char>> &
 JITDispatch::getSourceLocationExcludes() const {
-  return _mlir_dispatch.getSourceLocationExcludes();
+  return _opts.dispatcher.source_location_excludes;
 }
 
 void JITDispatch::setCurrentCodeLocation(
@@ -375,7 +375,7 @@ void JITDispatch::fallback(const c10::OperatorHandle &op, c10::Stack *stack) {
   for (const c10::IValue &value : *stack) {
     process_value(value);
   }
-  _mlir_dispatch.handleOp(op, stack);
+  _type_inference_handler.inferOutputTypes(op, stack);
 
   // Fix the fake tensor so it can still work with our canonicalisation
   // functions which check the output.

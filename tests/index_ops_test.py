@@ -124,10 +124,9 @@ def test_index(op, idxs):
 def test_index_bool_mask_failure():
     with pytest.raises(
             poptorch.poptorch_core.Error,
-            match=r"Indexing using boolean or byte tensor masks is unsupported "
-            r"because it would produce dynamic output shapes based on "
-            r"the mask values\. The IPU cannot support dynamic output "
-            r"shapes\."):
+            match=r"Operations using aten::nonzero are unsupported "
+            r"because the output shape is determined by the tensor "
+            r"values\. The IPU cannot support dynamic output shapes\."):
         index_harness(index_ops[0], [True, False], False)
 
 

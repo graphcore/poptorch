@@ -16,8 +16,19 @@ TORCH_LIBRARY_IMPL(aten, IPU, m) {
 
   m.impl("index.Tensor", PTC_BOXED(poptorch::fallback));
 
-  m.impl("convolution_overrideable", PTC_BOXED(poptorch::fallback));
-  m.impl("convolution_backward_overrideable", PTC_BOXED(poptorch::fallback));
+  m.impl("convolution", PTC_BOXED(poptorch::fallback));
+  m.impl("convolution_backward", PTC_BOXED(poptorch::fallback));
+
+  // These ops must be intercepted so that meta type inference
+  // doesn't have to deal with "out" tensors that aren't directly
+  // assigned to
+  m.impl("median.dim", PTC_BOXED(poptorch::fallback));
+  m.impl("min.dim", PTC_BOXED(poptorch::fallback));
+  m.impl("max.dim", PTC_BOXED(poptorch::fallback));
+  m.impl("topk", PTC_BOXED(poptorch::fallback));
+  m.impl("nll_loss_forward", PTC_BOXED(poptorch::fallback));
+  m.impl("nll_loss2d_forward", PTC_BOXED(poptorch::fallback));
+
   m.impl("transpose.int", PTC_BOXED(poptorch::fallback));
   m.impl("expand", PTC_BOXED(poptorch::fallback));
   m.impl("_unsafe_view", PTC_BOXED(poptorch::fallback));

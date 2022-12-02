@@ -237,5 +237,5 @@ def test_error_on_cpu_tensor():
     with pytest.raises(poptorch.Error,
                        match=re.escape(
                            "Expected an IPU tensor but got tensor(device=cpu, "
-                           "shape=[2], dtype= long int)")):
+                           "shape=[2], dtype=Long)")):
         inference_model.compile(t1)

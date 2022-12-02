@@ -9,9 +9,11 @@
 #include <unordered_map>
 #include <vector>
 
+#include "pytorch_bridge/CompilerOptions.hpp"
+
+#include "../TypeInferenceHandler.hpp"
 #include "../ValueMapper.hpp"
 #include "IDispatch.hpp"
-#include "MLIRDispatch.hpp"
 
 #include "poptorch/InplaceOps.hpp"
 
@@ -57,8 +59,8 @@ private:
 
   void addTensorToParamNode(const at::Tensor &cpu_tensor);
 
-  // We use the MLIR dispatch for shape inference.
-  MLIRDispatch _mlir_dispatch;
+  CompilerOptions _opts;
+  TypeInferenceHandler _type_inference_handler;
   InplaceInputsTracker _inplace_tracker;
 };
 

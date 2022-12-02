@@ -49,6 +49,8 @@ at::ScalarType scalarTypeOrDefault(c10::optional<at::ScalarType> dtype);
 // If device is set: return device, otherwise return the default device (ipu0)
 c10::Device deviceOrDefaultIpu(c10::optional<c10::Device> device);
 
+std::string getSchemaKey(const c10::FunctionSchema &schema);
+
 } // namespace poptorch
 
 #endif // POPTORCH_DISPATCH_COMMON_HELPERS_HPP_

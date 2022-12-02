@@ -247,4 +247,16 @@ c10::Device deviceOrDefaultIpu(c10::optional<c10::Device> device) {
   return device ? *device : c10::Device(at::kIPU, 0);
 }
 
+std::string getSchemaKey(const c10::FunctionSchema &schema) {
+  std::string schema_key;
+  // Unfortunately we can't overload based only on the schema symbol as it does
+  // not contain the overload info.
+  if (schema.overload_name().empty()) {
+    schema_key = schema.name();
+  } else {
+    schema_key = schema.name() + "." + schema.overload_name();
+  }
+  return schema_key;
+}
+
 } // namespace poptorch

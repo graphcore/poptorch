@@ -19,6 +19,7 @@ add_library(dispatch_tracer STATIC
   dispatchers/CompilerDispatchTable.cpp
   ValueMapper.cpp
   Tensor.cpp
+  TypeInferenceHandler.cpp
 )
 
 target_link_libraries(dispatch_tracer

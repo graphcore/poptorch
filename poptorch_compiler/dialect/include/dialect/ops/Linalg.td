@@ -61,16 +61,16 @@ def Poptorch_conv : Poptorch_Op<"conv", []> {
   }]>];
 }
 
-// aten::convolution_backward_overrideable(
-//   Tensor grad_output, Tensor input, Tensor weight,
-//   int[] stride, int[] padding, int[] dilation,
-//   bool transposed, int[] output_padding, int groups,
-//   bool[3] output_mask) ->
-//   (Tensor grad_input, Tensor grad_weight, Tensor grad_bias)
+// aten::convolution_backward(Tensor grad_output, Tensor input, Tensor weight,
+//                            SymInt[]? bias_sizes, int[] stride, int[] padding,
+//                            int[] dilation, bool transposed, int[] output_padding,
+//                            int groups, bool[3] output_mask) ->
+//                            (Tensor, Tensor, Tensor)
 def Poptorch_conv_backward : Poptorch_Op<"conv_backward", []> {
   let arguments = (ins Poptorch_tensor:$grad_output,
                        Poptorch_tensor:$input,
                        Poptorch_tensor:$weight,
+                       OptionalAttr<I64ArrayAttr>:$bias_sizes,
                        I64ArrayAttr:$stride, I64ArrayAttr:$padding,
                        I64ArrayAttr:$dilation, BoolAttr:$transposed,
                        I64ArrayAttr:$output_padding, I64Attr:$groups,
@@ -82,6 +82,7 @@ def Poptorch_conv_backward : Poptorch_Op<"conv_backward", []> {
   let builders = [OpBuilder<(ins "mlir::Value":$grad_output,
                                  "mlir::Value":$input,
                                  "mlir::Value":$weight,
+                                 "std::optional<std::vector<std::int64_t>>":$bias_sizes,
                                  "const std::vector<std::int64_t>&":$stride,
                                  "const std::vector<std::int64_t>&":$padding,
                                  "const std::vector<std::int64_t>&":$dilation,
@@ -99,7 +100,11 @@ def Poptorch_conv_backward : Poptorch_Op<"conv_backward", []> {
         $_state.addAttribute("output_mask", $_builder.getI64ArrayAttr(output_mask));
 
         const auto weight_type = weight.getType().cast<mlir::RankedTensorType>();
-        llvm::SmallVector<std::int64_t, 1> bias_shape = {weight_type.getShape()[0]};
+        std::vector<std::int64_t> bias_shape = {weight_type.getShape()[0]};
+        if (bias_sizes.has_value()) {
+          bias_shape = bias_sizes.value();
+          $_state.addAttribute("bias_sizes",$_builder.getI64ArrayAttr(bias_sizes.value()));
+        }
 
         $_state.addTypes({input.getType(), weight.getType(),
                           mlir::RankedTensorType::get(bias_shape,
