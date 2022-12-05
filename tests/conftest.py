@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 
+import random
 import enum
 import gc
 import pytest
 import torch
 import helpers
+import numpy as np
 import poptorch
 
 
@@ -128,3 +130,22 @@ def pytest_addoption(parser):
                      default=False,
                      help=("Run some tests with a reduced "
                            "number of parameters"))
+    parser.addoption("--seed",
+                     type=int,
+                     default=0,
+                     help=("Set the seed for running the tests."))
+
+
+@pytest.fixture(autouse=True, scope="function")
+def random_seed(pytestconfig):
+    """Set the random seed for all tests in this directory. autouse=True will
+    use this fixture in every test. Seed can be overridden with --seed on the
+    command line to alter the seed for testing purposes. By default uses 0 for
+    all tests.
+    """
+    seed = 0
+    if hasattr(pytestconfig, "seed"):
+        seed = pytestconfig.seed
+    np.random.seed(seed)
+    random.seed(seed)
+    torch.manual_seed(seed)
