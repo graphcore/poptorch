@@ -255,33 +255,11 @@ class CondaCommand(Command):
                              name=name or cmd[0])
 
 
-def get_llvm_path_from_build():
-    llvm_path = ""
-
-    def parse_cmake_cache(output, returncode):
-        # Expected to contain a line of the form:
-        # LLVM_DIR:PATH=/path/to/llvm_dir/lib/cmake/llvm
-        nonlocal llvm_path
-        for line in output.splitlines():
-            m = re.match("^LLVM_DIR:.*=(.*)/lib/cmake/llvm", line)
-            if m:
-                llvm_path = m.group(1)
-                break
-        return output, returncode
-
-    CondaCommand("cat ${CONDA_PREFIX}/../CMakeCache.txt",
-                 print_output=False,
-                 output_processor=parse_cmake_cache).run()
-    return llvm_path
-
-
 class ClangTools:
-    _llvm_path = None
+    _llvm_path = "${CONDA_PREFIX}"
 
     @staticmethod
     def path():
-        if ClangTools._llvm_path is None:
-            ClangTools._llvm_path = get_llvm_path_from_build()
         return os.path.join(ClangTools._llvm_path, "bin")
 
     @staticmethod
@@ -467,15 +445,15 @@ class ClangFormat(ILinter):
         else:
             output_processor = DiffCreator(filename, "clang-format", autofix)
 
-        return Command(ClangTools.clang_format(),
-                       flags,
-                       filename,
-                       output_processor=output_processor,
-                       print_output=autofix)
+        return CondaCommand(ClangTools.clang_format(),
+                            flags,
+                            filename,
+                            output_processor=output_processor,
+                            print_output=autofix)
 
     def check_version(self):
         return compare_versions_from_output(ClangTools.clang_format(),
-                                            "15.0.2", "version")
+                                            "13.0.1", "version")
 
 
 class ClangTidy(ILinter):
@@ -548,8 +526,8 @@ class ClangTidy(ILinter):
                     print(raw_output)
                 # Apply the fixes using clang-apply-replacements
                 if self.autofix:
-                    Command(ClangTools.clang_apply_replacements(),
-                            self.tmp_folder.name).run()
+                    CondaCommand(ClangTools.clang_apply_replacements(),
+                                 self.tmp_folder.name).run()
             return raw_output, returncode
 
     def __init__(self):
@@ -621,19 +599,19 @@ class ClangTidy(ILinter):
         for i, c in enumerate(self.configs):
             report = os.path.join(results.tmp_folder.name, f"report_{i}.yaml")
             commands.append(
-                Command(cd,
-                        ClangTools.clang_tidy(),
-                        "--quiet",
-                        os.path.realpath(filename),
-                        f"--export-fixes={report}",
-                        c,
-                        "--",
-                        flags,
-                        name=("clang-tidy --quiet "
-                              f"{filename} -- {flags}"),
-                        output_processor=results,
-                        print_output_on_error=False,
-                        print_output=False))
+                CondaCommand(cd,
+                             ClangTools.clang_tidy(),
+                             "--quiet",
+                             os.path.realpath(filename),
+                             f"--export-fixes={report}",
+                             c,
+                             "--",
+                             flags,
+                             name=("clang-tidy --quiet "
+                                   f"{filename} -- {flags}"),
+                             output_processor=results,
+                             print_output_on_error=False,
+                             print_output=False))
         return commands
 
     def process_compile_commands(self, commands):
@@ -719,13 +697,13 @@ class ClangTidy(ILinter):
                         output_processor=parse_system_includes).run():
             return False
 
-        if Command(ClangTools.clang_tidy() + " --dump-config",
-                   print_output=False,
-                   output_processor=parse_config).run():
+        if CondaCommand(ClangTools.clang_tidy() + " --dump-config",
+                        print_output=False,
+                        output_processor=parse_config).run():
             return False
-        if Command(ClangTools.clang_tidy() + " --list-checks",
-                   print_output=False,
-                   output_processor=parse_checks).run():
+        if CondaCommand(ClangTools.clang_tidy() + " --list-checks",
+                        print_output=False,
+                        output_processor=parse_checks).run():
             return False
         tests = [
             f"test -d {i} || echo \"Include folder {i} not found\""
@@ -742,7 +720,7 @@ class ClangTidy(ILinter):
                         output_processor=parse_compile_commands_file).run():
             return False
 
-        return compare_versions_from_output(ClangTools.clang_tidy(), "15.0.2",
+        return compare_versions_from_output(ClangTools.clang_tidy(), "13.0.1",
                                             "version")
 
     def is_enabled(self, filename, autofix):
