@@ -183,7 +183,11 @@ remove_use_distributed_definition(torch_cpu)
 
 add_subdirectory(poptorch_err)
 add_subdirectory(poptorch_logging)
+add_subdirectory(poptorch_compiler/pytorch_bridge)
+# TODO(T71387) Remove line below once apply_linter.py has been updated to
+# not rely on CMake to find the clang linters (Follow up patch)
 add_subdirectory(poptorch_compiler)
+
 add_subdirectory(poptorch/source/dispatch_tracer)
 add_subdirectory(popart_compiler)
 add_subdirectory(poptorch)

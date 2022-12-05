@@ -1,8 +1,6 @@
 // Copyright (c) 2022 Graphcore Ltd. All rights reserved.
 #include "pytorch_bridge/IpuSession.hpp"
 
-#include <llvm/ADT/STLExtras.h>
-
 #include <chrono>
 #include <memory>
 #include <thread>

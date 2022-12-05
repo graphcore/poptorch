@@ -1,9 +1,0 @@
-# MLIR YAML definitions for functions in the torch_scatter namespace
-
- - func: scatter_max
-   native_func: scatter_max(Tensor src, Tensor index, int dim, Tensor? out, int? dim_size) -> (Tensor, Tensor)
-   PopTorchDirect: scatter_max
-
- - func: scatter_min
-   native_func: scatter_min(Tensor src, Tensor index, int dim, Tensor? out, int? dim_size) -> (Tensor, Tensor)
-   PopTorchDirect: scatter_min
