@@ -74,13 +74,12 @@ short_tests = [
 ]
 
 # The only tests that should be run in doc-only builds.
-docs_only_tests = [
+docs_only_test_files = [
     "test_doc_urls.py"
 ]
 
 long_tests = [
     "bert_small_and_medium_test.py::test_bert_medium_result",
-    "fine_tuning_test.py",
     "half_test.py::test_resnet",
     "io_performance_test.py::test_compare_io_performance",
     "torch_nn_test.py::test_pytorch_nn[trace_model:False-use_half:False-test_name:test_nn_Conv2d_circular_stride2_pad2]",
@@ -103,10 +102,12 @@ external_data_tests = [
 # yapf: enable
 
 # Tests that cannot run in parallel with other tests
-serial_tests = [
-    "attach_detach_test.py",
-    "attach_detach_wait_for_ipu_test.py",
-    "io_performance_test.py::test_compare_io_performance",
+# Note: these are files not, tests
+serial_test_files = [
+    "attach_detach_test.py",  # Needs specific IPUs
+    "attach_detach_wait_for_ipu_test.py",  # Needs specific IPUs
+    "fine_tuning_test.py",  # Takes too much memory for the AWS builders.
+    "io_performance_test.py",  # Measures performance
 ]
 #pylint: enable=line-too-long
 
@@ -164,20 +165,21 @@ with open(args.output_file, "w") as output:
 
             if test_file in short_tests:
                 continue
+            test_name = f"{test_file}::{m.group(2)}"
             labels = []
-            if test in long_tests:
+            if test_name in long_tests:
                 labels.append("long")
-            if test in external_data_tests:
+            if test_name in external_data_tests:
                 labels.append("external_data")
-            if test_file in docs_only_tests:
+            if test_file in docs_only_test_files:
                 labels.append("docs_only")
 
-            if test_file in serial_tests:
+            if test_file in serial_test_files:
                 test_properties['RUN_SERIAL'] = 'TRUE'
 
             if labels:
                 test_properties['LABELS'] = ";".join(labels)
 
-            add_test(output, f"{test_file}::{m.group(2)}", args.test_dir,
-                     dir_path, test_id, test_properties, extra_args)
+            add_test(output, test_name, args.test_dir, dir_path, test_id,
+                     test_properties, extra_args)
             test_id += 1
