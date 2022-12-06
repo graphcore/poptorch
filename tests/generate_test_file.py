@@ -109,6 +109,9 @@ serial_test_files = [
     "fine_tuning_test.py",  # Takes too much memory for the AWS builders.
     "io_performance_test.py",  # Measures performance
 ]
+serial_tests = [
+    "half_test.py::test_resnet",
+]
 #pylint: enable=line-too-long
 
 
@@ -174,7 +177,7 @@ with open(args.output_file, "w") as output:
             if test_file in docs_only_test_files:
                 labels.append("docs_only")
 
-            if test_file in serial_test_files:
+            if test_file in serial_test_files or test_name in serial_tests:
                 test_properties['RUN_SERIAL'] = 'TRUE'
 
             if labels:
