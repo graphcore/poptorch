@@ -165,17 +165,4 @@ expand(
     "addmm", lambda x, y, z, beta, alpha: op.gemm(y, z, x, cfloat(
         alpha), cfloat(beta), clong(0), clong(0)))
 
-
-def baddbmm_handler(input, batch1, batch2, beta, alpha):
-    mul1 = op.mul(op.matmul(batch1, batch2), alpha)
-    mul2 = op.mul(input, beta)
-    return op.add(mul1, mul2)
-
-
-def addmv_handler(input, mat, vec, beta, alpha):
-    # Redeclare the function, just for the benefit of arg names in generated
-    # comments.
-    return baddbmm_handler(input, mat, vec, beta, alpha)
-
-
 generate(script, "c10::aten", output_dir + "/AtenHandlers.gen.cpp", globals())
