@@ -44,8 +44,8 @@ torch::jit::Node *matmulHandler(torch::jit::Graph *graph,
 
   std::vector<std::int64_t> shape_input_a = shapeFromTensor(matrix_a);
   std::vector<std::int64_t> shape_input_b = shapeFromTensor(matrix_b);
-  std::int64_t size_a = shape_input_a.size();
-  std::int64_t size_b = shape_input_b.size();
+  std::int64_t const size_a = shape_input_a.size();
+  std::int64_t const size_b = shape_input_b.size();
 
   torch::jit::Node *result;
   // Matrix A can have any batch dimensions
@@ -89,10 +89,46 @@ torch::jit::Node *matmulHandler(torch::jit::Graph *graph,
   return result;
 }
 
+torch::jit::Node *baddbmmHandler(torch::jit::Graph *graph,
+                                 torch::jit::Node *node) {
+  auto *batch1 = node->input(1);
+  auto *batch2 = node->input(2);
+  auto b2_dtype = *batch2->type()->expect<c10::TensorType>()->scalarType();
+  auto *t0 = createMatmul(graph, {batch1, batch2})->output();
+  auto *alpha = node->input(4);
+  auto *t1 = createMul(graph, {t0, alpha})->output();
+  auto *input = node->input(0);
+  auto input_dtype = *input->type()->expect<c10::TensorType>()->scalarType();
+  auto *beta = node->input(3);
+  // PyTorch type inference dictates that the output scalar type is that of
+  // the second batch input, so cast the first input if necessary
+  auto *t2 = createMul(graph, {input, beta})->output();
+  if (b2_dtype != input_dtype) {
+    t2 = createCast(graph, t2, b2_dtype)->output();
+  }
+  // add(mul(matmul(batch1, batch2), alpha), mul(input, beta))
+  return createAdd(graph, {t1, t2});
+}
+
+torch::jit::Node *addmvHandler(torch::jit::Graph *graph,
+                               torch::jit::Node *node) {
+  auto *mat = node->input(1);
+  auto *vec = node->input(2);
+  auto *t0 = createMatmul(graph, {mat, vec})->output();
+  auto *alpha = node->input(4);
+  auto *t1 = createMul(graph, {t0, alpha})->output();
+  auto *input = node->input(0);
+  auto *beta = node->input(3);
+  auto *t2 = createMul(graph, {input, beta})->output();
+  // add(mul(matmul(mat, vec), alpha), mul(input, beta))
+  return createAdd(graph, {t1, t2});
+}
 } // namespace
 
 __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::matmul, matmulHandler);
+  registerHandler(c10::aten::baddbmm, baddbmmHandler);
+  registerHandler(c10::aten::addmv, addmvHandler);
 
   // Matrix-Vector
   registerHandler(c10::aten::mv, matmulHandler);
