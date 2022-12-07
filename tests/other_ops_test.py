@@ -180,7 +180,35 @@ def test_scatter_reduce(dim, reduce, include_self):
     sz[dim] = dim_size
     inp = torch.randn(sz)
     index = torch.randint_like(src, high=dim_size).long()
+    op_harness(Model(dim, reduce, include_self), inp, index, src)
 
+
+@pytest.mark.parametrize("dim", range(-3, 3))
+@pytest.mark.parametrize("reduce", ["mean", "amax", "amin"])
+@pytest.mark.parametrize("include_self", [True, False])
+def test_index_reduce(dim, reduce, include_self):
+    class Model(torch.nn.Module):
+        def __init__(self, dim, reduce, include_self):
+            super().__init__()
+            self.dim = dim
+            self.reduce = reduce
+            self.include_self = include_self
+
+        def forward(self, inp, index, src):
+            output = inp.index_reduce_(self.dim,
+                                       index,
+                                       src,
+                                       reduce=self.reduce,
+                                       include_self=self.include_self)
+            return output
+
+    torch.manual_seed(17)
+    inp = torch.randn(5, 8, 11)
+    dim_size = inp.shape[dim] // 2
+    sz = list(inp.shape)
+    sz[dim] = dim_size
+    src = torch.randn(sz)
+    index = torch.randint(high=dim_size, size=(dim_size, )).long()
     op_harness(Model(dim, reduce, include_self), inp, index, src)
 
 

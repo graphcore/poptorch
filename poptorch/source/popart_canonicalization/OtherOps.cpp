@@ -439,6 +439,9 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::tensordot, tensordotHandler);
   registerHandler(c10::aten::scatter_add, scatterAddHandler);
   registerHandler(c10::aten::scatter_reduce, scatterReduceHandler);
+  // PopArt handles broadcast of `index` tensor internally, scatter_reduce
+  // implementation can be reused for `index_reduce` op.
+  registerHandler(c10::aten::index_reduce, scatterReduceHandler);
   registerHandler(c10::aten::_weight_norm, weightNormHandler);
   registerHandler(c10::aten::randint, randintHandler);
   registerHandler(c10::aten::random_, randomHandler);
