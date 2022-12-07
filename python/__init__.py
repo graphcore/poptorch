@@ -299,9 +299,6 @@ class DataLoader(torch.utils.data.DataLoader):
                 raise createPoptorchError(
                     '`batch_sampler` option is mutually '
                     'exclusive with auto_distributed_partitioning=True.')
-            if mode != DataLoaderMode.Sync:
-                raise createPoptorchError('batch_sampler is not supported in '
-                                          'Async mode')
             if hasattr(batch_sampler, "batch_size"):
                 batch_size = batch_sampler.batch_size
             self.batch_sampler_drop_last = drop_last
@@ -337,6 +334,8 @@ class DataLoader(torch.utils.data.DataLoader):
         self._is_iterable = isinstance(dataset,
                                        torch.utils.data.IterableDataset)
         self._shuffle_map_style_data_in_distributed_env = False
+
+        self._accessor = None
 
         if self._is_iterable:
             if auto_distributed_partitioning:
@@ -375,6 +374,12 @@ class DataLoader(torch.utils.data.DataLoader):
                                 self._num_batches_to_combine,
                                 num_incomplete_batches * batch_size,
                                 batch_size, self._combined_batch_size)
+
+                            assert mode is not DataLoaderMode.Async, \
+                                "The 'drop_last=False' option from the " \
+                                "DataLoader works in Async mode only if " \
+                                "all the batches to be generated will be " \
+                                "complete."
                     else:
                         logger.warning(
                             "The `batch_sampler` __len__ method is not"
@@ -447,7 +452,6 @@ class DataLoader(torch.utils.data.DataLoader):
                          persistent_workers=persistent_workers,
                          **kwargs)
 
-        self._accessor = None
         if mode == DataLoaderMode.Async:
             async_options = async_options or {}
             assert "rebatched_size" not in async_options, (
@@ -586,8 +590,10 @@ class AsynchronousDataAccessor:
                 "the existing one or set mode='poptorch.DataLoaderMode.Sync'"
                 " in the DataLoader.")
 
-        if isinstance(dataset, DataLoader) and not dataset.drop_last and \
-                rebatched_size is None:
+        if isinstance(dataset, DataLoader) and \
+           not dataset._is_user_batch_sampler_set and \
+           not dataset.drop_last and \
+           rebatched_size is None:
             # Otherwise we'll end up with one left over tensor per worker
             # to return to the main process and we don't currently
             # support that.

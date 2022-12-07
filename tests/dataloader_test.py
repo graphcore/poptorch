@@ -1279,7 +1279,7 @@ class CustomBatch:
 
 
 class CustomBatchParser(poptorch.ICustomArgParser):
-    def yieldTensors(self, struct) -> None:
+    def yieldTensors(self, struct):
         yield struct.data
         yield struct.label
 
@@ -1388,8 +1388,12 @@ def get_item(batch, item, return_type):
 @pytest.mark.parametrize("num_workers", [0, 3])
 @pytest.mark.parametrize("return_type", [tuple, CustomBatch])
 @pytest.mark.parametrize("drop_last", [True, False])
+@pytest.mark.parametrize("mode", [
+    poptorch.DataLoaderMode.Sync, poptorch.DataLoaderMode.Async,
+    poptorch.DataLoaderMode.AsyncRebatched
+])
 def test_custom_batch_sampler(batch_size, device_iteration, num_workers,
-                              return_type, drop_last):
+                              return_type, drop_last, mode):
 
     shape = [3, 1]
     dataset_size = 149
@@ -1408,12 +1412,22 @@ def test_custom_batch_sampler(batch_size, device_iteration, num_workers,
 
     collate_fn = DynamicPadCollateFunction(batch_size, return_type)
     opts = poptorch.Options().deviceIterations(device_iteration)
-    loader = poptorch.DataLoader(opts,
-                                 dataset,
-                                 batch_sampler=dynamic_batch_sampler,
-                                 collate_fn=collate_fn,
-                                 num_workers=num_workers,
-                                 drop_last=drop_last)
+
+    try:
+        loader = poptorch.DataLoader(opts,
+                                     dataset,
+                                     batch_sampler=dynamic_batch_sampler,
+                                     collate_fn=collate_fn,
+                                     num_workers=num_workers,
+                                     drop_last=drop_last,
+                                     mode=mode)
+    except AssertionError as error:
+        # In case Dataloader works in Async mode on the dataset with
+        # a batch_sampler that would generate an incomplete batch, the expected
+        # behavior is raising an exception.
+        if mode == poptorch.DataLoaderMode.Async and incomplete_batches > 0:
+            return
+        raise error
 
     batches = list(loader)
     assert len(batches) == expected_num_batches
