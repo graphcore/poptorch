@@ -110,6 +110,9 @@ class PoplarExecutor:
     It only has a few methods which can be used to interface with the IPU.
     """
 
+    _precompile_hooks: Dict[int, Callable] = collections.OrderedDict()
+    _postcompile_hooks: Dict[int, Callable] = collections.OrderedDict()
+
     # pylint: disable=too-many-statements
     def __init__(self,
                  model: 'torch.nn.Module',
@@ -726,6 +729,10 @@ class PoplarExecutor:
                 poptorch_core.startDispatch()
                 _impl.setDispatchTracing(True)
                 _impl.setIpuContext(True)
+
+                for _, hook in PoplarExecutor._precompile_hooks.items():
+                    hook()
+
                 self._options._execution_strategy.onStartTracing()  # pylint: disable=protected-access
 
                 # The optimizer was created using the CPU model, therefore it points
@@ -808,6 +815,10 @@ class PoplarExecutor:
                 raise
             finally:
                 self._options._execution_strategy.onEndTracing()  # pylint: disable=protected-access
+
+                for _, hook in PoplarExecutor._postcompile_hooks.items():
+                    hook()
+
                 _impl.setIpuContext(False)
                 _impl.setDispatchTracing(False)
                 # Turn off the dispatcher.
@@ -1483,3 +1494,41 @@ class PoplarExecutor:
         poptorch_core.loadEngineAndConnectStreams(self._executable)
         self._is_attached = True
         self._on_device_attach()
+
+
+def _registerHook(hooks, new_hook) -> torch.utils.hooks.RemovableHandle:
+    handle = torch.utils.hooks.RemovableHandle(hooks)
+    hooks[handle.id] = new_hook
+    return handle
+
+
+def registerPreCompileHook(hook: Callable
+                           ) -> torch.utils.hooks.RemovableHandle:
+    """Register a hook that is called before model compilation.
+
+    Raises a ``RuntimeError` if the hook is not callable.
+
+    :param hook: A callable that is ran before model compilation begins.
+    :returns: a :py:class:`torch.utils.hooks.RemovableHandle` that can be used
+        to remove the hook using :py:func:`~remove`
+    """
+    if not callable(hook):
+        raise RuntimeError("Pre-compile hook must be callable")
+    hooks = PoplarExecutor._precompile_hooks  # pylint: disable=protected-access
+    return _registerHook(hooks, hook)
+
+
+def registerPostCompileHook(hook: Callable
+                            ) -> torch.utils.hooks.RemovableHandle:
+    """Register a hook that is called after model compilation.
+
+    Raises a ``RuntimeError` if the hook is not callable.
+
+    :param hook: A callable that is ran after model compilation ends.
+    :returns: a :py:class:`torch.utils.hooks.RemovableHandle` that can be used
+        to remove the hook using :py:func:`~remove`
+    """
+    if not callable(hook):
+        raise RuntimeError("Post-compile hook must be callable")
+    hooks = PoplarExecutor._postcompile_hooks  # pylint: disable=protected-access
+    return _registerHook(hooks, hook)
