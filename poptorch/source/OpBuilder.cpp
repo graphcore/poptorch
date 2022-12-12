@@ -565,21 +565,6 @@ torch::jit::Node *createRandomUniform(torch::jit::Graph *graph,
   return new_node;
 }
 
-torch::jit::Node *createPrintIpuTensor(torch::jit::Graph *graph,
-                                       torch::jit::Value *value,
-                                       const std::string &title) {
-  torch::jit::Node *new_node =
-      createAndInsertNode(graph, symbols::poptorch::ipu_print_tensor, {value});
-
-  new_node->i_(c10::Symbol::attr("print_gradient"), 1);
-  new_node->s_(c10::Symbol::attr("name"), "");
-  new_node->s_(c10::Symbol::attr("title"), title);
-
-  new_node->output()->setType(value->type());
-
-  return new_node;
-}
-
 torch::jit::Node *createCallCpuOp(torch::jit::Graph *graph,
                                   const std::vector<torch::jit::Value *> &value,
                                   const std::string &id,

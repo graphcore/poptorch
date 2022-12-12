@@ -20,7 +20,6 @@ expand("begin_ipu_block", lambda x, y, z: op.beginIpuBlock(
 
 expand("internal_cast", lambda tensor, dtype: op.internalCast(
     tensor, cstr(dtype)))
-expand("ipu_print_tensor", lambda x, s: op.printIpuTensor(x, cstr(s)))
 expand("call_cpu_op", lambda x, s: op.callCpuOp(tensor_list(x), cstr(s),
                                                 OriginalNode()))
 expand("identity_loss", lambda x, r: op.identityloss(x, cint(r)))

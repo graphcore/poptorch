@@ -874,7 +874,10 @@ TORCH_LIBRARY(poptorch, m) {
   m.def(OP_WITHOUT_OUTPUTS("clear_attribute(str attribute, str key) -> ()"));
 
   // Operations returning the first argument
-  m.def("ipu_print_tensor(Tensor self, str? title) -> Tensor");
+  m.def("ipu_print_tensor(Tensor self, str title, int print_gradient, int "
+        "summarize_threshold, int edge_items, int max_line_width, int digits, "
+        "int float_format, str separator, str open_bracket, str close_bracket) "
+        "-> Tensor");
   m.def("nop(Tensor self) -> Tensor");
   m.def("end_for_loop(Tensor[] outputs, Tensor[] "
         "inputs, int trip_count) -> Tensor[]");

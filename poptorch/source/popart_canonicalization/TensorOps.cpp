@@ -402,6 +402,25 @@ torch::jit::Node *triuHandler(torch::jit::Graph *graph,
   UNUSED(node);
   return nullptr;
 }
+
+torch::jit::Node *ipuPrintTensorHandler(torch::jit::Graph *graph,
+                                        torch::jit::Node *node) {
+  auto *x = node->input(0);
+  auto title = constantToString(node->input(1)->node());
+  auto print_gradient = constantToInt(node->input(2)->node());
+  auto summarise_threshold = constantToInt(node->input(3)->node());
+  auto edge_items = constantToInt(node->input(4)->node());
+  auto max_line_width = constantToInt(node->input(5)->node());
+  auto digits = constantToInt(node->input(6)->node());
+  auto float_format = constantToInt(node->input(7)->node());
+  auto separator = constantToString(node->input(8)->node());
+  auto open_bracket = constantToString(node->input(9)->node());
+  auto close_bracket = constantToString(node->input(10)->node());
+  return createPrinttensor(graph, {x}, print_gradient, title,
+                           summarise_threshold, edge_items, max_line_width,
+                           digits, float_format, *separator.c_str(),
+                           *open_bracket.c_str(), *close_bracket.c_str());
+}
 } // namespace
 
 __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
@@ -420,6 +439,7 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::new_full, fullHandler);
   registerHandler(c10::aten::full_like, fullLikeHandler);
   registerHandler(c10::aten::triu, triuHandler);
+  registerHandler(symbols::poptorch::ipu_print_tensor, ipuPrintTensorHandler);
 }
 
 } // namespace poptorch

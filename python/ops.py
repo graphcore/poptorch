@@ -47,9 +47,17 @@ def ctc_beam_search_decoder(probs: "torch.Tensor",
 
 
 def ipu_print_tensor(tensor: "torch.Tensor",
-                     title: str = "") -> "torch.Tensor":
-    """
-    Adds an op to print the contents of the IPU tensor.
+                     title: str = "",
+                     print_gradient: bool = True,
+                     summarise_threshold: int = 1000,
+                     edge_items: int = 3,
+                     max_line_width: int = 80,
+                     digits: int = 4,
+                     float_format: str = "auto",
+                     separator: str = ", ",
+                     open_bracket: str = "(",
+                     close_bracket: str = ")") -> "torch.Tensor":
+    """Adds an op to print the contents of the IPU tensor.
 
     When this is executed the tensor
     will be copied back to host and printed.
@@ -102,13 +110,49 @@ def ipu_print_tensor(tensor: "torch.Tensor",
 
     :param tensor: The tensor to print.
     :param title: An optional title to print before the tensor value.
+        Defaults to "".
+    :param print_gradient: Whether to print the gradient tensor associated
+        with this tensor. Defaults to True.
+    :param summarise_threshold: If the number of elements of the
+        tensor exceeds this threshold the output will be summarised. Only the
+        edge elements will be displayed with an ellipsis indicating skipped
+        elements. A value of 0 will disable summarisation. Defaults to 1000.
+    :param edge_items: Number of edge elements to include at the
+        beginning and end when summarisation is enabled. Defaults to 3.
+    :param max_line_width: Lines longer than this limit will be split
+        across multiple lines. A value of 0 will disable line splitting.
+        Defaults to 75.
+    :param digits: Number of digits to display. For integers this limit can be
+        exceeded if any number is large enough. For floating points this does
+        not include the exponent. The number of digits is used in conjunction
+        analysis of the tensor to determine the width of each element to align
+        all elements when printed. A value of 0 disables this analysis and each
+        elements will be printed in an unaligned format. Defaults to 4.
+    :param float_format: Determines the floating point format to use. Automatic
+        mode determines the appropriate format based on the data.
+        Defaults to "auto".
+        One of:
+        - "auto": Automatically determine the format through analysis.
+        - "fixed": Use fixed point e.g. -100.00.
+        - "scientific": Use scientific notation e.g. -1.123e+10.
+        - "none": Do not display all elements with the same format
+    :param separator: Character used to delineate values. Defaults to " ".
+    :param open_bracket: Character used to open a tensor. Defaults to "[".
+    :param close_bracket: Character used to close a tensor. Defaults to "]".
     :returns: The input tensor unchanged.
     """
     if not isinstance(tensor, torch.Tensor):
         raise _impl.createPoptorchError(
             "ipu print tensor must take a torch.tensor argument. "
             f"{type(tensor)} is not supported.")
-    return torch.ops.poptorch.ipu_print_tensor(tensor, title)
+    float_format_dict = {"auto": 0, "fixed": 1, "scientific": 2, "none": 3}
+    return torch.ops.poptorch.ipu_print_tensor(tensor, title,
+                                               int(print_gradient),
+                                               summarise_threshold, edge_items,
+                                               max_line_width, digits,
+                                               float_format_dict[float_format],
+                                               separator, open_bracket,
+                                               close_bracket)
 
 
 def for_loop(count: int,

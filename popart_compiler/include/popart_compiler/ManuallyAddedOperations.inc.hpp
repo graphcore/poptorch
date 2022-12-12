@@ -1,10 +1,11 @@
 // Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 OP_DECL(popart, reshape_static_shape, reshape, _impl->reshape,
         ARG(INT_VEC, shape), BODY_ARG(shape))
-OP_DECL(poptorch, ipu_print_tensor, ipu_print_tensor,
-        AiGraphcoreOpset1.printtensor,
-        ARG(INT, print_gradient) ARG(STRING, name) ARG(STRING, title),
-        BODY_ARG(print_gradient) BODY_ARG(name) BODY_ARG(title))
+OP_DECL(poptorch, ipu_print_tensor, ipu_print_tensor, AiGraphcoreOpset1.printtensor, 
+        ARG(INT,print_gradient) ARG(STRING,title) ARG(INT,summariseThreshold) ARG(INT,edgeItems) 
+        ARG(INT,maxLineWidth) ARG(INT,digits) ARG(INT,floatFormat) ARG(CHAR,separator) ARG(CHAR,openBracket) ARG(CHAR,closeBracket) ,
+        BODY_ARG(print_gradient) BODY_ARG(DEBUG_CONTEXT("Printtensor"))BODY_ARG(title) BODY_ARG(summariseThreshold) BODY_ARG(edgeItems) 
+        BODY_ARG(maxLineWidth) BODY_ARG(digits) BODY_ARG(floatFormat) BODY_ARG(separator) BODY_ARG(openBracket) BODY_ARG(closeBracket))
 OP_DECL(poptorch, tensor_constant, tensor_constant, _impl->tensorConstant,
         POPART_CONST_ARG(popartConstant), BODY_ARG(popartConstant))
 OP_DECL(poptorch, host_side_tensor_constant, host_side_tensor_constant,

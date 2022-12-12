@@ -82,15 +82,6 @@ torch::jit::Node *internalCastHandler(torch::jit::Graph *graph,
   return createInternalCast(graph, tensor, t0);
 }
 
-torch::jit::Node *ipuPrintTensorHandler(torch::jit::Graph *graph,
-                                        torch::jit::Node *node) {
-  auto *x = node->input(0);
-  auto *s = node->input(1);
-  auto t0 = constantToString(s->node());
-  // printIpuTensor(x, cstr(s))
-  return createPrintIpuTensor(graph, x, t0);
-}
-
 torch::jit::Node *nopHandler(torch::jit::Graph *graph, torch::jit::Node *node) {
   auto *args = node->input(0);
   // nop(args)
@@ -159,7 +150,6 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(symbols::poptorch::end_ipu_block, endIpuBlockHandler);
   registerHandler(symbols::poptorch::identity_loss, identityLossHandler);
   registerHandler(symbols::poptorch::internal_cast, internalCastHandler);
-  registerHandler(symbols::poptorch::ipu_print_tensor, ipuPrintTensorHandler);
   registerHandler(symbols::poptorch::nop, nopHandler);
   registerHandler(symbols::poptorch::optimizer_group, optimizerGroupHandler);
   registerHandler(symbols::poptorch::pop_name_scope, popNameScopeHandler);
