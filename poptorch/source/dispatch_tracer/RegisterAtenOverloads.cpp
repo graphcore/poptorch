@@ -598,6 +598,33 @@ at::Tensor emptyStrided(at::IntArrayRef size, at::IntArrayRef stride,
   return emptyBase(size, dtype, layout, device, pin_memory);
 }
 
+at::Tensor linalgMatrixNorm(const at::Tensor &self, const at::Scalar &ord,
+                            at::IntArrayRef dim, bool keepdim,
+                            c10::optional<at::ScalarType> dtype) {
+  auto ord_double = ord.toDouble();
+  auto abs_ord = std::abs(ord_double);
+  if (abs_ord != 2.) {
+    // As long as we're not dealing with a 2-norm, we can call the
+    // operator as usual, which will redispatch the constituent operations
+    return at::native::linalg_matrix_norm(self, ord, dim, keepdim, dtype);
+  }
+  // The 2-norm is defined as the largest (for +2) or smallest (for -2)
+  // singular value of the matrix.
+  ERROR("Matrix 2-norm is not supported.");
+}
+
+at::Tensor linalgMatrixNormStrOrd(const at::Tensor &self, c10::string_view ord,
+                                  at::IntArrayRef dim, bool keepdim,
+                                  c10::optional<at::ScalarType> dtype) {
+  if (ord != "nuc") {
+    // As long as we're not dealing with a nuclear norm, we can call the
+    // operator as usual, which will redispatch the constituent operations
+    return at::native::linalg_matrix_norm(self, ord, dim, keepdim, dtype);
+  }
+  // The nuclear norm is defined as the sum of singular values of the matrix.
+  ERROR("Matrix nuclear norm is not supported.");
+}
+
 // aten::detach(Tensor(a) self) -> (Tensor(a))
 void detach(const c10::OperatorHandle &op, c10::Stack *stack) {
   logging::debug("[DISPATCHER] Intercepting aten::detach");
@@ -695,11 +722,17 @@ TORCH_LIBRARY_IMPL(_, AutogradIPU, m) {
 #include "RegisterMetaOps.cpp.inc"
 #include "RegisterOptionalAtenOps.cpp.inc"
 
-// This is required to intercept detach calls when
-// moving parameters to the IPU. For some reason, these
-// cannot be intercepted using the non-autograd key
+// These cannot be intercepted using the non-autograd key unless
+// torch.inference_mode is used
 TORCH_LIBRARY_IMPL(aten, AutogradIPU, m) {
+  // This is required to intercept detach calls when moving parameters to the
+  // IPU.
   m.impl("detach", PTC_BOXED(poptorch::detach));
+
+  // These must be intercepted at the autograd level otherwise they'll go
+  // through fallback
+  m.impl("linalg_matrix_norm", PTC(poptorch::linalgMatrixNorm));
+  m.impl("linalg_matrix_norm.str_ord", PTC(poptorch::linalgMatrixNormStrOrd));
 }
 
 void popArgumentsFromStack(const c10::OperatorHandle &op, c10::Stack *stack) {

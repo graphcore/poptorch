@@ -196,6 +196,20 @@ Comparison ops
 * ``torch.randperm``
 
 
+torch.linalg ops
+''''''''''''''''
+
+* ``torch.linalg.norm``
+
+    2-norm and nuclear norm are unsupported for matrices.
+
+* ``torch.linalg.matrix_norm``
+
+    2-norm and nuclear norm are unsupported.
+
+* ``torch.linalg.vector_norm``
+
+
 Other ops
 '''''''''
 

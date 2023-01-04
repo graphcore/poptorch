@@ -280,6 +280,9 @@ torch::jit::Node *tensorNormHandler(torch::jit::Graph *graph,
   // aten::norm(Tensor in, float p) -> Tensor
   // aten::norm(Tensor in, int p, int[] dim, int keepdim) -> Tensor
   // aten::norm(Tensor in, float p, int[] dim, int keepdim) -> Tensor
+  // aten::linalg_vector_norm(Tensor self, Scalar ord=2, int[1]?
+  //                          dim=None, bool keepdim=False, ScalarType?
+  //                          dtype=None) -> Tensor
   torch::jit::Value *input = node->input(0);
   torch::jit::Value *p_val = node->input(1);
 
@@ -291,7 +294,10 @@ torch::jit::Node *tensorNormHandler(torch::jit::Graph *graph,
     input = flatten->output();
     axes = {1};
   } else {
-    axes = constantToLongVec(node->input(2)->node());
+    auto *axes_val = node->input(2);
+    if (!isNone(axes_val)) {
+      axes = constantToLongVec(node->input(2)->node());
+    }
     keepdim = constantToLong(node->input(3)->node());
     auto shape = shapeFromTensor(input);
     // Empty axes array means reduce over all axes in PyTorch, but means
@@ -299,6 +305,15 @@ torch::jit::Node *tensorNormHandler(torch::jit::Graph *graph,
     if (axes.empty()) {
       axes.resize(shape.size());
       std::iota(std::begin(axes), std::end(axes), 0);
+    }
+    // linalg_vector_norm takes an optional dtype
+    if (node->inputs().size() == 5) {
+      auto *opt_dtype = node->input(4);
+      if (opt_dtype != nullptr) {
+        input =
+            createCast(graph, input, constantToScalarType(opt_dtype->node()))
+                ->output();
+      }
     }
     // If we're reducing over singleton dims and keeping them, the
     // behaviour of PopART reduce ops is to do nothing, but PyTorch will
@@ -455,6 +470,7 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::sum, reduceHandler);
   registerHandler(c10::aten::logsumexp, reduceHandler);
   registerHandler(c10::aten::norm, tensorNormHandler);
+  registerHandler(c10::aten::linalg_vector_norm, tensorNormHandler);
   registerHandler(c10::aten::frobenius_norm, frobeniusnormHandler);
   registerHandler(c10::aten::min, minHandler);
   registerHandler(c10::aten::minimum, minHandler);

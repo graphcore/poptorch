@@ -500,7 +500,7 @@ reduction_ops_api1 = [
     torch.mean,
     torch.median,
     # torch.mode,
-    #torch.linalg.norm, TODO(T71314) adding support for aten::linalg_norm
+    torch.linalg.norm,
     torch.prod,
     #torch.std, torch.std_mean,
     torch.sum,
@@ -519,7 +519,7 @@ reduction_ops_api2 = [
     torch.mean,
     torch.median,
     # torch.mode,
-    #torch.linalg.norm, TODO(T71314) adding support for aten::linalg_norm
+    torch.linalg.norm,
     torch.prod,
     torch.logsumexp,  # logsumexp doesn't support API 1.
     #torch.std, torch.std_mean,
@@ -611,16 +611,18 @@ def test_minmax_tuple_out(op, dim, keepdim):
 
 # Interesting p-values for testing torch.linalg.norm(X, p=<>)
 norm_pvals = [
-    'fro', 'nuc',
+    'fro',
     float('inf'),
-    float('-inf'), 1, 1.0, 2, 2.0, -1, -2
+    float('-inf'),
+    1,
+    1.0,
+    -1,
+    # 2, 2.0, -2, 'nuc' Unsupported
 ]
 
 
 @pytest.mark.parametrize("p", norm_pvals)
 def test_norm_p_values(p):
-    pytest.skip("TODO(T71314) adding support for aten::linalg_norm")
-
     torch.manual_seed(42)
     input = torch.randn([2, 10])
 
@@ -634,13 +636,11 @@ def test_norm_p_values(p):
 
 
 def test_norm_dtype():
-    pytest.skip("TODO(T71314) adding support for aten::linalg_norm")
-
     torch.manual_seed(42)
     input = torch.randn([2, 10])
 
     def operation(x):
-        return torch.linalg.norm(x, dtype=torch.float, ord=2)
+        return torch.linalg.norm(x, dtype=torch.float, ord="fro")
 
     def assert_(native_out, poptorch_out):
         helpers.assert_allclose(actual=poptorch_out, expected=native_out)
