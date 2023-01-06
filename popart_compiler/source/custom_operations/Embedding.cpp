@@ -1,8 +1,5 @@
 // Copyright (c) 2021, Graphcore Ltd, All rights reserved.
 
-// TODO(T70346): snap:: API is deprecated
-#pragma GCC diagnostic warning "-Wdeprecated-declarations"
-
 #include <map>
 #include <memory>
 #include <set>
@@ -17,8 +14,8 @@
 #include <popart/popx/irlowering.hpp>
 #include <popart/popx/op/gatherx.hpp>
 #include <popart/popx/op/sliceplanx.hpp>
+#include <popart/popx/opx.hpp>
 #include <popart/popx/opxmanager.hpp>
-#include <popart/popx/popopx.hpp>
 #include <popart/vendored/optional.hpp>
 
 #include <popops/DynamicSlice.hpp>
@@ -167,10 +164,10 @@ popart::OpCreator<EmbeddingOp> embedding_creator(
 
 } // namespace
 
-class EmbeddingOpx : public popart::popx::PopOpx {
+class EmbeddingOpx : public popart::popx::Opx {
 public:
   EmbeddingOpx(popart::Op *op, popart::popx::Devicex *devicex)
-      : popart::popx::PopOpx(op, devicex) {
+      : popart::popx::Opx(op, devicex) {
     verifyOp<EmbeddingOp>(op, {poptorch_custom_ops::embedding});
 
     // We always want the EmbeddingOpx to layout its inputs
@@ -185,7 +182,7 @@ public:
         inInfo(EmbeddingOp::indicesInIndex()), options, /*axis=*/0);
   }
 
-  void grow(snap::program::Sequence &prog) const final {
+  void grow(poplar::program::Sequence &prog) const final {
     auto weight = getInTensor(EmbeddingOp::weightInIndex());
     auto indices = getInTensor(EmbeddingOp::indicesInIndex());
 
@@ -194,16 +191,14 @@ public:
     indices = indices.flatten();
     indices = indices.expand({1});
 
-    auto result = popops::multiSlice(
-        graph().getPoplarGraph(), weight.getPoplarTensor(),
-        indices.getPoplarTensor(), {0}, {1}, prog.getPoplarSequence(), _plan,
-        poplar::OptionFlags());
+    auto result = popops::multiSlice(graph(), weight, indices, {0}, {1}, prog,
+                                     _plan, poplar::OptionFlags());
 
     result = result.reshape(outInfo(EmbeddingOp::outIndex()).shape_szt());
-    setOutTensor(EmbeddingOp::outIndex(), snap::Tensor{result, graph()});
+    setOutTensor(EmbeddingOp::outIndex(), result);
   }
 
-  snap::Tensor
+  poplar::Tensor
   createInputTensor(popart::InIndex index,
                     const poplar::DebugNameAndId &dnai) const final {
     if (index != EmbeddingOp::weightInIndex() &&
@@ -215,22 +210,20 @@ public:
     if (index == EmbeddingOp::weightInIndex()) {
       const auto &weight_info = inInfo(index);
       auto weight = popops::createSliceableTensor(
-          graph().getPoplarGraph(), popart::popx::popType(weight_info),
-          weight_info.shape_szt(), {0}, {1}, _plan, poplar::OptionFlags(),
-          dnai);
+          graph(), popart::popx::popType(weight_info), weight_info.shape_szt(),
+          {0}, {1}, _plan, poplar::OptionFlags(), dnai);
 
-      return snap::Tensor{weight, graph()};
+      return weight;
     }
 
     const auto &indices_info = inInfo(index);
     auto num_lookups = static_cast<std::size_t>(indices_info.nelms());
-    auto indices =
-        popops::createIndicesTensor(graph().getPoplarGraph(), {0}, num_lookups,
-                                    _plan, poplar::OptionFlags(), dnai);
+    auto indices = popops::createIndicesTensor(graph(), {0}, num_lookups, _plan,
+                                               poplar::OptionFlags(), dnai);
 
     indices = indices.reinterpret(popart::popx::popType(indices_info));
     indices = indices.reshape(indices_info.shape_szt());
-    return snap::Tensor{indices, graph()};
+    return indices;
   }
 
   popart::popx::InputCreatorType
@@ -240,7 +233,7 @@ public:
       return popart::popx::InputCreatorType::CanCreate;
     }
 
-    return PopOpx::getInputCreatorType(index);
+    return Opx::getInputCreatorType(index);
   }
 
   std::set<popart::TensorId>
@@ -253,10 +246,10 @@ private:
   popops::SlicePlan _plan;
 };
 
-class EmbeddingGradOpx : public popart::popx::PopOpx {
+class EmbeddingGradOpx : public popart::popx::Opx {
 public:
   EmbeddingGradOpx(popart::Op *op, popart::popx::Devicex *devicex)
-      : popart::popx::PopOpx(op, devicex) {
+      : popart::popx::Opx(op, devicex) {
     verifyOp<EmbeddingGradOp>(op, {poptorch_custom_ops::embedding_grad});
 
     // We always want the EmbeddingGradOpx to layout its inputs
@@ -274,44 +267,41 @@ public:
         inInfo(EmbeddingGradOp::indicesInIndex()), options, /*axis=*/0);
   }
 
-  void grow(snap::program::Sequence &prog) const final {
+  void grow(poplar::program::Sequence &prog) const final {
     auto grad_in = getInTensor(EmbeddingGradOp::gradInIndex());
     auto indices = getInTensor(EmbeddingGradOp::indicesInIndex());
     auto output_shape = outInfo(EmbeddingGradOp::gradOutIndex()).shape_szt();
 
     auto out = popops::createSliceableTensor(
-        graph().getPoplarGraph(), grad_in.elementType(), output_shape, {0}, {1},
-        _plan, poplar::OptionFlags(), debugContext("embedding_grad_out"));
+        graph(), grad_in.elementType(), output_shape, {0}, {1}, _plan,
+        poplar::OptionFlags(), debugContext("embedding_grad_out"));
 
-    popops::zero(graph().getPoplarGraph(), out, prog.getPoplarSequence(),
-                 debugContext("zero"));
+    popops::zero(graph(), out, prog, debugContext("zero"));
 
-    auto scale = graph().getPoplarGraph().addConstant(
-        grad_in.elementType(), {}, 1.0f, debugContext("const_1"));
-    graph().getPoplarGraph().setTileMapping(scale, 0);
+    auto scale = graph().addConstant(grad_in.elementType(), {}, 1.0f,
+                                     debugContext("const_1"));
+    graph().setTileMapping(scale, 0);
 
-    auto inputs = popart::popx::GatherGradOpx::handleNDMultiUpdate(
-        out, grad_in.getPoplarTensor(), indices.getPoplarTensor(), 0);
+    auto inputs = popart::popx::GatherGradOpx::handleNDMultiUpdate(out, grad_in,
+                                                                   indices, 0);
     auto &target_nd = std::get<0>(inputs);
     auto &update_nd = std::get<1>(inputs);
     auto &indices_nd = std::get<2>(inputs);
 
-    popops::multiUpdateAdd(
-        graph().getPoplarGraph(), target_nd, update_nd, indices_nd, scale, {0},
-        {1}, prog.getPoplarSequence(), _plan, poplar::OptionFlags(),
-        debugContext("embedding_grad"));
+    popops::multiUpdateAdd(graph(), target_nd, update_nd, indices_nd, scale,
+                           {0}, {1}, prog, _plan, poplar::OptionFlags(),
+                           debugContext("embedding_grad"));
 
     if (_padding_idx) {
       auto start = static_cast<std::size_t>(*_padding_idx);
       auto padding = out.slice(start, start + 1, 0);
-      popops::zero(graph().getPoplarGraph(), padding, prog.getPoplarSequence(),
-                   debugContext("zero_padding_idx"));
+      popops::zero(graph(), padding, prog, debugContext("zero_padding_idx"));
     }
 
-    setOutTensor(EmbeddingGradOp::gradOutIndex(), snap::Tensor{out, graph()});
+    setOutTensor(EmbeddingGradOp::gradOutIndex(), out);
   }
 
-  snap::Tensor
+  poplar::Tensor
   createInputTensor(popart::InIndex index,
                     const poplar::DebugNameAndId &dnai) const final {
     if (index != EmbeddingGradOp::gradInIndex() &&
@@ -323,21 +313,20 @@ public:
     if (index == EmbeddingGradOp::gradInIndex()) {
       const auto &grad_info = inInfo(index);
       auto weight = popops::createSliceableTensor(
-          graph().getPoplarGraph(), popart::popx::popType(grad_info),
-          grad_info.shape_szt(), {0}, {1}, _plan, poplar::OptionFlags(), dnai);
+          graph(), popart::popx::popType(grad_info), grad_info.shape_szt(), {0},
+          {1}, _plan, poplar::OptionFlags(), dnai);
 
-      return snap::Tensor{weight, graph()};
+      return weight;
     }
 
     const auto &indices_info = inInfo(index);
     auto num_lookups = static_cast<std::size_t>(indices_info.nelms());
-    auto indices =
-        popops::createIndicesTensor(graph().getPoplarGraph(), {0}, num_lookups,
-                                    _plan, poplar::OptionFlags(), dnai);
+    auto indices = popops::createIndicesTensor(graph(), {0}, num_lookups, _plan,
+                                               poplar::OptionFlags(), dnai);
 
     indices = indices.reinterpret(popart::popx::popType(indices_info));
     indices = indices.reshape(indices_info.shape_szt());
-    return snap::Tensor{indices, graph()};
+    return indices;
   }
 
   popart::popx::InputCreatorType
@@ -347,7 +336,7 @@ public:
       return popart::popx::InputCreatorType::CanCreate;
     }
 
-    return PopOpx::getInputCreatorType(index);
+    return Opx::getInputCreatorType(index);
   }
 
   std::set<popart::TensorId>

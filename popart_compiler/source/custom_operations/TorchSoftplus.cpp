@@ -1,8 +1,5 @@
 // Copyright (c) 2021 Graphcore Ltd. All rights reserved.
 
-// TODO(T70346): snap:: API is deprecated
-#pragma GCC diagnostic warning "-Wdeprecated-declarations"
-
 #include "TorchSoftplus.hpp"
 #include "popart_compiler/CustomOps.hpp"
 
@@ -11,9 +8,9 @@
 #include <popart/popx/devicex.hpp>
 #include <popart/popx/op/softplusx.hpp>
 #include <popart/popx/opxmanager.hpp>
+#include <poplar/Graph.hpp>
 #include <popnn/NonLinearity.hpp>
 #include <popops/ElementWise.hpp>
-#include <snap/Graph.hpp>
 
 namespace poptorch {
 namespace poptorch_custom_ops {
@@ -104,10 +101,11 @@ popart::OpCreator<TorchSoftplusOp> softplus_creator(
     popart::OpDefinitions({{poptorch_custom_ops::torch_softplus,
                             softplus_def}}),
     [](const popart::OpCreatorInfo &info) {
-      float beta =
+      float const beta =
           info.attributes.getAttribute<popart::Attributes::Float>("beta", 1.0);
-      float threshold = info.attributes.getAttribute<popart::Attributes::Float>(
-          "threshold", 1.0);
+      float const threshold =
+          info.attributes.getAttribute<popart::Attributes::Float>("threshold",
+                                                                  1.0);
       return std::unique_ptr<popart::Op>(
           new TorchSoftplusOp(info.opid, beta, threshold, info.settings));
     },
@@ -133,9 +131,9 @@ TorchSoftplusOpx::TorchSoftplusOpx(popart::Op *op,
   verifyOp<TorchSoftplusOp>(op, {poptorch_custom_ops::torch_softplus});
 }
 
-void TorchSoftplusComputex::inplace(snap::program::Sequence &prog,
-                                    snap::Graph &graph,
-                                    const snap::Tensor &tensor,
+void TorchSoftplusComputex::inplace(poplar::program::Sequence &prog,
+                                    poplar::Graph &graph,
+                                    const poplar::Tensor &tensor,
                                     const poplar::DebugNameAndId &dnai,
                                     const std::string &prefix) const {
   // Torch Softplus definition:
@@ -173,8 +171,7 @@ void TorchSoftplusComputex::inplace(snap::program::Sequence &prog,
   exprs.push_back(std::make_unique<pe::Select>(*exprs.back(), pe::_1,
                                                bx <= pe::Const(_threshold)));
 
-  popops::mapInPlace(graph.getPoplarGraph(), *exprs.back(),
-                     {tensor.getPoplarTensor()}, prog.getPoplarSequence(),
+  popops::mapInPlace(graph, *exprs.back(), {tensor}, prog,
                      {dnai, "torch_softplus"});
 }
 
@@ -193,14 +190,14 @@ TorchSoftplusInplaceOpx::TorchSoftplusInplaceOpx(popart::Op *op,
 
 TorchSoftplusGradOpx::TorchSoftplusGradOpx(popart::Op *op,
                                            popart::popx::Devicex *devicex)
-    : PopOpx(op, devicex), _beta(), _threshold() {
+    : Opx(op, devicex), _beta(), _threshold() {
   verifyOp<TorchSoftplusGradOp>(op, poptorch_custom_ops::torch_softplus_grad);
   auto &grad_op = getOp<TorchSoftplusGradOp>();
   _beta = grad_op.beta();
   _threshold = grad_op.threshold();
 }
 
-void TorchSoftplusGradOpx::grow(snap::program::Sequence &prog) const {
+void TorchSoftplusGradOpx::grow(poplar::program::Sequence &prog) const {
   // The derivative of the softplus activation function is:
   //
   // exp(beta*x)/(exp(beta*x) + 1) = 1/(exp(-beta*x) + 1) = sigmoid(beta*x)
@@ -229,13 +226,10 @@ void TorchSoftplusGradOpx::grow(snap::program::Sequence &prog) const {
   exprs.push_back(std::make_unique<pe::Select>(*exprs.back(), pe::_1,
                                                bx <= pe::Const(_threshold)));
 
-  auto output = popops::map(
-      graph().getPoplarGraph(), *exprs.back(),
-      {grad_in.getPoplarTensor(), fwd_input.getPoplarTensor()},
-      prog.getPoplarSequence(), debugContext("torch_softplus_grad"));
+  auto output = popops::map(graph(), *exprs.back(), {grad_in, fwd_input}, prog,
+                            debugContext("torch_softplus_grad"));
 
-  setOutTensor(TorchSoftplusGradOp::getOutIndex(),
-               snap::Tensor{output, graph()});
+  setOutTensor(TorchSoftplusGradOp::getOutIndex(), output);
 }
 
 namespace {

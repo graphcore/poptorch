@@ -2,9 +2,6 @@
 #ifndef GUARD_POPTORCH_SOFTPLUS_HPP
 #define GUARD_POPTORCH_SOFTPLUS_HPP
 
-// TODO(T70346): snap:: API is deprecated
-#pragma GCC diagnostic warning "-Wdeprecated-declarations"
-
 #include <memory>
 #include <string>
 #include <tuple>
@@ -76,8 +73,8 @@ public:
   TorchSoftplusComputex(float beta, float threshold)
       : _beta(beta), _threshold(threshold) {}
 
-  void inplace(snap::program::Sequence &prog, snap::Graph &graph,
-               const snap::Tensor &tensor, const poplar::DebugNameAndId &dnai,
+  void inplace(poplar::program::Sequence &prog, poplar::Graph &graph,
+               const poplar::Tensor &tensor, const poplar::DebugNameAndId &dnai,
                const std::string &prefix) const final;
 
   static std::unique_ptr<popart::popx::EwuComputex> get(float beta,
@@ -99,10 +96,10 @@ public:
   TorchSoftplusInplaceOpx(popart::Op *op, popart::popx::Devicex *devicex);
 };
 
-class TorchSoftplusGradOpx : public popart::popx::PopOpx {
+class TorchSoftplusGradOpx : public popart::popx::Opx {
 public:
   TorchSoftplusGradOpx(popart::Op *op, popart::popx::Devicex *devicex);
-  void grow(snap::program::Sequence &prog) const final;
+  void grow(poplar::program::Sequence &prog) const final;
 
 private:
   float _beta;
