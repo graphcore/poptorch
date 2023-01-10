@@ -276,10 +276,14 @@ torch::jit::Node *maxHandler(torch::jit::Graph *graph, torch::jit::Node *node) {
 
 torch::jit::Node *tensorNormHandler(torch::jit::Graph *graph,
                                     torch::jit::Node *node) {
+  // TODO(T72620): add handling of other norm operation versions
   // aten::norm(Tensor in, int p) -> Tensor
   // aten::norm(Tensor in, float p) -> Tensor
   // aten::norm(Tensor in, int p, int[] dim, int keepdim) -> Tensor
   // aten::norm(Tensor in, float p, int[] dim, int keepdim) -> Tensor
+  // aten::norm(Tensor in, float p, int[] dim, int keepdim, Tensor out)
+  //            -> Tensor
+
   // aten::linalg_vector_norm(Tensor self, Scalar ord=2, int[1]?
   //                          dim=None, bool keepdim=False, ScalarType?
   //                          dtype=None) -> Tensor
@@ -310,9 +314,13 @@ torch::jit::Node *tensorNormHandler(torch::jit::Graph *graph,
     if (node->inputs().size() == 5) {
       auto *opt_dtype = node->input(4);
       if (opt_dtype != nullptr) {
-        input =
-            createCast(graph, input, constantToScalarType(opt_dtype->node()))
-                ->output();
+        const auto &opt_dtype_tensors = opt_dtype->node()->ts(c10::attr::value);
+        ERROR_ON(opt_dtype_tensors.empty());
+        if (opt_dtype_tensors.front().dim() == 0) {
+          input =
+              createCast(graph, input, constantToScalarType(opt_dtype->node()))
+                  ->output();
+        }
       }
     }
     // If we're reducing over singleton dims and keeping them, the
