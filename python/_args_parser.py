@@ -142,27 +142,17 @@ class ArgsParser:
                      inputs.kwargs,
                      are_named_args=True)
 
-        def _forEachMatched(self, data, condition, doOnTrue, conditionMatches):
-            if isinstance(data, (tuple, list)):
-                return type(data)(self._forEachMatched(
-                    d, condition, doOnTrue, conditionMatches) for d in data)
-            if isinstance(data, dict):
-                return {
-                    key: self._forEachMatched(value, condition, doOnTrue,
-                                              conditionMatches)
-                    for key, value in data.items()
-                }
-            if condition(data):
-                conditionMatches[0] = True
-                return doOnTrue(data)
-            return data
-
-        def forEachMatchedAtLeastOnce(self, condition, doOnTrue=None):
+        def forEachTensorMatchedAtLeastOnce(self, condition, doOnTrue=None):
             matches = [False]
-            self._args = self._forEachMatched(self._args, condition, doOnTrue,
-                                              matches)
-            self._kwargs = self._forEachMatched(self._kwargs, condition,
-                                                doOnTrue, matches)
+
+            def fn(t):
+                if condition(t):
+                    matches[0] = True
+                    if doOnTrue is not None:
+                        return doOnTrue(t)
+                return t
+
+            self.forEach(fn)
             return matches[0]
 
         def forEach(self, fn):
@@ -297,9 +287,8 @@ class ArgsParser:
                 else:
                     in_tensors.appendArg(value, name)
 
-        if in_tensors.forEachMatchedAtLeastOnce(
-                condition=lambda t: isinstance(t, torch.Tensor
-                                               ) and not t.is_contiguous(),
+        if in_tensors.forEachTensorMatchedAtLeastOnce(
+                condition=lambda t: not t.is_contiguous(),
                 doOnTrue=lambda t: t.contiguous()):
             if not self._warned_not_contiguous_input:
                 logger.warning("At least one input tensor is not contiguous: "

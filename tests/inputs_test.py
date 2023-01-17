@@ -323,6 +323,41 @@ def test_nested_dict_input():
         helpers.assert_allclose(expected=native_out, actual=poptorch_out)
 
 
+@pytest.mark.parametrize("fwd_args", [True, False])
+def test_ordered_dict_inputs(fwd_args):
+    """ OrderedDict based types shouldn't require any custom parser."""
+
+    class MyArg(collections.OrderedDict):
+        def print(self):
+            return str(self)
+
+    class Model(torch.nn.Module):
+        def forward(self, args):
+            assert isinstance(args, MyArg)
+            return args["a"] * 2 + poptorch.ipu_print_tensor(args["b"])
+
+    class ModelWrapper(Model):
+        def forward(self, *args, **kwargs):
+            print(len(args))
+            return super().forward(*args, **kwargs)
+
+    if fwd_args:
+        model = ModelWrapper()
+    else:
+        model = Model()
+
+    poptorch_model = poptorch.inferenceModel(model)
+
+    for i in range(2):
+        print(f"Run {i}")
+        args = MyArg()
+        args["b"] = torch.randn(2, 2)
+        args["a"] = torch.randn(2, 2)
+        native_out = model(args)
+        poptorch_out = poptorch_model(args)
+        helpers.assert_allclose(expected=native_out, actual=poptorch_out)
+
+
 @pytest.mark.parametrize("device_iterations", [1, 3])
 def test_custom_input(device_iterations):
     batch_size = 2

@@ -180,7 +180,9 @@ at::Tensor copyAndCoerceType(const at::Tensor &tensor) {
   auto scalar_type = tensor.scalar_type();
   auto coerced_scalar_type = coerceToSupportedType(scalar_type);
   if (scalar_type != coerced_scalar_type) {
-    logging::warn("[DISPATCHER] Tensor (ptr {}) type coerced from {} to {}",
+    static std::uint64_t log_repeat = 0;
+    logging::warn(log_repeat,
+                  "[DISPATCHER] Tensor (ptr {}) type coerced from {} to {}",
                   static_cast<void *>(tensor.unsafeGetTensorImpl()),
                   scalar_type, coerced_scalar_type);
     return tensor.to(coerced_scalar_type);
