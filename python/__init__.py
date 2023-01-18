@@ -375,11 +375,6 @@ class DataLoader(torch.utils.data.DataLoader):
                                 num_incomplete_batches * batch_size,
                                 batch_size, self._combined_batch_size)
 
-                            assert mode is not DataLoaderMode.Async, \
-                                "The 'drop_last=False' option from the " \
-                                "DataLoader works in Async mode only if " \
-                                "all the batches to be generated will be " \
-                                "complete."
                     else:
                         logger.warning(
                             "The `batch_sampler` __len__ method is not"
@@ -429,7 +424,13 @@ class DataLoader(torch.utils.data.DataLoader):
         dataset_batch_size = 1 if self._is_user_batch_sampler_set \
                                 else self._combined_batch_size
 
-        if mode == DataLoaderMode.AsyncRebatched:
+        if self._is_user_batch_sampler_set:
+            real_drop_last = self.batch_sampler_drop_last
+        else:
+            real_drop_last = drop_last
+        async_mode_with_remainder = mode == DataLoaderMode.Async and \
+            not real_drop_last
+        if mode == DataLoaderMode.AsyncRebatched or async_mode_with_remainder:
             mode = DataLoaderMode.Async
             rebatched_size = self._combined_batch_size
             # When we rebatch: always let the worker process handle the

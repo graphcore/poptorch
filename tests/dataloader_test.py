@@ -1283,8 +1283,8 @@ class CustomBatchParser(poptorch.ICustomArgParser):
         yield struct.data
         yield struct.label
 
-    def reconstruct(self, struct, tensor_iterator):
-        return type(struct)(*tensor_iterator)
+    def reconstruct(self, original_structure, tensor_iterator):
+        return type(original_structure)(*tensor_iterator)
 
 
 poptorch.registerCustomArgParser(CustomBatch, CustomBatchParser())
@@ -1413,26 +1413,77 @@ def test_custom_batch_sampler(batch_size, device_iteration, num_workers,
     collate_fn = DynamicPadCollateFunction(batch_size, return_type)
     opts = poptorch.Options().deviceIterations(device_iteration)
 
-    try:
-        loader = poptorch.DataLoader(opts,
-                                     dataset,
-                                     batch_sampler=dynamic_batch_sampler,
-                                     collate_fn=collate_fn,
-                                     num_workers=num_workers,
-                                     drop_last=drop_last,
-                                     mode=mode)
-    except AssertionError as error:
-        # In case Dataloader works in Async mode on the dataset with
-        # a batch_sampler that would generate an incomplete batch, the expected
-        # behavior is raising an exception.
-        if mode == poptorch.DataLoaderMode.Async and incomplete_batches > 0:
-            return
-        raise error
+    loader = poptorch.DataLoader(opts,
+                                 dataset,
+                                 batch_sampler=dynamic_batch_sampler,
+                                 collate_fn=collate_fn,
+                                 num_workers=num_workers,
+                                 drop_last=drop_last,
+                                 mode=mode)
 
     batches = list(loader)
     assert len(batches) == expected_num_batches
 
     combined_batch_size = batch_size * device_iteration
+    expected_data_full_size = torch.Size([combined_batch_size] + shape)
+    expected_labels_full_size = torch.Size([combined_batch_size, 1])
+
+    full_batches = itertools.islice(
+        batches,
+        len(batches) - 1 if last_incomplete else None)
+
+    for batch in full_batches:
+        assert get_item(batch, "data",
+                        return_type).shape == expected_data_full_size
+        assert get_item(batch, "label",
+                        return_type).shape == expected_labels_full_size
+
+    if last_incomplete:
+        combined_tail_batch_size = incomplete_batches * batch_size
+        assert get_item(batches[-1], "data", return_type).shape  == \
+            torch.Size([combined_tail_batch_size] + shape)
+        assert get_item(batches[-1], "label", return_type).shape  == \
+            torch.Size([combined_tail_batch_size, 1])
+
+
+@pytest.mark.parametrize("drop_last", [True, False])
+def test_default_batch_sampler(drop_last):
+    batch_size = 4
+    device_iteration = 1
+    num_workers = 1
+    return_type = tuple
+    mode = poptorch.DataLoaderMode.Async
+
+    shape = [3, 1]
+
+    # pseudo random value for number of expected batches produced by dataloader
+    expected_num_batches = batch_size + device_iteration + num_workers
+    incomplete_batches = 3 % device_iteration
+
+    combined_batch_size = batch_size * device_iteration
+    dataset_size = expected_num_batches * combined_batch_size
+    dataset_size += incomplete_batches * batch_size
+
+    last_incomplete = not drop_last and incomplete_batches != 0
+    if last_incomplete:
+        expected_num_batches += 1
+
+    collate_fn = DynamicPadCollateFunction(batch_size, return_type)
+    opts = poptorch.Options().deviceIterations(device_iteration)
+
+    dataset = IncrementDatasetWithLabels(shape, dataset_size)
+
+    loader = poptorch.DataLoader(opts,
+                                 dataset,
+                                 batch_size=batch_size,
+                                 collate_fn=collate_fn,
+                                 num_workers=num_workers,
+                                 drop_last=drop_last,
+                                 mode=mode)
+
+    batches = list(loader)
+    assert len(batches) == expected_num_batches
+
     expected_data_full_size = torch.Size([combined_batch_size] + shape)
     expected_labels_full_size = torch.Size([combined_batch_size, 1])
 
