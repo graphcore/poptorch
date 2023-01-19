@@ -16,6 +16,7 @@ if __name__ == "__main__":
                         action="store_true",
                         help="Print debug messages")
     parser.add_argument("--torch-version", type=str)
+    parser.add_argument("--input-file", type=str)
     parser.add_argument("output", help="File to create")
 
     args = parser.parse_args()
@@ -29,8 +30,10 @@ if __name__ == "__main__":
     # Copy the content of python/__init__.py and replace the occurrences of
     # @VERSION@ / @SNAPSHOT@ with the actual version / snapshot
     with open(args.output, "w") as f:
-        for line in open(
-                os.path.join(_utils.sources_dir(), "python", "__init__.py")):
+        if args.input_file is None:
+            args.input_file = os.path.join(_utils.sources_dir(), "python",
+                                           "__init__.py")
+        for line in open(args.input_file):
             line = line.replace("@VERSION@", pkg_info.version_long)
             line = line.replace("@SNAPSHOT@", pkg_info.snapshot)
             if args.torch_version:

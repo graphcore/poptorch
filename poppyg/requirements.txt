@@ -1,0 +1,17 @@
+# IMPORTANT: Keep requirements in sync with config.buildenv.py
+
+# Install pre-built wheels for PyTorch Geometric that are compatible with
+# poptorch which is currently pinned to torch 1.13
+--find-links https://data.pyg.org/whl/torch-1.13.0+cpu.html
+
+pyg-nightly==2.2.0.dev20230110
+
+pytest-benchmark
+pytest-cov
+torch-scatter
+torch-sparse
+torch-cluster
+torch-spline-conv
+
+nbformat
+nbconvert

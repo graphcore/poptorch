@@ -1,0 +1,243 @@
+# Copyright (c) 2022 Graphcore Ltd. All rights reserved.
+import pickle
+
+import pytest
+import torch
+from torch_geometric.data import Batch, Data
+from torch_geometric.datasets import FakeDataset
+
+import utils
+from poppyg.batch_sampler import FixedBatchSampler
+from poppyg.collate import CombinedBatchingCollater, make_exclude_keys
+from poppyg.dataloader import FixedSizeDataLoader as IPUFixedSizeDataLoader
+from poppyg.dataloader import \
+    create_fixed_batch_dataloader as ipu_create_fixed_batch_dataloader
+from poppyg.pyg_collate import Collater
+from poppyg.pyg_dataloader import (FixedSizeDataLoader, TorchDataLoaderMeta,
+                                   create_fixed_batch_dataloader)
+from poppyg.types import PyGArgsParser
+import poptorch
+
+
+def _compare_batches(batch_actual: Batch, batch_expected: Batch):
+    for key in batch_expected.keys:
+        expected_value = batch_expected[key]
+        actual_value = batch_actual[key]
+        if isinstance(expected_value, torch.Tensor):
+            assert torch.equal(actual_value, expected_value)
+        else:
+            assert actual_value == expected_value
+
+
+def test_batch_serialization():
+    data = FakeDataset(num_graphs=1, avg_num_nodes=30, avg_degree=5)[0]
+    batch = Batch.from_data_list([data])
+    serialized_batch = pickle.dumps(batch)
+    batch_unserialized = pickle.loads(serialized_batch)
+    _compare_batches(batch_unserialized, batch)
+
+
+def test_custom_batch_parser():
+    data = FakeDataset(num_graphs=1, avg_num_nodes=30, avg_degree=5)[0]
+    batch = Batch.from_data_list([data])
+    parser = PyGArgsParser()
+    generator = parser.yieldTensors(batch)
+    batch_reconstructed = parser.reconstruct(batch, generator)
+    _compare_batches(batch_reconstructed, batch)
+
+
+def test_collater(molecule):
+    include_keys = ('x', 'y', 'z')
+    exclude_keys = make_exclude_keys(include_keys, molecule)
+    collate_fn = Collater(exclude_keys=exclude_keys)
+    batch = collate_fn([molecule])
+    assert isinstance(batch, type(Batch(_base_cls=Data().__class__)))
+    batch_keys = list(
+        filter(lambda key: key not in ("ptr", "batch"), batch.keys))
+
+    assert len(batch_keys) == len(include_keys)
+
+    for key in include_keys:
+        utils.assert_equal(actual=batch[key], expected=getattr(molecule, key))
+        utils.assert_equal(actual=getattr(batch, key),
+                           expected=getattr(molecule, key))
+
+
+def test_inject_base_dataloader():
+    r"""Test ensures the loader's metaclass API doesn't change as external
+    libraries depend on that."""
+
+    class DummyBaseDataLoader:
+        def __init__(self):
+            pass
+
+    class DummyDataLoaderMeta(TorchDataLoaderMeta):
+        base_loader = DummyBaseDataLoader
+
+    class DummyLoader(FixedSizeDataLoader, metaclass=DummyDataLoaderMeta):  # pylint: disable=invalid-metaclass
+        def __init__(self):
+            pass
+
+    loader = DummyLoader()
+
+    assert issubclass(type(loader), DummyBaseDataLoader)
+    assert not issubclass(type(loader), TorchDataLoaderMeta.base_loader)
+
+
+def test_multiple_collater(molecule):
+    r"""Test that we can have two different collaters at the same time and
+    that attribute access works as expected."""
+    include_keys = ('x', )
+    exclude_keys = make_exclude_keys(include_keys, molecule)
+    indclude_keys_2 = ('z', )
+    exclude_keys_2 = make_exclude_keys(indclude_keys_2, molecule)
+    batch = Collater(exclude_keys=exclude_keys)([molecule])
+    batch_2 = Collater(exclude_keys=exclude_keys_2)([molecule])
+
+    for k1, k2 in zip(include_keys, indclude_keys_2):
+        assert k1 in batch.keys
+        assert k2 in batch_2.keys
+        assert k2 not in batch.keys
+        assert k1 not in batch_2.keys
+
+
+def test_collater_invalid_keys(molecule):
+    exclude_keys = ('v', 'name')
+    collate_fn = Collater(exclude_keys=exclude_keys)
+
+    batch = collate_fn([molecule])
+    assert isinstance(batch, type(Batch(_base_cls=Data().__class__)))
+    batch_keys = list(
+        filter(lambda key: key not in ("ptr", "batch"), batch.keys))
+
+    expected_keys = ['edge_index', 'pos', 'y', 'idx', 'z', 'edge_attr', 'x']
+
+    assert len(expected_keys) == len(batch_keys)
+
+    for key in expected_keys:
+        utils.assert_equal(actual=batch[key], expected=getattr(molecule, key))
+        utils.assert_equal(actual=getattr(batch, key),
+                           expected=getattr(molecule, key))
+
+
+@pytest.mark.parametrize('mini_batch_size', [1, 16])
+def test_combined_batching_collater(molecule, mini_batch_size):
+    # Simulates 4 replicas.
+    num_replicas = 4
+    combined_batch_size = num_replicas * mini_batch_size
+    data_list = [molecule] * combined_batch_size
+    collate_fn = CombinedBatchingCollater(mini_batch_size=mini_batch_size,
+                                          collater=Collater())
+    batch = collate_fn(data_list)
+    for _, v in batch.items():
+        if isinstance(v, torch.Tensor):
+            assert v.shape[0] == num_replicas
+
+
+def test_combined_batching_collater_invalid(molecule):
+    collate_fn = CombinedBatchingCollater(mini_batch_size=8,
+                                          collater=Collater())
+
+    with pytest.raises(AssertionError, match='Invalid batch size'):
+        collate_fn([molecule] * 9)
+
+
+def test_create_fixed_batch_dataloader(num_graphs=2, num_nodes=30):
+    dataset = FakeDataset(num_graphs=num_graphs, avg_num_nodes=30)
+    ipu_dataloader = ipu_create_fixed_batch_dataloader(dataset,
+                                                       num_nodes=num_nodes,
+                                                       num_graphs=num_graphs)
+    assert isinstance(ipu_dataloader, IPUFixedSizeDataLoader)
+    pyg_dataloader = create_fixed_batch_dataloader(dataset,
+                                                   num_nodes=num_nodes,
+                                                   num_graphs=num_graphs)
+    assert not isinstance(pyg_dataloader, IPUFixedSizeDataLoader)
+
+
+@pytest.mark.parametrize('loader', [
+    FixedSizeDataLoader,
+    dict(loader_cls=IPUFixedSizeDataLoader, device_iterations=3),
+    dict(loader_cls=IPUFixedSizeDataLoader)
+])
+@pytest.mark.parametrize('use_batch_sampler', [True, False])
+def test_fixed_size_dataloader(
+        loader,
+        use_batch_sampler,
+        benchmark,
+        fake_molecular_dataset,
+        batch_size=10,
+):
+    ipu_dataloader = loader is not FixedSizeDataLoader
+    # CombinedBatchingCollater adds an additional 0-th dimension.
+    dim_offset = 1 if ipu_dataloader else 0
+
+    # Get a sensible value for the the maximum number of nodes.
+    padded_num_nodes = fake_molecular_dataset.avg_num_nodes * (batch_size + 10)
+    padded_num_edges = fake_molecular_dataset.avg_degree * padded_num_nodes
+
+    # Define the expected tensor sizes in the output.
+    data = fake_molecular_dataset[0]
+    data_attributes = (k for k, _ in data()
+                       if data.is_node_attr(k) or data.is_edge_attr(k))
+    expected_sizes = {
+        k: ((padded_num_nodes if data.is_node_attr(k) else padded_num_edges),
+            dim_offset)
+        for k in data_attributes
+    }
+    # Special case for edge_index which is of shape [2, num_edges].
+    expected_sizes['edge_index'] = (padded_num_edges, 1 + dim_offset)
+
+    # Create a fixed size dataloader.
+    kwargs = {
+        'dataset': fake_molecular_dataset,
+        'num_nodes': padded_num_nodes,
+        'collater_args': {
+            'num_edges': padded_num_edges,
+        }
+    }
+    if use_batch_sampler:
+        batch_sampler = FixedBatchSampler(fake_molecular_dataset,
+                                          batch_size,
+                                          num_nodes=padded_num_nodes,
+                                          num_edges=padded_num_edges)
+        kwargs['batch_sampler'] = batch_sampler
+    else:
+        kwargs['batch_size'] = batch_size
+
+    if ipu_dataloader:
+        options = poptorch.Options()
+        default_options_device_iterations = options.device_iterations
+        device_iterations = loader.get('device_iterations',
+                                       default_options_device_iterations)
+        options.deviceIterations(device_iterations=device_iterations)
+        kwargs['options'] = options
+        loader = loader['loader_cls']
+
+    loader = loader(**kwargs)
+
+    # Check that each batch matches the expected size.
+    for batch in loader:
+        assert hasattr(batch, 'batch')
+        assert hasattr(batch, 'ptr')
+
+        if ipu_dataloader:
+            assert list(
+                batch.batch.size()) == [device_iterations, padded_num_nodes]
+            if not use_batch_sampler:
+                assert list(
+                    batch.ptr.size()) == [device_iterations, batch_size + 2]
+        else:
+            assert list(batch.batch.size()) == [padded_num_nodes]
+            if not use_batch_sampler:
+                assert list(batch.ptr.size()) == [batch_size + 2]
+
+        sizes_match = all(
+            getattr(batch, k).shape[dim] == size
+            for k, (size, dim) in expected_sizes.items())
+        assert sizes_match
+
+    def loop():
+        for _ in loader:
+            pass
+
+    benchmark(loop)
