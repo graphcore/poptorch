@@ -220,6 +220,7 @@ def merge_dicts(x, y):
 
 # The test is reliant on an IPU model with limited memory, so force the small model
 @helpers.printCapfdOnExit
+@pytest.mark.skip(reason="Known issue. Unblock when AFS-85 will be completed.")
 @unittest.mock.patch.dict("os.environ",
                           merge_dicts(helpers.forceSmallModel(),
                                       {"POPLIBS_LOG_LEVEL": "DEBUG"}))

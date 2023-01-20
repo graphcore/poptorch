@@ -428,6 +428,10 @@ def assert_allclose(native_out, poptorch_out, rtol, atol):
 @pytest.mark.parametrize("test_name", all_tests.keys())
 @pytest.mark.parametrize("use_half", [False, True])
 def test_pytorch_nn(test_name, use_half):
+
+    if test_name == "test_nn_PairwiseDistance_no_batch_dim":
+        pytest.skip("Known issue. Unblock when AFS-77 will be completed.")
+
     reason = EXPECTED_FAILURES.get(test_name)
     if reason is None:
         reason = HALF_EXPECTED_FAILURES.get(

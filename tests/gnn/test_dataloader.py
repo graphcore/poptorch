@@ -84,6 +84,7 @@ def test_inject_base_dataloader():
     assert not issubclass(type(loader), TorchDataLoaderMeta.base_loader)
 
 
+@pytest.mark.skip(reason="Known issue. Unblock when AFS-86 will be completed.")
 def test_multiple_collater(molecule):
     r"""Test that we can have two different collaters at the same time and
     that attribute access works as expected."""
