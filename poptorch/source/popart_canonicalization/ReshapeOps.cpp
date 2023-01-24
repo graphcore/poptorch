@@ -5,6 +5,8 @@
 #include "../PoptorchStaticInit.hpp"
 #include "PopartCanonicalizationUtils.hpp"
 
+#include "ScatterReduction.hpp"
+
 #include "poptorch/DispatchTracer.hpp"
 #include "poptorch/OpBuilder.hpp"
 #include "poptorch/Utils.hpp"
@@ -571,9 +573,10 @@ torch::jit::Node *col2imHandler(torch::jit::Graph *graph,
   auto *indices_tiled =
       createTile(graph, {indices_const->output(), repeats_const->output()});
 
+  const auto sum_reduce = static_cast<std::int32_t>(ScatterReduction::Sum);
   auto *scatter_reduced =
       createScatterreduce(graph, {reshaped->output(), indices_tiled->output()},
-                          output_size[0] * output_size[1], 2, 0);
+                          output_size[0] * output_size[1], 2, sum_reduce);
 
   auto *res = createReshape(
       graph, scatter_reduced->output(),

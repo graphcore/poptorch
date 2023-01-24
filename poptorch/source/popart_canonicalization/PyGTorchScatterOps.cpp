@@ -3,6 +3,8 @@
 #include "../PoptorchSymbols.hpp"
 #include "PopartCanonicalizationUtils.hpp"
 
+#include "ScatterReduction.hpp"
+
 #include "poptorch/OpBuilder.hpp"
 #include "poptorch/Utils.hpp"
 #include "poptorch_logging/Error.hpp"
@@ -79,9 +81,10 @@ torch::jit::Node *scatterMaxMinHandler(torch::jit::Graph *graph,
   auto *index_of_result =
       createWhere(graph, {mask, index_range, not_chosen})->output();
   // Apply the same scattering to our index tensor as we did to the input tensor
-  auto *arg_scatter =
-      createScatterreduce(graph, {index_of_result, index}, axissize, axis, 2)
-          ->output();
+  const auto min_reduce = static_cast<std::int32_t>(ScatterReduction::Min);
+  auto *arg_scatter = createScatterreduce(graph, {index_of_result, index},
+                                          axissize, axis, min_reduce)
+                          ->output();
   // Now we've got a tensor of 1-based indices, with zeroes where no index
   // was scattered. We need to transform this to zero-based indices, with
   // ishape[axis] where no index was scattered.

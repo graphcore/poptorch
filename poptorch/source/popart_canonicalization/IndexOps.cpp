@@ -6,6 +6,8 @@
 #include "../PoptorchSymbols.hpp"
 #include "PopartCanonicalizationUtils.hpp"
 
+#include "ScatterReduction.hpp"
+
 #include "poptorch/DispatchTracer.hpp"
 #include "poptorch/OpBuilder.hpp"
 #include "poptorch/Utils.hpp"
@@ -250,8 +252,9 @@ torch::jit::Node *indexPutHandler(torch::jit::Graph *graph,
       v = createExpand(graph, {v, intVectorToIrConstant(graph, new_shape)})
               ->output();
     }
+    const auto none_reduce = static_cast<std::int32_t>(ScatterReduction::None);
     auto *out = createScatterreduce(graph, {v, indices[*vectorized_dim], x},
-                                    shape[0], *vectorized_dim, 3);
+                                    shape[0], *vectorized_dim, none_reduce);
     applyInplaceSlice(node, out);
     return out;
   }

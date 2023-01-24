@@ -214,7 +214,6 @@ def get_index_fill_fn(dim):
 
 @pytest.mark.parametrize("value", (-1, torch.tensor(-1)))
 @pytest.mark.parametrize("dim", [1, 2, 3])
-@pytest.mark.skip(reason="Known issue. Unblock when AFS-80 will be completed.")
 def test_index_fill(value, dim):
     torch.manual_seed(42)
     op = get_index_fill_fn(dim)
@@ -246,7 +245,6 @@ def test_index_select(dim):
 @helpers.printCapfdOnExit
 @helpers.overridePoptorchLogLevel("TRACE")
 @pytest.mark.parametrize("dim", [0, 1])
-@pytest.mark.skip(reason="Known issue. Unblock when AFS-81 will be completed.")
 def test_vectorized_scatter(capfd, dim):
     def op(out, index, src):
         if dim == 0:

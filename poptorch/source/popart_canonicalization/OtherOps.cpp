@@ -6,6 +6,8 @@
 #include "EinsumOp.hpp"
 #include "PopartCanonicalizationUtils.hpp"
 
+#include "ScatterReduction.hpp"
+
 #include "poptorch/OpBuilder.hpp"
 #include "poptorch/PopartCanonicalization.hpp"
 #include "poptorch/Utils.hpp"
@@ -219,8 +221,6 @@ torch::jit::Node *scatterAddHandler(torch::jit::Graph *graph,
   auto *add = createAdd(graph, {output, sr->output()});
   return add;
 }
-
-enum class ScatterReduction { Sum = 0, Max, Min, Mul, None, Mean };
 
 std::int32_t getReductionMethod(torch::jit::Node *node) {
   const auto reduce = constantToString(node);
