@@ -24,3 +24,8 @@ run_poptorch_install_command(
            --extra-pytest-args=\"${EXTRA_PYTEST_ARGS}\" "
   "${PROJECT_BINARY_DIR}"
   "generate_test_file.py")
+
+run_poptorch_install_command(
+  "python3 ${CMAKE_CURRENT_SOURCE_DIR}/gnn/download_external_datasets.py \
+           ${TESTS_PATH}" "${PROJECT_BINARY_DIR}" "download_external_datasets.py"
+)

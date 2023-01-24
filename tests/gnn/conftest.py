@@ -1,18 +1,21 @@
 # Copyright (c) 2022 Graphcore Ltd. All rights reserved.
 import os.path as osp
-import tempfile
 import pytest
 import torch_geometric as pyg
 
 
-@pytest.fixture(scope="session")
-def tmp_dataset_dir():
-    return tempfile.TemporaryDirectory()
+def pytest_addoption(parser):
+    parser.addoption("--external_datasets_dir",
+                     type=str,
+                     default=osp.join(osp.dirname(osp.abspath(__file__)),
+                                      ".datasets"),
+                     help=("The directory where the external datasets will be "
+                           "downloaded."))
 
 
 @pytest.fixture
-def pyg_qm9(tmp_dataset_dir):
-    qm9root = osp.join(tmp_dataset_dir.name, "test_data", "qm9")
+def pyg_qm9(pytestconfig):
+    qm9root = osp.join(pytestconfig.getoption("external_datasets_dir"), "qm9")
     return pyg.datasets.QM9(root=qm9root)
 
 
