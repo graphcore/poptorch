@@ -146,7 +146,7 @@ class FixedBatchSampler(Sampler[List[int]]):
             and graphs_left == 0
         return has_space_for_graph or graph_will_fully_fill_batch
 
-    @lru_cache
+    @lru_cache(maxsize=128)
     def __len__(self) -> int:
         if isinstance(self.sampler, RandomSampler):
             raise NotImplementedError(

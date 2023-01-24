@@ -2,7 +2,6 @@
 
 import numbers
 from collections import defaultdict
-from functools import singledispatchmethod
 from typing import Dict, Generator, List, Optional, Tuple, Union
 
 import torch
@@ -11,6 +10,23 @@ from torch_geometric.data import Data, HeteroData
 from torch_geometric.transforms import BaseTransform
 
 from . import utils
+
+try:
+    from functools import singledispatchmethod
+except ImportError:
+    # Workaround for systems with Python 3.7
+    from functools import singledispatch, update_wrapper
+
+    def singledispatchmethod(func):
+        dispatcher = singledispatch(func)
+
+        def wrapper(*arg, **kw):
+            return dispatcher.dispatch(arg[1].__class__)(*arg, **kw)
+
+        wrapper.register = dispatcher.register
+        update_wrapper(wrapper, func)
+        return wrapper
+
 
 __all__ = ['Pad']
 
