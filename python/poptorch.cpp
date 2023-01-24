@@ -173,18 +173,6 @@ void registerBuffersWithCallback(
   }
 }
 
-std::vector<torch::jit::StackEntry> pythonTracebackAccessor() {
-  // Workaround for bug in upstream Torch: they don't check
-  // if the frame is null before dereferencing it and will
-  // therefore segfault if called from a non-python thread.
-  pybind11::gil_scoped_acquire gil;
-  PyFrameObject *frame = PyEval_GetFrame();
-  if (frame == nullptr) {
-    return {};
-  }
-  return torch::jit::tracer::pythonCallstack();
-}
-
 // Python interface to map a given CPU op with the IR calls.
 void registerCPUCallBack(const py::object &obj, const std::string &ID) {
   // Map the string identifier to the metadata.
@@ -1224,7 +1212,6 @@ PYBIND11_MODULE(poptorch_core, m) { // NOLINT
   m.def("getIpuTensorId", PTC(poptorch::getIpuTensorId));
 
   poptorch::bindings::initialiseExceptionHandling(m);
-  poptorch::setPythonTracebackAccessor(&poptorch::pythonTracebackAccessor);
 
   py::enum_<poptorch::popart_compiler::TestErrorType>(m, "TestErrorType")
       .value("Poptorch", poptorch::popart_compiler::TestErrorType::Poptorch)

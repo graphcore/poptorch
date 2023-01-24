@@ -17,7 +17,6 @@
 #include <set>
 #include <string>
 #include <unordered_map>
-#include <utility>
 
 #include "../popart_canonicalization/PopartCanonicalizationUtils.hpp"
 #include "CommonHelperFunctions.hpp"
@@ -107,11 +106,7 @@ struct GlobalTracerContext {
   }
 
   void updatePythonCallstack() {
-    if (_python_traceback_accessor) {
-      activeDispatch()->setPythonStack(_python_traceback_accessor());
-    } else {
-      activeDispatch()->setPythonStack({});
-    }
+    activeDispatch()->setPythonStack(torch::jit::tracer::pythonCallstack());
   }
 
   void throwPoptorchError(const PoptorchErrorInfo &info) {
@@ -147,10 +142,6 @@ struct GlobalTracerContext {
   // Create and store Tensors...
   TensorStore tensor_store;
 
-  void setPythonTracebackAccessor(PythonTracebackAccessor accessor) {
-    _python_traceback_accessor = std::move(accessor);
-  }
-
   void setPoptorchErrorThrower(PoptorchErrorThrower thrower) {
     _poptorch_error_thrower = std::move(thrower);
   }
@@ -158,7 +149,6 @@ struct GlobalTracerContext {
 private:
   // The active dispatcher. Created once upon dispatch start.
   std::unique_ptr<IDispatch> _active_dispatch;
-  PythonTracebackAccessor _python_traceback_accessor;
   PoptorchErrorThrower _poptorch_error_thrower;
 };
 
@@ -239,9 +229,7 @@ void copyInplace(const c10::OperatorHandle &op, c10::Stack *stack) {
                    "Unsupported scalar type `"
                        << scalar_type << "'. Please cast to `" << coerced_type
                        << "' before moving this tensor to the IPU.");
-      // TODO(T71349): contiguous is needed to ensure the cpu data has the
-      // standard striding layout and is continuous in memory
-      getContext().tensor_store.copyFromCpu(self, src.contiguous());
+      getContext().tensor_store.copyFromCpu(self, src);
     } else if (self.is_cpu() && src.is_ipu()) {
       logging::trace("copy_ IPU -> CPU, outside dispatch");
       getContext().tensor_store.copyToCpu(self, src);
@@ -285,10 +273,8 @@ void copyInplace(const c10::OperatorHandle &op, c10::Stack *stack) {
       std::stringstream ss;
       ss << "copy_ CPU -> IPU ";
       if (isParameter(self) || getContext().moving_parameters) {
-        // TODO(T71349): src.contiguous() is needed to ensure the cpu data has
-        // the standard striding layout and is continuous in memory
-        getContext().activeDispatch()->addParameter(
-            downCastIfNeeded(src.contiguous()), self);
+        getContext().activeDispatch()->addParameter(downCastIfNeeded(src),
+                                                    self);
         // Make sure the parameter flag is preserved.
         ss << "parameter";
       } else {
@@ -297,14 +283,11 @@ void copyInplace(const c10::OperatorHandle &op, c10::Stack *stack) {
             "An input tensor to an IPU model can not have requires_grad set "
             "to True.");
 
-        // TODO(T71349): src.contiguous() is needed to ensure the cpu data has
-        // the standard striding layout and is continuous in memory
         if (getContext().graph_inputs.count(src.unsafeGetTensorImpl()) > 0) {
-          getContext().activeDispatch()->addInput(
-              downCastIfNeeded(src.contiguous()), self);
+          getContext().activeDispatch()->addInput(downCastIfNeeded(src), self);
         } else {
-          getContext().activeDispatch()->addConstant(
-              downCastIfNeeded(src.contiguous()), self);
+          getContext().activeDispatch()->addConstant(downCastIfNeeded(src),
+                                                     self);
         }
         ss << "input";
         // Make sure the parameter flag is preserved.
@@ -351,10 +334,6 @@ void endOutputsMove() { getContext().moving_outputs = false; }
 
 // Turn on.
 void startDispatch() { getContext().dispatch_on = true; }
-
-void setPythonTracebackAccessor(PythonTracebackAccessor accessor) {
-  getContext().setPythonTracebackAccessor(std::move(accessor));
-}
 
 void setPoptorchErrorThrower(PoptorchErrorThrower thrower) {
   getContext().setPoptorchErrorThrower(std::move(thrower));
@@ -591,10 +570,7 @@ at::Tensor emptyStrided(at::IntArrayRef size, at::IntArrayRef stride,
   ERROR_ON(!isIpuDevice(*device));
   logging::debug("[DISPATCHER] Intercepting aten::empty_strided, device {}",
                  device->str());
-  // TODO(T71349): once upstream torch understands that the ipu tensor doesn't
-  // support striding the striding should always be default
-  // ERROR_ON(at::detail::defaultStrides(size) != stride);
-  UNUSED(stride);
+  ERROR_ON(at::detail::defaultStrides(size) != stride);
   return emptyBase(size, dtype, layout, device, pin_memory);
 }
 

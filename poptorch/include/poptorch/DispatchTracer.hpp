@@ -17,7 +17,6 @@ namespace jit {
 struct Graph;
 struct Node;
 struct Value;
-struct StackEntry;
 } // namespace jit
 } // namespace torch
 
@@ -116,13 +115,7 @@ void replaceValueDispatcher(torch::jit::Value *v_old, torch::jit::Value *v_new);
 
 std::uint64_t getIpuTensorId(const at::Tensor &tensor);
 
-using PythonTracebackAccessor =
-    std::function<std::vector<torch::jit::StackEntry>()>;
-
 using PoptorchErrorThrower = std::function<void(const PoptorchErrorInfo &info)>;
-
-// Set the function that will access and return the current python stacktrace
-void setPythonTracebackAccessor(PythonTracebackAccessor accessor);
 
 // Set the function to use to throw python PoptorchError exceptions.
 void setPoptorchErrorThrower(PoptorchErrorThrower thrower);

@@ -791,57 +791,6 @@ def _tensor_str(self, indent):
 
 torch._tensor_str._tensor_str = _tensor_str  # pylint: disable=protected-access
 
-# TODO(T71316) Similar to above, this is a hack to work around hardcoded device names
-# in torch.Tensor.__deepcopy__. An upstream PR will be made to fix this
-# properly, at which point this can be deleted.
-_real_tensor_deepcopy = torch.Tensor.__deepcopy__
-
-
-def _tensor_deepcopy(self, memo):
-    if self.device.type != "ipu":
-        return _real_tensor_deepcopy(self, memo)
-
-    if id(self) in memo:
-        return memo[id(self)]
-    with torch.no_grad():
-        new_tensor = self.clone()
-        if type(new_tensor) is not type(self):
-            raise RuntimeError(
-                "The default implementation of __deepcopy__() for wrapper "
-                "subclasses nly works for subclass types that implement "
-                "clone() and for which cloning returns another instance of "
-                "the same subclass. You should either properly implement "
-                "clone() for your subclass or override __deepcopy__() if it "
-                "is intended behavior for clone() to return an instance of a "
-                "different type.")
-        if self.requires_grad:
-            new_tensor.requires_grad_()
-        if self.grad is not None:
-            new_tensor.grad = self.grad.__deepcopy__(memo)
-
-        if not isinstance(self, torch.Tensor):
-            if type(new_tensor) is not type(self):
-                raise RuntimeError(
-                    "Type of deepcopy result does not match the type of the "
-                    "source tensor. If you encounter this, please open an "
-                    "issue on PyTorch's GitHub.")
-
-            # Plain Tensors don't have slots
-            slots_to_save = copyreg._slotnames(  # pylint: disable=protected-access
-                self.__class__)  # type: ignore[attr-defined]
-            for slot in slots_to_save:
-                if hasattr(self, slot):
-                    setattr(new_tensor, slot,
-                            copy.deepcopy(getattr(self, slot), memo))
-
-        new_tensor.__dict__ = copy.deepcopy(self.__dict__, memo)
-
-        memo[id(self)] = new_tensor
-        return new_tensor
-
-
-torch.Tensor.__deepcopy__ = _tensor_deepcopy
-
 
 class ICustomArgParser(abc.ABC):
     """Interface to create custom argument parsers to extract tensors and
