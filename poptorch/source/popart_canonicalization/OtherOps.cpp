@@ -220,7 +220,7 @@ torch::jit::Node *scatterAddHandler(torch::jit::Graph *graph,
   return add;
 }
 
-enum class ScatterReduction { Sum = 0, Max, Min, None, Mean };
+enum class ScatterReduction { Sum = 0, Max, Min, Mul, None, Mean };
 
 std::int32_t getReductionMethod(torch::jit::Node *node) {
   const auto reduce = constantToString(node);
@@ -236,6 +236,9 @@ std::int32_t getReductionMethod(torch::jit::Node *node) {
   if (reduce == "mean") {
     return static_cast<std::int32_t>(ScatterReduction::Mean);
   }
+  if (reduce == "prod") {
+    return static_cast<std::int32_t>(ScatterReduction::Mul);
+  }
 
   ERROR("Unsupported reduction type for scatter_reduce: " << reduce);
 }
@@ -246,6 +249,9 @@ float getReductionInitValue(int32_t reduce) {
   case static_cast<std::int32_t>(ScatterReduction::Sum):
   case static_cast<std::int32_t>(ScatterReduction::Mean):
     init_val = 0.0;
+    break;
+  case static_cast<std::int32_t>(ScatterReduction::Mul):
+    init_val = 1.0;
     break;
   case static_cast<std::int32_t>(ScatterReduction::Max):
     init_val = -std::numeric_limits<float>::infinity();
