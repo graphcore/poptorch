@@ -69,10 +69,13 @@ def dispatcher_options():
     return options
 
 
-@pytest.mark.skip()
 @pytest.mark.parametrize('arg', [data(), batch()], ids=['data', 'batch'])
 def test_args(arg, dispatcher_options):
     arg, in_channels, out_channels = arg
+
+    if isinstance(arg, Batch):
+        pytest.skip("Known issue. Unblock when AFS-97 will be completed.")
+
     model = Model(in_channels, out_channels)
     model.train()
     optimizer = poptorch.optim.Adam(model.parameters(), lr=0.001)
