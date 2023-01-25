@@ -9,7 +9,7 @@ from torch_geometric.transforms import Compose, GCNNorm, NormalizeFeatures
 from torch_geometric.utils import degree
 from torch_scatter import scatter_add
 
-from poppyg import TrainingStepper, set_aggregation_dim_size
+from poptorch_geometric import TrainingStepper, set_aggregation_dim_size
 
 
 @pytest.fixture

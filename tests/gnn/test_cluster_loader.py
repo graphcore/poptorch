@@ -4,9 +4,9 @@ from torch_geometric import seed_everything
 from torch_geometric.datasets import FakeDataset
 from torch_geometric.loader import ClusterData
 
-from poppyg.cluster_loader import \
+from poptorch_geometric.cluster_loader import \
     FixedSizeClusterLoader as IPUFixedSizeClusterLoader
-from poppyg.pyg_cluster_loader import FixedSizeClusterLoader
+from poptorch_geometric.pyg_cluster_loader import FixedSizeClusterLoader
 import poptorch
 
 

@@ -9,9 +9,9 @@ from utils import FakeDatasetEqualGraphs
 from torch.utils.data.sampler import RandomSampler, SequentialSampler
 from torch_geometric.datasets import FakeDataset
 
-from poppyg.batch_sampler import FixedBatchSampler, make_fixed_batch_generator
-from poppyg.collate import CombinedBatchingCollater, FixedSizeCollater
-from poppyg.dataloader import create_fixed_batch_dataloader
+from poptorch_geometric.batch_sampler import FixedBatchSampler, make_fixed_batch_generator
+from poptorch_geometric.collate import CombinedBatchingCollater, FixedSizeCollater
+from poptorch_geometric.dataloader import create_fixed_batch_dataloader
 
 
 def test_fixed_batch_sampler_default_params():

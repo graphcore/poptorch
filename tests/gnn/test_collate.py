@@ -5,7 +5,7 @@ import torch
 import torch_geometric as pyg
 from torch.utils.data import BatchSampler, RandomSampler, SequentialSampler
 
-from poppyg.collate import FixedSizeCollater
+from poptorch_geometric.collate import FixedSizeCollater
 
 # pylint: disable=protected-access
 

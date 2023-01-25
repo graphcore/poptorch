@@ -35,7 +35,7 @@ class IpuGNN(pyg.SomeGNN):
 
 
 options = poptorch.Options()
-poppyg_dataloader = poppyg.create_dataloader(
+dataloader = poptorch_geometric.create_dataloader(
     dataset=dataset,
     num_nodes=6000,
     options=options,
@@ -45,10 +45,10 @@ poppyg_dataloader = poppyg.create_dataloader(
     },
 )
 
-model = IpuGNN(poppyg_dataloader.masker)
+model = IpuGNN(dataloader.masker)
 train_model = poptorch.TrainingModel(model, options=options, ...)
 
-for data in poppyg_dataloader:
+for data in dataloader:
     # Need to pass the mask as an extra argument.
     train_model(data.node_mask, data.y, ...)
 ```

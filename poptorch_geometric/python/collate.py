@@ -6,7 +6,7 @@ from typing import Any, Callable, Dict, Generator, List, Optional, Tuple, Union
 import torch
 from torch_geometric.data import Batch, Data
 
-from poppyg.pyg_collate import Collater
+from poptorch_geometric.pyg_collate import Collater
 
 from . import types, utils
 

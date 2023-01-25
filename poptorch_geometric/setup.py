@@ -1,6 +1,6 @@
 # Copyright (c) 2022 Graphcore Ltd. All rights reserved.
 
-from setuptools import setup
+from setuptools import setup, find_packages
 
 REQUIRES = [
     '@PYG_DEPENDENCY@', '@POPTORCH_DEPENDENCY@', 'torch-scatter',
@@ -9,10 +9,10 @@ REQUIRES = [
 VERSION = "@VERSION@"
 
 LONG_DESCRIPTION = (
-    "PopPyG is a set of extensions for PyTorch Geometric, enabling "
+    "PopTorch Geometric is a set of extensions for PyTorch Geometric, enabling "
     "GNN models to be trained, evaluated and used on the Graphcore IPU.")
 
-setup(name='poppyg',
+setup(name='poptorch_geometric',
       version=VERSION,
       description=LONG_DESCRIPTION,
       long_description=LONG_DESCRIPTION,
@@ -33,4 +33,4 @@ setup(name='poppyg',
       platforms="@PLATFORM@",
       install_requires=REQUIRES,
       python_requires=">=3.7",
-      packages=['poppyg'])
+      packages=find_packages())

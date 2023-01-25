@@ -5,9 +5,9 @@ from typing import Dict, Optional, Union
 
 from torch_geometric.loader import ClusterData
 
-from poppyg.collate import CombinedBatchingCollater
-from poppyg.dataloader import PopTorchDataLoaderMeta
-from poppyg.pyg_cluster_loader import \
+from poptorch_geometric.collate import CombinedBatchingCollater
+from poptorch_geometric.dataloader import PopTorchDataLoaderMeta
+from poptorch_geometric.pyg_cluster_loader import \
     FixedSizeClusterLoader as PyGFixedSizeClusterLoader
 import poptorch
 

@@ -3,8 +3,8 @@ from typing import Dict, Optional, Union
 
 from torch_geometric.loader import ClusterData, ClusterLoader
 
-from poppyg.collate import FixedSizeCollater
-from poppyg.pyg_dataloader import TorchDataLoaderMeta
+from poptorch_geometric.collate import FixedSizeCollater
+from poptorch_geometric.pyg_dataloader import TorchDataLoaderMeta
 
 
 class FixedSizeClusterLoader(metaclass=TorchDataLoaderMeta):

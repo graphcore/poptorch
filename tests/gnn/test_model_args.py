@@ -8,9 +8,9 @@ from torch_geometric.datasets import FakeDataset
 from torch_geometric.nn.models import MLP
 
 from utils import assert_equal
-# Need to import poppyg to ensure that our arg parser implementation is
+# Need to import poptorch_geometric to ensure that our arg parser implementation is
 # registered with poptorch ahead of running these tests
-import poppyg  # pylint: disable=unused-import
+import poptorch_geometric  # pylint: disable=unused-import
 import poptorch
 
 

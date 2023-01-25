@@ -6,7 +6,7 @@ from typing import Any, Generator, Iterable, Iterator, List, Optional, Union
 from torch.utils.data.sampler import RandomSampler, Sampler
 from torch_geometric.data import Batch, Data, Dataset
 
-from poppyg.collate import FixedSizeCollater
+from poptorch_geometric.collate import FixedSizeCollater
 
 __all__ = ["FixedBatchSampler", "make_fixed_batch_generator"]
 

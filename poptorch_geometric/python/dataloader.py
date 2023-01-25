@@ -7,10 +7,10 @@ from torch.utils.data.sampler import Sampler
 from torch_geometric.data import Dataset
 
 import poptorch
-from poppyg.collate import CombinedBatchingCollater
-from poppyg.pyg_dataloader import FixedSizeDataLoader as PyGFixedSizeDataLoader
-from poppyg.pyg_dataloader import TorchDataLoaderMeta
-from poppyg.pyg_dataloader import \
+from poptorch_geometric.collate import CombinedBatchingCollater
+from poptorch_geometric.pyg_dataloader import FixedSizeDataLoader as PyGFixedSizeDataLoader
+from poptorch_geometric.pyg_dataloader import TorchDataLoaderMeta
+from poptorch_geometric.pyg_dataloader import \
     create_fixed_batch_dataloader as pyg_create_fixed_batch_dataloader
 
 

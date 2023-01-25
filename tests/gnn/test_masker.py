@@ -3,7 +3,7 @@ import pytest
 import torch
 import torch_geometric as pyg
 
-from poppyg import masker
+from poptorch_geometric import masker
 
 
 @pytest.fixture(params=[True, False])

@@ -6,8 +6,8 @@ import torch.utils.data
 from torch.utils.data.sampler import Sampler
 from torch_geometric.data import Dataset
 
-from poppyg.batch_sampler import FixedBatchSampler
-from poppyg.collate import FixedSizeCollater
+from poptorch_geometric.batch_sampler import FixedBatchSampler
+from poptorch_geometric.collate import FixedSizeCollater
 
 
 class TorchDataLoaderMeta(type):

@@ -23,7 +23,7 @@ parser.add_argument('--output-dir',
                     help='Where to create the packages')
 args = parser.parse_args()
 
-PROJ_NAME = 'poppyg'
+PROJ_NAME = 'poptorch_geometric'
 src_dir = os.path.join(utils.sources_dir(), PROJ_NAME)
 output_dir = os.path.realpath(args.output_dir)
 python_dir = os.path.realpath(args.python_dir)

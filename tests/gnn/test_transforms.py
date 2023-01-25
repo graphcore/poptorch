@@ -6,7 +6,7 @@ import pytest
 import torch
 from torch_geometric.datasets import KarateClub
 
-from poppyg import Pad
+from poptorch_geometric import Pad
 
 
 def _hetero_edges_gen(data):

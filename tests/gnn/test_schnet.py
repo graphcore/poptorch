@@ -9,7 +9,7 @@ from torch_geometric.data import Batch
 from torch_geometric.transforms import Compose, Distance, RadiusGraph
 
 from utils import assert_equal
-from poppyg import Pad, SchNet, TrainingStepper, set_aggregation_dim_size
+from poptorch_geometric import Pad, SchNet, TrainingStepper, set_aggregation_dim_size
 import poptorch
 
 CUTOFF = 6.0
