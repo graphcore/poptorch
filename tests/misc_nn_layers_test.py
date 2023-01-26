@@ -469,9 +469,6 @@ def test_fold_with_padding(stride_x, stride_y):
 @pytest.mark.parametrize("dim", [0, 1, None])
 def test_weight_norm(dim):
 
-    if dim is None:
-        pytest.skip("Known issue. Unblock when AFS-79 will be completed.")
-
     torch.manual_seed(42)
 
     x = torch.randn(10)
