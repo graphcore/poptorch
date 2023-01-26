@@ -12,6 +12,10 @@ parser = argparse.ArgumentParser(description="Generate CTestTestfile.cmake")
 parser.add_argument("test_dir", help="Path to the folder containing the tests")
 parser.add_argument("output_file", help="Path to CTestTestfile.cmake")
 parser.add_argument("--add-to-sys-path", help="Path to add to sys.path")
+parser.add_argument("--external-datasets-dir",
+                    type=str,
+                    help=("The directory where the external datasets will be "
+                          "downloaded."))
 parser.add_argument("--extra-pytest-args",
                     type=str,
                     help=("Extra arguments to pass to pytest when generating "
@@ -31,8 +35,15 @@ import poptorch  # pylint: disable=unused-import,wrong-import-position
 
 # Collect the list of tests:
 list_tests = io.StringIO()
-pytest_args = ["-x", args.test_dir, "--collect-only", "-q"]
+pytest_args = [
+    "-x",
+    args.test_dir,
+    "--collect-only",
+    "-q",
+]
+
 extra_args = []
+
 if args.extra_pytest_args:
     arg = args.extra_pytest_args.replace("\"", "")
     if arg:
@@ -130,6 +141,7 @@ def add_test(output, test, root_folder, folder, test_id, test_properties,
     output.write(
         f"add_test({test} \"{root_folder}/timeout_handler.py\" \"python3\""
         f" \"-m\" \"pytest\" \"-sv\" \"{folder}/{test}\" "
+        f"\"--external-datasets-dir={args.external_datasets_dir}\" "
         f"\"--junitxml=junit/junit-test{test_id}.xml\" {extra})\n")
 
     props_string = " ".join(f"{k} {v}" for k, v in test_properties.items())

@@ -6,9 +6,11 @@ import os.path as osp
 import torch_geometric as pyg
 
 parser = argparse.ArgumentParser(description="Download external datasets")
-parser.add_argument("test_dir", help="Path to the folder containing the tests")
+parser.add_argument(
+    "external_datasets_dir",
+    help="The directory where the external datasets will be downloaded.")
 
 args = parser.parse_args()
 
-qm9root = osp.join(args.test_dir, "gnn", ".datasets", "qm9")
+qm9root = osp.join(args.external_datasets_dir, "qm9")
 pyg.datasets.QM9(root=qm9root)

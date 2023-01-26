@@ -4,15 +4,6 @@ import pytest
 import torch_geometric as pyg
 
 
-def pytest_addoption(parser):
-    parser.addoption("--external_datasets_dir",
-                     type=str,
-                     default=osp.join(osp.dirname(osp.abspath(__file__)),
-                                      ".datasets"),
-                     help=("The directory where the external datasets will be "
-                           "downloaded."))
-
-
 @pytest.fixture
 def pyg_qm9(pytestconfig):
     qm9root = osp.join(pytestconfig.getoption("external_datasets_dir"), "qm9")

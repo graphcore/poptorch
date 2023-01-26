@@ -3,6 +3,7 @@
 
 import random
 import enum
+import os.path as osp
 import gc
 import pytest
 import torch
@@ -134,6 +135,12 @@ def pytest_addoption(parser):
                      type=int,
                      default=0,
                      help=("Set the seed for running the tests."))
+    parser.addoption("--external-datasets-dir",
+                     type=str,
+                     default=osp.join(osp.dirname(osp.abspath(__file__)),
+                                      ".datasets"),
+                     help=("The directory where the external datasets will be "
+                           "downloaded."))
 
 
 @pytest.fixture(autouse=True, scope="function")

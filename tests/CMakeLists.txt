@@ -15,17 +15,24 @@ else()
   set(TESTS_PATH "${CMAKE_CURRENT_SOURCE_DIR}")
 endif()
 
+set(EXTERNAL_DATASETS_DIR "${CMAKE_CURRENT_BINARY_DIR}/external_datasets")
+
+run_poptorch_install_command(
+  "python3 ${CMAKE_CURRENT_SOURCE_DIR}/gnn/download_external_datasets.py \
+           ${EXTERNAL_DATASETS_DIR}"
+           "${PROJECT_BINARY_DIR}"
+           "download_external_datasets.py"
+)
+
 # Generate tests.
 run_poptorch_install_command(
   "python3 ${CMAKE_CURRENT_SOURCE_DIR}/generate_test_file.py \
            ${TESTS_PATH} \
            ${CMAKE_CURRENT_BINARY_DIR}/CTestTestfile.cmake \
            --add-to-sys-path ${CMAKE_INSTALL_PREFIX} \
+           --external-datasets-dir ${EXTERNAL_DATASETS_DIR} \
            --extra-pytest-args=\"${EXTRA_PYTEST_ARGS}\" "
   "${PROJECT_BINARY_DIR}"
   "generate_test_file.py")
 
-run_poptorch_install_command(
-  "python3 ${CMAKE_CURRENT_SOURCE_DIR}/gnn/download_external_datasets.py \
-           ${TESTS_PATH}" "${PROJECT_BINARY_DIR}" "download_external_datasets.py"
-)
+
