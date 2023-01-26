@@ -212,14 +212,6 @@ new_node->i_(c10::Symbol::attr("axis"),axis);
 new_node->i_(c10::Symbol::attr("reduction"),reduction);
 return new_node;
 }
-torch::jit::Node* createGroupedscatterreduce(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,std::int32_t axis_size,std::int32_t axis,std::int32_t reduction,std::int32_t group_size) {
- torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::groupedscatterreduce, args, ImplicitCast::None, OutputType::AsFirstInput);
-new_node->i_(c10::Symbol::attr("axis_size"),axis_size);
-new_node->i_(c10::Symbol::attr("axis"),axis);
-new_node->i_(c10::Symbol::attr("reduction"),reduction);
-new_node->i_(c10::Symbol::attr("group_size"), group_size);
-return new_node;
-}
 torch::jit::Node* createSwish(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args) {
  torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::swish, args, ImplicitCast::None, OutputType::AsFirstInput);
 return new_node;

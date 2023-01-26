@@ -16,7 +16,6 @@
 
 #include "poptorch/DispatchTracer.hpp"
 #include "poptorch/InplaceOps.hpp"
-#include "poptorch/PopartCanonicalization.hpp"
 #include "poptorch/Utils.hpp"
 #include "poptorch_logging/Error.hpp"
 #include "poptorch_logging/Logging.hpp"
@@ -631,7 +630,6 @@ void LowerToPopartImpl::validateOutputShapeAndType(
 // Lower the main body of the _graph.
 void LowerToPopartImpl::lowerBody() {
   logging::LogContext const ctx_func("LowerToPopartImpl::lowerBody");
-
   for (torch::jit::Node *node : _graph.nodes()) {
     logging::LogContext const ctx("processing " + nodeToString(node));
     // Switch/lookup based on the actual int value.
