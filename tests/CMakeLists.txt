@@ -4,10 +4,8 @@ add_subdirectory(custom_ops)
 if(COPY_TESTS)
   # NOTE: Collapsing the hierarchy like this may cause conflicts.
   file(GLOB TEST_FILES "${CMAKE_CURRENT_SOURCE_DIR}/*.py"
-                       "${CMAKE_CURRENT_SOURCE_DIR}/dispatcher/*.py"
-                       "${CMAKE_CURRENT_SOURCE_DIR}/dispatcher/**/*.py"
                        "${CMAKE_CURRENT_SOURCE_DIR}/gnn/*.py"
-                       "${CMAKE_CURRENT_SOURCE_DIR}/gnn/**/*.py
+                       "${CMAKE_CURRENT_SOURCE_DIR}/gnn/nn/conv/*.py
                        ")
   install(FILES ${TEST_FILES} DESTINATION "${CMAKE_CURRENT_BINARY_DIR}")
   set(TESTS_PATH "${CMAKE_CURRENT_BINARY_DIR}")
