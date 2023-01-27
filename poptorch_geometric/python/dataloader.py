@@ -8,6 +8,7 @@ from torch_geometric.data import Dataset
 
 import poptorch
 from poptorch_geometric.collate import CombinedBatchingCollater
+from poptorch_geometric.pyg_dataloader import DataLoader as PyGDataLoader
 from poptorch_geometric.pyg_dataloader import FixedSizeDataLoader as PyGFixedSizeDataLoader
 from poptorch_geometric.pyg_dataloader import TorchDataLoaderMeta
 from poptorch_geometric.pyg_dataloader import \
@@ -19,6 +20,58 @@ class PopTorchDataLoaderMeta(TorchDataLoaderMeta):
     that uses the `PopTorchDataLoaderMeta` metaclass.
     """
     base_loader = poptorch.DataLoader
+
+
+# pylint: disable=invalid-metaclass
+class DataLoader(PyGDataLoader, metaclass=PopTorchDataLoaderMeta):
+    r"""A data loader which merges data objects from a
+    :class:`torch_geometric.data.Dataset` to a mini-batch.
+    Data objects can be either of type :class:`~torch_geometric.data.Data` or
+    :class:`~torch_geometric.data.HeteroData`.
+
+    Args:
+        dataset (Dataset): The dataset from which to load the data.
+        batch_size (int, optional): How many samples per batch to load.
+            (default: :obj:`1`)
+        shuffle (bool, optional): If set to :obj:`True`, the data will be
+            reshuffled at every epoch. (default: :obj:`False`)
+        follow_batch (List[str], optional): Creates assignment batch
+            vectors for each key in the list. (default: :obj:`None`)
+        exclude_keys (List[str], optional): Will exclude each key in the
+            list. (default: :obj:`None`)
+        options (poptorch.Options, optional): The additional PopTorch options
+            to be passed to :obj:`poptorch.DataLoader`. (default: :obj:`None`)
+        **kwargs (optional): Additional arguments of
+            :class:`poptorch.DataLoader`.
+    """
+
+    def __init__(
+            self,
+            dataset: Dataset,
+            batch_size: int = 1,
+            shuffle: bool = False,
+            follow_batch: Optional[Union[List[str], Tuple[str, ...]]] = None,
+            exclude_keys: Optional[Union[List[str], Tuple[str, ...]]] = None,
+            options: Optional[poptorch.Options] = None,
+            **kwargs,
+    ):
+        self.batch_size = batch_size
+
+        if options is None:
+            options = poptorch.Options()
+
+        super().__init__(dataset=dataset,
+                         batch_size=batch_size,
+                         shuffle=shuffle,
+                         follow_batch=follow_batch,
+                         exclude_keys=exclude_keys,
+                         options=options,
+                         **kwargs)
+
+    def _create_collater(self, **collater_args):
+        base_collater = super()._create_collater(**collater_args)
+        return CombinedBatchingCollater(mini_batch_size=self.batch_size,
+                                        collater=base_collater)
 
 
 # pylint: disable=invalid-metaclass

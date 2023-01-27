@@ -1,13 +1,15 @@
 # Copyright (c) 2022-2023 Graphcore Ltd. All rights reserved.
 # Note: The content of this file is going to be upstreamed to PyG.
-from typing import Dict, Iterable, List, Optional, Tuple, Type, Union
+from typing import Dict, Iterable, List, Optional, Sequence, Tuple, Type, Union
 
 import torch.utils.data
 from torch.utils.data.sampler import Sampler
 from torch_geometric.data import Dataset
+from torch_geometric.data.data import BaseData
 
 from poptorch_geometric.batch_sampler import FixedBatchSampler
 from poptorch_geometric.collate import FixedSizeCollater
+from poptorch_geometric.pyg_collate import Collater
 
 
 class TorchDataLoaderMeta(type):
@@ -50,6 +52,62 @@ class TorchDataLoaderMeta(type):
         new_cls = globals()[name]
 
         return super(TorchDataLoaderMeta, new_cls).__call__(*args, **kwargs)
+
+
+# ==== Copied from PyG and changed to use metaclass, have
+# `_create_collater` method and pass arguments to `__init__`` as keyword ones.
+class DataLoader(metaclass=TorchDataLoaderMeta):
+    r"""A data loader which merges data objects from a
+    :class:`torch_geometric.data.Dataset` to a mini-batch.
+    Data objects can be either of type :class:`~torch_geometric.data.Data` or
+    :class:`~torch_geometric.data.HeteroData`.
+
+    Args:
+        dataset (Dataset): The dataset from which to load the data.
+        batch_size (int, optional): How many samples per batch to load.
+            (default: :obj:`1`)
+        shuffle (bool, optional): If set to :obj:`True`, the data will be
+            reshuffled at every epoch. (default: :obj:`False`)
+        follow_batch (List[str], optional): Creates assignment batch
+            vectors for each key in the list. (default: :obj:`None`)
+        exclude_keys (List[str], optional): Will exclude each key in the
+            list. (default: :obj:`None`)
+        **kwargs (optional): Additional arguments of
+            :class:`torch.utils.data.DataLoader`.
+    """
+
+    def __init__(
+            self,
+            dataset: Union[Dataset, Sequence[BaseData]],
+            batch_size: int = 1,
+            shuffle: bool = False,
+            follow_batch: Optional[List[str]] = None,
+            exclude_keys: Optional[List[str]] = None,
+            **kwargs,
+    ):
+
+        if 'collate_fn' in kwargs:
+            del kwargs['collate_fn']
+
+        # Save for PyTorch Lightning < 1.6:
+        self.follow_batch = follow_batch
+        self.exclude_keys = exclude_keys
+
+        collater = self._create_collater(follow_batch=follow_batch,
+                                         exclude_keys=exclude_keys)
+        super().__init__(
+            dataset=dataset,
+            batch_size=batch_size,
+            shuffle=shuffle,
+            collate_fn=collater,
+            **kwargs,
+        )
+
+    def _create_collater(self, **collater_args):
+        return Collater(**collater_args)
+
+
+# ==== End of copied code
 
 
 class FixedSizeDataLoader(metaclass=TorchDataLoaderMeta):

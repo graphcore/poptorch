@@ -9,11 +9,13 @@ from torch_geometric.datasets import FakeDataset
 import utils
 from poptorch_geometric.batch_sampler import FixedBatchSampler
 from poptorch_geometric.collate import CombinedBatchingCollater, make_exclude_keys
+from poptorch_geometric.dataloader import DataLoader as IPUDataLoader
 from poptorch_geometric.dataloader import FixedSizeDataLoader as IPUFixedSizeDataLoader
 from poptorch_geometric.dataloader import \
     create_fixed_batch_dataloader as ipu_create_fixed_batch_dataloader
+from poptorch_geometric.pad import Pad
 from poptorch_geometric.pyg_collate import Collater
-from poptorch_geometric.pyg_dataloader import (FixedSizeDataLoader,
+from poptorch_geometric.pyg_dataloader import (DataLoader, FixedSizeDataLoader,
                                                TorchDataLoaderMeta,
                                                create_fixed_batch_dataloader)
 from poptorch_geometric.types import PyGArgsParser
@@ -278,3 +280,84 @@ def test_dataloader_produces_fixed_sizes(use_factory, num_edges, num_graphs,
     for data in train_dataloader:
         for attr in attrs:
             assert batch[attr].shape == data[attr].shape
+
+
+def test_dataloader(
+        fake_molecular_dataset,
+        batch_size=10,
+):
+    dataset = fake_molecular_dataset
+    loader = DataLoader(dataset=dataset, batch_size=batch_size)
+
+    for idx, batch in enumerate(loader):
+        assert hasattr(batch, 'batch')
+        assert hasattr(batch, 'ptr')
+
+        # Check that each batch matches the expected size.
+        idx_range = slice(idx * batch_size, (idx + 1) * batch_size)
+        assert batch.num_graphs == batch_size
+        assert batch.num_nodes == sum(d.num_nodes for d in dataset[idx_range])
+        assert batch.num_edges == sum(d.num_edges for d in dataset[idx_range])
+
+        # Split batch to the list of data and compare with the data from the
+        # dataset.
+        data_list = batch.to_data_list()
+        for original, new in zip(dataset[idx_range], data_list):
+
+            assert set(new.keys) == set(original.keys)
+
+            for key in original.keys:
+                if not isinstance(original[key], torch.Tensor):
+                    assert new[key] == original[key]
+                else:
+                    assert torch.all(torch.eq(new[key], original[key]))
+
+
+@pytest.mark.parametrize('device_iterations', [None, 3])
+def test_padded_dataloader(
+        device_iterations,
+        fake_molecular_dataset,
+        batch_size=10,
+):
+    dataset = fake_molecular_dataset[:123]
+    dataset.transform = Pad(max_num_nodes=30, max_num_edges=150)
+
+    options = poptorch.Options()
+    if device_iterations is not None:
+        options.deviceIterations(device_iterations=device_iterations)
+
+    loader = IPUDataLoader(dataset=dataset,
+                           batch_size=batch_size,
+                           options=options)
+
+    # Create PyG's dataloader to compare the created batches.
+    pyg_loader = DataLoader(dataset=dataset, batch_size=batch_size)
+    torch_loader_iter = iter(pyg_loader)
+
+    for idx, batch in enumerate(loader):
+        assert hasattr(batch, 'batch')
+        assert hasattr(batch, 'ptr')
+
+        # Check that each batch matches the expected size.
+        idx_range = slice(idx * batch_size, (idx + 1) * batch_size)
+        assert batch.num_graphs == batch_size
+        assert batch.num_nodes == sum(d.num_nodes for d in dataset[idx_range])
+        assert batch.num_edges == sum(d.num_edges for d in dataset[idx_range])
+
+        num_batches = device_iterations or 1
+
+        for key in batch.keys:
+            if isinstance(batch[key], torch.Tensor):
+                assert batch[key].shape[0] == num_batches
+
+        # Compare batches from PyG's and PopPyG's dataloaders.
+        torch_batches = [next(torch_loader_iter) for _ in range(num_batches)]
+        for b_idx, torch_batch in enumerate(torch_batches):
+            assert set(batch.keys) == set(torch_batch.keys)
+
+            for key in torch_batch.keys:
+                if not isinstance(torch_batch[key], torch.Tensor):
+                    assert batch[key] == torch_batch[key]
+                else:
+                    assert torch.all(
+                        torch.eq(batch[key][b_idx, ], torch_batch[key]))
