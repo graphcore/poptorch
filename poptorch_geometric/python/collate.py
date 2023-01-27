@@ -1,4 +1,4 @@
-# Copyright (c) 2022 Graphcore Ltd. All rights reserved.
+# Copyright (c) 2022-2023 Graphcore Ltd. All rights reserved.
 
 from functools import partial
 from typing import Any, Callable, Dict, Generator, List, Optional, Tuple, Union
@@ -170,6 +170,12 @@ class FixedSizeCollater(Collater):
 
         data = data_list[0]
 
+        if num_pad_graphs == 0 and (num_pad_nodes > 0 or num_pad_edges > 0):
+            raise RuntimeError(
+                f'Requested to pad a batch to {num_all_graphs} graphs but ' \
+                f'collater got a list of {num_real_graphs} graphs and ' \
+                'cannot create additional graphs to pad nodes and edges.')
+
         if num_pad_graphs and (num_pad_nodes > 0 or num_pad_edges > 0):
             # Divide padding nodes and edges evenly between padding graphs.
             pad_nodes_by_graph = _divide_evenly(num_pad_nodes, num_pad_graphs)
@@ -330,7 +336,7 @@ class CombinedBatchingCollater:
 
         assert num_items % mini_batch_size == 0, \
             'Invalid batch size. ' \
-            f'Got {num_items} graphs and' \
+            f'Got {num_items} graphs and ' \
             f'`mini_batch_size={mini_batch_size}`.'
 
         num_mini_batches = num_items // mini_batch_size

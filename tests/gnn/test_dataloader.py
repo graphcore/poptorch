@@ -1,4 +1,4 @@
-# Copyright (c) 2022 Graphcore Ltd. All rights reserved.
+# Copyright (c) 2022-2023 Graphcore Ltd. All rights reserved.
 import pickle
 
 import pytest
@@ -226,11 +226,11 @@ def test_fixed_size_dataloader(
                 batch.batch.size()) == [device_iterations, padded_num_nodes]
             if not use_batch_sampler:
                 assert list(
-                    batch.ptr.size()) == [device_iterations, batch_size + 2]
+                    batch.ptr.size()) == [device_iterations, batch_size + 1]
         else:
             assert list(batch.batch.size()) == [padded_num_nodes]
             if not use_batch_sampler:
-                assert list(batch.ptr.size()) == [batch_size + 2]
+                assert list(batch.ptr.size()) == [batch_size + 1]
 
         sizes_match = all(
             getattr(batch, k).shape[dim] == size
@@ -242,3 +242,39 @@ def test_fixed_size_dataloader(
             pass
 
     benchmark(loop)
+
+
+@pytest.mark.parametrize('use_factory', [True, False])
+@pytest.mark.parametrize('num_edges', [None, 500])
+@pytest.mark.parametrize('num_graphs', [2, 10])
+def test_dataloader_produces_fixed_sizes(use_factory, num_edges, num_graphs,
+                                         fake_molecular_dataset):
+    num_nodes = num_graphs * 30
+    dataset_size = 123
+    dataset = fake_molecular_dataset[:dataset_size]
+
+    if use_factory:
+        train_dataloader = create_fixed_batch_dataloader(
+            dataset,
+            num_nodes=num_nodes,
+            num_graphs=num_graphs,
+            num_edges=num_edges,
+            collater_args={'add_masks_to_batch': True})
+    else:
+        train_dataloader = FixedSizeDataLoader(dataset,
+                                               num_nodes=num_nodes,
+                                               batch_size=num_graphs,
+                                               collater_args={
+                                                   'add_masks_to_batch': True,
+                                                   'num_edges': num_edges,
+                                                   'trim_nodes': True,
+                                                   'trim_edges': True,
+                                               })
+
+    batch = next(iter(train_dataloader))
+    attrs = [
+        attr for attr in batch.keys if isinstance(batch[attr], torch.Tensor)
+    ]
+    for data in train_dataloader:
+        for attr in attrs:
+            assert batch[attr].shape == data[attr].shape

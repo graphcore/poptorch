@@ -1,4 +1,4 @@
-# Copyright (c) 2022 Graphcore Ltd. All rights reserved.
+# Copyright (c) 2022-2023 Graphcore Ltd. All rights reserved.
 # Note: The content of this file is going to be upstreamed to PyG.
 from typing import Dict, Iterable, List, Optional, Tuple, Type, Union
 
@@ -63,7 +63,8 @@ class FixedSizeDataLoader(metaclass=TorchDataLoaderMeta):
         dataset (Dataset): The dataset from which to load the data.
         num_nodes (int): The total number of nodes in the padded batch.
         batch_size (int, optional): The number of samples per batch to load.
-            (default: :obj:`1`)
+            This should be at least :obj:`2` to allow for creating at least
+            one padding graph. (default: :obj:`None`)
         batch_sampler (Sampler, optional): Batch sampler to yield a mini-batch
             of indices. If :obj:`batch_sampler` is specified, the
             :obj:`batch_size` and :obj:`shuffle` arguments do not have any
@@ -84,7 +85,7 @@ class FixedSizeDataLoader(metaclass=TorchDataLoaderMeta):
             self,
             dataset: Dataset,
             num_nodes: int,
-            batch_size: int = 1,
+            batch_size: Optional[int] = None,
             batch_sampler: Optional[Sampler[List[int]]] = None,
             shuffle: bool = False,
             exclude_keys: Optional[Union[List[str], Tuple[str, ...]]] = None,
@@ -100,15 +101,30 @@ class FixedSizeDataLoader(metaclass=TorchDataLoaderMeta):
         collater_args = collater_args if collater_args else {}
         assert ('num_nodes' not in collater_args and
                 'exclude_keys' not in collater_args), \
-            'FixedSizeDataLoader uses arguments `num_nodes` and ' \
+            '`FixedSizeDataLoader` uses arguments `num_nodes` and ' \
             '`exclude_keys` passed directly to the initializer. They should ' \
             'not be included in `collater_args`.'
+
+        if batch_sampler is not None:
+            self.padded_batch_size = batch_sampler.num_graphs
+            # The `torch.DataLoader` class expects batch size to be `1` when
+            # `batch_sampler` is provided.
+            torch_dataloader_batch_size = 1
+            if 'num_edges' not in collater_args:
+                collater_args['num_edges'] = batch_sampler.num_edges
+        else:
+            self.padded_batch_size = batch_size or 2
+            num_real_graphs = self.padded_batch_size - 1
+            torch_dataloader_batch_size = num_real_graphs
+
+        if 'num_graphs' not in collater_args:
+            collater_args['num_graphs'] = self.padded_batch_size
 
         collater = self._create_collater(num_nodes=num_nodes,
                                          exclude_keys=exclude_keys,
                                          **collater_args)
         super().__init__(dataset=dataset,
-                         batch_size=batch_size,
+                         batch_size=torch_dataloader_batch_size,
                          batch_sampler=batch_sampler,
                          shuffle=shuffle,
                          collate_fn=collater,
@@ -122,7 +138,7 @@ def create_fixed_batch_dataloader(
         dataset: Dataset,
         num_nodes: int,
         num_edges: Optional[int] = None,
-        num_graphs: int = 1,
+        num_graphs: int = 2,
         loader_cls: Type[FixedSizeDataLoader] = FixedSizeDataLoader,
         exclude_keys: Optional[Union[List[str], Tuple[str, ...]]] = None,
         collater_args: Optional[Dict[str, Union[int, float]]] = None,
@@ -140,7 +156,8 @@ def create_fixed_batch_dataloader(
         num_edges (int, optional): Number of edges in a batch.
             (default :obj:`None`)
         num_graphs (int, optional): How many graph examples to load in each
-            batch. (default :obj:`1`)
+            batch. This should be at least :obj:`2` to allow for creating at
+            least one padding graph. (default :obj:`2`)
         loader_cls (type, optional): Initialization class for the data loader.
             (default :class:`FixedSizeDataLoader`)
         exclude_keys (list or tuple, optional): Keys to exclude from the

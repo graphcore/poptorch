@@ -1,4 +1,4 @@
-# Copyright (c) 2022 Graphcore Ltd. All rights reserved.
+# Copyright (c) 2022-2023 Graphcore Ltd. All rights reserved.
 from __future__ import annotations  # noqa: F407
 
 from typing import Dict, Iterable, List, Optional, Tuple, Union
@@ -34,7 +34,8 @@ class FixedSizeDataLoader(PyGFixedSizeDataLoader,
         dataset (Dataset): The dataset from which to load the data.
         num_nodes (int): The total number of nodes in the padded batch.
         batch_size (int, optional): The number of samples per batch to load.
-            (default: :obj:`1`)
+            This should be at least :obj:`2` to allow for creating at least
+            one padding graph. (default: :obj:`None`)
         batch_sampler (Sampler, optional): Batch sampler to yield a mini-batch
             of indices. If :obj:`batch_sampler` is specified, the
             :obj:`batch_size` and :obj:`shuffle` arguments do not have any
@@ -57,7 +58,7 @@ class FixedSizeDataLoader(PyGFixedSizeDataLoader,
             self,
             dataset: Dataset,
             num_nodes: int,
-            batch_size: int = 1,
+            batch_size: Optional[int] = None,
             batch_sampler: Optional[Sampler[List[int]]] = None,
             shuffle: bool = False,
             exclude_keys: Optional[Union[List[str], Tuple[str, ...]]] = None,
@@ -65,7 +66,6 @@ class FixedSizeDataLoader(PyGFixedSizeDataLoader,
             options: Optional[poptorch.Options] = None,
             **kwargs,
     ):
-        self.batch_size = batch_size
         self.batch_sampler = batch_sampler
         if options is None:
             # Create IPU default options
@@ -85,7 +85,7 @@ class FixedSizeDataLoader(PyGFixedSizeDataLoader,
         if self.batch_sampler is not None:
             mini_batch_size = None
         else:
-            mini_batch_size = self.batch_size
+            mini_batch_size = self.padded_batch_size - 1
         return CombinedBatchingCollater(mini_batch_size=mini_batch_size,
                                         collater=base_collater)
 
@@ -94,7 +94,7 @@ def create_fixed_batch_dataloader(
         dataset: Dataset,
         num_nodes: int,
         num_edges: Optional[int] = None,
-        num_graphs: int = 1,
+        num_graphs: int = 2,
         options: Optional[poptorch.Options] = None,
         exclude_keys: Optional[Union[List[str], Tuple[str, ...]]] = None,
         collater_args: Optional[Dict[str, Union[int, float]]] = None,
@@ -112,7 +112,8 @@ def create_fixed_batch_dataloader(
         num_edges (int, optional): Number of edges in a batch.
             (default :obj:`None`)
         num_graphs (int, optional): How many graph examples to load in each
-            batch. (default :obj:`1`)
+            batch. This should be at least :obj:`2` to allow for creating at
+            least one padding graph. (default :obj:`2`)
         options (poptorch.Options, optional): The :class:`poptorch.Options`
             used by the :class:`poptorch.DataLoader`. Will use the default
             options if not provided. (default :obj:`None`)

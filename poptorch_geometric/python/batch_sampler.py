@@ -1,4 +1,4 @@
-# Copyright (c) 2022 Graphcore Ltd. All rights reserved.
+# Copyright (c) 2022-2023 Graphcore Ltd. All rights reserved.
 
 from functools import lru_cache
 from typing import Any, Generator, Iterable, Iterator, List, Optional, Union
@@ -119,7 +119,7 @@ class FixedBatchSampler(Sampler[List[int]]):
                     is_data_appendable = False
 
                 if not self.allow_skip_data and not is_data_appendable:
-                    raise RuntimeError(f"Dataset[{idx}] {data} is not  "
+                    raise RuntimeError(f"Dataset[{idx}] {data} is not "
                                        "appendable to empty batch with  "
                                        "following configuration: { number of "
                                        f"graphs: {self.num_graphs}, number of "
