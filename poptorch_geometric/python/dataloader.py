@@ -42,12 +42,15 @@ class FixedSizeDataLoader(PyGFixedSizeDataLoader,
             effect and are omited. (default: :obj:`None`)
         shuffle (bool, optional): If set to :obj:`True`, the data will be
             reshuffled at every epoch. (default: :obj:`False`)
+        follow_batch (list or tuple, optional): Creates assignment batch
+            vectors for each key in the list. (default: :obj:`None`)
         exclude_keys (list or tuple, optional): The keys to exclude from the
             input data object. (default: :obj:`None`)
         collater_args (dict, optional): The additional arguments passed to
             :class:`FixedSizeCollater`. They should not contain
-            :obj:`num_nodes` or :obj:`exclude_keys` as those should be passed
-            directly to the initializer method. (default :obj:`None`)
+            :obj:`num_nodes`, :obj:`follow_batch` and :obj:`exclude_keys` as
+            those should be passed directly to the initializer method.
+            (default :obj:`None`)
         options (poptorch.Options, optional): The additional PopTorch options
             to be passed to :obj:`poptorch.DataLoader`. (default: :obj:`None`)
         **kwargs (optional): The additional arguments of
@@ -61,6 +64,7 @@ class FixedSizeDataLoader(PyGFixedSizeDataLoader,
             batch_size: Optional[int] = None,
             batch_sampler: Optional[Sampler[List[int]]] = None,
             shuffle: bool = False,
+            follow_batch: Optional[Union[List[str], Tuple[str, ...]]] = None,
             exclude_keys: Optional[Union[List[str], Tuple[str, ...]]] = None,
             collater_args: Optional[Dict[str, Union[int, float]]] = None,
             options: Optional[poptorch.Options] = None,
@@ -75,6 +79,7 @@ class FixedSizeDataLoader(PyGFixedSizeDataLoader,
                          batch_size=batch_size,
                          batch_sampler=batch_sampler,
                          shuffle=shuffle,
+                         follow_batch=follow_batch,
                          exclude_keys=exclude_keys,
                          collater_args=collater_args,
                          options=options,
@@ -96,6 +101,7 @@ def create_fixed_batch_dataloader(
         num_edges: Optional[int] = None,
         num_graphs: int = 2,
         options: Optional[poptorch.Options] = None,
+        follow_batch: Optional[Union[List[str], Tuple[str, ...]]] = None,
         exclude_keys: Optional[Union[List[str], Tuple[str, ...]]] = None,
         collater_args: Optional[Dict[str, Union[int, float]]] = None,
         sampler: Optional[Union[Sampler[int], Iterable[int]]] = None,
@@ -117,12 +123,15 @@ def create_fixed_batch_dataloader(
         options (poptorch.Options, optional): The :class:`poptorch.Options`
             used by the :class:`poptorch.DataLoader`. Will use the default
             options if not provided. (default :obj:`None`)
+        follow_batch (list or tuple, optional): Creates assignment batch
+            vectors for each key in the list. (default: :obj:`None`)
         exclude_keys (list or tuple, optional): Keys to exclude from the
             batch. (default :obj:`None`)
         collater_args (dict, optional): The additional arguments passed to
             :class:`FixedSizeCollater`. They should not contain
-            :obj:`num_nodes` or :obj:`exclude_keys` as those should be passed
-            directly to the initializer method. (default :obj:`None`)
+            :obj:`num_nodes`, :obj:`follow_batch` and :obj:`exclude_keys` as
+            those should be passed directly to the initializer method.
+            (default :obj:`None`)
         sampler (Sampler or Iterable, optional): Base sampler. Can be any
             iterable object. (default :obj:`None`)
         allow_skip_data (bool, optional): Allow skip :obj:`data_source` item,
@@ -141,6 +150,7 @@ def create_fixed_batch_dataloader(
                                              num_edges=num_edges,
                                              num_graphs=num_graphs,
                                              loader_cls=FixedSizeDataLoader,
+                                             follow_batch=follow_batch,
                                              exclude_keys=exclude_keys,
                                              collater_args=collater_args,
                                              sampler=sampler,

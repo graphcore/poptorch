@@ -71,12 +71,15 @@ class FixedSizeDataLoader(metaclass=TorchDataLoaderMeta):
             effect and are omited. (default: :obj:`None`)
         shuffle (bool, optional): If set to :obj:`True`, the data will be
             reshuffled at every epoch. (default: :obj:`False`)
+        follow_batch (list or tuple, optional): Creates assignment batch
+            vectors for each key in the list. (default: :obj:`None`)
         exclude_keys (list or tuple, optional): The keys to exclude from the
             input data object. (default: :obj:`None`)
         collater_args (dict, optional): The additional arguments passed to
             :class:`FixedSizeCollater`. They should not contain
-            :obj:`num_nodes` or :obj:`exclude_keys` as those should be passed
-            directly to the initializer method. (default :obj:`None`)
+            :obj:`num_nodes`, :obj:`follow_batch` and :obj:`exclude_keys` as
+            those should be passed directly to the initializer method.
+            (default :obj:`None`)
         **kwargs (optional): The additional arguments of
             :class:`torch.utils.data.DataLoader`.
     """
@@ -88,6 +91,7 @@ class FixedSizeDataLoader(metaclass=TorchDataLoaderMeta):
             batch_size: Optional[int] = None,
             batch_sampler: Optional[Sampler[List[int]]] = None,
             shuffle: bool = False,
+            follow_batch: Optional[Union[List[str], Tuple[str, ...]]] = None,
             exclude_keys: Optional[Union[List[str], Tuple[str, ...]]] = None,
             collater_args: Optional[Dict[str, Union[int, float]]] = None,
             **kwargs,
@@ -99,11 +103,13 @@ class FixedSizeDataLoader(metaclass=TorchDataLoaderMeta):
             'to specify collater manually.'
 
         collater_args = collater_args if collater_args else {}
-        assert ('num_nodes' not in collater_args and
-                'exclude_keys' not in collater_args), \
-            '`FixedSizeDataLoader` uses arguments `num_nodes` and ' \
-            '`exclude_keys` passed directly to the initializer. They should ' \
-            'not be included in `collater_args`.'
+        not_in_collater_args = {'num_nodes', 'follow_batch', 'exclude_keys'}
+        invalid_collater_args = not_in_collater_args.intersection(
+            set(collater_args))
+        assert not invalid_collater_args, \
+            '`FixedSizeDataLoader` uses arguments: ' \
+            f'{", ".join(invalid_collater_args)} passed directly to the ' \
+            'initializer. They should not be included in `collater_args`.'
 
         if batch_sampler is not None:
             self.padded_batch_size = batch_sampler.num_graphs
@@ -121,6 +127,7 @@ class FixedSizeDataLoader(metaclass=TorchDataLoaderMeta):
             collater_args['num_graphs'] = self.padded_batch_size
 
         collater = self._create_collater(num_nodes=num_nodes,
+                                         follow_batch=follow_batch,
                                          exclude_keys=exclude_keys,
                                          **collater_args)
         super().__init__(dataset=dataset,
@@ -140,6 +147,7 @@ def create_fixed_batch_dataloader(
         num_edges: Optional[int] = None,
         num_graphs: int = 2,
         loader_cls: Type[FixedSizeDataLoader] = FixedSizeDataLoader,
+        follow_batch: Optional[Union[List[str], Tuple[str, ...]]] = None,
         exclude_keys: Optional[Union[List[str], Tuple[str, ...]]] = None,
         collater_args: Optional[Dict[str, Union[int, float]]] = None,
         sampler: Optional[Union[Sampler[int], Iterable[int]]] = None,
@@ -160,12 +168,15 @@ def create_fixed_batch_dataloader(
             least one padding graph. (default :obj:`2`)
         loader_cls (type, optional): Initialization class for the data loader.
             (default :class:`FixedSizeDataLoader`)
+        follow_batch (list or tuple, optional): Creates assignment batch
+            vectors for each key in the list. (default: :obj:`None`)
         exclude_keys (list or tuple, optional): Keys to exclude from the
             batch. (default :obj:`None`)
         collater_args (dict, optional): The additional arguments passed to
             :class:`FixedSizeCollater`. They should not contain
-            :obj:`num_nodes` or :obj:`exclude_keys` as those should be passed
-            directly to the initializer method. (default :obj:`None`)
+            :obj:`num_nodes`, :obj:`follow_batch` and :obj:`exclude_keys` as
+            those should be passed directly to the initializer method.
+            (default :obj:`None`)
         sampler (Sampler or Iterable, optional): Base sampler. Can be any
             iterable object. (default :obj:`None`)
         allow_skip_data (bool, optional): Allow skip :obj:`data_source` item,
@@ -190,6 +201,7 @@ def create_fixed_batch_dataloader(
     return loader_cls(dataset=dataset,
                       num_nodes=num_nodes,
                       batch_sampler=batch_sampler,
+                      follow_batch=follow_batch,
                       exclude_keys=exclude_keys,
                       collater_args=collater_args,
                       **kwargs)
