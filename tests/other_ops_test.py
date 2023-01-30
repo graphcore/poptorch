@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 
+import json
 import re
 
 import torch
@@ -22,6 +23,14 @@ params_einsum = [
 ]
 
 
+def default_assert_fn(native_out, poptorch_out):
+    if isinstance(native_out, tuple):
+        for native, pop in zip(native_out, poptorch_out):
+            helpers.assert_allclose(expected=native, actual=pop)
+    else:
+        helpers.assert_allclose(expected=native_out, actual=poptorch_out)
+
+
 def op_harness(op, *inputs, assert_fn=None, out_fn=None):
     model = helpers.ModelWithWeights(op, inputs[0].shape, out_fn=out_fn)
     poptorch_model = poptorch.trainingModel(model)
@@ -33,20 +42,15 @@ def op_harness(op, *inputs, assert_fn=None, out_fn=None):
     poptorch_out, _ = poptorch_model(inputs)
 
     if assert_fn is None:
-
-        def assert_fn(native_out, poptorch_out):
-            if isinstance(native_out, tuple):
-                for native, pop in zip(native_out, poptorch_out):
-                    helpers.assert_allclose(expected=native, actual=pop)
-            else:
-                helpers.assert_allclose(expected=native_out,
-                                        actual=poptorch_out)
+        assert_fn = default_assert_fn
 
     # Inference test - check outputs
     assert_fn(native_out, poptorch_out)
 
     # Training test - check weights changed
     poptorch_model.assert_weights_changed()
+
+    return model, poptorch_model
 
 
 @pytest.mark.parametrize("params", params_einsum)
@@ -181,6 +185,89 @@ def test_scatter_reduce(dim, reduce, include_self):
     inp = torch.randn(sz)
     index = torch.randint_like(src, high=dim_size).long()
     op_harness(Model(dim, reduce, include_self), inp, index, src)
+
+
+@pytest.mark.parametrize("reduce", ['sum', 'amin', 'amax', 'mean', 'prod'])
+@pytest.mark.parametrize("include_self", [True, False])
+def test_scatter_reduce_fusable(reduce, include_self):
+    dim = 0
+    torch.manual_seed(42)
+
+    class Model(torch.nn.Module):
+        def __init__(self, dim, reduce, include_self):
+            super().__init__()
+            self.dim = dim
+            self.reduce = reduce
+            self.include_self = include_self
+
+        def forward(self, inp, index, src):
+            output = []
+            for i in range(3):
+                output.append(
+                    inp.scatter_reduce(self.dim,
+                                       index,
+                                       src[i],
+                                       reduce=self.reduce,
+                                       include_self=self.include_self))
+            return torch.cat(output, dim=1)
+
+    src = [torch.randn(8, 16) for i in range(3)]
+    inp = torch.randn(torch.Size([4, 16]))
+    index = torch.randint_like(src[0], high=4).long()
+    _, poptorch_model = op_harness(Model(dim, reduce, include_self), inp,
+                                   index, src)
+
+    all_ops = json.loads(poptorch_model._debugGetPopartIR())['maingraph']  # pylint: disable=protected-access
+    scatter_reduce_ops = [
+        op for op in all_ops if op['type'] == 'ScatterReduce'
+    ]
+
+    expected_scatter_len = 1 if include_self else 2
+    assert len(scatter_reduce_ops) == expected_scatter_len
+    expected_group_size = 6 if reduce == 'mean' else 3
+    assert int(scatter_reduce_ops[0]['attributes']
+               ['group_size']) == expected_group_size
+
+
+@pytest.mark.parametrize("reduce", ['sum', 'amin', 'amax', 'mean', 'prod'])
+@pytest.mark.parametrize("include_self", [True, False])
+def test_scatter_reduce_should_not_apply_grouped_fuse(reduce, include_self):
+    dim = 0
+    torch.manual_seed(42)
+    num_scatters = 3
+
+    class Model(torch.nn.Module):
+        def __init__(self, dim, reduce, include_self, num_scatters):
+            super().__init__()
+            self.dim = dim
+            self.reduce = reduce
+            self.include_self = include_self
+            self.num_scatters = num_scatters
+
+        def forward(self, inp, index, src):
+            output = []
+            for i in range(self.num_scatters):
+                output.append(inp[i].scatter_reduce(
+                    self.dim,
+                    index,
+                    src[i],
+                    reduce=self.reduce,
+                    include_self=self.include_self))
+            return torch.cat(output, dim=1)
+
+    src = [torch.randn(8, 16 + i) for i in range(num_scatters)]
+    inp = [torch.randn(torch.Size([8, 16 + i])) for i in range(num_scatters)]
+    index = torch.randint(low=0, high=8, size=[8, 1]).long()
+    model = Model(dim, reduce, include_self, num_scatters)
+    poptorch_model = poptorch.inferenceModel(model)
+    poptorch_model.compile(inp, index, src)
+
+    all_ops = json.loads(poptorch_model._debugGetPopartIR())['maingraph']  # pylint: disable=protected-access
+    scatter_reduce_ops = [
+        op for op in all_ops if op['type'] == 'ScatterReduce'
+    ]
+
+    assert len(scatter_reduce_ops) >= 3
 
 
 @pytest.mark.parametrize("dim", range(-3, 3))

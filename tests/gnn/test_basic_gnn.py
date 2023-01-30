@@ -1,4 +1,6 @@
 # Copyright (c) 2022 Graphcore Ltd. All rights reserved.
+import unittest.mock
+
 import pytest
 import torch
 import torch.nn.functional as F
@@ -9,6 +11,7 @@ from torch_geometric.transforms import Compose, GCNNorm, NormalizeFeatures
 from torch_geometric.utils import degree
 from torch_scatter import scatter_add
 
+import helpers
 from poptorch_geometric import TrainingStepper, set_aggregation_dim_size
 
 
@@ -113,8 +116,8 @@ def test_node_classification_PNA(data):
     node_classification_harness(gnn, data, num_steps=1)
 
 
+@unittest.mock.patch.dict("os.environ", helpers.disableSmallModel())
 @pytest.mark.parametrize('act', [torch.nn.ReLU(), torch.relu_])
-@pytest.mark.skip(reason="Known issue. Unblock when AFS-87 will be completed.")
 def test_node_classification_EdgeCNN(data, act):
     if act == torch.relu_:
         # TODO: enable testing with the inplace relu_ op when this is supported

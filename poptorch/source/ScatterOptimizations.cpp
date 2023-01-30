@@ -1,8 +1,10 @@
 // Copyright (c) 2022 Graphcore Ltd. All rights reserved.
+#include <map>
 #include <queue>
 #include <torch/csrc/jit/ir/ir.h>
 #include <unordered_map>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 #include "popart_canonicalization/PopartCanonicalizationUtils.hpp"
@@ -40,7 +42,7 @@ void removeScatterAddIndexExpansion(torch::jit::Graph *graph) {
 
     auto *src = node->input(3);
     auto *original_index = index_producer->input(0);
-    auto expanded_index_shape = shapeFromTensor(index);
+    const auto expanded_index_shape = shapeFromTensor(index);
 
     // Make sure removal is valid
     if (index->uses().size() > 1 ||
@@ -64,27 +66,29 @@ torch::jit::Node *applyScatter(torch::jit::Graph *graph,
                                torch::jit::Node *node_with_attributes,
                                const std::vector<torch::jit::Value *> &inputs,
                                int64_t num_scatters) {
-  auto axis_size = node_with_attributes->i(c10::Symbol::attr("axis_size"));
-  auto old_axis = node_with_attributes->i(c10::Symbol::attr("axis"));
-  auto reduction = node_with_attributes->i(c10::Symbol::attr("reduction"));
+  const auto axis_size =
+      node_with_attributes->i(c10::Symbol::attr("axis_size"));
+  const auto old_axis = node_with_attributes->i(c10::Symbol::attr("axis"));
+  const auto reduction =
+      node_with_attributes->i(c10::Symbol::attr("reduction"));
   return createGroupedscatterreduce(graph, inputs, axis_size, old_axis + 1,
                                     reduction, num_scatters);
 }
 
 torch::jit::Node *mergeSet(torch::jit::Graph *graph,
-                           torch::jit::node_list &scatters) {
+                           torch::jit::node_list &scatters, bool with_update) {
   std::unordered_map<torch::jit::Value *, torch::jit::Node *> srcs;
   std::unordered_set<torch::jit::Node *> to_destroy;
 
-  bool with_update = scatters[0]->inputs().size() == 3;
   auto *last_scatter = scatters[0];
-  srcs.insert({last_scatter->input(0), last_scatter});
+  srcs.emplace(last_scatter->input(0), last_scatter);
   for (size_t i = 1; i < scatters.size(); i++) {
     auto *scatter = scatters[i];
     // If encountered, remove the repetition.
-    if (srcs.find(scatter->input(0)) != srcs.end()) {
+    if (auto input0_it = srcs.find(scatter->input(0));
+        input0_it != srcs.end()) {
       // Check with second input.
-      auto *scatter_with_same_input0 = srcs[scatter->input(0)];
+      auto *scatter_with_same_input0 = input0_it->second;
       bool is_repetition =
           scatter->input(1) == scatter_with_same_input0->input(1);
       if (with_update) {
@@ -93,13 +97,13 @@ torch::jit::Node *mergeSet(torch::jit::Graph *graph,
       }
 
       if (is_repetition) {
-        replaceOutputUse(scatter->output(), srcs[scatter->input(0)]->output());
+        replaceOutputUse(scatter->output(), scatter_with_same_input0->output());
         to_destroy.insert(scatter);
         scatters.erase(scatters.begin() + i);
         i--;
       }
     } else {
-      srcs.insert({scatter->input(0), scatter});
+      srcs.emplace(scatter->input(0), scatter);
       // Find last scatter to execute. This should be insert point for grouped
       // scatter.
       if (last_scatter->isBefore(scatter)) {
@@ -108,8 +112,8 @@ torch::jit::Node *mergeSet(torch::jit::Graph *graph,
     }
   }
 
-  auto insert_outputs_users = [](torch::jit::Node *node_to_process,
-                                 std::queue<torch::jit::Node *> &queue) {
+  const auto insert_outputs_users = [](torch::jit::Node *node_to_process,
+                                       std::queue<torch::jit::Node *> &queue) {
     for (auto *output : node_to_process->outputs()) {
       for (const auto &use : output->uses()) {
         const auto &user = use.user;
@@ -168,17 +172,17 @@ torch::jit::Node *mergeSet(torch::jit::Graph *graph,
           createUnsqueeze(graph, {inputs2_scat[i]}, {0})->output();
     }
   }
-  auto *concat0 = createConcat(graph, inputs0_scat, 0)->output();
-  auto *concat1 = createConcat(graph, inputs1_scat, 0)->output();
-  torch::jit::Value *concat2;
+
+  std::vector<torch::jit::Value *> args;
+  args.reserve(3);
+
+  args.push_back(createConcat(graph, inputs0_scat, 0)->output());
+  args.push_back(createConcat(graph, inputs1_scat, 0)->output());
+
   if (with_update) {
-    concat2 = createConcat(graph, inputs2_scat, 0)->output();
+    args.push_back(createConcat(graph, inputs2_scat, 0)->output());
   }
 
-  std::vector<torch::jit::Value *> args{concat0, concat1};
-  if (with_update) {
-    args.push_back(concat2);
-  }
   auto *grouped_scatter = applyScatter(graph, scatters[0], args, num_scatters);
 
   for (int64_t i = 0; i < num_scatters; i++) {
@@ -199,52 +203,37 @@ torch::jit::Node *mergeSet(torch::jit::Graph *graph,
 }
 
 torch::jit::node_list dispatchScatters(torch::jit::Graph *graph,
-                                       torch::jit::node_list &scatters) {
+                                       torch::jit::node_list &scatters,
+                                       bool with_update) {
+  using Shape = std::vector<std::int64_t /*dim*/>;
+  using Group = std::tuple<std::int64_t /*axis*/, Shape /*index*/,
+                           Shape /*src*/, Shape /*self*/>;
 
-  // Separate the scatters by their shape (converted to string).
-  std::unordered_map<std::string, torch::jit::node_list> sets_by_ind;
-  for (auto *scatter : scatters) {
-    auto ind_shape = shapeFromTensor(scatter->input(1));
+  std::map<Group, torch::jit::node_list> group_to_merge_candidates;
 
-    std::ostringstream shape_str_stream;
-    std::copy(ind_shape.begin(), ind_shape.end(),
-              std::ostream_iterator<int>(shape_str_stream, " "));
-    const std::string &shape_str = shape_str_stream.str();
+  for (torch::jit::Node *scatter_node : scatters) {
 
-    if (sets_by_ind.find(shape_str) == sets_by_ind.end()) {
-      sets_by_ind.insert({shape_str, {scatter}});
-    } else {
-      sets_by_ind[shape_str].push_back(scatter);
-    }
+    const std::int64_t axis = scatter_node->i(c10::Symbol::attr("axis"));
+    const Shape src_shape = shapeFromTensor(scatter_node->input(0));
+    const Shape index_shape = shapeFromTensor(scatter_node->input(1));
+    const Shape self_shape =
+        with_update ? shapeFromTensor(scatter_node->input(2)) : Shape{};
+
+    const Group key{axis, index_shape, src_shape, self_shape};
+    group_to_merge_candidates[key].push_back(scatter_node);
   }
 
   torch::jit::node_list grouped_scatters;
-  for (auto &it_by_ind : sets_by_ind) {
-    auto &set_by_ind = it_by_ind.second;
+  for (auto &&[_, merge_candidates] : group_to_merge_candidates) {
 
-    // Separate the scatters by their axis attribute.
-    std::unordered_map<int, torch::jit::node_list> sets_by_axis;
-    for (auto *scatter_by_ind : set_by_ind) {
-      const auto axis = scatter_by_ind->i(c10::Symbol::attr("axis"));
-      if (sets_by_axis.find(axis) == sets_by_axis.end()) {
-        sets_by_axis.insert({axis, {scatter_by_ind}});
-      } else {
-        sets_by_axis[axis].push_back(scatter_by_ind);
-      }
-    }
-
-    // Merge sets.
-    for (auto &it_by_axis : sets_by_axis) {
-      auto &set_by_axis = it_by_axis.second;
-      if (set_by_axis.size() > 1) {
-        auto *grouped_scatter = mergeSet(graph, set_by_axis);
-        grouped_scatters.push_back(grouped_scatter);
-      } else {
-        grouped_scatters.push_back(set_by_axis[0]);
-      }
+    if (merge_candidates.size() > 1) {
+      grouped_scatters.push_back(
+          mergeSet(graph, merge_candidates, with_update));
+    } else {
+      grouped_scatters.push_back(merge_candidates.front());
     }
   }
-  // Return grouped scatters.
+
   return grouped_scatters;
 }
 
@@ -258,7 +247,6 @@ torch::jit::node_list dispatchScatters(torch::jit::Graph *graph,
  */
 void fuseScatters(torch::jit::Graph *graph) {
   logging::LogContext const ctx{"fuseScatters"};
-  constexpr int num_reductions = 6; // add, min, max, mul, none, mean
 
   // Queue contains fully reached nodes.
   std::queue<torch::jit::Node *> queue;
@@ -282,41 +270,41 @@ void fuseScatters(torch::jit::Graph *graph) {
 
   // The unordered_map elements represent the number of times the node was
   // reached.
-  std::unordered_map<torch::jit::Node *, std::size_t> occurs;
+  std::unordered_map<torch::jit::Node *, std::size_t> node_num_visited_inputs;
   // The unordered_set elements mean that children have been added to the queue.
   // std::unordered_set<torch::jit::Node *> visited;
-  // Divide the scatters according to the type of reduction, types and whether
-  // an update is used.
-  torch::jit::node_list scatters[num_reductions][at::NumScalarTypes]
-                                [2 /*with_update*/];
+
+  using ScatterKind =
+      std::tuple<std::int64_t /*reduction*/, at::ScalarType /*input_type*/,
+                 bool /*with_update*/>;
+  std::map<ScatterKind, torch::jit::node_list> scatters;
+
   std::size_t num_scatters_in_queue = 0;
 
   // Lambda to add the children of the vertex.
-  auto add_children_to_queue = [&](torch::jit::Node *node) {
-    for (auto *output : node->outputs()) {
-      for (const auto &use : output->uses()) {
-        const auto &user = use.user;
-        if (occurs.find(user) != occurs.end()) {
-          occurs[user]++;
-        } else {
-          occurs[user] = 1;
-        }
+  const auto add_children_to_queue = [&](const torch::jit::Node *node) {
+    for (const torch::jit::Value *output : node->outputs()) {
+      for (const torch::jit::Use &use : output->uses()) {
+        torch::jit::Node *user = use.user;
+        const auto num_user_inputs = user->inputs().size();
 
-        if (occurs[user] == user->inputs().size()) {
+        auto &num_user_visited_inputs = node_num_visited_inputs[user];
+        ++num_user_visited_inputs;
+
+        if (num_user_visited_inputs == num_user_inputs) {
           queue.push(user);
-          const torch::jit::Symbol user_kind = user->kind();
-          if (user_kind == symbols::popart::scatterreduce) {
-            num_scatters_in_queue++;
-            const auto reduction = user->i(c10::Symbol::attr("reduction"));
-            const auto input_type = *user->input(0)
-                                         ->type()
-                                         ->expect<c10::TensorType>()
-                                         ->scalarType();
-            // ScalarType is enum of int8_t.
-            const auto input_type_idx = static_cast<int8_t>(input_type);
-            const int with_update =
-                static_cast<int>(user->inputs().size() == 3);
-            scatters[reduction][input_type_idx][with_update].push_back(user);
+          if (user->kind() == symbols::popart::scatterreduce) {
+            ++num_scatters_in_queue;
+            const std::int64_t reduction =
+                user->i(c10::Symbol::attr("reduction"));
+            const at::ScalarType input_type = *user->input(0)
+                                                   ->type()
+                                                   ->expect<c10::TensorType>()
+                                                   ->scalarType();
+
+            const bool with_update = num_user_inputs == 3;
+            const ScatterKind key{reduction, input_type, with_update};
+            scatters[key].push_back(user);
           }
         }
       }
@@ -342,22 +330,19 @@ void fuseScatters(torch::jit::Graph *graph) {
       num_scatters_in_queue = 0;
 
       // Merge scatters that have been encountered twice.
-      for (auto &scatter_set_by_reduction : scatters) {
-        for (auto &scatter_set_by_type : scatter_set_by_reduction) {
-          for (auto &scatter_set : scatter_set_by_type) {
-            if (scatter_set.size() > 1) {
-              const auto &grouped_scatters =
-                  dispatchScatters(graph, scatter_set);
-              for (auto *grouped_scatter : grouped_scatters) {
-                add_children_to_queue(grouped_scatter);
-              }
-            } else if (scatter_set.size() == 1) {
-              add_children_to_queue(scatter_set[0]);
-            }
-            scatter_set.clear();
+      for (auto &&[scatter_kind, scatter_vec] : scatters) {
+        if (scatter_vec.size() > 1) {
+          const bool with_update = std::get<bool>(scatter_kind);
+          const auto &merged_scatters =
+              dispatchScatters(graph, scatter_vec, with_update);
+          for (torch::jit::Node *scatter_node : merged_scatters) {
+            add_children_to_queue(scatter_node);
           }
+        } else {
+          add_children_to_queue(scatter_vec.front());
         }
       }
+      scatters.clear();
     }
   }
 }
