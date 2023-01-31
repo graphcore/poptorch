@@ -56,7 +56,7 @@ def node_classification_harness(gnn,
     stepper.run(num_steps, batch)
 
 
-@pytest.mark.skip(reason="Known issue. Unblock when AFS-88 will be completed.")
+@unittest.mock.patch.dict("os.environ", helpers.disableSmallModel())
 def test_node_classification_GCN(data):
     gnn = GCN(in_channels=data.num_node_features,
               hidden_channels=32,
@@ -67,7 +67,7 @@ def test_node_classification_GCN(data):
     node_classification_harness(gnn, data)
 
 
-@pytest.mark.skip(reason="Known issue. Unblock when AFS-88 will be completed.")
+@unittest.mock.patch.dict("os.environ", helpers.disableSmallModel())
 def test_node_classification_GraphSAGE(data):
     gnn = GraphSAGE(in_channels=data.num_node_features,
                     hidden_channels=32,
@@ -77,7 +77,7 @@ def test_node_classification_GraphSAGE(data):
     node_classification_harness(gnn, data, atol=1e-3, rtol=1e-2)
 
 
-@pytest.mark.skip(reason="Known issue. Unblock when AFS-88 will be completed.")
+@unittest.mock.patch.dict("os.environ", helpers.disableSmallModel())
 def test_node_classification_GIN(data):
     gnn = GIN(in_channels=data.num_node_features,
               hidden_channels=32,
@@ -87,7 +87,7 @@ def test_node_classification_GIN(data):
     node_classification_harness(gnn, data)
 
 
-@pytest.mark.skip(reason="Known issue. Unblock when AFS-88 will be completed.")
+@unittest.mock.patch.dict("os.environ", helpers.disableSmallModel())
 def test_node_classification_GAT(data):
     gnn = GAT(in_channels=data.num_node_features,
               hidden_channels=32,
@@ -98,6 +98,7 @@ def test_node_classification_GAT(data):
     node_classification_harness(gnn, data)
 
 
+@unittest.mock.patch.dict("os.environ", helpers.disableSmallModel())
 @pytest.mark.skip(reason="Known issue. Unblock when AFS-88 will be completed.")
 def test_node_classification_PNA(data):
     # Calculate the in-degree histogram
