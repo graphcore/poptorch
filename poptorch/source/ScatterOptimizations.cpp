@@ -225,6 +225,7 @@ torch::jit::node_list dispatchScatters(torch::jit::Graph *graph,
 
   torch::jit::node_list grouped_scatters;
   for (auto &&[_, merge_candidates] : group_to_merge_candidates) {
+    UNUSED(_);
 
     if (merge_candidates.size() > 1) {
       grouped_scatters.push_back(
