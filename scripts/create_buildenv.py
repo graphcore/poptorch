@@ -512,7 +512,15 @@ class BuildenvManager:
                             "https://repo.anaconda.com/miniconda/ and save it "
                             f"as ${installer}")
                     arch_type = _utils.get_arch_type()
-                    url = f"https://repo.anaconda.com/miniconda/Miniconda3-latest-{conda_os}-{arch_type}.sh"
+                    # Use Conda 4.12 instead of "latest" while we wait for
+                    # https://github.com/conda/conda/issues/12250 to be fixed.
+                    # (Issue with paths > 128 characters)
+                    # Note: py38 only refers to the self-contained version of
+                    # python used by Conda, it is not a system requirement
+                    # and does not affect the python version inside the
+                    # buildenv.
+                    url = ("https://repo.anaconda.com/miniconda/"
+                           f"Miniconda3-py38_4.12.0-{conda_os}-{arch_type}.sh")
                     urllib.request.urlretrieve(url, installer)
                 _utils.rmdir_if_exists(miniconda_install_dir)
                 _utils.run_commands(
