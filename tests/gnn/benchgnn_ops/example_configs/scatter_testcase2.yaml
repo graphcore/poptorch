@@ -1,0 +1,5 @@
+scatter:
+  src_shape: [1,12]
+  input_shape: [1,12]
+  index_shape: [1,12]
+  dim: 0
