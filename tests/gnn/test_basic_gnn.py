@@ -99,7 +99,6 @@ def test_node_classification_GAT(data):
 
 
 @unittest.mock.patch.dict("os.environ", helpers.disableSmallModel())
-@pytest.mark.skip(reason="Known issue. Unblock when AFS-88 will be completed.")
 def test_node_classification_PNA(data):
     # Calculate the in-degree histogram
     deg = degree(data.edge_index[1]).long()
