@@ -723,12 +723,15 @@ def test_no_inputs_no_output():
     class Model(torch.nn.Module):
         def __init__(self):
             super().__init__()
-            self.x = torch.tensor([1.], dtype=torch.float)
+            self.x = torch.tensor([1.],
+                                  dtype=torch.float,
+                                  device=helpers.get_device())
 
         def forward(self):
             self.x += self.x
 
     model = Model()
+    helpers.set_device_ipu()
     poptorch_model = poptorch.inferenceModel(model)
     poptorch_model()
     poptorch_model()
@@ -737,10 +740,11 @@ def test_no_inputs_no_output():
 def test_return_and_use_input():
     class Model(torch.nn.Module):
         def forward(self, input):
-            c = torch.tensor([1.])
+            c = torch.tensor([1.], device=helpers.get_device())
             return c, input + c
 
     model = Model()
+    helpers.set_device_ipu()
     poptorch_model = poptorch.inferenceModel(model)
     assert poptorch_model(torch.tensor([0.])) == (torch.tensor([1.]),
                                                   torch.tensor([1.]))
@@ -751,13 +755,14 @@ def test_return_and_use_input():
 def test_return_and_use_nested_input():
     class Model(torch.nn.Module):
         def forward(self, input):
-            c = torch.tensor([1.])
+            c = torch.tensor([1.], device=helpers.get_device())
 
             c = poptorch.set_available_memory(c, 0.1)
 
             return c, (c, input + c)
 
     model = Model()
+    helpers.set_device_ipu()
     poptorch_model = poptorch.inferenceModel(model)
     assert poptorch_model(torch.tensor([0.])) == (torch.tensor([1.]),
                                                   (torch.tensor([1.]),

@@ -173,6 +173,10 @@ passing in the updated optimizer.
    for performance/memory savings and allow you to specify additional parameters such as loss scaling and velocity scaling.
    See :numref:`optimizers` for more information.
 
+.. note:: If your model creates a tensor explicitly, its ``device`` has to be defined.
+   The default tensor ``device`` is CPU. If your model creates a tensor internally, its ``device`` has to be explicitly set up.
+   To override this default behavior and force all model tensors to become IPU tensors (without a need to explicitly specify their ``device`` parameters), you may use the option ``forceAllTensorsDeviceToIpu`` from :py:class:`~poptorch.Options`.
+
 Going further
 =============
 

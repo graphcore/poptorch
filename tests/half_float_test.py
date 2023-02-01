@@ -8,9 +8,11 @@ import poptorch
 
 
 def assert_same_type(inputs, model):
+    helpers.set_device_cpu()
     native_out = model(inputs)
 
     pop_model = poptorch.inferenceModel(model)
+    helpers.set_device_ipu()
     pop_out = pop_model(inputs)
 
     assert native_out.dtype == pop_out.dtype
@@ -29,6 +31,7 @@ def type_out_harness(inputs, forward_op):
 ## Ones and Zeros tests ##
 
 ones_zeros = [torch.ones, torch.zeros]
+
 
 @pytest.mark.parametrize("op", ones_zeros)
 def test_ones_zeros_default_resolved(op):
@@ -156,7 +159,10 @@ def test_distributions_uniform():
     def fw_op(input_low):
         torch.manual_seed(42)
         ud = torch.distributions.uniform.Uniform(
-            input_low, torch.tensor([10.0], dtype=torch.float32))
+            input_low,
+            torch.tensor([10.0],
+                         dtype=torch.float32,
+                         device=helpers.get_device()))
         return ud.sample((10, 10, 1000))
 
     type_out_harness(torch.tensor([1], dtype=torch.float16), fw_op)
@@ -223,7 +229,8 @@ def test_normal_correctly_resolved():
 # The output will always be the same as the
 def test_constant_correctly_resolved():
     def fw_op(input):
-        return torch.tensor([1, 2, 3], dtype=input.dtype) + input
+        return torch.tensor(
+            [1, 2, 3], dtype=input.dtype, device=helpers.get_device()) + input
 
     type_out_harness(torch.tensor([3, 4, 8], dtype=torch.float16), fw_op)
     type_out_harness(torch.tensor([3, 4, 8], dtype=torch.float32), fw_op)
@@ -233,8 +240,9 @@ def test_constant_correctly_resolved():
 # The output will always be float 16.
 def test_constant_add_float16():
     def fw_op(input):
-        return torch.tensor([1, 2, 3], dtype=input.dtype) + input.to(
-            torch.float16)
+        return torch.tensor(
+            [1, 2, 3], dtype=input.dtype,
+            device=helpers.get_device()) + input.to(torch.float16)
 
     type_out_harness(torch.tensor([3, 4, 8], dtype=torch.float16), fw_op)
     type_out_harness(torch.tensor([3, 4, 8], dtype=torch.float32), fw_op)
@@ -242,7 +250,9 @@ def test_constant_add_float16():
 
 def test_constant_always_float32():
     def fw_op(input):
-        return torch.tensor([1, 2, 3], dtype=torch.float32) + input
+        return torch.tensor([1, 2, 3],
+                            dtype=torch.float32,
+                            device=helpers.get_device()) + input
 
     type_out_harness(torch.tensor([3, 4, 8], dtype=torch.float16), fw_op)
     type_out_harness(torch.tensor([3, 4, 8], dtype=torch.float32), fw_op)

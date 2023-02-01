@@ -176,6 +176,7 @@ def op_harness(op,
 
         # Run on CPU.
         if native_out is None:
+            helpers.set_device_cpu()
             native_out, op_raises_exception = exception_catcher(model, inputs)
 
             # native_out could be an alias of the input and so modified by
@@ -194,6 +195,7 @@ def op_harness(op,
 
         # Run on IPU.
         poptorch_model = poptorch.trainingModel(model, options=options)
+        helpers.set_device_ipu()
         poptorch_out, ipu_raises = exception_catcher(
             poptorch_model, inputs, can_raise_exception=op_raises_exception)
 
@@ -221,6 +223,7 @@ def op_harness(op,
 
         poptorch_model = poptorch.inferenceModel(model, options)
         # Run on IPU.
+        helpers.set_device_ipu()
         poptorch_out, ipu_raises = exception_catcher(
             poptorch_model, *inputs, can_raise_exception=op_raises_exception)
 
@@ -835,7 +838,8 @@ def test_masked_fill(input_shapes, value):
     class Model(torch.nn.Module):
         def forward(self, x):
             fill_result = x.masked_fill(x > 0.5, value)
-            where_result = torch.where(x > 0.5, x, torch.tensor(value))
+            where_result = torch.where(
+                x > 0.5, x, torch.tensor(value, device=helpers.get_device()))
             return fill_result, where_result
 
     x = torch.randn(*input_shapes)

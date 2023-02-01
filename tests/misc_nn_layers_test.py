@@ -356,7 +356,9 @@ def test_embedding_bag_include_last_offset(mode):
 
         def forward(self, x):
             offsets = torch.arange(0, x.numel(), x.size(1))
-            offsets = torch.cat((offsets, torch.tensor([x.numel()])))
+            offsets = torch.cat(
+                (offsets, torch.tensor([x.numel()],
+                                       device=helpers.get_device())))
             x = x.reshape(-1)
             return F.embedding_bag(x,
                                    self.weight,
@@ -367,7 +369,9 @@ def test_embedding_bag_include_last_offset(mode):
     torch.manual_seed(0)
     model = Model()
     x = torch.LongTensor([[1, 2, 4, 5], [4, 3, 2, 9]])
+    helpers.set_device_cpu()
     cpu_out = model(x)
+    helpers.set_device_ipu()
     pop_model = poptorch.inferenceModel(model)
     pop_out = pop_model(x)
     helpers.assert_allclose(actual=pop_out, expected=cpu_out)

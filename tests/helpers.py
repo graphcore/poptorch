@@ -12,6 +12,20 @@ is_running_tests = True
 running_reduced_testing = False
 
 
+def get_device():
+    if not hasattr(get_device, 'device'):
+        set_device_cpu()
+    return get_device.device
+
+
+def set_device_cpu():
+    get_device.device = torch.device("cpu")
+
+
+def set_device_ipu():
+    get_device.device = torch.device("ipu")
+
+
 def selectIfReduced(reduced_set, full_set):
     if running_reduced_testing:
         return reduced_set

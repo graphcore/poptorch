@@ -4,23 +4,29 @@ import poptorch
 
 
 class ExampleModel(torch.nn.Module):
-    def __init__(self):
+    def __init__(self, device):
         super().__init__()
         self.bias = torch.nn.Parameter(torch.zeros(()))
+        self.device = device
 
     def forward(self, x):
-        return torch.cat([
+        # The following tensor is created explicitly inside the model, so its
+        # device has to be specified.
+        # Alternatively, the user can set option 'forceAllTensorsDeviceToIpu'
+        # in poptorch.Options() which will set tensors device to ipu by default.
+        model_tensor = torch.tensor([0], device=self.device)
+        return model_tensor + torch.cat([
             100 * torch.nn.LeakyReLU()(-x + self.bias),
             100 * torch.nn.LeakyReLU()(x - self.bias)
         ],
-                         dim=-1)
+                                        dim=-1)
 
 
 # model_with_loss_start
 class ExampleModelWithLoss(torch.nn.Module):
-    def __init__(self):
+    def __init__(self, device):
         super().__init__()
-        self.model = ExampleModel()
+        self.model = ExampleModel(device)
 
     def forward(self, input, target):
         out = self.model(input)
@@ -67,7 +73,7 @@ def run_examples():
                                         shuffle=True,
                                         drop_last=True)
 
-    model = ExampleModelWithLoss()
+    model = ExampleModelWithLoss(device='ipu')
     model.train()
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=0.001)
@@ -95,7 +101,6 @@ def run_examples():
                 torch.optim.AdamW(model.parameters(), lr=0.0001))
     # simple_ipu_end
 
-    print(model.model.bias)
     assert (model.model.bias > 0.4 and model.model.bias < 0.6)
 
     # simple_cpu_start
@@ -105,7 +110,7 @@ def run_examples():
                                                 shuffle=True,
                                                 drop_last=True)
 
-    model = ExampleModelWithLoss()
+    model = ExampleModelWithLoss(device='cpu')
     model.train()
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=0.001)
