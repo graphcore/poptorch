@@ -265,7 +265,7 @@ class BuildenvManager:
                 # Share the os module as it's commonly used to get the current
                 # working directory, create directories, etc.
                 # pylint: disable=exec-used
-                exec(code, {"os": os}, exec_locals)
+                exec(code, {"os": os, "_utils": _utils}, exec_locals)
 
         # Process the installers:
         other_installers = []

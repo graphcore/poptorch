@@ -4,13 +4,15 @@ import pytest
 import torch_geometric as pyg
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def pyg_qm9(pytestconfig):
     qm9root = osp.join(pytestconfig.getoption("external_datasets_dir"), "qm9")
+    if not osp.exists(qm9root):
+        raise RuntimeError(f'Path {qm9root} not exists.')
     return pyg.datasets.QM9(root=qm9root)
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def molecule(pyg_qm9):
     # The index of the largest molecule in the QM9 dataset, which looks like:
     # Data(edge_attr=[56, 4], edge_index=[2, 56], idx=[1], name="gdb_57518",
@@ -19,7 +21,7 @@ def molecule(pyg_qm9):
     return pyg_qm9[max_index]
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def fake_hetero_dataset() -> pyg.datasets.FakeHeteroDataset:
     pyg.seed_everything(1410)
     dataset = pyg.datasets.FakeHeteroDataset(num_node_types=2,
@@ -28,7 +30,7 @@ def fake_hetero_dataset() -> pyg.datasets.FakeHeteroDataset:
     return dataset
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def fake_molecular_dataset() -> pyg.datasets.FakeDataset:
     # setup a dataset which looks like a molecular dataset.
     pyg.seed_everything(42)

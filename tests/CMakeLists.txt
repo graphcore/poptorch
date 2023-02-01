@@ -13,14 +13,7 @@ else()
   set(TESTS_PATH "${CMAKE_CURRENT_SOURCE_DIR}")
 endif()
 
-set(EXTERNAL_DATASETS_DIR "${CMAKE_CURRENT_BINARY_DIR}/external_datasets")
-
-run_poptorch_install_command(
-  "python3 ${CMAKE_CURRENT_SOURCE_DIR}/gnn/download_external_datasets.py \
-           ${EXTERNAL_DATASETS_DIR}"
-           "${PROJECT_BINARY_DIR}"
-           "download_external_datasets.py"
-)
+set(EXTERNAL_DATASETS_DIR "${CMAKE_BINARY_DIR}/buildenv/external_datasets")
 
 # Generate tests.
 run_poptorch_install_command(

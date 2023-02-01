@@ -40,3 +40,24 @@ if config.install_linters:
             # To preserve the comments when updating the schemas
             "ruamel.yaml=0.17.21",
         ))
+
+
+class DownloadExternalDatasets(Installer):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.downloader_path = os.path.join(_utils.sources_dir(), 'scripts',
+                                            'download_external_datasets.py')
+        if not os.path.exists(self.downloader_path):
+            raise RuntimeError(f'Path {self.downloader_path} not exists.')
+
+    def hashString(self):
+        with open(self.downloader_path, "r") as f:
+            return f.read()
+
+    def install(self, env):
+        datasets_path = os.path.join(env.prefix, "external_datasets")
+        env.run_commands(f"mkdir {datasets_path}",
+                         f"python3 {self.downloader_path} {datasets_path}")
+
+
+installers.add(DownloadExternalDatasets())
