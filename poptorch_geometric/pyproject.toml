@@ -1,13 +1,6 @@
 [build-system]
 requires = [
-  "python_version>=3.7",
   "setuptools>=42",
-  "wheel",
-  "@PYG_DEPENDENCY@",
-  "@POPTORCH_DEPENDENCY@",
-  "torch-scatter",
-  "torch-sparse",
-  "torch-cluster",
-  "torch-spline-conv"
+  "wheel"
 ]
 build-backend = "setuptools.build_meta"
