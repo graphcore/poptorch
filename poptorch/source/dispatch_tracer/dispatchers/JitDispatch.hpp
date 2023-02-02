@@ -57,8 +57,6 @@ private:
   void
   setCurrentCodeLocation(const torch::jit::SourceRange &source_location) final;
 
-  void addTensorToParamNode(const at::Tensor &cpu_tensor);
-
   CompilerOptions _opts;
   TypeInferenceHandler _type_inference_handler;
   InplaceInputsTracker _inplace_tracker;

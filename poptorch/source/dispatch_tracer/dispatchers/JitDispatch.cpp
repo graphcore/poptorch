@@ -79,17 +79,6 @@ void JITDispatch::addConstant(const at::Tensor &cpu_tensor,
   _mapper.addTensor(ipu_tensor, value, false);
 }
 
-void JITDispatch::addTensorToParamNode(const at::Tensor &cpu_tensor) {
-  auto *param_node = graph->param_node();
-  if (param_node->hasAttribute(c10::attr::values)) {
-    auto tensors = param_node->ts(c10::attr::values);
-    tensors.push_back(cpu_tensor);
-    param_node->ts_(c10::attr::values, tensors);
-  } else {
-    param_node->ts_(c10::attr::values, {cpu_tensor});
-  }
-}
-
 void JITDispatch::addTensor(const at::Tensor &cpu_tensor,
                             const at::Tensor &ipu_tensor, bool is_parameter) {
   ERROR_ON(!cpu_tensor.unsafeGetTensorImpl()->is_cpu());
@@ -99,9 +88,6 @@ void JITDispatch::addTensor(const at::Tensor &cpu_tensor,
   _tensor_store->copyFromCpu(ipu_tensor, src);
 
   torch::jit::Value *value = graph->addInput(cpu_tensor.name());
-  // Add tensor to the values attribute of the graph's param node, so that
-  // input tensor values can be later retrieved from the graph
-  addTensorToParamNode(src);
   setSourceRangeToCurrentLocation(value->node());
   value->setType(c10::TensorType::create(ipu_tensor)
                      ->withRequiresGrad(cpu_tensor.requires_grad()));
@@ -144,15 +130,31 @@ void JITDispatch::addOutput(const at::Tensor &ipu_src,
                    << static_cast<void *>(&_mapper) << " for "
                    << static_cast<void *>(ipu_src.unsafeGetTensorImpl()));
 
-  torch::jit::Value *val = record->jit;
-  logging::trace("[DISPATCHER][JIT] Graph output: Tensor ptr {}, jit ir %{} "
-                 "(scalar type {})",
-                 reinterpret_cast<void *>(ipu_src.unsafeGetTensorImpl()),
-                 val->debugNameBase(),
-                 val->type()->expect<c10::TensorType>()->scalarType().value_or(
-                     at::ScalarType::Undefined));
+  torch::jit::Value *output = record->jit;
 
-  graph->registerOutput(val);
+  // If the output is an input: add an identity op to make sure the graph
+  // is not empty.
+  for (torch::jit::Value *input : graph->inputs()) {
+    if (input == output) {
+      auto *none = graph->createNone();
+      insertNodeInGraph(graph.get(), none);
+      output = createAndInsertNode(graph.get(), c10::aten::clone,
+                                   {output, none->output()}, ImplicitCast::None,
+                                   OutputType::AsFirstInput)
+                   ->output();
+      break;
+    }
+  }
+
+  logging::trace(
+      "[DISPATCHER][JIT] Graph output: Tensor ptr {}, jit ir %{} "
+      "(scalar type {})",
+      reinterpret_cast<void *>(ipu_src.unsafeGetTensorImpl()),
+      output->debugNameBase(),
+      output->type()->expect<c10::TensorType>()->scalarType().value_or(
+          at::ScalarType::Undefined));
+
+  graph->registerOutput(output);
 }
 
 void JITDispatch::finalizeGraph() {

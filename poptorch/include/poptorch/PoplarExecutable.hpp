@@ -23,13 +23,11 @@ public:
                    std::vector<popart_compiler::TensorId> &&outputs,
                    std::vector<at::ScalarType> &&outputTypes,
                    std::vector<std::string> parameter_names,
-                   InplaceGraphInfo &&inplace_info,
-                   std::vector<std::size_t> &&input_index_map)
+                   InplaceGraphInfo &&inplace_info)
       : _compiler(std::move(c)), _popart_inputs(inputs),
         _popart_outputs(outputs), _popart_output_types(outputTypes),
         _parameter_names(std::move(parameter_names)),
-        _inplace_info(std::move(inplace_info)),
-        _input_index_map(std::move(input_index_map)) {
+        _inplace_info(std::move(inplace_info)) {
     for (size_t i = 0; i < inputs.size(); i++) {
       _converted_inputs.emplace_back();
     }
@@ -79,8 +77,6 @@ private:
   const std::vector<std::string> _parameter_names;
 
   const InplaceGraphInfo _inplace_info;
-
-  std::vector<std::size_t> _input_index_map;
 };
 
 } // namespace poptorch

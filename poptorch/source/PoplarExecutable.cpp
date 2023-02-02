@@ -28,8 +28,7 @@ PoplarExecutable::run(std::vector<at::Tensor> &inTensors) {
   // pytorch tensors.
   for (std::size_t i = 0; i < _popart_inputs.size(); ++i) {
     popart_compiler::TensorId const popart_id = _popart_inputs[i];
-    auto in_index = _input_index_map.empty() ? i : _input_index_map[i];
-    const at::Tensor &pytorch_tensor = inTensors.at(in_index);
+    const at::Tensor &pytorch_tensor = inTensors.at(i);
 
     ERROR_ON(!pytorch_tensor.is_contiguous());
 

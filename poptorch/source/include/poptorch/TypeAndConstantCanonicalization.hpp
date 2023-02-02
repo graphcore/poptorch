@@ -51,8 +51,7 @@ void checkAndChangeOutputTypes(torch::jit::Graph *graph);
 
 // Changes all constants used in implicit casting operations into tensor
 // constants (poptorch::tensor_constant) of the correct type.
-void canonicaliseConstants(torch::jit::Graph *graph,
-                           std::vector<std::size_t> &input_index_map);
+void canonicaliseConstants(torch::jit::Graph *graph);
 
 } // namespace type_and_constant_canonicalization
 } // namespace poptorch

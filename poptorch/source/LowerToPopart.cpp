@@ -292,8 +292,7 @@ public:
                     std::vector<popart_compiler::Optimizer> &&opt,
                     const popart_compiler::SessionOptions &options,
                     const AttributeAccessor &attribute_accessor,
-                    CPUCallbackMap &&callback, const AnchorList &&anchors,
-                    std::vector<std::size_t> &&input_index_map);
+                    CPUCallbackMap &&callback, const AnchorList &&anchors);
   void lower();
 
   std::shared_ptr<PoplarExecutable> compile();
@@ -331,8 +330,6 @@ private:
   popart_compiler::Compiler _compiler;
 
   CPUCallbackMap _callbacks;
-
-  std::vector<std::size_t> _input_index_map;
 
   void lowerParameters();
 
@@ -391,7 +388,7 @@ std::shared_ptr<PoplarExecutable> LowerToPopartImpl::compile() {
   return std::make_shared<PoplarExecutable>(
       std::move(_compiler), std::move(_input_tensor_hooks),
       std::move(_output_tensor_hooks), std::move(data_types), _parameter_names,
-      std::move(_inplace_info), std::move(_input_index_map));
+      std::move(_inplace_info));
 }
 
 std::shared_ptr<PoplarExecutable>
@@ -410,7 +407,7 @@ LowerToPopartImpl::loadExecutableFromFile(const std::string &input_filename) {
   return std::make_shared<PoplarExecutable>(
       std::move(_compiler), std::move(_input_tensor_hooks),
       std::move(_output_tensor_hooks), std::move(data_types), _parameter_names,
-      std::move(_inplace_info), std::move(_input_index_map));
+      std::move(_inplace_info));
 }
 
 void LowerToPopartImpl::lower() {
@@ -1246,10 +1243,10 @@ LowerToPopartImpl::LowerToPopartImpl(
     std::vector<popart_compiler::Optimizer> &&opt,
     const popart_compiler::SessionOptions &options,
     const AttributeAccessor &attribute_accessor, CPUCallbackMap &&callback,
-    const AnchorList &&anchors, std::vector<std::size_t> &&input_index_map)
+    const AnchorList &&anchors)
     : _graph(*g), _lowered(false), _inplace_info(std::move(inplace_info)),
       _optimizers(opt), _anchors(anchors), _compiler(training, options),
-      _callbacks(callback), _input_index_map(input_index_map) {
+      _callbacks(callback) {
   // Init the function implementation map. This map will be populated by
   // elements which look something like:
   /* {"popart::Foo", [&](const std::vector<popart_compiler::TensorId> &inputs,
@@ -1340,12 +1337,11 @@ LowerToPopart::LowerToPopart(torch::jit::Graph *graph,
                              std::vector<popart_compiler::Optimizer> &&opt,
                              const popart_compiler::SessionOptions &options,
                              const AttributeAccessor &attribute_accessor,
-                             CPUCallbackMap callbacks, AnchorList &&anchors,
-                             std::vector<std::size_t> &&input_index_map) {
+                             CPUCallbackMap callbacks, AnchorList &&anchors) {
   _impl = std::make_unique<detail::LowerToPopartImpl>(
       graph, std::move(inplace_info), training, std::move(opt),
       std::move(options), attribute_accessor, std::move(callbacks),
-      std::move(anchors), std::move(input_index_map));
+      std::move(anchors));
 }
 void LowerToPopart::lower() { _impl->lower(); }
 

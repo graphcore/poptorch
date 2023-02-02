@@ -781,8 +781,8 @@ def test_scalar_tensor_input():
 def test_returned_only_inputs():
     class Model(torch.nn.Module):
         def forward(self, x, y, z):
-            # x and y will be erased as inputs and converted to
-            # host-side-only constants
+            # x and y will become Identity ops inputs and will get passed out
+            # as the model outputs
             return x, y, z + 0.0
 
     m = Model()
@@ -790,6 +790,13 @@ def test_returned_only_inputs():
     x = torch.tensor([1, 2])
     y = torch.tensor([3, 4])
     z = torch.tensor([1.2, 3.4])
+
+    for cpu_out, ipu_out in zip(m(x, y, z), p(x, y, z)):
+        helpers.assert_allclose(actual=ipu_out, expected=cpu_out)
+
+    x = torch.tensor([11, 12])
+    y = torch.tensor([13, 14])
+    z = torch.tensor([11.2, 13.4])
 
     for cpu_out, ipu_out in zip(m(x, y, z), p(x, y, z)):
         helpers.assert_allclose(actual=ipu_out, expected=cpu_out)

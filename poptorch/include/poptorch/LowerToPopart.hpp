@@ -52,8 +52,7 @@ public:
                 bool training, std::vector<popart_compiler::Optimizer> &&opt,
                 const popart_compiler::SessionOptions &options,
                 const AttributeAccessor &attribute_accessor,
-                CPUCallbackMap callback, AnchorList &&anchors,
-                std::vector<std::size_t> &&input_index_map);
+                CPUCallbackMap callback, AnchorList &&anchors);
   LowerToPopart(LowerToPopart &&lower);
   ~LowerToPopart();
 

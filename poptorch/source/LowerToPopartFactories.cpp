@@ -52,9 +52,8 @@ poptorch::LowerToPopart lowerToPopartFromDispatch(
   poptorch::type_and_constant_canonicalization::evaluateConstexprs(graph.get());
   logging::trace("Graph after evaluating constant expressions:\n{}", *graph);
 
-  std::vector<std::size_t> input_index_map;
   poptorch::type_and_constant_canonicalization::canonicaliseConstants(
-      graph.get(), input_index_map);
+      graph.get());
   logging::trace("Graph after constant canonicalisation:\n{}", *graph);
 
   poptorch::removeScatterAddIndexExpansion(graph.get());
@@ -102,8 +101,7 @@ poptorch::LowerToPopart lowerToPopartFromDispatch(
   logging::trace("Graph before lowering to PopART:\n{}", *graph);
   poptorch::LowerToPopart lower(
       graph.get(), std::move(inplace_info), training, std::move(optimizers),
-      parsed_options, attribute_accessor, callbacks, std::move(anchors_list),
-      std::move(input_index_map));
+      parsed_options, attribute_accessor, callbacks, std::move(anchors_list));
 
   lower.lower();
 
