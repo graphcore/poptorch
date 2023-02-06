@@ -2,7 +2,10 @@
 
 from setuptools import setup, find_packages
 
-REQUIRES = ['@PYG_DEPENDENCY@', '@POPTORCH_DEPENDENCY@', 'torch-scatter']
+REQUIRES = [
+    '@PYG_DEPENDENCY@', '@POPTORCH_DEPENDENCY@', 'torch-scatter',
+    'torch-sparse'
+]
 VERSION = "@VERSION@"
 
 LONG_DESCRIPTION = (
