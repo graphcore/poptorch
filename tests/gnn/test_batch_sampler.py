@@ -19,7 +19,7 @@ def test_fixed_batch_sampler_default_params():
     dataset = FakeDataset(num_graphs=num_graphs,
                           avg_num_nodes=30,
                           avg_degree=5)
-    sampler = FixedBatchSampler(dataset, num_graphs=2)
+    sampler = FixedBatchSampler(dataset, num_graphs=1)
     length = sum(1 for _ in itertools.chain(sampler))
 
     assert length == num_graphs
@@ -97,10 +97,11 @@ def test_fixed_batch_should_return_valid_samples(shuffle, batch_num_graphs,
     base_sampler = RandomSampler(dataset) if shuffle else \
         SequentialSampler(dataset)
 
+    # Leave space for padding.
     sampler = FixedBatchSampler(dataset,
-                                num_graphs=batch_num_graphs,
-                                num_nodes=batch_num_nodes,
-                                num_edges=batch_num_edges,
+                                num_graphs=batch_num_graphs - 1,
+                                num_nodes=batch_num_nodes - 1,
+                                num_edges=batch_num_edges - 1,
                                 sampler=base_sampler,
                                 allow_skip_data=allow_skip_data)
     length = sum(1 for _ in sampler)
@@ -153,11 +154,12 @@ def test_fixed_batch_sampler_should_be_usable_with_torch_data_loader(
         batch_num_edges = max(batch_num_edges,
                               max_num_edges + batch_num_graphs)
 
+    # Leave space for padding.
     if torch_data_loader:
         batch_sampler = FixedBatchSampler(dataset,
-                                          num_graphs=num_graphs,
-                                          num_nodes=batch_num_nodes,
-                                          num_edges=batch_num_edges,
+                                          num_graphs=num_graphs - 1,
+                                          num_nodes=batch_num_nodes - 1,
+                                          num_edges=batch_num_edges - 1,
                                           sampler=base_sampler,
                                           allow_skip_data=allow_skip_data)
 

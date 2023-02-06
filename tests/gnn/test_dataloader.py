@@ -200,9 +200,9 @@ def test_fixed_size_dataloader(
     }
     if use_batch_sampler:
         batch_sampler = FixedBatchSampler(fake_molecular_dataset,
-                                          batch_size,
-                                          num_nodes=padded_num_nodes,
-                                          num_edges=padded_num_edges)
+                                          batch_size - 1,
+                                          num_nodes=padded_num_nodes - 1,
+                                          num_edges=padded_num_edges - 1)
         kwargs['batch_sampler'] = batch_sampler
     else:
         kwargs['batch_size'] = batch_size
@@ -361,3 +361,29 @@ def test_padded_dataloader(
                 else:
                     assert torch.all(
                         torch.eq(batch[key][b_idx, ], torch_batch[key]))
+
+
+@pytest.mark.parametrize('allow_skip_data', [True, False])
+def test_dataloader_with_sampler_num_nodes(allow_skip_data,
+                                           fake_molecular_dataset):
+    dataset = fake_molecular_dataset[:10]
+
+    sampler = FixedBatchSampler(dataset,
+                                num_graphs=1,
+                                num_nodes=100,
+                                allow_skip_data=allow_skip_data)
+
+    with pytest.raises(AssertionError,
+                       match=r'Argument `num_nodes` \(= 100\) should ' \
+                             r'be greater'):
+        dataloader = FixedSizeDataLoader(dataset,
+                                         batch_sampler=sampler,
+                                         num_nodes=100)
+
+    num_nodes = 101
+    dataloader = FixedSizeDataLoader(dataset,
+                                     batch_sampler=sampler,
+                                     num_nodes=num_nodes)
+
+    for batch in dataloader:
+        assert batch.num_nodes == num_nodes

@@ -1,5 +1,6 @@
 # Copyright (c) 2022-2023 Graphcore Ltd. All rights reserved.
 
+import numbers
 from functools import lru_cache
 from typing import Any, Generator, Iterable, Iterator, List, Optional, Union
 
@@ -76,29 +77,31 @@ class FixedBatchSampler(Sampler[List[int]]):
             raise ValueError(
                 "Invalid `num_graphs` parameter, `num_graphs` is None.")
 
-        validate_batch_limit(num_graphs, "num_graphs", 2)
+        validate_batch_limit(num_graphs, "num_graphs", 1)
         validate_batch_limit(num_nodes, "num_nodes", num_graphs)
         validate_batch_limit(num_edges, "num_edges", num_graphs)
 
     class _Batch:
         def __init__(self) -> None:
             self.indices: List[int] = []
-            self.curn = 0
-            self.cure = 0
-            self.curg = 0
+            self.num_nodes = 0
+            self.num_edges = 0
+            self.num_graphs = 0
 
         def append(self, idx: int, data: Data) -> None:
             self.indices.append(idx)
-            self.curn += data.num_nodes
-            self.cure += data.num_edges
-            self.curg += 1
+            self.num_nodes += data.num_nodes
+            self.num_edges += data.num_edges
+            self.num_graphs += 1
 
         def empty(self) -> bool:
             return len(self.indices) == 0
 
         def __repr__(self) -> str:
-            return f"Batch{{indices: {self.indices}, curn: {self.curn}, " \
-                   f"cure: {self.cure}, curg: {self.curg} }}"
+            return f'Batch{{ indices: {self.indices}, ' \
+                   f'num_nodes: {self.num_nodes}, ' \
+                   f'num_edges: {self.num_edges}, ' \
+                   f'num_graphs: {self.num_graphs} }}'
 
     def __iter__(self) -> Iterator[List[int]]:
         batch = self._Batch()
@@ -134,17 +137,17 @@ class FixedBatchSampler(Sampler[List[int]]):
         next_nodes = data.num_nodes
         next_edges = data.num_edges
 
-        nodes_left = self.num_nodes - (batch.curn + next_nodes)
-        edges_left = self.num_edges - (batch.cure + next_edges)
-        graphs_left = self.num_graphs - (batch.curg + 1)
+        nodes_left = self.num_nodes - (batch.num_nodes + next_nodes)
+        edges_left = self.num_edges - (batch.num_edges + next_edges)
+        graphs_left = self.num_graphs - (batch.num_graphs + 1)
 
-        has_space_for_graph = all([
-            nodes_left >= 0, edges_left >= 0, graphs_left > 0,
-            nodes_left >= graphs_left, edges_left >= graphs_left
-        ])
-        graph_will_fully_fill_batch = nodes_left == 0 and edges_left == 0 \
-            and graphs_left == 0
-        return has_space_for_graph or graph_will_fully_fill_batch
+        graph_fits = nodes_left >= 0 and edges_left >= 0 and \
+            graphs_left >= 0
+        has_space_for_padding = nodes_left >= graphs_left and \
+            edges_left >= graphs_left
+
+        has_space = graph_fits and has_space_for_padding
+        return has_space
 
     @lru_cache(maxsize=128)
     def __len__(self) -> int:
@@ -178,21 +181,37 @@ def make_fixed_batch_generator(batch_sampler: Sampler[List[int]],
     """
 
     def get_param(param: Any, param_name: str) -> Any:
-        if param is not None:
+        nonlocal batch_sampler
+        sampler_attr = getattr(batch_sampler, param_name, None)
+
+        if param is None and sampler_attr is None:
+            raise ValueError(f'Passed parameter `{param_name}` is None '
+                             f'and `batch_sampler` does not have an '
+                             f'attribute called `{param_name}`.')
+
+        if param is None:
+            if isinstance(sampler_attr, numbers.Number):
+                # Add 1 to leave space for padding graph, node and edge.
+                return sampler_attr + 1
+            return sampler_attr
+
+        if sampler_attr is None:
             return param
 
-        nonlocal batch_sampler
-        if hasattr(batch_sampler, param_name):
-            return getattr(batch_sampler, param_name)
+        if sampler_increment and not sampler_attr + sampler_increment <= param:
+            raise ValueError(f'When provided, parameter `{param_name}` (= '
+                             f'{param}) should be greater than sampler\'s ' \
+                             f'`{param_name}` attribute (= {sampler_attr}) ' \
+                             f'to account for padding and it is not.')
 
-        raise ValueError(f"Passed parameter `{param_name}` is None "
-                         f"and `batch_sampler` does not contain an "
-                         f"attribute called `{param_name}`.")
+        return param
 
-    num_graphs = get_param(num_graphs, "num_graphs")
-    num_nodes = get_param(num_nodes, "num_nodes")
-    num_edges = get_param(num_edges, "num_edges")
-    data_source = get_param(data_source, "data_source")
+    # If using values from the sampler, add at least one padding graph, node
+    # and edge.
+    num_graphs = get_param(num_graphs, 'num_graphs')
+    num_nodes = get_param(num_nodes, 'num_nodes')
+    num_edges = get_param(num_edges, 'num_edges')
+    data_source = get_param(data_source, 'data_source')
 
     collater = FixedSizeCollater(num_nodes, num_edges, num_graphs)
 

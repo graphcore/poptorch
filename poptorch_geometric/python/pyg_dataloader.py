@@ -170,12 +170,18 @@ class FixedSizeDataLoader(metaclass=TorchDataLoaderMeta):
             'initializer. They should not be included in `collater_args`.'
 
         if batch_sampler is not None:
-            self.padded_batch_size = batch_sampler.num_graphs
+            self.padded_batch_size = batch_sampler.num_graphs + 1
+
+            assert num_nodes >= batch_sampler.num_nodes + 1, \
+                f'Argument `num_nodes` (= {num_nodes}) should be greater ' \
+                f'than `num_nodes` (= {batch_sampler.num_nodes}) attribute ' \
+                f'of `batch_sampler` in order to leave some space for padding.'
+
             # The `torch.DataLoader` class expects batch size to be `1` when
             # `batch_sampler` is provided.
             torch_dataloader_batch_size = 1
             if 'num_edges' not in collater_args:
-                collater_args['num_edges'] = batch_sampler.num_edges
+                collater_args['num_edges'] = batch_sampler.num_edges + 1
         else:
             self.padded_batch_size = batch_size or 2
             num_real_graphs = self.padded_batch_size - 1
@@ -249,10 +255,14 @@ def create_fixed_batch_dataloader(
         An instance of the :obj:`loader_cls` class with the
         :class:`FixedBatchSampler` sampler.
     """
+    # Leave space for padding.
+    sampler_graphs = num_graphs - 1
+    sampler_nodes = num_nodes - 1 if num_nodes is not None else num_nodes
+    sampler_edges = num_edges - 1 if num_edges is not None else num_edges
     batch_sampler = FixedBatchSampler(dataset,
-                                      num_graphs,
-                                      num_nodes=num_nodes,
-                                      num_edges=num_edges,
+                                      sampler_graphs,
+                                      num_nodes=sampler_nodes,
+                                      num_edges=sampler_edges,
                                       sampler=sampler,
                                       allow_skip_data=allow_skip_data)
 
