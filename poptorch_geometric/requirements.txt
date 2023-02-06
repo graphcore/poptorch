@@ -2,7 +2,7 @@
 # poptorch which is currently pinned to torch 1.13.1
 --find-links https://data.pyg.org/whl/torch-1.13.1+cpu.html
 
-pyg-nightly==2.2.0.dev20230110
+pyg-nightly==2.3.0.dev20230206
 
 pytest-benchmark==4.0.0
 pytest-cov==4.0.0
