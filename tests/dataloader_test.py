@@ -1446,11 +1446,11 @@ def test_custom_batch_sampler(batch_size, device_iteration, num_workers,
             torch.Size([combined_tail_batch_size, 1])
 
 
+@pytest.mark.parametrize("batch_size", [1, 4])
 @pytest.mark.parametrize("drop_last", [True, False])
-def test_default_batch_sampler(drop_last):
-    batch_size = 4
+def test_default_batch_sampler(batch_size, drop_last):
     device_iteration = 1
-    num_workers = 1
+    num_workers = 4
     return_type = tuple
     mode = poptorch.DataLoaderMode.Async
 

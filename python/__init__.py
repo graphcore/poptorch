@@ -428,8 +428,10 @@ class DataLoader(torch.utils.data.DataLoader):
             real_drop_last = self.batch_sampler_drop_last
         else:
             real_drop_last = drop_last
+        cbs_is_gt_one = self._combined_batch_size is not None and \
+            self._combined_batch_size > 1
         async_mode_with_remainder = mode == DataLoaderMode.Async and \
-            not real_drop_last
+            not real_drop_last and cbs_is_gt_one
         if mode == DataLoaderMode.AsyncRebatched or async_mode_with_remainder:
             mode = DataLoaderMode.Async
             rebatched_size = self._combined_batch_size
