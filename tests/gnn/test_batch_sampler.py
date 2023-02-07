@@ -275,3 +275,37 @@ def test_fixed_batch_sampler_padding_not_needed(shuffle, allow_skip_data):
         total_graphs_from_dataloader += data.num_graphs
 
     assert total_graphs_from_dataloader == num_graphs_in_dataset
+
+
+def test_make_fixed_batch_generator_incorrect_values():
+    dataset = FakeDataset(num_graphs=10, avg_num_nodes=10, avg_degree=3)
+
+    sampler = FixedBatchSampler(dataset, num_graphs=3)
+    batch_generator = make_fixed_batch_generator(sampler,
+                                                 dataset,
+                                                 num_graphs=3)
+    with pytest.raises(ValueError, match=r'parameter `num_graphs` \(= 3\) ' \
+                                         r'should be greater'):
+        next(iter(batch_generator))
+
+    sampler = FixedBatchSampler(dataset, num_graphs=2, num_nodes=20)
+    batch_generator = make_fixed_batch_generator(sampler,
+                                                 dataset,
+                                                 num_graphs=3,
+                                                 num_nodes=20)
+    with pytest.raises(ValueError, match=r'parameter `num_nodes` \(= 20\) ' \
+                                         r'should be greater'):
+        next(iter(batch_generator))
+
+    sampler = FixedBatchSampler(dataset,
+                                num_graphs=2,
+                                num_nodes=20,
+                                num_edges=50)
+    batch_generator = make_fixed_batch_generator(sampler,
+                                                 dataset,
+                                                 num_graphs=3,
+                                                 num_nodes=25,
+                                                 num_edges=50)
+    with pytest.raises(ValueError, match=r'parameter `num_edges` \(= 50\) ' \
+                                         r'should be greater'):
+        next(iter(batch_generator))

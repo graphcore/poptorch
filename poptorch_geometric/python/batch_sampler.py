@@ -189,16 +189,15 @@ def make_fixed_batch_generator(batch_sampler: Sampler[List[int]],
                              f'and `batch_sampler` does not have an '
                              f'attribute called `{param_name}`.')
 
+        is_number = isinstance(sampler_attr, numbers.Number)
         if param is None:
-            if isinstance(sampler_attr, numbers.Number):
-                # Add 1 to leave space for padding graph, node and edge.
-                return sampler_attr + 1
-            return sampler_attr
+            # Add 1 to leave space for padding graph, node and edge.
+            return sampler_attr + 1 if is_number else sampler_attr
 
         if sampler_attr is None:
             return param
 
-        if sampler_increment and not sampler_attr + sampler_increment <= param:
+        if is_number and sampler_attr + 1 > param:
             raise ValueError(f'When provided, parameter `{param_name}` (= '
                              f'{param}) should be greater than sampler\'s ' \
                              f'`{param_name}` attribute (= {sampler_attr}) ' \
