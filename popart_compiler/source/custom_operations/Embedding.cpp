@@ -34,7 +34,7 @@ public:
               const nonstd::optional<int64_t> &padding_idx,
               const nonstd::optional<float> &available_memory_proportion_,
               const popart::Op::Settings &settings_)
-      : popart::GatherOp(_opid, /*axis=*/0, settings_,
+      : popart::GatherOp(_opid, /*axis=*/0, /*groupSize=*/1, settings_,
                          available_memory_proportion_),
         _padding_idx(padding_idx) {}
 
@@ -282,8 +282,8 @@ public:
                                      debugContext("const_1"));
     graph().setTileMapping(scale, 0);
 
-    auto inputs = popart::popx::GatherGradOpx::handleNDMultiUpdate(out, grad_in,
-                                                                   indices, 0);
+    auto inputs = popart::popx::GatherGradOpx::handleNDMultiUpdate(
+        out, grad_in, indices, 0, 1);
     auto &target_nd = std::get<0>(inputs);
     auto &update_nd = std::get<1>(inputs);
     auto &indices_nd = std::get<2>(inputs);
