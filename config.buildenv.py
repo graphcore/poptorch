@@ -61,3 +61,5 @@ class DownloadExternalDatasets(Installer):
 
 
 installers.add(DownloadExternalDatasets())
+
+installers.add(PipRequirements("poptorch_geometric/requirements.txt"))

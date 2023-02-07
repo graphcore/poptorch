@@ -11,8 +11,7 @@ out_channels = 16
 def test_rgcn_conv(rgcn):
     if rgcn == RGCNConv:
         pytest.skip("RGCNConv uses dynamic shapes")
-    else:
-        pytest.skip("Reenable when AFS-104 is fixed")
+
     in_channels = 4
     out_channels = 32
     num_relations = 4
