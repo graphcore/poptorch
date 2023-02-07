@@ -3,8 +3,10 @@
 from setuptools import setup, find_packages
 
 REQUIRES = [
-    '@PYG_DEPENDENCY@', '@POPTORCH_DEPENDENCY@', 'torch-scatter',
-    'torch-sparse'
+    '@PYG_DEPENDENCY@',
+    '@POPTORCH_DEPENDENCY@',
+    '@TORCH_SCATTER_DEPENDENCY@',
+    '@TORCH_SPARSE_DEPENDENCY@',
 ]
 VERSION = "@VERSION@"
 

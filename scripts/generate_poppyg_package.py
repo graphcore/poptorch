@@ -9,6 +9,7 @@ import shutil
 import distutils.util
 import distutils.dir_util
 import utils._utils as utils
+from wheel.pep425tags import get_abbr_impl, get_impl_ver, get_abi_tag
 
 targets = ['bdist_wheel', 'sdist', 'install']
 
@@ -45,11 +46,31 @@ def find_requirement(package):
     return None
 
 
+def get_pyg_hosted_dependency(pkg_name):
+    name_and_version = find_requirement(pkg_name)
+    assert name_and_version is not None, f'{pkg_name} not found.'
+
+    # For sdist packages we don't know ahead of time what the python version
+    # will be, and there is no support for --find-links so we just have to
+    # use the regular wheel instead.
+    if args.target != "bdist_wheel":
+        return name_and_version
+
+    pkg_ver = name_and_version.split('=')[-1]
+    file_name = pkg_name.replace('-', '_')
+    pkg_whl = f'{pkg_name} @ https://data.pyg.org/whl/torch-1.13.0%2Bcpu/{file_name}-{pkg_ver}-{get_abbr_impl()}{get_impl_ver()}-{get_abi_tag()}-{PLATFORM}.whl'
+
+    return pkg_whl
+
+
 PYG_DEPENDENCY = find_requirement('torch-geometric') or find_requirement(
     'pyg-nightly')
 
 if PYG_DEPENDENCY is None:
     raise RuntimeError('"torch-geometric" not found in requirements.txt')
+
+SCATTER_DEPENDENCY = get_pyg_hosted_dependency('torch-scatter')
+SPARSE_DEPENDENCY = get_pyg_hosted_dependency('torch-sparse')
 
 POPTORCH_DEPENDENCY = f'poptorch=={VERSION}'
 
@@ -61,7 +82,9 @@ def configure(src_filename, dst_filename):
                 line.replace('@VERSION@', VERSION) \
                     .replace('@PYG_DEPENDENCY@', PYG_DEPENDENCY) \
                     .replace('@POPTORCH_DEPENDENCY@', POPTORCH_DEPENDENCY) \
-                    .replace('@PLATFORM@', PLATFORM)
+                    .replace('@PLATFORM@', PLATFORM) \
+                    .replace('@TORCH_SCATTER_DEPENDENCY@', SCATTER_DEPENDENCY) \
+                    .replace('@TORCH_SPARSE_DEPENDENCY@', SPARSE_DEPENDENCY)
             )
 
 
@@ -73,7 +96,6 @@ with tempfile.TemporaryDirectory() as tmp_dir:
     shutil.copy(os.path.join(src_dir, 'MANIFEST.in'), '.')
 
     configure(os.path.join(src_dir, 'setup.py'), 'setup.py')
-    configure(os.path.join(src_dir, 'pyproject.toml'), 'pyproject.toml')
 
     env = {**os.environ}
     start = datetime.datetime.now()
