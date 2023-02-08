@@ -1196,7 +1196,21 @@ class Options(_options_impl.OptionsDict):
             self.enableExecutableCaching(path)
         self.from_json(os.environ.get("POPTORCH_DEFAULT_OPTIONS", r"{}"))
 
-    def from_json(self, string):
+    def from_json(self, string: str):
+        """Sets values of the object from a JSON string.
+
+        The format of the JSON string is:
+
+            {"name.of.accessor": value}
+
+        Examples:
+
+            >>> Options().from_json(
+            ...     '{"Precision.enableFloatingPointExceptions":true}'
+            ... )
+            >>> Options().from_json('{"_Popart.set":["OptionName", 1]}')
+        """
+
         def string_to_enum(value):
             try:
                 enum_type, enum_value = value.split(".")
@@ -1216,8 +1230,11 @@ class Options(_options_impl.OptionsDict):
             # This parses strings into enum type and values
             if isinstance(v, str) and "." in v:
                 v = string_to_enum(v)
-
-            active_obj(v)
+            if isinstance(v, list):
+                active_obj(*v)
+            else:
+                active_obj(v)
+        return self
 
     def sourceLocationExcludes(self,
                                excludes: List[str]) -> "poptorch.Options":

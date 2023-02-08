@@ -78,6 +78,21 @@ class TestSetOptionsFromEnvironment:
         assert f"{ref}" != f"{init_set}"
         assert f"{opts}" == f"{init_set}"
 
+    def test_setting_popart_options(self):
+        ref = poptorch.Options()
+        opts = poptorch.Options()
+        # pylint: disable=protected-access
+        opts._Popart.set("saveInitializersToFile", "my_file.onnx")
+        try:
+            os.environ["POPTORCH_DEFAULT_OPTIONS"] = (
+                '{"_Popart.set":["saveInitializersToFile", "my_file.onnx"]}')
+            init_set = poptorch.Options()
+        finally:
+            del os.environ["POPTORCH_DEFAULT_OPTIONS"]
+
+        assert f"{ref}" != f"{init_set}"
+        assert f"{opts}" == f"{init_set}"
+
 
 @pytest.mark.parametrize("key, value, expected_str", [
     ("asdfasdf", True, r"Unknown .* option .*"),
