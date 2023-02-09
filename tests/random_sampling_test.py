@@ -32,7 +32,6 @@ def rng_harness(rng_op, input, stat_funs, expected_dtype=torch.float):
 
     # Run on IPU and check that the result has the correct type
     opts = poptorch.Options().randomSeed(8)
-    helpers.set_device_ipu()
     pop_model = poptorch.inferenceModel(model, opts)
     pop_out = pop_model(input)
     assert pop_out.dtype == expected_dtype
@@ -44,7 +43,6 @@ def rng_harness(rng_op, input, stat_funs, expected_dtype=torch.float):
         # promote IPU result to allow summary stat comparison
         pop_out = pop_out.float()
 
-    helpers.set_device_cpu()
     native_out = model(input)
     assert native_out.size() == pop_out.size()
 
@@ -151,7 +149,7 @@ def test_normal_buffers():
 @pytest.mark.ipuHardwareRequired
 def test_distributions_normal():
     def rng_op(x):
-        h = torch.tensor([234.0, 100.0], device=helpers.get_device())
+        h = torch.tensor([234.0, 100.0])
         nd = torch.distributions.Normal(loc=h, scale=torch.sqrt(h))
         return nd.sample(x.size())
 

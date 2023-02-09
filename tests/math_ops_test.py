@@ -29,8 +29,6 @@ def op_harness(op, inputs, assert_func, test_training=False, out_fn=None):
 
         # Run on IPU.
         poptorch_model = poptorch.trainingModel(model, optimizer=optim)
-
-        helpers.set_device_ipu()
         poptorch_out, _ = poptorch_model(tuple(inputs))
 
         # Training test - check weights have changed
@@ -50,12 +48,10 @@ def op_harness(op, inputs, assert_func, test_training=False, out_fn=None):
         model = Model(op)
 
         # Run on CPU.
-        helpers.set_device_cpu()
         native_out = model(*inputs)
 
         # Run on IPU.
         poptorch_model = poptorch.inferenceModel(model)
-        helpers.set_device_ipu()
         poptorch_out = poptorch_model(*inputs)
 
     assert_func(native_out, poptorch_out)
@@ -248,8 +244,7 @@ def test_clamp_min_max_tensor(op):
     input = torch.randn(1, 2, 10, 10) * magnitude
 
     def op_clamp(x):
-        return op(x, torch.tensor(magnitude * 0.75,
-                                  device=helpers.get_device()))
+        return op(x, torch.tensor(magnitude * 0.75))
 
     def assert_(native_out, poptorch_out):
         helpers.assert_allclose(actual=poptorch_out, expected=native_out)
@@ -764,8 +759,7 @@ def test_constant_arrays(ty):
 
     def operation(x):
         constant_tensor = torch.tensor([1, -2, -3, 4, 5, 6, 7, -8, 9, -10],
-                                       dtype=ty,
-                                       device=helpers.get_device())
+                                       dtype=ty)
         return torch.sub(x, constant_tensor)
 
     def assert_(native_out, poptorch_out):
@@ -803,8 +797,7 @@ def test_big_constant_arrays_sliced(ty):
                  -2345, 4, 13155, 5, 98754, 143535, 245232, 16523, 17127, 2,
                  42, 5, 19468
              ]],
-            dtype=ty,
-            device=helpers.get_device())
+            dtype=ty)
         return x * big_array[0]
 
     def assert_(native_out, poptorch_out):

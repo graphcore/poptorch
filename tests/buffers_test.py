@@ -299,5 +299,5 @@ def test_unsynchronised_replicated_buffers():
     for _ in range(50):
         y = poptorch_model(x)
 
-    assert all(y[0][-1] == x[0] * 50)
-    assert all(y[1][-1] == x[1] * 50)
+    assert y[0][-1] == x[0] * 50
+    assert y[1][-1] == x[1] * 50

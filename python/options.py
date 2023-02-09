@@ -1167,7 +1167,6 @@ class Options(_options_impl.OptionsDict):
         self._distributed = _DistributedOptions()
         self._tensor_locations = _TensorLocationOptions()
         self._execution_strategy = PipelinedExecution()
-        self._force_all_tensors_device_to_ipu = False
         # Don't pass it to super().__init__() -> we don't want it to be passed to the backend with the other
         # options. (It is passed to createGraph() instead).
         self._source_location_excludes = copy.copy(
@@ -1814,20 +1813,6 @@ class Options(_options_impl.OptionsDict):
         with disabled it will be GroupNormalization.
         """
         self._module_namescope_enabled = False
-        return self
-
-    def forceAllTensorsDeviceToIpu(self,
-                                   force_all_tensors_device_to_ipu: bool = True
-                                   ) -> "poptorch.Options":
-        """ Force all model tensors to be created on IPU.
-
-        By default, the user is responsible for specifying the device of tensors
-        introduced inside the model. Setting this option will enforce the
-        automatic labeling of all tensors to be created on IPU.
-        """
-        # Doesn't need to be stored in the OptionsDict because it's only used
-        # by the python side.
-        self._force_all_tensors_device_to_ipu = force_all_tensors_device_to_ipu
         return self
 
     def toDict(self) -> Dict[str, Any]:

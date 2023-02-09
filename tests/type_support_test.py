@@ -29,7 +29,6 @@ def test_many_input_output_types(input_type, output_type):
     t1 = torch.tensor([1.0, 25, -1.0, 83], dtype=input_type)
     t2 = torch.tensor([2.0, 35, 1.0, 32.4], dtype=input_type)
 
-    helpers.set_device_ipu()
     output = model(t1, t2)
 
     if output_type not in DEMOTED_ON_IPU:
@@ -98,9 +97,7 @@ def test_add_two_many_types(input_type):
 def get_simple_incrementer(constant_type, return_type):
     class SimpleIncrementer(nn.Module):
         def forward(self, x):
-            return (x + torch.tensor(
-                1, dtype=constant_type,
-                device=helpers.get_device())).type(return_type)
+            return (x + torch.tensor(1, dtype=constant_type)).type(return_type)
 
     return poptorch.inferenceModel(SimpleIncrementer())
 
@@ -113,7 +110,6 @@ def test_many_constant_implicit_cast(input_type, constant_type, output_type):
     if constant_type == torch.float16:
         return
 
-    helpers.set_device_ipu()
     model = get_simple_incrementer(constant_type, output_type)
     t = torch.tensor([1.0, 25., -1.0, 83.], dtype=input_type)
 
@@ -282,18 +278,15 @@ def test_small_int_return(input_type):
 def test_tuple_and_list_constant():
     class Model(torch.nn.Module):
         def forward(self):
-            const1 = torch.tensor([1., 2.], device=helpers.get_device())
-            const2 = torch.tensor([3., 4.], device=helpers.get_device())
+            const1 = torch.tensor([1., 2.])
+            const2 = torch.tensor([3., 4.])
 
             return torch.tensor(1), const1 + const2, [const1, const2]
 
     model = Model()
     inference_model = poptorch.inferenceModel(model)
 
-    helpers.set_device_ipu()
     poptorch_out = inference_model()
-
-    helpers.set_device_cpu()
     native = model()
     helpers.assert_allclose(actual=poptorch_out, expected=native)
 
@@ -301,8 +294,8 @@ def test_tuple_and_list_constant():
 def test_tuple_and_list_constant_double_nested():
     class Model(torch.nn.Module):
         def forward(self):
-            const1 = torch.tensor([1., 2.], device=helpers.get_device())
-            const2 = torch.tensor([3., 4.], device=helpers.get_device())
+            const1 = torch.tensor([1., 2.])
+            const2 = torch.tensor([3., 4.])
 
             return ([torch.tensor(1)], const1 + const2,
                     ([const1, const2], [const1, const2]), const2)
@@ -310,8 +303,6 @@ def test_tuple_and_list_constant_double_nested():
     model = Model()
     inference_model = poptorch.inferenceModel(model)
 
-    helpers.set_device_ipu()
     poptorch_out = inference_model()
-    helpers.set_device_cpu()
     native = model()
     helpers.assert_allclose(actual=poptorch_out, expected=native)

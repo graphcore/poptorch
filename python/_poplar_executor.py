@@ -2,13 +2,11 @@
 import collections
 import copy
 import functools
-import importlib
-import inspect
 import itertools
 import os
 import pickle
-from typing import Any, Callable, Dict, List, Optional
-from types import MethodType, ModuleType
+from typing import Callable, Dict, List, Optional
+from types import MethodType
 import weakref
 import warnings
 import torch
@@ -36,18 +34,9 @@ NO_EXECUTABLE_ERR = "Model has not been compiled or has been destroyed."
 # Note: this is only needed for backward compatibility with tracing but we will
 # eventually stop supporting this approach so make sure a warning is printed.
 class _SetDefaultDeviceType:
-    def __init__(self, force_all_tensors_device_to_ipu):
-        # dict (op str: wrapped function) of ops to be overriden
-        self.overrides: Dict[str, Callable] = dict()
-        # list of modules using torch.distributions.utils.broadcast_all
-        self.overrides_broadcast_all: List[ModuleType] = list()
-        self.saved_distribution_validate_args: Any = None
-        # by def, tensors created in a user model have to define device
-        # explicitly - this flag overrides this behavior
-        self.force_all_tensors_device_to_ipu: bool = \
-            force_all_tensors_device_to_ipu
-        # copy of the original broadcast_all to be wrapped
-        self.def_broadcast_all = torch.distributions.utils.broadcast_all
+    def __init__(self):
+        self.overrides = dict()
+        self.saved_distribution_validate_args = None
 
     def __enter__(self):
         def create_wrapper(f):
@@ -62,16 +51,12 @@ class _SetDefaultDeviceType:
 
             return _wrapper
 
-        # All the ops (except tensor) with FACTORY_PARAMS in
-        # <torch>/tools/pyi/gen_pyi.py
-        ops = [
-            "arange", "empty", "full", "full_like", "linspace", "logspace",
-            "ones", "rand", "randint", "randn", "randperm", "range", "zeros",
-            "zeros_like"
-        ]
-        if self.force_all_tensors_device_to_ipu:
-            ops.append("tensor")
-        for name in ops:
+        # All the ops with FACTORY_PARAMS in <torch>/tools/pyi/gen_pyi.py
+        for name in [
+                "arange", "empty", "full", "full_like", "linspace", "logspace",
+                "ones", "rand", "randint", "randn", "randperm", "range",
+                "tensor", "zeros", "zeros_like"
+        ]:
             func = getattr(torch, name)
 
             self.overrides[name] = func
@@ -98,60 +83,6 @@ class _SetDefaultDeviceType:
             self.overrides[name] = func
             setattr(torch, name, create_non_tensor_wrapper(func))
 
-        # Collect all torch classes derived from 'torch.distributions.distribution.Distribution'
-        def pred(obj):
-            if not inspect.isclass(obj):
-                return False
-            for mro in inspect.getmro(obj):
-                if mro.__module__.startswith(
-                        'torch.distributions.distribution'
-                ) and mro.__name__ == 'Distribution':
-                    return True
-            return False
-
-        if not self.force_all_tensors_device_to_ipu:
-            derived_from_distribution = inspect.getmembers(
-                torch.distributions, pred)
-
-            # The specified classes utilize a common util function 'broadcast_all'
-            # responsible for broadcasting scalar values to 'torch.tensors' used
-            # internally. To enforce creation of ipu tensors, we override that
-            # function with the wrapped one, providing the desired behavior.
-            #
-            # NOTE: Torch modules storing definitions of derived classes import the
-            # 'broadcast_all' function directly using:
-            # 'from torch.distributions.utils import broadcast_all'
-            # In such a case, there is a separate 'broadcast_all' symbol injected
-            # in each of the modules, so each of them need to be replaced with the
-            # wrapped function individually.
-            #
-            def_tensor = getattr(torch, 'tensor')
-            wrapped_tensor = create_wrapper(def_tensor)
-
-            def _broadcast_all(f):
-                @functools.wraps(f)
-                def _wrapper(*args, **kwargs):
-                    setattr(torch, 'tensor', wrapped_tensor)
-                    out = f(*args, **kwargs)
-                    setattr(torch, 'tensor', def_tensor)
-                    return out
-
-                return _wrapper
-
-            wrapped_broadcast_all = _broadcast_all(
-                torch.distributions.utils.broadcast_all)
-            for _, _class in derived_from_distribution:
-                _module = importlib.import_module(_class.__module__)
-                self.overrides_broadcast_all.append(_module)
-                setattr(_module, 'broadcast_all', wrapped_broadcast_all)
-
-            # As an extra the global symbol
-            # 'torch.distributions.utils.broadcast_all' is also replaced with the
-            # wrapped function.
-            _module = torch.distributions.utils
-            self.overrides_broadcast_all.append(_module)
-            setattr(_module, 'broadcast_all', wrapped_broadcast_all)
-
         # Arguments validation forces the tensors to be compared onto the IPU
         # then the result is sent back to the CPU.
         # For example:
@@ -167,10 +98,6 @@ class _SetDefaultDeviceType:
         # Restore the real Torch functions
         for name, real in self.overrides.items():
             setattr(torch, name, real)
-
-        if not self.force_all_tensors_device_to_ipu:
-            for _module in self.overrides_broadcast_all:
-                setattr(_module, 'broadcast_all', self.def_broadcast_all)
 
         torch.distributions.Distribution.set_default_validate_args(
             self.saved_distribution_validate_args)
@@ -701,8 +628,7 @@ class PoplarExecutor:
 
     @_impl.destroyDispatcherOnExit
     def _compileWithDispatch(self, in_tensors, executable_filename=None):
-        with _SetDefaultDeviceType(
-                self._options._force_all_tensors_device_to_ipu):  # pylint: disable=protected-access
+        with _SetDefaultDeviceType():
             module_namescope = None
             if self.options._module_namescope_enabled:  # pylint: disable=protected-access
                 module_namescope = _impl.NameScopeHook(self._model)
@@ -857,6 +783,7 @@ class PoplarExecutor:
                 # Re-inject moved tensors in args and kwargs:
                 args, kwargs = reconstructTensorStructure(
                     (in_tensors.args, in_tensors.kwargs), tensor_args)
+
                 result = self._model(*args, **kwargs)
                 if result is not None:
                     self._outputs_structure = result
