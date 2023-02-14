@@ -178,6 +178,77 @@ def test_set_options_from_file(capfd):
 
 @helpers.printCapfdOnExit
 @helpers.overridePoptorchLogLevel("DEBUG")
+def test_override_options_from_file(capfd):
+    class LogChecker(helpers.LogChecker):
+        def validate(self):
+            # pylint: disable=line-too-long
+            self.assert_contains(
+                "poptorch.Options set replication_factor to value 2")
+            self.assert_contains(
+                "poptorch.Options set device_iterations to value 1")
+            self.assert_contains(
+                "poptorch.Options set execution_mode to value 1")
+            self.assert_contains(
+                "poptorch.Options set syntheticDataMode to value 2")
+
+    class Network(nn.Module):
+        def forward(self, x, y):
+            return x + y
+
+    options_list = [
+        "deviceIterations(2)",
+        "setExecutionStrategy(poptorch.ShardedExecution())",
+        "replicationFactor(2)",
+        "enableSyntheticData(True)",
+    ]
+
+    options_list_override = [
+        "deviceIterations(1)",
+    ]
+
+    options_list = "\n".join(options_list)
+    options_list_override = "\n".join(options_list_override)
+
+    with tempfile.TemporaryDirectory() as tmp:
+        filepath = os.path.join(tmp, "tmp.conf")
+        f = open(filepath, "w")
+        # Write the options to file
+        f.write(options_list)
+        f.close()
+
+        filepath_override = os.path.join(tmp, "tmp_override.conf")
+        f = open(filepath_override, "w")
+        # Write the options to file
+        f.write(options_list_override)
+        f.close()
+
+        opts = poptorch.Options()
+        # Read the options back
+        opts.loadFromFile(filepath)
+        # Read the override options
+        opts.loadFromFile(filepath_override)
+
+    # Create the model
+    model = Network()
+    inference_model = poptorch.inferenceModel(model, opts)
+
+    assert inference_model.options.replication_factor == 2
+    assert inference_model.options.device_iterations == 1
+
+    x = torch.ones(2)
+    y = torch.zeros(2)
+
+    # Run the model
+    inference_model(x, y)
+
+    testlog = LogChecker(capfd)
+    # Ensure the options were set correctly
+    # The override should ONLY override options that were actually set
+    testlog.validate()
+
+
+@helpers.printCapfdOnExit
+@helpers.overridePoptorchLogLevel("DEBUG")
 def test_set_popart_options(capfd):
     # pylint: disable=protected-access
 

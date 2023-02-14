@@ -1281,6 +1281,33 @@ class Options(_options_impl.OptionsDict):
         For example, if you wanted to set ``options.deviceIterations(1)``,
         this would be set in the config file by adding a single line with
         contents ``deviceIterations(1)``.
+
+        This method can be called multiple times on the same `Options`
+        object. The options will not be reset to their defaults in between.
+
+        For example, if ``c1.cfg`` contains the following::
+
+            deviceIterations(32)
+            replicationFactor(2)
+
+        and ``c2.cfg`` contains the following::
+
+            deviceIterations(4)
+
+        then calling:
+
+        .. code-block:: python
+
+            options.loadFromFile('c1.cfg')
+            options.loadFromFile('c2.cfg')
+
+        is equivalent to calling:
+
+        .. code-block:: python
+
+            options.deviceIterations(4)
+            options.replicationFactor(2)
+
         """
         _options_config.parseAndSetOptions(self, filepath)
         return self
