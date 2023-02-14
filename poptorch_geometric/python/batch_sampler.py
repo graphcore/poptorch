@@ -24,16 +24,16 @@ class FixedBatchSampler(Sampler[List[int]]):
             process.
         num_graphs (int): Number of graphs in a batch.
         num_nodes (int, optional): Number of nodes in a batch.
-            (default :obj:`None`)
+            (default: :obj:`None`)
         num_edges (int, optional): Number of edges in a batch.
-            (default :obj:`None`)
+            (default: :obj:`None`)
         sampler (Sampler or Iterable, optional): Base sampler. Can be any
             iterable object. (default: RandomSampler(data_source))
         allow_skip_data (bool, optional): Allow skip :obj:`data_source` item,
             otherwise throw :class:`RuntimeError` when the sampler is not able
             to form a single item batch from :obj:`data_source`, because
             :obj:`Data` exceeds the maximum batch requirements.
-            (default :obj:`False`)
+            (default: :obj:`False`)
     """
 
     def __init__(self,

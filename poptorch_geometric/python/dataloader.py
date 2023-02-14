@@ -103,7 +103,7 @@ class FixedSizeDataLoader(PyGFixedSizeDataLoader,
             :class:`FixedSizeCollater`. They should not contain
             :obj:`num_nodes`, :obj:`follow_batch` and :obj:`exclude_keys` as
             those should be passed directly to the initializer method.
-            (default :obj:`None`)
+            (default: :obj:`None`)
         options (poptorch.Options, optional): The additional PopTorch options
             to be passed to :obj:`poptorch.DataLoader`. (default: :obj:`None`)
         **kwargs (optional): The additional arguments of
@@ -169,29 +169,29 @@ def create_fixed_batch_dataloader(
             from which to load the graph examples for the IPU.
         num_nodes (int): Number of nodes in a batch.
         num_edges (int, optional): Number of edges in a batch.
-            (default :obj:`None`)
+            (default: :obj:`None`)
         num_graphs (int, optional): How many graph examples to load in each
             batch. This should be at least :obj:`2` to allow for creating at
-            least one padding graph. (default :obj:`2`)
+            least one padding graph. (default: :obj:`2`)
         options (poptorch.Options, optional): The :class:`poptorch.Options`
             used by the :class:`poptorch.DataLoader`. Will use the default
-            options if not provided. (default :obj:`None`)
+            options if not provided. (default: :obj:`None`)
         follow_batch (list or tuple, optional): Creates assignment batch
             vectors for each key in the list. (default: :obj:`None`)
         exclude_keys (list or tuple, optional): Keys to exclude from the
-            batch. (default :obj:`None`)
+            batch. (default: :obj:`None`)
         collater_args (dict, optional): The additional arguments passed to
             :class:`FixedSizeCollater`. They should not contain
             :obj:`num_nodes`, :obj:`follow_batch` and :obj:`exclude_keys` as
             those should be passed directly to the initializer method.
-            (default :obj:`None`)
+            (default: :obj:`None`)
         sampler (Sampler or Iterable, optional): Base sampler. Can be any
-            iterable object. (default :obj:`None`)
+            iterable object. (default: :obj:`None`)
         allow_skip_data (bool, optional): Allow skip :obj:`data_source` item,
             otherwise throw :class:`RuntimeError` when the sampler is not able
             to form a single item batch from :obj:`data_source`, because
             :obj:`Data` exceeds the maximum batch requirements.
-            (default :obj:`False`)
+            (default: :obj:`False`)
         **kwargs (optional): Additional arguments of
             :class:`poptorch.DataLoader`.
     Returns:

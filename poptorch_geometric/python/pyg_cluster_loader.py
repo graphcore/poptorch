@@ -21,7 +21,7 @@ class FixedSizeClusterLoader(metaclass=TorchDataLoaderMeta):
         collater_args (dict, optional): The additional arguments passed to
             :class:`FixedSizeCollater`. They should not contain
             :obj:`num_nodes` or :obj:`exclude_keys` as those should be passed
-            directly to the initializer method. (default :obj:`None`)
+            directly to the initializer method. (default: :obj:`None`)
         **kwargs (optional): The additional arguments of
             :class:`torch.utils.data.DataLoader`.
     """

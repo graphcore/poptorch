@@ -27,7 +27,7 @@ class FixedSizeClusterLoader(PyGFixedSizeClusterLoader,
         collater_args (dict, optional): The additional arguments passed to
             :class:`FixedSizeCollater`. They should not contain
             :obj:`num_nodes` as it should be passed directly to the initializer
-            method. (default :obj:`None`)
+            method. (default: :obj:`None`)
         options (poptorch.Options, optional): The additional PopTorch options
             to be passed to :obj:`poptorch.DataLoader`. (default: :obj:`None`)
         **kwargs (optional): The additional arguments of
