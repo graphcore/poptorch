@@ -276,17 +276,50 @@ torch::jit::Node *maxHandler(torch::jit::Graph *graph, torch::jit::Node *node) {
 
 torch::jit::Node *tensorNormHandler(torch::jit::Graph *graph,
                                     torch::jit::Node *node) {
-  // TODO(T72620): add handling of other norm operation versions
   // aten::norm(Tensor in, int p) -> Tensor
   // aten::norm(Tensor in, float p) -> Tensor
   // aten::norm(Tensor in, int p, int[] dim, int keepdim) -> Tensor
   // aten::norm(Tensor in, float p, int[] dim, int keepdim) -> Tensor
-  // aten::norm(Tensor in, float p, int[] dim, int keepdim, Tensor out)
-  //            -> Tensor
 
-  // aten::linalg_vector_norm(Tensor self, Scalar ord=2, int[1]?
-  //                          dim=None, bool keepdim=False, ScalarType?
-  //                          dtype=None) -> Tensor
+  // aten::norm(Tensor self, Scalar? p, int[1] dim, bool keepdim, *,
+  //            ScalarType dtype) -> Tensor
+  // aten::norm(Tensor self, Scalar? p, Dimname[1] dim, bool keepdim, *,
+  //            ScalarType dtype) -> Tensor
+  // aten::norm(Tensor self, Scalar? p, int[1] dim, bool keepdim=False, *,
+  //            Tensor(a!) out) -> Tensor(a!)
+  // aten::norm(Tensor self, Scalar? p, int[1] dim, bool keepdim=False, *,
+  //            Tensor(a!) out) -> Tensor(a!)
+  // aten::norm(Tensor self, Scalar? p, Dimname[1] dim, bool keepdim=False, *,
+  //            Tensor(a!) out) -> Tensor(a!)
+  // aten::norm(Tensor self, Scalar? p, Dimname[1] dim, bool keepdim=False, *,
+  //            Tensor(a!) out) -> Tensor(a!)
+  //
+  // aten::norm(Tensor self, Scalar? p, int[1] dim, bool keepdim, *,
+  //            ScalarType dtype, Tensor(a!) out) -> Tensor(a!)
+  // aten::norm(Tensor self, Scalar? p, int[1] dim, bool keepdim, *,
+  //            ScalarType dtype, Tensor(a!) out) -> Tensor(a!)
+  // aten::norm(Tensor self, Scalar? p, Dimname[1] dim, bool keepdim, *,
+  //            ScalarType dtype, Tensor(a!) out) -> Tensor(a!)
+  // aten::norm(Tensor self, Scalar? p, Dimname[1] dim, bool keepdim, *,
+  //            ScalarType dtype, Tensor(a!) out) -> Tensor(a!)
+  //
+  // aten::linalg_norm(Tensor self, Scalar? ord=None, int[1]? dim=None,
+  //                    bool keepdim=False, *, ScalarType? dtype=None) -> Tensor
+  // aten::linalg_norm(Tensor self, str ord, int[1]? dim=None,
+  //                   bool keepdim=False, *, ScalarType? dtype=None) -> Tensor
+  // aten::linalg_norm(Tensor self, Scalar? ord=None, int[1]? dim=None,
+  //                   bool keepdim=False, *, ScalarType? dtype=None,
+  //                   Tensor(a!) out) -> Tensor(a!)
+  // aten::linalg_norm(Tensor self, Scalar? ord=None, int[1]? dim=None,
+  //                   bool keepdim=False, *, ScalarType? dtype=None,
+  //                   Tensor(a!) out) -> Tensor(a!)
+  // aten::linalg_norm(Tensor self, str ord, int[1]? dim=None,
+  //                   bool keepdim=False, *, ScalarType? dtype=None,
+  //                   Tensor(a!) out) -> Tensor(a!)
+  // aten::linalg_norm(Tensor self, str ord, int[1]? dim=None,
+  //                   bool keepdim=False, *, ScalarType? dtype=None,
+  //                   Tensor(a!) out) -> Tensor(a!)
+
   torch::jit::Value *input = node->input(0);
   torch::jit::Value *p_val = node->input(1);
 
@@ -310,10 +343,10 @@ torch::jit::Node *tensorNormHandler(torch::jit::Graph *graph,
       axes.resize(shape.size());
       std::iota(std::begin(axes), std::end(axes), 0);
     }
-    // linalg_vector_norm takes an optional dtype
-    if (node->inputs().size() == 5) {
+    // handle optional dtype
+    if (node->inputs().size() >= 5) {
       auto *opt_dtype = node->input(4);
-      if (opt_dtype != nullptr) {
+      if (opt_dtype->mustNotBeNone()) {
         const auto &opt_dtype_tensors = opt_dtype->node()->ts(c10::attr::value);
         ERROR_ON(opt_dtype_tensors.empty());
         if (!opt_dtype_tensors.front().is_floating_point()) {
