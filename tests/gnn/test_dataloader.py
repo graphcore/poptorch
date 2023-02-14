@@ -149,11 +149,11 @@ def test_create_fixed_batch_dataloader(num_graphs=2, num_nodes=30):
     dataset = FakeDataset(num_graphs=num_graphs, avg_num_nodes=30)
     ipu_dataloader = ipu_create_fixed_batch_dataloader(dataset,
                                                        num_nodes=num_nodes,
-                                                       num_graphs=num_graphs)
+                                                       batch_size=num_graphs)
     assert isinstance(ipu_dataloader, IPUFixedSizeDataLoader)
     pyg_dataloader = create_fixed_batch_dataloader(dataset,
                                                    num_nodes=num_nodes,
-                                                   num_graphs=num_graphs)
+                                                   batch_size=num_graphs)
     assert not isinstance(pyg_dataloader, IPUFixedSizeDataLoader)
 
 
@@ -259,7 +259,7 @@ def test_dataloader_produces_fixed_sizes(use_factory, num_edges, num_graphs,
         train_dataloader = create_fixed_batch_dataloader(
             dataset,
             num_nodes=num_nodes,
-            num_graphs=num_graphs,
+            batch_size=num_graphs,
             num_edges=num_edges,
             collater_args={'add_masks_to_batch': True})
     else:

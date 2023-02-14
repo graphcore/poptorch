@@ -188,7 +188,7 @@ def test_fixed_batch_sampler_should_be_usable_with_torch_data_loader(
             dataset,
             num_nodes=batch_num_nodes,
             num_edges=batch_num_edges,
-            num_graphs=num_graphs,
+            batch_size=num_graphs,
             collater_args=collater_args,
             sampler=base_sampler,
             allow_skip_data=allow_skip_data)

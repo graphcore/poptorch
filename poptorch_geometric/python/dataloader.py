@@ -152,7 +152,7 @@ def create_fixed_batch_dataloader(
         dataset: Dataset,
         num_nodes: int,
         num_edges: Optional[int] = None,
-        num_graphs: int = 2,
+        batch_size: int = 2,
         options: Optional[poptorch.Options] = None,
         follow_batch: Optional[Union[List[str], Tuple[str, ...]]] = None,
         exclude_keys: Optional[Union[List[str], Tuple[str, ...]]] = None,
@@ -170,7 +170,7 @@ def create_fixed_batch_dataloader(
         num_nodes (int): Number of nodes in a batch.
         num_edges (int, optional): Number of edges in a batch.
             (default: :obj:`None`)
-        num_graphs (int, optional): How many graph examples to load in each
+        batch_size (int, optional): How many graph examples to load in each
             batch. This should be at least :obj:`2` to allow for creating at
             least one padding graph. (default: :obj:`2`)
         options (poptorch.Options, optional): The :class:`poptorch.Options`
@@ -201,7 +201,7 @@ def create_fixed_batch_dataloader(
     return pyg_create_fixed_batch_dataloader(dataset,
                                              num_nodes=num_nodes,
                                              num_edges=num_edges,
-                                             num_graphs=num_graphs,
+                                             batch_size=batch_size,
                                              loader_cls=FixedSizeDataLoader,
                                              follow_batch=follow_batch,
                                              exclude_keys=exclude_keys,

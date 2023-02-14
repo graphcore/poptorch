@@ -209,7 +209,7 @@ def create_fixed_batch_dataloader(
         dataset: Dataset,
         num_nodes: int,
         num_edges: Optional[int] = None,
-        num_graphs: int = 2,
+        batch_size: int = 2,
         loader_cls: Type[FixedSizeDataLoader] = FixedSizeDataLoader,
         follow_batch: Optional[Union[List[str], Tuple[str, ...]]] = None,
         exclude_keys: Optional[Union[List[str], Tuple[str, ...]]] = None,
@@ -227,7 +227,7 @@ def create_fixed_batch_dataloader(
         num_nodes (int): Number of nodes in a batch.
         num_edges (int, optional): Number of edges in a batch.
             (default: :obj:`None`)
-        num_graphs (int, optional): How many graph examples to load in each
+        batch_size (int, optional): How many graph examples to load in each
             batch. This should be at least :obj:`2` to allow for creating at
             least one padding graph. (default: :obj:`2`)
         loader_cls (type, optional): Initialization class for the data loader.
@@ -256,7 +256,7 @@ def create_fixed_batch_dataloader(
         :class:`FixedBatchSampler` sampler.
     """
     # Leave space for padding.
-    sampler_graphs = num_graphs - 1
+    sampler_graphs = batch_size - 1
     sampler_nodes = num_nodes - 1 if num_nodes is not None else num_nodes
     sampler_edges = num_edges - 1 if num_edges is not None else num_edges
     batch_sampler = FixedBatchSampler(dataset,
