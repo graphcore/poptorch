@@ -51,13 +51,13 @@ class FixedBatchSampler(Sampler[List[int]]):
 
         self.num_nodes = num_nodes
         if num_nodes is None:
-            self.num_nodes = max(data.num_nodes for data in data_source) + \
-                (num_graphs - 1)
+            self.num_nodes = max(data.num_nodes
+                                 for data in data_source) * num_graphs
 
         self.num_edges = num_edges
         if num_edges is None:
-            self.num_edges = max(data.num_edges for data in data_source) + \
-                (num_graphs - 1)
+            self.num_edges = max(data.num_edges
+                                 for data in data_source) * num_graphs
 
         self.sampler = sampler if sampler is not None else \
             RandomSampler(data_source)

@@ -387,3 +387,68 @@ def test_dataloader_with_sampler_num_nodes(allow_skip_data,
 
     for batch in dataloader:
         assert batch.num_nodes == num_nodes
+
+
+@pytest.mark.parametrize(
+    'create_loader',
+    [create_fixed_batch_dataloader, ipu_create_fixed_batch_dataloader])
+def test_fixed_size_dataloader_num_created_batches(create_loader):
+    total_num_graphs = 100
+    ds = FakeDataset(num_graphs=total_num_graphs, avg_num_nodes=10)
+    total_num_nodes = sum(d.num_nodes for d in ds)
+    total_num_edges = sum(d.num_edges for d in ds)
+
+    # Loader should create 10 batches of 11 graphs each (10 real + 1 padding
+    # graph).
+    expected_num_batches = 10
+    padded_batch_size = 11
+    loader = create_loader(ds,
+                           batch_size=padded_batch_size,
+                           num_nodes=total_num_nodes)
+    batches_created = sum(1 for _ in loader)
+
+    assert batches_created == expected_num_batches
+
+    # Loader should create only 1 batch since there is space for all graphs
+    # and one padding graph.
+    expected_num_batches = 1
+    loader = create_loader(ds,
+                           batch_size=101,
+                           num_nodes=total_num_nodes + 1,
+                           num_edges=total_num_edges + 1)
+    batches_created = sum(1 for _ in loader)
+
+    assert batches_created == expected_num_batches
+
+    # There is no space for padding graph in the first batch (not enough
+    # graphs) so loader should create two batches.
+    expected_num_batches = 2
+    loader = create_loader(ds,
+                           batch_size=100,
+                           num_nodes=total_num_nodes + 1,
+                           num_edges=total_num_edges + 1)
+    batches_created = sum(1 for _ in loader)
+
+    assert batches_created == expected_num_batches
+
+    # There is no space for padding graph in the first batch (not enough
+    # nodes) so loader should create two batches.
+    expected_num_batches = 2
+    loader = create_loader(ds,
+                           batch_size=101,
+                           num_nodes=total_num_nodes,
+                           num_edges=total_num_edges + 1)
+    batches_created = sum(1 for _ in loader)
+
+    assert batches_created == expected_num_batches
+
+    # There is no space for padding graph in the first batch (not enough
+    # edges) so loader should create two batches.
+    expected_num_batches = 2
+    loader = create_loader(ds,
+                           batch_size=101,
+                           num_nodes=total_num_nodes + 1,
+                           num_edges=total_num_edges)
+    batches_created = sum(1 for _ in loader)
+
+    assert batches_created == expected_num_batches
