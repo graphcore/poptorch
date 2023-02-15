@@ -87,8 +87,9 @@ public:
   StepIO() = default;
 
   popart::ConstVoidData in(popart::TensorId id, int64_t num_elems, // NOLINT
-                           bool prefetch) override;
-  void inComplete(popart::TensorId id, int64_t num_elems) override; // NOLINT
+                           bool prefetch, bool /*isBroadcast*/) override;
+  void inComplete(popart::TensorId id, int64_t num_elems,
+                  bool) override; // NOLINT
   popart::MutableVoidData out(popart::TensorId id,
                               int64_t num_elems) override; // NOLINT
   void outComplete(popart::TensorId id) override;          // NOLINT

@@ -240,13 +240,14 @@ void assertSingleInstanceMaxNumIPUs(std::size_t num_ipus) {
 namespace detail {
 
 popart::ConstVoidData StepIO::in(popart::TensorId id, int64_t num_elems,
-                                 bool prefetch) {
+                                 bool prefetch, bool /*isBroadcast*/) {
   (void)prefetch;
   timestamp(&_in_times, id);
   return get<popart::ConstVoidData>(id, &_inputs_info, num_elems, true);
 }
 
-void StepIO::inComplete(popart::TensorId id, int64_t num_elems) {
+void StepIO::inComplete(popart::TensorId id, int64_t num_elems,
+                        bool /*isBroadcast*/) {
   (void)num_elems;
   timestamp(&_in_complete_times, id);
 }
