@@ -452,3 +452,34 @@ def test_fixed_size_dataloader_num_created_batches(create_loader):
     batches_created = sum(1 for _ in loader)
 
     assert batches_created == expected_num_batches
+
+
+def test_num_nodes_default_value():
+    total_num_graphs = 100
+    ds = FakeDataset(num_graphs=total_num_graphs, avg_num_nodes=10)
+
+    batch_size = 10
+    padded_batch_size = batch_size + 1
+    # The default value of `num_nodes` should be large enough so it's possible
+    # to always pick 10 graphs and create additional padding graph.
+    loader = FixedSizeDataLoader(ds, batch_size=padded_batch_size)
+    expected_batches = 10
+
+    num_batches = sum(1 for _ in loader)
+    assert expected_batches == num_batches
+
+    # The same when using create_fixed_batch_dataloader.
+    loader = create_fixed_batch_dataloader(ds, batch_size=padded_batch_size)
+
+    num_batches = sum(1 for _ in loader)
+    assert expected_batches == num_batches
+
+    # DataLoader should correctly capture the number of nodes from sampler.
+    sampler = FixedBatchSampler(ds, num_graphs=batch_size)
+    loader = FixedSizeDataLoader(ds, batch_sampler=sampler)
+
+    num_batches = 0
+    for batch in loader:
+        assert batch.num_nodes == sampler.num_nodes + 1
+        num_batches += 1
+    assert expected_batches == num_batches

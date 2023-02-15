@@ -119,7 +119,11 @@ class FixedSizeDataLoader(metaclass=TorchDataLoaderMeta):
 
     Args:
         dataset (Dataset): The dataset from which to load the data.
-        num_nodes (int): The total number of nodes in the padded batch.
+        num_nodes (int, optional): The total number of nodes in the padded
+            batch. If the value is not provided, it will be set to the
+            maximum number of nodes times the batch size. For maximum
+            performance it is recommended to tune that value per specific
+            use case. (default: `None`)
         batch_size (int, optional): The number of samples per batch to load.
             This should be at least :obj:`2` to allow for creating at least
             one padding graph. (default: :obj:`None`)
@@ -145,7 +149,7 @@ class FixedSizeDataLoader(metaclass=TorchDataLoaderMeta):
     def __init__(
             self,
             dataset: Dataset,
-            num_nodes: int,
+            num_nodes: Optional[int] = None,
             batch_size: Optional[int] = None,
             batch_sampler: Optional[Sampler[List[int]]] = None,
             shuffle: bool = False,
@@ -172,10 +176,15 @@ class FixedSizeDataLoader(metaclass=TorchDataLoaderMeta):
         if batch_sampler is not None:
             self.padded_batch_size = batch_sampler.num_graphs + 1
 
-            assert num_nodes >= batch_sampler.num_nodes + 1, \
-                f'Argument `num_nodes` (= {num_nodes}) should be greater ' \
-                f'than `num_nodes` (= {batch_sampler.num_nodes}) attribute ' \
-                f'of `batch_sampler` in order to leave some space for padding.'
+            if num_nodes is not None:
+                assert num_nodes >= batch_sampler.num_nodes + 1, \
+                    f'Argument `num_nodes` (= {num_nodes}) should be ' \
+                    f'greater than `num_nodes` (= ' \
+                    f'{batch_sampler.num_nodes}) attribute of ' \
+                    f'`batch_sampler` in order to leave some space for ' \
+                    f'padding.'
+            else:
+                num_nodes = batch_sampler.num_nodes + 1
 
             # The `torch.DataLoader` class expects batch size to be `1` when
             # `batch_sampler` is provided.
@@ -186,6 +195,10 @@ class FixedSizeDataLoader(metaclass=TorchDataLoaderMeta):
             self.padded_batch_size = batch_size or 2
             num_real_graphs = self.padded_batch_size - 1
             torch_dataloader_batch_size = num_real_graphs
+
+            if num_nodes is None:
+                num_nodes = max(d.num_nodes
+                                for d in dataset) * num_real_graphs + 1
 
         if 'num_graphs' not in collater_args:
             collater_args['num_graphs'] = self.padded_batch_size
@@ -207,7 +220,7 @@ class FixedSizeDataLoader(metaclass=TorchDataLoaderMeta):
 
 def create_fixed_batch_dataloader(
         dataset: Dataset,
-        num_nodes: int,
+        num_nodes: Optional[int] = None,
         num_edges: Optional[int] = None,
         batch_size: int = 2,
         loader_cls: Type[FixedSizeDataLoader] = FixedSizeDataLoader,
@@ -224,7 +237,8 @@ def create_fixed_batch_dataloader(
     Args:
         dataset (Dataset): The :class:`~torch_geometric.data.Dataset` instance
             from which to load the graph examples.
-        num_nodes (int): Number of nodes in a batch.
+        num_nodes (int, optional): Number of nodes in a batch.
+            (default: :obj:`None`)
         num_edges (int, optional): Number of edges in a batch.
             (default: :obj:`None`)
         batch_size (int, optional): How many graph examples to load in each

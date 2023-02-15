@@ -85,7 +85,11 @@ class FixedSizeDataLoader(PyGFixedSizeDataLoader,
 
     Args:
         dataset (Dataset): The dataset from which to load the data.
-        num_nodes (int): The total number of nodes in the padded batch.
+        num_nodes (int, optional): The total number of nodes in the padded
+            batch. If the value is not provided, it will be set to the
+            maximum number of nodes times the batch size. For maximum
+            performance it is recommended to tune that value per specific
+            use case. (default: `None`)
         batch_size (int, optional): The number of samples per batch to load.
             This should be at least :obj:`2` to allow for creating at least
             one padding graph. (default: :obj:`None`)
@@ -113,7 +117,7 @@ class FixedSizeDataLoader(PyGFixedSizeDataLoader,
     def __init__(
             self,
             dataset: Dataset,
-            num_nodes: int,
+            num_nodes: Optional[int] = None,
             batch_size: Optional[int] = None,
             batch_sampler: Optional[Sampler[List[int]]] = None,
             shuffle: bool = False,
@@ -150,7 +154,7 @@ class FixedSizeDataLoader(PyGFixedSizeDataLoader,
 
 def create_fixed_batch_dataloader(
         dataset: Dataset,
-        num_nodes: int,
+        num_nodes: Optional[int] = None,
         num_edges: Optional[int] = None,
         batch_size: int = 2,
         options: Optional[poptorch.Options] = None,
@@ -167,7 +171,7 @@ def create_fixed_batch_dataloader(
     Args:
         dataset (Dataset): The :class:`~torch_geometric.data.Dataset` instance
             from which to load the graph examples for the IPU.
-        num_nodes (int): Number of nodes in a batch.
+        num_nodes (int, optional): Number of nodes in a batch.
         num_edges (int, optional): Number of edges in a batch.
             (default: :obj:`None`)
         batch_size (int, optional): How many graph examples to load in each
