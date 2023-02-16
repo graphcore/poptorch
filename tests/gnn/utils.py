@@ -9,11 +9,20 @@ import nbformat
 import torch  # noqa F401
 from nbconvert.preprocessors import ExecutePreprocessor
 from torch.testing import assert_close
-from torch_geometric.data import Data, InMemoryDataset
+from torch_geometric.data import Data, HeteroData, InMemoryDataset
+from torch_geometric.data.data import BaseData
 
 assert_equal = functools.partial(assert_close, rtol=0., atol=0.)
 DEFAULT_PROCESS_TIMEOUT_SECONDS = 40 * 60
 REPO_ROOT = Path(__file__).resolve().parents[1]
+
+
+def is_data(type_: BaseData):
+    if type_ is Data:
+        return True
+    if type_ is HeteroData:
+        return False
+    raise f"Wrong data type: {type_}. Should be Data or HeteroData!"
 
 
 class CalledProcessError(subprocess.CalledProcessError):

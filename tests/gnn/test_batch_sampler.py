@@ -5,8 +5,9 @@ from statistics import mean
 
 import pytest
 import torch
-from utils import FakeDatasetEqualGraphs
+from utils import FakeDatasetEqualGraphs, is_data
 from torch.utils.data.sampler import RandomSampler, SequentialSampler
+from torch_geometric.data import Data, HeteroData
 from torch_geometric.datasets import FakeDataset
 
 from poptorch_geometric.batch_sampler import FixedBatchSampler, make_fixed_batch_generator
@@ -69,17 +70,28 @@ def test_fixed_batch_sampler_should_not_throw_exception():
     assert length == 0
 
 
-@pytest.mark.parametrize("shuffle", [True, False])
-@pytest.mark.parametrize("batch_num_graphs", [2, 10])
-@pytest.mark.parametrize("allow_skip_data", [True, False])
-def test_fixed_batch_should_return_valid_samples(shuffle, batch_num_graphs,
-                                                 allow_skip_data):
-    avg_num_nodes = 30
-    dataset = FakeDataset(num_graphs=100,
-                          avg_num_nodes=avg_num_nodes,
-                          avg_degree=5,
-                          num_channels=16,
-                          edge_dim=8)
+@pytest.mark.parametrize('data_type', [Data, HeteroData])
+@pytest.mark.parametrize('shuffle', [True, False])
+@pytest.mark.parametrize('batch_num_graphs', [2, 10])
+@pytest.mark.parametrize('allow_skip_data', [True, False])
+def test_fixed_batch_should_return_valid_samples(data_type, shuffle,
+                                                 batch_num_graphs,
+                                                 allow_skip_data,
+                                                 fake_hetero_dataset):
+    if is_data(data_type):
+        avg_num_nodes = 30
+        num_node_types = 1
+        num_edge_types = 1
+        dataset = FakeDataset(num_graphs=100,
+                              avg_num_nodes=avg_num_nodes,
+                              avg_degree=5,
+                              num_channels=16,
+                              edge_dim=8)
+    else:
+        avg_num_nodes = 50
+        num_node_types = 2
+        num_edge_types = 5
+        dataset = fake_hetero_dataset
     avg_num_edges = int(math.ceil(mean((data.num_edges for data in dataset))))
 
     batch_num_nodes = avg_num_nodes * batch_num_graphs + batch_num_graphs
@@ -112,6 +124,8 @@ def test_fixed_batch_should_return_valid_samples(shuffle, batch_num_graphs,
 
     batch_generator = make_fixed_batch_generator(sampler)
 
+    batch_num_nodes *= num_node_types
+    batch_num_edges *= num_edge_types
     for batch in batch_generator:
         assert batch.num_graphs == batch_num_graphs
         assert sum(batch[i].num_nodes
@@ -120,23 +134,27 @@ def test_fixed_batch_should_return_valid_samples(shuffle, batch_num_graphs,
                    for i in range(batch.num_graphs)) == batch_num_edges
 
 
-@pytest.mark.parametrize("shuffle", [True, False])
-@pytest.mark.parametrize("allow_skip_data", [True, False])
-@pytest.mark.parametrize("torch_data_loader", [True, False])
+@pytest.mark.parametrize('data_type', [Data, HeteroData])
+@pytest.mark.parametrize('shuffle', [True, False])
+@pytest.mark.parametrize('allow_skip_data', [True, False])
+@pytest.mark.parametrize('torch_data_loader', [True, False])
 def test_fixed_batch_sampler_should_be_usable_with_torch_data_loader(
-        shuffle, allow_skip_data, torch_data_loader):
+        data_type, shuffle, allow_skip_data, torch_data_loader,
+        fake_hetero_dataset):
 
     avg_num_nodes = 30
     batch_num_graphs = 10
     num_channels = 16
     edge_dim = 8
     num_graphs = 10
-    dataset = FakeDataset(num_graphs=100,
-                          avg_num_nodes=avg_num_nodes,
-                          avg_degree=5,
-                          num_channels=num_channels,
-                          edge_dim=8)
-
+    if is_data(data_type):
+        dataset = FakeDataset(num_graphs=100,
+                              avg_num_nodes=avg_num_nodes,
+                              avg_degree=5,
+                              num_channels=num_channels,
+                              edge_dim=8)
+    else:
+        dataset = fake_hetero_dataset
     avg_num_edges = math.ceil(mean(data.num_edges for data in dataset))
 
     base_sampler = RandomSampler(dataset) if shuffle else \
@@ -177,12 +195,12 @@ def test_fixed_batch_sampler_should_be_usable_with_torch_data_loader(
                                                  collate_fn=collater)
     else:
         collater_args = {
-            "add_masks_to_batch": True,
-            "num_edges": batch_num_edges,
-            "num_graphs": num_graphs,
-            "node_pad_value": 0.0,
-            "edge_pad_value": 0.0,
-            "graph_pad_value": 0.0
+            'add_masks_to_batch': True,
+            'num_edges': batch_num_edges,
+            'num_graphs': num_graphs,
+            'node_pad_value': 0.0,
+            'edge_pad_value': 0.0,
+            'graph_pad_value': 0.0
         }
         dataloader = FixedSizeDataLoader(dataset,
                                          num_nodes=batch_num_nodes,
@@ -192,22 +210,28 @@ def test_fixed_batch_sampler_should_be_usable_with_torch_data_loader(
                                          sampler=base_sampler,
                                          allow_skip_data=allow_skip_data)
 
-    expected_x_shape = torch.Size([1, batch_num_nodes, num_channels])
-    expected_batch_shape = torch.Size([1, batch_num_nodes])
-    expected_edge_attr_shape = torch.Size([1, batch_num_edges, edge_dim])
-    expected_mask_attr_shape = torch.Size([1, batch_num_graphs])
-    expected_edge_index_attr_shape = torch.Size([1, 2, batch_num_edges])
+    expected_x_shape = torch.Size([batch_num_nodes, num_channels])
+    expected_batch_shape = torch.Size([batch_num_nodes])
+    expected_edge_attr_shape = torch.Size([batch_num_edges, edge_dim])
+    expected_mask_attr_shape = torch.Size([batch_num_graphs])
+    expected_edge_index_attr_shape = torch.Size([2, batch_num_edges])
 
     for data in dataloader:
-        assert data.x.shape == expected_x_shape
-        assert data.batch.shape == expected_batch_shape
-        assert data.edge_attr.shape == expected_edge_attr_shape
         assert data.graphs_mask.shape == expected_mask_attr_shape
-        assert data.edge_index.shape == expected_edge_index_attr_shape
+        if is_data(data_type):
+            assert data.x.shape == expected_x_shape
+            assert data.batch.shape == expected_batch_shape
+            assert data.edge_attr.shape == expected_edge_attr_shape
+            assert data.edge_index.shape == expected_edge_index_attr_shape
+        else:
+            num_node_types = 2
+            num_edge_types = 5
+            assert data.num_nodes == batch_num_nodes * num_node_types
+            assert data.num_edges == batch_num_edges * num_edge_types
 
 
-@pytest.mark.parametrize("shuffle", [True, False])
-@pytest.mark.parametrize("allow_skip_data", [True, False])
+@pytest.mark.parametrize('shuffle', [True, False])
+@pytest.mark.parametrize('allow_skip_data', [True, False])
 def test_fixed_batch_sampler_padding_not_needed(shuffle, allow_skip_data):
 
     num_graphs_in_dataset = 100
@@ -258,11 +282,11 @@ def test_fixed_batch_sampler_padding_not_needed(shuffle, allow_skip_data):
                                              batch_sampler=batch_sampler,
                                              collate_fn=collator)
 
-    expected_x_shape = torch.Size([1, batch_num_nodes, num_channels])
-    expected_batch_shape = torch.Size([1, batch_num_nodes])
-    expected_edge_attr_shape = torch.Size([1, batch_num_edges, edge_dim])
-    expected_mask_attr_shape = torch.Size([1, batch_num_graphs])
-    expected_edge_index_attr_shape = torch.Size([1, 2, batch_num_edges])
+    expected_x_shape = torch.Size([batch_num_nodes, num_channels])
+    expected_batch_shape = torch.Size([batch_num_nodes])
+    expected_edge_attr_shape = torch.Size([batch_num_edges, edge_dim])
+    expected_mask_attr_shape = torch.Size([batch_num_graphs])
+    expected_edge_index_attr_shape = torch.Size([2, batch_num_edges])
 
     total_graphs_from_dataloader = 0
     for data in dataloader:
@@ -276,9 +300,13 @@ def test_fixed_batch_sampler_padding_not_needed(shuffle, allow_skip_data):
     assert total_graphs_from_dataloader == num_graphs_in_dataset
 
 
-def test_make_fixed_batch_generator_incorrect_values():
-    dataset = FakeDataset(num_graphs=10, avg_num_nodes=10, avg_degree=3)
-
+@pytest.mark.parametrize('data_type', [Data, HeteroData])
+def test_make_fixed_batch_generator_incorrect_values(data_type,
+                                                     fake_hetero_dataset):
+    if is_data(data_type):
+        dataset = FakeDataset(num_graphs=10, avg_num_nodes=10, avg_degree=3)
+    else:
+        dataset = fake_hetero_dataset
     sampler = FixedBatchSampler(dataset, num_graphs=3)
     batch_generator = make_fixed_batch_generator(sampler,
                                                  dataset,

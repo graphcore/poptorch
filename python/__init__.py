@@ -350,6 +350,7 @@ class DataLoader(torch.utils.data.DataLoader):
                     " in the dataset (See torch.utils.data.IterableDataset's"
                     " documentation for more information)", num_workers,
                     num_workers)
+
         else:
             num_elts = len(dataset)
             if not drop_last:
@@ -374,7 +375,6 @@ class DataLoader(torch.utils.data.DataLoader):
                                 self._num_batches_to_combine,
                                 num_incomplete_batches * batch_size,
                                 batch_size, self._combined_batch_size)
-
                     else:
                         logger.warning(
                             "The `batch_sampler` __len__ method is not"

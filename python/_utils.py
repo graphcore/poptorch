@@ -5,8 +5,7 @@ import functools
 import inspect
 import itertools
 import json
-
-from typing import List
+from typing import List, Generator
 
 import torch
 
@@ -16,9 +15,9 @@ from ._logging import logger
 ATTR_PREFIX = "attr:"
 
 
-# Decorator function to mark other functions as
-# deprecated.
 def deprecated(domain, since_version, reason):
+    """Decorator function to mark other functions as deprecated."""
+
     def deprecated_func(func):
         @functools.wraps(func)
         def wrapped_func(*args, **kwargs):
@@ -41,8 +40,8 @@ def assert_signatures_match(poptorch_method, reference_method):
         f"{reference_params} but got {poptorch_params}")
 
 
-# Allow access to attributes
 def accessAttributes(attribute_id_str):
+    """Allow access to attributes"""
     logger.debug("Accessing attributes with: %s", attribute_id_str)
 
     if not isinstance(attribute_id_str, (str)):
@@ -136,41 +135,42 @@ def reconstructTensorStructure(structure, values, filter_fn=lambda t: True):
     return copy_structure(structure, iter(values))
 
 
-# Wraps DataLoader iterator. Generates combined batches by concatenating next
-# batch tensors from dataloader_iterator over dim=0.
+def combine_batch_tensors_gen(tensors: List[List[torch.Tensor]]
+                              ) -> Generator[torch.Tensor, None, None]:
+    """Concatenated batches tensors along dim = 0.
+    """
+    for tensor_id in range(len(tensors[0])):
+        tensors_list = [
+            tensors[batch_id][tensor_id] for batch_id in range(len(tensors))
+        ]
+        yield torch.cat(tensors_list)
+
+
 def combined_batch_generator(dataloader_iterator,
                              num_batches_to_combine,
                              drop_last=True):
-
-    tensors_to_concatenate = []
-
-    def concat(tensors_to_concatenate: List[List[torch.Tensor]]
-               ) -> List[torch.Tensor]:
-        batch_len = len(tensors_to_concatenate[0])
-        for tensor_idx in range(batch_len):
-            yield torch.concat([
-                tensors_to_concatenate[batch_idx][tensor_idx]
-                for batch_idx in range(len(tensors_to_concatenate))
-            ],
-                               dim=0)
-
+    """Wraps DataLoader iterator. Generates combined batches by concatenating
+    consecutive batches tensors from dataloader_iterator along dim=0.
+    """
+    tensors_to_combine = []
     batch = None
     # iterate over next data batches
     for batch in dataloader_iterator:
         # append batch tensors to concatenate list
-        if len(tensors_to_concatenate) < num_batches_to_combine:
-            tensors_to_concatenate.append(flattenTensorStructure(batch))
+        if len(tensors_to_combine) < num_batches_to_combine:
+            tensors_to_combine.append(flattenTensorStructure(batch))
         else:
             # concatenate all tensors from concatenate list - create combined batch
-            yield reconstructTensorStructure(batch,
-                                             concat(tensors_to_concatenate))
-            tensors_to_concatenate = [flattenTensorStructure(batch)]
+            yield reconstructTensorStructure(
+                batch, combine_batch_tensors_gen(tensors_to_combine))
+            tensors_to_combine = [flattenTensorStructure(batch)]
 
-    if tensors_to_concatenate and len(tensors_to_concatenate) > 0 and \
-        len(tensors_to_concatenate) == num_batches_to_combine or \
+    if tensors_to_combine and len(tensors_to_combine) > 0 and \
+        len(tensors_to_combine) == num_batches_to_combine or \
         not drop_last:
         # concatenate all tensors from concatenate list - create combined batch
-        yield reconstructTensorStructure(batch, concat(tensors_to_concatenate))
+        yield reconstructTensorStructure(
+            batch, combine_batch_tensors_gen(tensors_to_combine))
 
 
 def getIpuTensorId(x: torch.Tensor):

@@ -19,8 +19,6 @@ def test_fixed_size_dataloader_with_cluster_data(
         benchmark,
 ):
     ipu_dataloader = loader_cls is IPUFixedSizeClusterLoader
-    # CombinedBatchingCollater adds an additional 0-th dimension.
-    dim_offset = 1 if ipu_dataloader else 0
 
     avg_degree = 3
     num_parts = 8
@@ -31,7 +29,7 @@ def test_fixed_size_dataloader_with_cluster_data(
         avg_num_nodes=128,
         avg_degree=avg_degree,
         num_channels=4,
-        task="graph",
+        task='graph',
     )[0]
 
     # Get a sensible value for the the maximum number of nodes.
@@ -46,12 +44,12 @@ def test_fixed_size_dataloader_with_cluster_data(
                        if data.is_node_attr(k) or data.is_edge_attr(k))
 
     expected_sizes = {
-        k: ((padded_num_nodes if data.is_node_attr(k) else padded_num_edges),
-            dim_offset)
+        k:
+        ((padded_num_nodes if data.is_node_attr(k) else padded_num_edges), 0)
         for k in data_attributes
     }
     # Special case for edge_index which is of shape [2, num_edges].
-    expected_sizes['edge_index'] = (padded_num_edges, 1 + dim_offset)
+    expected_sizes['edge_index'] = (padded_num_edges, 1)
 
     # Create a fixed size dataloader.
     kwargs = {

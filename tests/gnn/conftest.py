@@ -22,12 +22,39 @@ def molecule(pyg_qm9):
 
 
 @pytest.fixture(scope="module")
+def fake_small_dataset() -> pyg.datasets.FakeDataset:
+    pyg.seed_everything(42)
+    dataset = pyg.datasets.FakeDataset(num_graphs=10,
+                                       avg_num_nodes=30,
+                                       avg_degree=5)
+    return dataset
+
+
+@pytest.fixture(scope="module")
+def fake_large_dataset() -> pyg.datasets.FakeDataset:
+    pyg.seed_everything(42)
+    dataset = pyg.datasets.FakeDataset(num_graphs=100, avg_num_nodes=10)
+    return dataset
+
+
+@pytest.fixture(scope="module")
 def fake_hetero_dataset() -> pyg.datasets.FakeHeteroDataset:
     pyg.seed_everything(1410)
-    dataset = pyg.datasets.FakeHeteroDataset(num_node_types=2,
+    dataset = pyg.datasets.FakeHeteroDataset(num_graphs=100,
+                                             num_node_types=2,
                                              num_edge_types=5,
-                                             avg_num_nodes=50)[0]
+                                             avg_num_nodes=50)
     return dataset
+
+
+@pytest.fixture(scope="module")
+def fake_hetero_data() -> pyg.datasets.FakeHeteroDataset:
+    pyg.seed_everything(1410)
+    dataset = pyg.datasets.FakeHeteroDataset(num_graphs=1,
+                                             num_node_types=2,
+                                             num_edge_types=5,
+                                             avg_num_nodes=50)
+    return dataset[0]
 
 
 @pytest.fixture(scope="module")

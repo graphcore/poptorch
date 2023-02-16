@@ -4,10 +4,13 @@ from copy import deepcopy
 
 import torch
 from torch.testing import assert_close
-from torch_geometric.data import Data
+from torch_geometric.data import Batch, Data, HeteroData
 from torch_geometric.nn import MessagePassing
 
 import poptorch
+
+DataBatch = type(Batch(_base_cls=Data))
+HeteroDataBatch = type(Batch(_base_cls=HeteroData))
 
 
 class AttributeTypeCache:

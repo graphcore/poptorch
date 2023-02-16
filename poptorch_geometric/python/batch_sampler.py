@@ -5,11 +5,12 @@ from functools import lru_cache
 from typing import Any, Generator, Iterable, Iterator, List, Optional, Union
 
 from torch.utils.data.sampler import RandomSampler, Sampler
-from torch_geometric.data import Batch, Data, Dataset
+from torch_geometric.data import Batch, Dataset
+from torch_geometric.data.data import BaseData
 
 from poptorch_geometric.collate import FixedSizeCollater
 
-__all__ = ["FixedBatchSampler", "make_fixed_batch_generator"]
+__all__ = ['FixedBatchSampler', 'make_fixed_batch_generator']
 
 
 class FixedBatchSampler(Sampler[List[int]]):
@@ -32,8 +33,8 @@ class FixedBatchSampler(Sampler[List[int]]):
         allow_skip_data (bool, optional): Allow skip :obj:`data_source` item,
             otherwise throw :class:`RuntimeError` when the sampler is not able
             to form a single item batch from :obj:`data_source`, because
-            :obj:`Data` exceeds the maximum batch requirements.
-            (default: :obj:`False`)
+            the iterated data exceeds the maximum batch requirements.
+            (default :obj:`False`)
     """
 
     def __init__(self,
@@ -44,7 +45,7 @@ class FixedBatchSampler(Sampler[List[int]]):
                  sampler: Optional[Union[Sampler[int], Iterable[int]]] = None,
                  allow_skip_data: Optional[bool] = False) -> None:
         super().__init__(data_source)
-        self.__validate(sampler, num_nodes, num_edges, num_graphs)
+        self._validate(sampler, num_nodes, num_edges, num_graphs)
 
         self.data_source = data_source
         self.num_graphs = num_graphs
@@ -63,23 +64,23 @@ class FixedBatchSampler(Sampler[List[int]]):
             RandomSampler(data_source)
         self.allow_skip_data = allow_skip_data
 
-    def __validate(self, sampler, num_nodes, num_edges, num_graphs):
+    def _validate(self, sampler, num_nodes, num_edges, num_graphs):
         if sampler is not None and len(sampler) == 0:
             raise ValueError(
-                "Invalid `sampler` parameter, `len(sampler) == 0`.")
+                'Invalid `sampler` parameter, `len(sampler) == 0`.')
 
         def validate_batch_limit(param, param_name, limit=1):
             if param is not None and param < limit:
-                raise ValueError(f"Invalid `{param_name}` parameter, "
-                                 f"{param_name} should be at least {limit}.")
+                raise ValueError(f'Invalid `{param_name}` parameter, '
+                                 f'{param_name} should be at least {limit}.')
 
         if num_graphs is None:
             raise ValueError(
-                "Invalid `num_graphs` parameter, `num_graphs` is None.")
+                'Invalid `num_graphs` parameter, `num_graphs` is None.')
 
-        validate_batch_limit(num_graphs, "num_graphs", 1)
-        validate_batch_limit(num_nodes, "num_nodes", num_graphs)
-        validate_batch_limit(num_edges, "num_edges", num_graphs)
+        validate_batch_limit(num_graphs, 'num_graphs', 1)
+        validate_batch_limit(num_nodes, 'num_nodes', num_graphs)
+        validate_batch_limit(num_edges, 'num_edges', num_graphs)
 
     class _Batch:
         def __init__(self) -> None:
@@ -88,7 +89,7 @@ class FixedBatchSampler(Sampler[List[int]]):
             self.num_edges = 0
             self.num_graphs = 0
 
-        def append(self, idx: int, data: Data) -> None:
+        def append(self, idx: int, data: BaseData) -> None:
             self.indices.append(idx)
             self.num_nodes += data.num_nodes
             self.num_edges += data.num_edges
@@ -105,14 +106,12 @@ class FixedBatchSampler(Sampler[List[int]]):
 
     def __iter__(self) -> Iterator[List[int]]:
         batch = self._Batch()
-
         for idx in self.sampler:
-
             data = self.data_source[idx]
             is_data_appendable = True
 
             while True:
-                if self.__has_space(batch, data):
+                if self._has_space(batch, data):
                     batch.append(idx, data)
                 elif not batch.empty():
                     yield batch.indices
@@ -122,18 +121,18 @@ class FixedBatchSampler(Sampler[List[int]]):
                     is_data_appendable = False
 
                 if not self.allow_skip_data and not is_data_appendable:
-                    raise RuntimeError(f"Dataset[{idx}] {data} is not "
-                                       "appendable to empty batch with  "
-                                       "following configuration: { number of "
-                                       f"graphs: {self.num_graphs}, number of "
-                                       f"nodes: {self.num_nodes}, number of "
-                                       f"edges: {self.num_edges} }}.")
+                    raise RuntimeError(f'Dataset[{idx}] {data} is not '
+                                       'appendable to empty batch with  '
+                                       'following configuration: { number of '
+                                       f'graphs: {self.num_graphs}, number of '
+                                       f'nodes: {self.num_nodes}, number of '
+                                       f'edges: {self.num_edges} }}.')
                 break
 
         if not batch.empty():
             yield batch.indices
 
-    def __has_space(self, batch: _Batch, data: Data) -> bool:
+    def _has_space(self, batch: _Batch, data: BaseData) -> bool:
         next_nodes = data.num_nodes
         next_edges = data.num_edges
 
@@ -153,8 +152,8 @@ class FixedBatchSampler(Sampler[List[int]]):
     def __len__(self) -> int:
         if isinstance(self.sampler, RandomSampler):
             raise NotImplementedError(
-                "`self.sampler` is `RandomSampler`. "
-                f"{self.__class__.__name__} length is non deterministic.")
+                '`self.sampler` is `RandomSampler`. '
+                f'{self.__class__.__name__} length is non deterministic.')
 
         return len(list(self.__iter__()))
 

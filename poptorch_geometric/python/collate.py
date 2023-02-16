@@ -1,12 +1,19 @@
 # Copyright (c) 2022-2023 Graphcore Ltd. All rights reserved.
 
-from functools import partial
-from typing import Any, Callable, Dict, Generator, List, Optional, Tuple, Union
+from typing import Any, Dict, Generator, List, Optional, Tuple, Union
+from functools import singledispatch, singledispatchmethod
+from itertools import chain
 
 import torch
-from torch_geometric.data import Batch, Data
+from torch_geometric.data import Batch, Data, HeteroData
+from torch_geometric.data.data import BaseData
+from torch_geometric.typing import EdgeType, NodeType
+from torch_geometric.transforms import Pad
 
 from poptorch_geometric.pyg_collate import Collater
+from poptorch_geometric.utils import DataBatch, HeteroDataBatch
+
+from poptorch._utils import combine_batch_tensors_gen
 
 from . import types, utils
 
@@ -14,18 +21,127 @@ __all__ = ['FixedSizeCollater', 'CombinedBatchingCollater']
 
 
 def make_exclude_keys(include_keys: Union[List[str], Tuple[str, ...]],
-                      data: Data) -> Tuple[str, ...]:
+                      data: BaseData) -> Tuple[str, ...]:
     return tuple(set(data.keys) - set(include_keys))
 
 
-def _divide_evenly(amount: int, pieces: int) -> List[int]:
+def _divide_evenly_formula(amount: int, pieces: int) -> List[int]:
     minimum = amount // pieces
     extra = amount - minimum * pieces
     return [minimum + (1 if i < extra else 0) for i in range(pieces)]
 
 
-def _data_slice_gen(data_list: List[Data],
-                    attr: str) -> Generator[slice, None, None]:
+@singledispatch
+def _divide_evenly(data, num_pad_graphs, num_pad_nodes, num_pad_edges):  # pylint: disable=unused-argument
+    raise ValueError(f'Unsupported data type: {type(data)}')
+
+
+@_divide_evenly.register(Data)
+def _(_, num_pad_graphs: int, num_pad_nodes: int,
+      num_pad_edges: int) -> Tuple[List[int], List[int]]:
+    return _divide_evenly_formula(num_pad_nodes,
+                                  num_pad_graphs), _divide_evenly_formula(
+                                      num_pad_edges, num_pad_graphs)
+
+
+@_divide_evenly.register(HeteroData)
+def _(_, num_pad_graphs: int, num_pad_nodes: Dict[NodeType, int],
+      num_pad_edges: Dict[EdgeType, int]
+      ) -> Tuple[List[Dict[NodeType, int]], List[Dict[EdgeType, int]]]:
+    def calc_pads(num_pad_elems):
+        pad_elems = [dict() for i in range(num_pad_graphs)]
+        for type_, pad_val in num_pad_elems.items():
+            pad_per_graph = _divide_evenly_formula(pad_val, num_pad_graphs)
+            for graph_idx, graph_pad in enumerate(pad_per_graph):
+                pad_elems[graph_idx][type_] = graph_pad
+        return pad_elems
+
+    pad_nodes = calc_pads(num_pad_nodes)
+    pad_edges = calc_pads(num_pad_edges)
+    return pad_nodes, pad_edges
+
+
+@singledispatch
+def _generate_data_to_pad(data_to_pad_dict):
+    raise ValueError(f'Unsupported data type: {type(data_to_pad_dict)}')
+
+
+@_generate_data_to_pad.register(Data)
+def _(data_to_pad_dict: dict) -> Data:
+    return Data.from_dict(data_to_pad_dict)
+
+
+@_generate_data_to_pad.register(HeteroData)
+def _(data_to_pad_dict: dict) -> HeteroData:
+    return HeteroData(data_to_pad_dict)
+
+
+def _reset_dim(shape: torch.Size, key: str = None) -> List[int]:
+    shape = list(shape)
+    if len(shape) > 1:
+        shape[1 if key == 'edge_index' else 0] = 0
+    return shape
+
+
+def _reset_attr(value: Any, key: str = None) -> Any:
+    """Reset value to the default of its type. In case of torch.Tensor, it
+    returns a tensor with one of the dims set to 0. The dim is
+    determined based on the key.
+    """
+    if isinstance(value, torch.Tensor):
+        # NOTE: It has to be torch.zeros - creating a Tensor directly
+        # (through torch.tensor) with 0 in shape ends up in creating a
+        # tensor with wrong dimensions.
+        return torch.zeros(_reset_dim(value.shape, key))
+    return type(value)()
+
+
+@singledispatch
+def _create_structure_dict(data):
+    """Create a dict representing the structure of the input data. Dict keys
+    correspond to the 'data' keys, its values are all defaulted.
+    """
+    raise ValueError(f'Unsupported data type: {type(data)}')
+
+
+@_create_structure_dict.register(Data)
+def _(data: Data) -> Dict[NodeType, Any]:
+    out = dict()
+    for key, val in data.to_dict().items():
+        out[key] = _reset_attr(val, key)
+    return out
+
+
+@_create_structure_dict.register(HeteroData)
+def _(data: HeteroData) -> Dict[Union[NodeType, EdgeType], Any]:
+    out = dict()
+    for key, attr in data._global_store.to_dict().items():  # pylint: disable=protected-access
+        out[key] = _reset_attr(attr)
+    for key, attr in chain(data.node_items(), data.edge_items()):
+        out[key] = {
+            k: torch.zeros(_reset_dim(v.shape, k))
+            for k, v in attr.to_dict().items() if isinstance(v, torch.Tensor)
+        }
+    return out
+
+
+def _make_node_slices_gen(data_list: List[BaseData]) -> List[slice]:
+    data_type = type(data_list[0])
+    return list(_data_slice_gen.dispatch(data_type)(data_list, 'num_nodes'))
+
+
+def _make_data_edge_slice_gen(data_list: List[BaseData]) -> List[slice]:
+    data_type = type(data_list[0])
+    return list(_data_slice_gen.dispatch(data_type)(data_list, 'num_edges'))
+
+
+@singledispatch
+def _data_slice_gen(data_list, attr) -> Generator[slice, None, None]:
+    raise ValueError(f'Unsupported data type: {type(data_list[0])}')
+
+
+@_data_slice_gen.register(Data)
+def _(data_list: List[Data], attr: str) -> Generator[slice, None, None]:
     start = 0
     end = 0
     for data in data_list:
@@ -34,14 +150,108 @@ def _data_slice_gen(data_list: List[Data],
         start = end
 
 
-def _make_data_node_slice_gen(data_list: List[Data]
-                              ) -> Callable[[], Generator[slice, None, None]]:
-    return partial(_data_slice_gen, data_list, "num_nodes")
+@_data_slice_gen.register(HeteroData)
+def _(data_list: List[HeteroData], attr: str) -> Generator[slice, None, None]:
+    start = 0
+    end = 0
+    is_nodes_gen = (attr == 'num_nodes')
+    for data in data_list:
+        for node_type in (data.node_stores
+                          if is_nodes_gen else data.edge_stores):
+            end += getattr(node_type, attr)
+            yield slice(start, end)
+            start = end
 
 
-def _make_data_edge_slice_gen(data_list: List[Data]
-                              ) -> Callable[[], Generator[slice, None, None]]:
-    return partial(_data_slice_gen, data_list, "num_edges")
+def _create_preserve_mask(num_elems: int, num_elems_to_trim: int,
+                          slices: List[slice]) -> List[bool]:
+    # Prevent deletion of all elements from a single graph.
+    removable_nodes_mask = torch.ones(num_elems, dtype=torch.bool)
+    for data_slice in slices:
+        if data_slice.start < data_slice.stop:
+            mask_slice = removable_nodes_mask[data_slice]
+            mask_slice[torch.randint(high=len(mask_slice), size=(1, ))] = False
+    indices = torch.arange(0, num_elems)[removable_nodes_mask]
+
+    # Randomly select elements to remove.
+    prune_indices = indices[torch.randperm(
+        len(indices))][:num_elems_to_trim].type(torch.long)
+    preserve_mask = torch.ones(num_elems, dtype=torch.bool)
+    preserve_mask[prune_indices] = False
+
+    return preserve_mask
+
+
+@singledispatch
+def _prune_data_nodes(data_list, preserve_nodes_mask, node_slices):  # pylint: disable=unused-argument
+    raise ValueError(f'Unsupported data types: {type(data_list[0])}')
+
+
+@_prune_data_nodes.register(Data)
+def _(data_list: List[Data], preserve_nodes_mask: torch.Tensor,
+      node_slices: List[slice]) -> List[Data]:
+    return [
+        data.subgraph(preserve_nodes_mask[slice])
+        for data, slice in zip(data_list, node_slices)
+    ]
+
+
+@_prune_data_nodes.register(HeteroData)
+def _(data_list: List[HeteroData], preserve_nodes_mask: torch.Tensor,
+      node_slices: List[slice]) -> List[HeteroData]:
+    node_slices_iter = iter(node_slices)
+    return [
+        data.subgraph({
+            node_type: preserve_nodes_mask[next(node_slices_iter)]
+            for node_type in data.node_types
+        }) for data in data_list
+    ]
+
+
+@singledispatch
+def _prune_data_edges(data_list, preserve_edges_mask, edge_slices):  # pylint: disable=unused-argument
+    raise ValueError(f'Unsupported data types: {type(data_list[0])}')
+
+
+@_prune_data_edges.register(Data)
+def _(data_list: List[Data], preserve_edges_mask: torch.Tensor,
+      edge_slices: List[slice]) -> Data:
+    return [
+        data.edge_subgraph(preserve_edges_mask[slc])
+        for data, slc in zip(data_list, edge_slices)
+    ]
+
+
+@_prune_data_edges.register(HeteroData)
+def _(data_list: List[HeteroData], preserve_edges_mask: torch.Tensor,
+      edge_slices: List[slice]) -> HeteroData:
+    edge_slices_iter = iter(edge_slices)
+    return [
+        data.edge_subgraph({
+            edge_type: preserve_edges_mask[next(edge_slices_iter)]
+            for edge_type in data.edge_types
+        }) for data in data_list
+    ]
+
+
+@singledispatch
+def _any_negative(value: int) -> bool:
+    return value < 0
+
+
+@_any_negative.register(dict)
+def _(value: dict) -> bool:
+    return any(v < 0 for v in value.values())
+
+
+@singledispatch
+def _all_positive(value: int) -> bool:
+    return value > 0
+
+
+@_all_positive.register(dict)
+def _(value: dict) -> bool:
+    return all(v > 0 for v in value.values())
 
 
 class FixedSizeCollater(Collater):
@@ -137,8 +347,7 @@ class FixedSizeCollater(Collater):
                                    pad_graph_defaults)
         self.attribute_cacher = utils.AttributeTypeCache()
 
-    def __call__(self, data_list: List[Data]) -> Batch:
-
+    def __call__(self, data_list: List[BaseData]) -> Batch:
         if not isinstance(data_list, list):
             raise TypeError(f'Expected list, got {type(data_list).__name__}.')
 
@@ -148,18 +357,18 @@ class FixedSizeCollater(Collater):
         num_all_graphs = num_real_graphs + num_pad_graphs
         num_real_nodes, num_pad_nodes, num_real_edges, num_pad_edges = \
             self._calc_pad_limits(data_list)
-
-        if self.trim_nodes and num_pad_nodes < 0:
+        if self.trim_nodes and _any_negative(num_pad_nodes):
             data_list = self._prune_nodes(data_list)
             num_real_nodes, num_pad_nodes, num_real_edges, num_pad_edges = \
                 self._calc_pad_limits(data_list)
 
-        if self.trim_edges and num_pad_edges < 0:
+        if self.trim_edges and _any_negative(num_pad_edges):
             data_list = self._prune_edges(data_list)
             num_real_nodes, num_pad_nodes, num_real_edges, num_pad_edges = \
                 self._calc_pad_limits(data_list)
 
-        if num_pad_graphs < 0 or num_pad_edges < 0 or num_pad_nodes < 0:
+        if num_pad_graphs < 0 or _any_negative(num_pad_edges) or _any_negative(
+                num_pad_nodes):
             raise RuntimeError('Graphs in the batch are too large. Requested '
                                f'{num_all_graphs} graphs, but batch has '
                                f'{num_real_graphs} graphs. Requested '
@@ -168,73 +377,184 @@ class FixedSizeCollater(Collater):
                                f'{self.num_edges} edges, but batch has '
                                f'{num_real_edges} edges.')
 
-        data = data_list[0]
-
-        if num_pad_graphs == 0 and (num_pad_nodes > 0 or num_pad_edges > 0):
+        num_nodes_or_edges_positive = _all_positive(
+            num_pad_nodes) or _all_positive(num_pad_edges)
+        if num_pad_graphs == 0 and num_nodes_or_edges_positive:
             raise RuntimeError(
                 f'Requested to pad a batch to {num_all_graphs} graphs but ' \
                 f'collater got a list of {num_real_graphs} graphs and ' \
                 'cannot create additional graphs to pad nodes and edges.')
 
-        if num_pad_graphs and (num_pad_nodes > 0 or num_pad_edges > 0):
+        if num_pad_graphs and num_nodes_or_edges_positive:
+            data = data_list[0]
             # Divide padding nodes and edges evenly between padding graphs.
-            pad_nodes_by_graph = _divide_evenly(num_pad_nodes, num_pad_graphs)
-            pad_edges_by_graph = _divide_evenly(num_pad_edges, num_pad_graphs)
+            pad_nodes_by_graph, pad_edges_by_graph = _divide_evenly(
+                data, num_pad_graphs, num_pad_nodes, num_pad_edges)
 
+            data_to_pad_dict = _create_structure_dict(data)
             for nodes, edges in zip(pad_nodes_by_graph, pad_edges_by_graph):
-                data_list.append(
-                    data.from_dict(self._make_pad_graph(data, nodes, edges)))
+                padded_data = self._create_padded_data(data_list,
+                                                       data_to_pad_dict, nodes,
+                                                       edges)
+                data_list.append(padded_data)
 
         batch = super().__call__(data_list)
-
         if self.add_masks_to_batch:
-            graphs_mask = torch.arange(num_all_graphs) < num_real_graphs
-            nodes_mask = torch.arange(self.num_nodes) < num_real_nodes
-            edges_mask = torch.arange(self.num_edges) < num_real_edges
-            setattr(batch, 'graphs_mask', graphs_mask)
-            setattr(batch, 'nodes_mask', nodes_mask)
-            setattr(batch, 'edges_mask', edges_mask)
+            padded_data_list = data_list[-num_pad_graphs:]
+            self._add_masks(batch,
+                            num_all_graphs,
+                            num_real_graphs,
+                            num_real_nodes=num_real_nodes,
+                            num_real_edges=num_real_edges,
+                            padded_data_list=padded_data_list)
 
         return batch
 
-    def _calc_pad_limits(self,
-                         data_list: List[Data]) -> Tuple[int, int, int, int]:
-        num_real_nodes, num_pad_nodes = self._calc_pad_limits_attr(
-            data_list, "num_nodes")
-        num_real_edges, num_pad_edges = self._calc_pad_limits_attr(
-            data_list, "num_edges")
+    @singledispatchmethod
+    def _add_masks(self, batch, num_all_graphs, num_real_graphs, **kwargs):
+        raise ValueError(f'Unsupported data type: {type(batch)}')
+
+    @_add_masks.register(DataBatch)
+    def _(self, batch: DataBatch, num_all_graphs: int, num_real_graphs: int,
+          **kwargs) -> None:  # num_real_nodes: int, num_real_edges: int
+        num_real_nodes = kwargs['num_real_nodes']
+        num_real_edges = kwargs['num_real_edges']
+        graphs_mask = torch.arange(num_all_graphs) < num_real_graphs
+        nodes_mask = torch.arange(self.num_nodes) < num_real_nodes
+        edges_mask = torch.arange(self.num_edges) < num_real_edges
+        setattr(batch, 'graphs_mask', graphs_mask)
+        setattr(batch, 'nodes_mask', nodes_mask)
+        setattr(batch, 'edges_mask', edges_mask)
+
+    @_add_masks.register(HeteroDataBatch)
+    def _(self, batch: HeteroDataBatch, num_all_graphs: int,
+          num_real_graphs: int,
+          **kwargs) -> None:  # padded_data_list: List[HeteroDataBatch]):
+        padded_data_list = kwargs['padded_data_list']
+        graphs_mask = torch.arange(num_all_graphs) < num_real_graphs
+        setattr(batch, 'graphs_mask', graphs_mask)
+
+        num_padded_nodes_list = [0] * len(batch.node_stores)
+        num_padded_edges_list = [0] * len(batch.edge_stores)
+        for padded_data in padded_data_list:
+            for idx, node_store in enumerate(padded_data.node_stores):
+                num_padded_nodes_list[idx] += node_store.num_nodes
+            for idx, edge_store in enumerate(padded_data.edge_stores):
+                num_padded_edges_list[idx] += edge_store.num_edges
+
+        def set_mask(stores, num_padded_list, num_attr, mask_attr):
+            for attr, num_padded in zip(stores, num_padded_list):
+                num_elems = getattr(attr, num_attr)
+                mask = torch.arange(num_elems) < (num_elems - num_padded)
+                setattr(attr, mask_attr, mask)
+
+        set_mask(batch.node_stores, num_padded_nodes_list, 'num_nodes',
+                 'nodes_mask')
+        set_mask(batch.edge_stores, num_padded_edges_list, 'num_edges',
+                 'edges_mask')
+
+    def _calc_pad_limits(
+            self, data_list: List[BaseData]
+    ) -> Union[Tuple[int, int, int, int],
+               Tuple[Dict[NodeType, int], Dict[NodeType, int],
+                     Dict[NodeType, int], Dict[NodeType, int]]]:
+
+        # Check if all elements in data_list are of the same type
+        data_list_types = [type(d) for d in data_list]
+        assert data_list_types[:-1] == data_list_types[1:]
+
+        return self._calc_pad_limits_body(data_list[0], data_list)
+
+    @singledispatchmethod
+    def _calc_pad_limits_body(self, data, data_list):  # pylint: disable=unused-argument
+        raise ValueError(f'Unsupported data type: {type(data)}')
+
+    @_calc_pad_limits_body.register(Data)
+    def _(self, _, data_list: List[Data]) -> Tuple[int, int, int, int]:
+        def calc_pad_limits_attr(data_list, attr):
+            data_num_attr = sum(getattr(d, attr) for d in data_list)
+            num_pad_attr = getattr(self, attr) - data_num_attr
+            return data_num_attr, num_pad_attr
+
+        num_real_nodes, num_pad_nodes = calc_pad_limits_attr(
+            data_list, 'num_nodes')
+        num_real_edges, num_pad_edges = calc_pad_limits_attr(
+            data_list, 'num_edges')
 
         return num_real_nodes, num_pad_nodes, num_real_edges, num_pad_edges
 
-    def _calc_pad_limits_attr(self, data_list: List[Data],
-                              attr: str) -> Tuple[int, int]:
-        data_num_attr = sum(getattr(d, attr) for d in data_list)
-        num_pad_attr = getattr(self, attr) - data_num_attr
+    @_calc_pad_limits_body.register(HeteroData)
+    def _(self, _, data_list: List[HeteroData]
+          ) -> Tuple[Dict[NodeType, int], Dict[NodeType, int],
+                     Dict[EdgeType, int], Dict[EdgeType, int]]:
+        real_nodes_nums = dict()
+        real_edges_nums = dict()
+        for data_ in data_list:
+            for node_type in data_.node_types:
+                real_nodes_nums[node_type] = real_nodes_nums.get(
+                    node_type, 0) + data_[node_type].x.shape[0]
 
-        return data_num_attr, num_pad_attr
+            for edge_type in data_.edge_types:
+                real_edges_nums[edge_type] = real_edges_nums.get(
+                    edge_type, 0) + data_[edge_type].edge_index.shape[1]
 
-    def _prune_edges(self, data_list: List[Data]) -> List[Data]:
-        batch_num_edges = sum(d.num_edges for d in data_list)
+        pad_nodes_nums = {
+            k: (self.num_nodes - v)
+            for k, v in real_nodes_nums.items()
+        }
+        pad_edges_nums = {
+            k: (self.num_edges - v)
+            for k, v in real_edges_nums.items()
+        }
+
+        return real_nodes_nums, pad_nodes_nums, real_edges_nums, pad_edges_nums
+
+    def _create_padded_data(
+            self, data_list: List[BaseData],
+            data_to_pad_dict: Dict[Union[NodeType, EdgeType, str], Any],
+            num_nodes: int, num_edges: int) -> BaseData:
+        """Create a new empty data instance (type specified based on the
+        'data_list' input) padded to num_nodes and num_edges.
+        """
+        data = data_list[0]
+        data_type = type(data)
+        data_to_pad = _generate_data_to_pad.dispatch(data_type)(
+            data_to_pad_dict)
+        pad_op = Pad(max_num_nodes=num_nodes,
+                     max_num_edges=num_edges,
+                     node_pad_value=self.node_pad_value,
+                     edge_pad_value=self.edge_pad_value,
+                     exclude_keys=self.exclude_keys)
+        padded_data = pad_op(data_to_pad)
+
+        # Because Pad op does not pad graph values, this needs to be done
+        # in a separate step.
+        self._pad_graph_values(padded_data, data)
+
+        return padded_data
+
+    def _prune_edges(self, data_list: List[BaseData]) -> List[BaseData]:
+        num_real_edges = sum(d.num_edges for d in data_list)
 
         # There is nothing to prune.
-        if batch_num_edges < self.num_edges:
+        if num_real_edges < self.num_edges:
             return data_list
 
-        num_edges_to_trim = batch_num_edges - self.num_edges
+        num_edges_to_trim = num_real_edges - self.num_edges
+        edge_slices = _make_data_edge_slice_gen(data_list)
 
-        # Randomly select edges to remove.
-        prune_edges_indices = torch.randperm(
-            batch_num_edges)[:num_edges_to_trim].type(torch.long)
-        preserve_edges_mask = torch.ones(batch_num_edges, dtype=torch.bool)
-        preserve_edges_mask[prune_edges_indices] = False
+        # Prepare the mask of edges randomly chosen to remove.
+        preserve_edges_mask = _create_preserve_mask(num_real_edges,
+                                                    num_edges_to_trim,
+                                                    edge_slices)
 
-        data_slice_gen = _make_data_edge_slice_gen(data_list)()
-        return [
-            data.edge_subgraph(preserve_edges_mask[next(data_slice_gen)])
-            for data in data_list
-        ]
+        # Apply the preservation masks to the data_list to finally trim edges.
+        data_type = type(data_list[0])
+        return _prune_data_edges.dispatch(data_type)(data_list,
+                                                     preserve_edges_mask,
+                                                     edge_slices)
 
-    def _prune_nodes(self, data_list: List[Data]) -> List[Data]:
+    def _prune_nodes(self, data_list: List[BaseData]) -> List[BaseData]:
         num_real_nodes = sum(d.num_nodes for d in data_list)
 
         # There is nothing to prune.
@@ -243,64 +563,57 @@ class FixedSizeCollater(Collater):
 
         num_graphs_to_trim = len(data_list)
         num_nodes_to_trim = num_real_nodes - self.num_nodes
-
         if self.num_nodes < num_graphs_to_trim:
             raise RuntimeError('Too many nodes to trim. Batch has '
                                f'{num_graphs_to_trim} graphs with '
                                f'{num_real_nodes} total nodes. Requested '
                                f'to trim it to {num_nodes_to_trim} nodes, '
                                'which would result in empty graphs.')
+        node_slices = _make_node_slices_gen(data_list)
 
-        data_slice_node_gen = _make_data_node_slice_gen(data_list)
-        # Prevent deletion of all nodes from a single graph.
-        removable_nodes_mask = torch.ones(num_real_nodes, dtype=torch.bool)
-        for data_slice in data_slice_node_gen():
-            mask_slice = removable_nodes_mask[data_slice]
-            mask_slice[torch.randint(high=len(mask_slice), size=(1, ))] = False
-        indices = torch.arange(0, num_real_nodes)[removable_nodes_mask]
+        # Prepare the mask of nodes randomly chosen to remove.
+        preserve_nodes_mask = _create_preserve_mask(num_real_nodes,
+                                                    num_nodes_to_trim,
+                                                    node_slices)
+        # Apply the preservation masks to the data_list  to finally trim nodes.
+        data_type = type(data_list[0])
+        return _prune_data_nodes.dispatch(data_type)(data_list,
+                                                     preserve_nodes_mask,
+                                                     node_slices)
 
-        # Randomly select nodes to remove.
-        prune_nodes_indices = indices[torch.randperm(
-            len(indices))][:num_nodes_to_trim].type(torch.long)
-        preserve_nodes_mask = torch.ones(num_real_nodes, dtype=torch.bool)
-        preserve_nodes_mask[prune_nodes_indices] = False
+    @singledispatchmethod
+    def _pad_graph_values(self, padded_data, original_data):
+        raise ValueError(
+            f'Unsupported pair of data types: {type(padded_data)}, '
+            f'{type(original_data)}')
 
-        data_slice_gen = data_slice_node_gen()
-        return [
-            data.subgraph(preserve_nodes_mask[next(data_slice_gen)])
-            for data in data_list
-        ]
-
-    def _make_pad_graph(self, data: Data, nodes: int, edges: int) -> Data:
-        new_data = {}
-        for key, value in data():
-            if key not in self.exclude_keys and not torch.is_tensor(value):
-                if key == 'num_nodes':
-                    new_data[key] = nodes
-                else:
-                    new_data[key] = self.pad_graph_defaults.get(key, value)
+    @_pad_graph_values.register(Data)
+    def _(self, padded_data: Data, original_data: Data) -> None:
+        for key, value in original_data():
+            if key in self.exclude_keys:
                 continue
+            if not (self.attribute_cacher.is_node_attr(padded_data, key)
+                    or self.attribute_cacher.is_edge_attr(padded_data, key)):
+                self._pad_graph_values_body(padded_data, original_data, key,
+                                            value)
 
-            dim = data.__cat_dim__(key, value)
+    @_pad_graph_values.register(HeteroData)
+    def _(self, padded_data: HeteroData, original_data: HeteroData) -> None:
+        for key, value in original_data._global_store.items():  # pylint: disable=protected-access
+            if key in self.exclude_keys:
+                continue
+            self._pad_graph_values_body(padded_data, original_data, key, value)
+
+    def _pad_graph_values_body(self, padded_data: BaseData,
+                               original_data: BaseData, key: Any,
+                               value: Any) -> None:
+        if not torch.is_tensor(value):
+            padded_data[key] = self.pad_graph_defaults.get(
+                key, original_data[key])
+        else:
             pad_shape = list(value.shape)
-
-            if self.attribute_cacher.is_node_attr(data, key):
-                pad_shape[dim] = nodes
-                pad_value = self.node_pad_value
-            elif self.attribute_cacher.is_edge_attr(data, key):
-                pad_shape[dim] = edges
-
-                if key == 'edge_index':
-                    # Padding edges are self-loops on the first padding
-                    # node.
-                    pad_value = 0
-                else:
-                    pad_value = self.edge_pad_value
-            else:
-                pad_value = self.graph_pad_value
-            new_data[key] = value.new_full(pad_shape, pad_value)
-
-        return new_data
+            pad_value = self.graph_pad_value
+            padded_data[key] = value.new_full(pad_shape, pad_value)
 
 
 class CombinedBatchingCollater:
@@ -329,7 +642,7 @@ class CombinedBatchingCollater:
         self.collater = collater
         self.parser = types.PyGArgsParser()
 
-    def __call__(self, batch: List[Data]) -> Batch:
+    def __call__(self, batch: List[BaseData]) -> Batch:
         num_items = len(batch)
         mini_batch_size = (self.mini_batch_size
                            if self.mini_batch_size is not None else num_items)
@@ -350,16 +663,9 @@ class CombinedBatchingCollater:
             self.collater(batch[batch_slice(batch_id)])
             for batch_id in range(num_mini_batches)
         ]
-
         batch_tensors = [
             list(self.parser.yieldTensors(batch)) for batch in batches
         ]
 
-        combined_batch_tensors = [
-            torch.stack([
-                batch_tensors[batch_id][tensor_id]
-                for batch_id in range(len(batches))
-            ]) for tensor_id in range(len(batch_tensors[0]))
-        ]
-
-        return self.parser.reconstruct(batches[0], combined_batch_tensors)
+        return self.parser.reconstruct(
+            batches[0], combine_batch_tensors_gen(batch_tensors))
