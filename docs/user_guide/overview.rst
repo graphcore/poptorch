@@ -909,6 +909,16 @@ This function supports dynamic slicing on the IPU.
 
 For more information see: :py:func:`~poptorch.dynamic_slice`.
 
+poptorch.dynamic_update
+-----------------------
+
+Standard PyTorch slicing syntax cannot currently be used to dynamically update a slice
+of a tensor. `poptorch.dynamic_update` allows updating a tensor with a statically sized
+slice at a dynamic index.
+This function supports dynamic updates on the IPU.
+
+For more information see: :py:func:`~poptorch.dynamic_update`.
+
 poptorch.serializedMatMul
 -------------------------
 

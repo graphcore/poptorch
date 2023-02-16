@@ -75,6 +75,7 @@ namespace poptorch {
 
 c10::Symbol nop;
 c10::Symbol dynamic_slice;
+c10::Symbol dynamic_update;
 c10::Symbol begin_ipu_block;
 c10::Symbol internal_cast;
 c10::Symbol end_ipu_block;
@@ -116,6 +117,7 @@ static void initializePoptorchSymbols() {
   logging::trace("Initializing poptorch symbols");
   SYMBOL_INIT(poptorch, nop);
   SYMBOL_INIT(poptorch, dynamic_slice);
+  SYMBOL_INIT(poptorch, dynamic_update);
   SYMBOL_INIT(poptorch, begin_ipu_block);
   SYMBOL_INIT(poptorch, internal_cast);
   SYMBOL_INIT(poptorch, end_ipu_block);

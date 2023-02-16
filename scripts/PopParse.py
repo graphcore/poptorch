@@ -223,7 +223,6 @@ CastingOps = [
     "convtranspose",
     "div",
     "dynamicadd",
-    "dynamicupdate",
     "dynamiczero",
     "equal",
     "fmod",
@@ -312,6 +311,7 @@ OutputTypeSameAsFirstInput = [
     "det",
     "detach",
     "dropout",
+    "dynamicupdate",
     "dynamicslice",
     "einsum",
     "elu",
@@ -594,11 +594,9 @@ def addOutputTypeStr(name):  # pylint: disable=too-many-return-statements
         return "OutputType::AlwaysFloat"
     if name in CastingAlwaysIntOutput or name in OutputTypeAlwaysInt32:
         return "OutputType::AlwaysInt"
-    if any([
-            name in n
-            for n in (CastingOps, CastingExceptFirstArgsOps,
-                      CastingExceptSecondArgsOps, CastingExceptThirdArgsOps)
-    ]):
+    if any(name in n
+           for n in (CastingOps, CastingExceptFirstArgsOps,
+                     CastingExceptSecondArgsOps, CastingExceptThirdArgsOps)):
         return "OutputType::AsImplicitCastPromoted"
     if name in OutputTypeSameAsFirstInput:
         return "OutputType::AsFirstInput"

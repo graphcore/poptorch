@@ -822,6 +822,25 @@ at::Tensor dynamicSlice(const at::Tensor &self, int64_t dim,
   return at::slice(self, dim, {start_int}, {start_int + size}, step);
 }
 
+// dynamic_update(Tensor self, Tensor src, int dim, Tensor start, int size) ->
+// Tensor
+at::Tensor dynamicUpdate(const at::Tensor &self, const at::Tensor &src,
+                         int64_t dim, const at::Tensor &start, int64_t size) {
+  auto st = start.scalar_type();
+  std::int64_t start_int;
+  if (st == torch::kInt64) {
+    start_int = start.data_ptr<std::int64_t>()[0];
+  } else if (st == torch::kInt32) {
+    start_int = start.data_ptr<std::int32_t>()[0];
+  } else if (st == torch::kInt16) {
+    start_int = start.data_ptr<std::int16_t>()[0];
+  } else {
+    ERROR("Expected integer typed start tensor");
+  }
+
+  return at::slice_scatter(self, src, dim, start_int, start_int + size, 1);
+}
+
 std::tuple<at::Tensor, at::Tensor, at::Tensor>
 ctcBeamSearchDecoder(const at::Tensor &log_probs,
                      const at::Tensor & /*lengths*/, int64_t /*blank*/,
@@ -905,6 +924,9 @@ TORCH_LIBRARY(poptorch, m) {
         "top_paths) -> (Tensor, Tensor, Tensor)");
   m.def("dynamic_slice(Tensor self, int dim, Tensor start, int size, int step) "
         "-> Tensor");
+  m.def("dynamic_update(Tensor self, Tensor src, int dim, Tensor start, int "
+        "size) "
+        "-> Tensor");
   m.def("identity_loss(Tensor x, int reduction) -> Tensor");
   m.def("internal_cast(Tensor self, str dtype) -> Tensor");
 
@@ -935,6 +957,7 @@ TORCH_LIBRARY_IMPL(poptorch, CPU, m) {
   m.impl("ctc_beam_search_decoder", PTC(ctcBeamSearchDecoder));
   m.impl("custom_operation", PTC_BOXED(customOperation));
   m.impl("dynamic_slice", PTC(dynamicSlice));
+  m.impl("dynamic_update", PTC(dynamicUpdate));
   m.impl("identity_loss", PTC(identityLoss));
   m.impl("internal_cast", PTC(castOp));
 }

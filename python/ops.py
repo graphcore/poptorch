@@ -242,6 +242,46 @@ def dynamic_slice(tensor: "torch.Tensor", dim: int, start: "torch.Tensor",
     return torch.ops.poptorch.dynamic_slice(tensor, dim, start, size, step)
 
 
+def dynamic_update(input: "torch.Tensor", src: "torch.Tensor", dim: int,
+                   start: "torch.Tensor", size: int) -> "torch.Tensor":
+    """Torch native dynamic slices can't be properly intercepted by backends,
+    so this op is provided to enable dynamic update slice in poptorch
+    applications.
+
+    :param input: The tensor to update.
+    :param src: The tensor to embed into `input`
+    :param dim: The dimension to slice along.
+    :param start: The start index.
+    :param size: The slice size. Must be a constant int.
+    :returns: The sliced tensor.
+    """
+    if not isinstance(input, torch.Tensor):
+        raise _impl.createPoptorchError(
+            f"dynamic_update must take a torch.tensor input. {type(input)} is "
+            "not supported.")
+    if not isinstance(dim, int):
+        raise _impl.createPoptorchError("Dimension must be an integer.")
+    if not isinstance(start, torch.Tensor):
+        raise _impl.createPoptorchError(
+            "Slice start argument to dynamic_update must be a torch.tensor. "
+            f"{type(start)} is not supported.")
+    if not isinstance(src, torch.Tensor):
+        raise _impl.createPoptorchError(
+            "Src argument to dynamic_update must be a torch.tensor. "
+            f"{type(src)} is not supported.")
+    if not isinstance(size, int):
+        raise _impl.createPoptorchError("Size must be an integer.")
+    if input.dim() != src.dim():
+        raise _impl.createPoptorchError(
+            "input and src tensors must have same dimensionality. "
+            f"({input.dim()}) vs ({src.dim()})")
+    if input.dtype != src.dtype:
+        raise _impl.createPoptorchError(
+            "input and src tensor must have same dtype. "
+            f"({input.dtype} vs {src.dtype})")
+    return torch.ops.poptorch.dynamic_update(input, src, dim, start, size)
+
+
 def recomputationCheckpoint(*tensors: List["torch.Tensor"]
                             ) -> List["torch.Tensor"]:
     """Operation for checkpointing values in a computational pipeline stage.

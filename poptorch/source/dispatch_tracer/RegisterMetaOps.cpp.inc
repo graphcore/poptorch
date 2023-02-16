@@ -202,6 +202,14 @@ at::Tensor dynamicSlice(const at::Tensor &self, int64_t dim, const at::Tensor &/
   return at::meta::empty(shape, self.scalar_type());
 }
 
+// dynamic_update(Tensor self, Tensor src, int dim, Tensor start, int size, int step) -> Tensor
+at::Tensor dynamicUpdate(const at::Tensor &self, const at::Tensor & /*src*/,
+                         int64_t /*dim*/, const at::Tensor & /*start*/,
+                         int64_t /*size*/) {
+  auto shape = self.sizes().vec();
+  return at::meta::empty(shape, self.scalar_type());
+}
+
 // custom_operation(Tensor[] inputs, str name, str domain, int domain_version, int num_outputs, Tensor(a!)[] outputs, str attributes) -> Tensor(a!)[]
 std::vector<at::Tensor> customOperation(const std::vector<at::Tensor> &/*inputs*/,
                                         const std::string &/*name*/,
@@ -306,6 +314,7 @@ TORCH_LIBRARY_IMPL(poptorch, Meta, m) {
   m.impl("ctc_beam_search_decoder", PTC(poptorch::meta::ctcBeamSearchDecoder));
   m.impl("custom_operation", PTC(poptorch::meta::customOperation));
   m.impl("dynamic_slice", PTC(poptorch::meta::dynamicSlice));
+  m.impl("dynamic_update", PTC(poptorch::meta::dynamicUpdate));
   m.impl("identity_loss", PTC(poptorch::meta::identityLoss));
 }
 
@@ -316,6 +325,7 @@ TORCH_LIBRARY_IMPL(poptorch, AutogradMeta, m) {
   m.impl("internal_cast", torch::autograd::autogradNotImplementedFallback());
   m.impl("nop", torch::autograd::autogradNotImplementedFallback());
   m.impl("dynamic_slice", torch::autograd::autogradNotImplementedFallback());
+  m.impl("dynamic_update", torch::autograd::autogradNotImplementedFallback());
   m.impl("custom_operation", torch::autograd::autogradNotImplementedFallback());
   m.impl("ctc_beam_search_decoder",
          torch::autograd::autogradNotImplementedFallback());

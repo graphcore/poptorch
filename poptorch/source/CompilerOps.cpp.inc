@@ -85,7 +85,7 @@ new_node->i_(c10::Symbol::attr("noOverlap"),noOverlap);
 return new_node;
 }
 torch::jit::Node* createDynamicupdate(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,std::vector<int64_t> axes,std::vector<int64_t> sizes,std::int32_t noOverlap) {
- torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::dynamicupdate, args, ImplicitCast::All, OutputType::AsImplicitCastPromoted);
+ torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::dynamicupdate, args, ImplicitCast::None, OutputType::AsFirstInput);
 new_node->is_(c10::Symbol::attr("axes"),axes);
 new_node->is_(c10::Symbol::attr("sizes"),sizes);
 new_node->i_(c10::Symbol::attr("noOverlap"),noOverlap);
