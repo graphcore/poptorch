@@ -11,6 +11,7 @@
 #include <popart/graphtransformer.hpp>
 #include <popart/ndarraywrapper.hpp>
 #include <popart/optimizer.hpp>
+#include <popart/popx/devicex.hpp>
 #include <popart/variablesettings.hpp>
 #include <popef/Reader.hpp>
 #include <popef/Writer.hpp>
@@ -1342,8 +1343,18 @@ std::vector<TensorMetadata> Compiler::optimizerTensorMetadataList() const {
   auto fn_add_tensor_data = [&](popart::Tensor *t, bool state_tensor) {
     TensorMetadata tm;
     tm.id = t->id.c_str();
-    tm.shape = t->info.shape();
-    tm.dtype = t->info.data_type().c_str();
+
+    popart::TensorInfo ti(t->info);
+
+    const auto global_replication_factor =
+        _impl->session->getDevice().getGlobalReplicationFactor();
+    // obtain real tensor shape that is taking into account replication and
+    // replica grouping
+    ti.set(ti.dataType(), t->getVariableSettings().shapeOnHost(
+                              t->info.shape(), global_replication_factor));
+
+    tm.shape = ti.shape();
+    tm.dtype = ti.data_type().c_str();
 
     // Optimiser state tensors are variables in PopART, and must be read/written
     // via WeightsIO. Optimiser parameters such as learning rate and loss
@@ -1351,7 +1362,7 @@ std::vector<TensorMetadata> Compiler::optimizerTensorMetadataList() const {
     // directly via memcpy
     if (state_tensor) {
       if (!_impl->optim_state_tensors.contains(t->id)) {
-        _impl->optim_state_tensors.registerParameter(t->id, t->info);
+        _impl->optim_state_tensors.registerParameter(t->id, ti);
       }
     } else {
       tm.data = t->tensorData()->data();

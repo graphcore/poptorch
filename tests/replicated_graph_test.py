@@ -213,3 +213,31 @@ def test_per_replica_variables(orthogonalInput):
                   .reshape(prob_W_init.shape)
     np.testing.assert_allclose(cpu_losses, pt_losses, atol=1e-6)
     np.testing.assert_allclose(cpu_W_final, pt_W_final, atol=1e-6)
+
+
+@pytest.mark.ipuHardwareRequired
+def test_per_replica_variables_no_grouping():
+    shape0 = 4
+    shape1 = shape0 + 2
+
+    model = ModelWithLoss(torch.randn(shape0, shape1))
+
+    optimizer = poptorch.optim.AdamW(model.parameters(), 0.1)
+
+    options = poptorch.Options()
+    options.replication_factor = shape0
+
+    training_model = poptorch.trainingModel(model,
+                                            options,
+                                            optimizer=optimizer)
+
+    training_model.W.replicaGrouping(
+        poptorch.CommGroupType.NoGrouping, 0,
+        poptorch.VariableRetrievalMode.OnePerGroup)
+
+    training_model(torch.randn(shape0, shape1))
+
+    for _, v in optimizer.state_dict()["ipu_state"].items():
+        assert v.shape[0] == shape0
+
+    training_model.destroy()
