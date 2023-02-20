@@ -1,6 +1,6 @@
 # Copyright (c) 2022-2023 Graphcore Ltd. All rights reserved.
 # Note: The content of this file is going to be upstreamed to PyG.
-from typing import Dict, Iterable, List, Optional, Sequence, Tuple, Type, Union
+from typing import Dict, Iterable, List, Optional, Sequence, Tuple, Union
 
 import torch.utils.data
 from torch.utils.data.sampler import Sampler
@@ -19,9 +19,10 @@ class TorchDataLoaderMeta(type):
     This metaclass can be used when a dataloader needs to be aware of
     platform-specific features or limitations.
     In such case this metaclass allows to inject custom dataloader as a base
-    class for :class:`FixedSizeDataLoader`. To achieve that, create a subclass
-    of this metaclass, override its :obj:`base_loader` field and use that new
-    class as a metaclass for subclass of :class:`FixedSizeDataLoader`.
+    class for :class:`CustomFixedSizeDataLoader`. To achieve that, create a
+    subclass of this metaclass, override its :obj:`base_loader` field and use
+    that new class as a metaclass for subclass of
+    :class:`CustomFixedSizeDataLoader`.
 
     Example:
 
@@ -31,8 +32,8 @@ class TorchDataLoaderMeta(type):
         >>> class CustomDataLoaderMeta(TorchDataLoaderMeta):
         ...     base_loader = CustomDataLoader
 
-        >>> class CustomFixedSizeDataLoader(FixedSizeDataLoader,
-        ...                                 metaclass=CustomDataLoaderMeta):
+        >>> class MyFixedSizeDataLoader(CustomFixedSizeDataLoader,
+        ...                             metaclass=CustomDataLoaderMeta):
         ...     def __init__(self, *args, *kwargs):
         ...         super().__init__(*args, **kwargs)
 
@@ -110,7 +111,7 @@ class DataLoader(metaclass=TorchDataLoaderMeta):
 # ==== End of copied code
 
 
-class FixedSizeDataLoader(metaclass=TorchDataLoaderMeta):
+class CustomFixedSizeDataLoader(metaclass=TorchDataLoaderMeta):
     r"""A data loader which merges data objects from a
     :class:`torch_geometric.data.Dataset` to a mini-batch and pads node and
     edge features so tensors across all batches have constant shapes.
@@ -160,7 +161,7 @@ class FixedSizeDataLoader(metaclass=TorchDataLoaderMeta):
     ):
 
         assert 'collate_fn' not in kwargs, \
-            'Cannot set `collate_fn` with `FixedSizeDataLoader`. '\
+            'Cannot set `collate_fn` with `CustomFixedSizeDataLoader`. '\
             'Use `torch.utils.dataloader.DataLoader` directly if you need ' \
             'to specify collater manually.'
 
@@ -169,7 +170,7 @@ class FixedSizeDataLoader(metaclass=TorchDataLoaderMeta):
         invalid_collater_args = not_in_collater_args.intersection(
             set(collater_args))
         assert not invalid_collater_args, \
-            '`FixedSizeDataLoader` uses arguments: ' \
+            '`CustomFixedSizeDataLoader` uses arguments: ' \
             f'{", ".join(invalid_collater_args)} passed directly to the ' \
             'initializer. They should not be included in `collater_args`.'
 
@@ -218,21 +219,14 @@ class FixedSizeDataLoader(metaclass=TorchDataLoaderMeta):
         return FixedSizeCollater(**collater_args)
 
 
-def create_fixed_batch_dataloader(
-        dataset: Dataset,
-        num_nodes: Optional[int] = None,
-        num_edges: Optional[int] = None,
-        batch_size: int = 2,
-        loader_cls: Type[FixedSizeDataLoader] = FixedSizeDataLoader,
-        follow_batch: Optional[Union[List[str], Tuple[str, ...]]] = None,
-        exclude_keys: Optional[Union[List[str], Tuple[str, ...]]] = None,
-        collater_args: Optional[Dict[str, Union[int, float]]] = None,
-        sampler: Optional[Union[Sampler[int], Iterable[int]]] = None,
-        allow_skip_data: bool = False,
-        **kwargs,
-) -> FixedSizeDataLoader:
-    r"""Creates a data loader based on the :obj:`loader_cls` class with
-    :class:`FixedBatchSampler` for graph datasets.
+class FixedSizeDataLoader(CustomFixedSizeDataLoader):
+    r"""A data loader which merges data objects from a
+    :class:`torch_geometric.data.Dataset` to a mini-batch and pads node and
+    edge features so tensors across all batches have constant shapes.
+    The data loader uses :class:`FixedBatchSampler` underneath.
+
+    If not specified, :obj:`num_nodes` and :obj:`num_edges` are set to the
+    batch size times the maximum number of nodes and edges, respectively.
 
     Args:
         dataset (Dataset): The :class:`~torch_geometric.data.Dataset` instance
@@ -244,8 +238,6 @@ def create_fixed_batch_dataloader(
         batch_size (int, optional): How many graph examples to load in each
             batch. This should be at least :obj:`2` to allow for creating at
             least one padding graph. (default: :obj:`2`)
-        loader_cls (type, optional): Initialization class for the data loader.
-            (default: :class:`FixedSizeDataLoader`)
         follow_batch (list or tuple, optional): Creates assignment batch
             vectors for each key in the list. (default: :obj:`None`)
         exclude_keys (list or tuple, optional): Keys to exclude from the
@@ -264,26 +256,36 @@ def create_fixed_batch_dataloader(
             (default: :obj:`False`)
         **kwargs (optional): Additional arguments of
             :class:`torch.utils.data.DataLoader`.
-
-    Returns:
-        An instance of the :obj:`loader_cls` class with the
-        :class:`FixedBatchSampler` sampler.
     """
-    # Leave space for padding.
-    sampler_graphs = batch_size - 1
-    sampler_nodes = num_nodes - 1 if num_nodes is not None else num_nodes
-    sampler_edges = num_edges - 1 if num_edges is not None else num_edges
-    batch_sampler = FixedBatchSampler(dataset,
-                                      sampler_graphs,
-                                      num_nodes=sampler_nodes,
-                                      num_edges=sampler_edges,
-                                      sampler=sampler,
-                                      allow_skip_data=allow_skip_data)
 
-    return loader_cls(dataset=dataset,
-                      num_nodes=num_nodes,
-                      batch_sampler=batch_sampler,
-                      follow_batch=follow_batch,
-                      exclude_keys=exclude_keys,
-                      collater_args=collater_args,
-                      **kwargs)
+    def __init__(
+            self,
+            dataset: Dataset,
+            num_nodes: Optional[int] = None,
+            num_edges: Optional[int] = None,
+            batch_size: int = 2,
+            follow_batch: Optional[Union[List[str], Tuple[str, ...]]] = None,
+            exclude_keys: Optional[Union[List[str], Tuple[str, ...]]] = None,
+            collater_args: Optional[Dict[str, Union[int, float]]] = None,
+            sampler: Optional[Union[Sampler[int], Iterable[int]]] = None,
+            allow_skip_data: bool = False,
+            **kwargs,
+    ) -> None:
+        # Leave space for padding.
+        sampler_graphs = batch_size - 1
+        sampler_nodes = num_nodes - 1 if num_nodes is not None else num_nodes
+        sampler_edges = num_edges - 1 if num_edges is not None else num_edges
+        batch_sampler = FixedBatchSampler(dataset,
+                                          sampler_graphs,
+                                          num_nodes=sampler_nodes,
+                                          num_edges=sampler_edges,
+                                          sampler=sampler,
+                                          allow_skip_data=allow_skip_data)
+
+        super().__init__(dataset=dataset,
+                         num_nodes=num_nodes,
+                         batch_sampler=batch_sampler,
+                         follow_batch=follow_batch,
+                         exclude_keys=exclude_keys,
+                         collater_args=collater_args,
+                         **kwargs)

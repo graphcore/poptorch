@@ -1,4 +1,5 @@
 # Copyright (c) 2022-2023 Graphcore Ltd. All rights reserved.
+import inspect
 import pickle
 
 import pytest
@@ -11,13 +12,13 @@ import utils
 from poptorch_geometric.batch_sampler import FixedBatchSampler
 from poptorch_geometric.collate import CombinedBatchingCollater, make_exclude_keys
 from poptorch_geometric.dataloader import DataLoader as IPUDataLoader
-from poptorch_geometric.dataloader import FixedSizeDataLoader as IPUFixedSizeDataLoader
+from poptorch_geometric.dataloader import CustomFixedSizeDataLoader as IPUCustomFixedSizeDataLoader
 from poptorch_geometric.dataloader import \
-    create_fixed_batch_dataloader as ipu_create_fixed_batch_dataloader
+    FixedSizeDataLoader as IPUFixedSizeDataLoader
 from poptorch_geometric.pyg_collate import Collater
-from poptorch_geometric.pyg_dataloader import (DataLoader, FixedSizeDataLoader,
-                                               TorchDataLoaderMeta,
-                                               create_fixed_batch_dataloader)
+from poptorch_geometric.pyg_dataloader import (CustomFixedSizeDataLoader,
+                                               DataLoader, TorchDataLoaderMeta,
+                                               FixedSizeDataLoader)
 from poptorch_geometric.types import PyGArgsParser
 import poptorch
 
@@ -77,7 +78,8 @@ def test_inject_base_dataloader():
     class DummyDataLoaderMeta(TorchDataLoaderMeta):
         base_loader = DummyBaseDataLoader
 
-    class DummyLoader(FixedSizeDataLoader, metaclass=DummyDataLoaderMeta):  # pylint: disable=invalid-metaclass
+    class DummyLoader(CustomFixedSizeDataLoader,
+                      metaclass=DummyDataLoaderMeta):  # pylint: disable=invalid-metaclass
         def __init__(self):
             pass
 
@@ -145,22 +147,40 @@ def test_combined_batching_collater_invalid(molecule):
         collate_fn([molecule] * 9)
 
 
-def test_create_fixed_batch_dataloader(num_graphs=2, num_nodes=30):
+def test_simple_fixed_size_data_loader_mro(num_graphs=2, num_nodes=30):
+    # Check that MROs of the dataloader classes are correct. There are other
+    # classes that inherit from `FixedSizeDataLoader` and would be
+    # affected if the MRO changes here.
     dataset = FakeDataset(num_graphs=num_graphs, avg_num_nodes=30)
-    ipu_dataloader = ipu_create_fixed_batch_dataloader(dataset,
-                                                       num_nodes=num_nodes,
-                                                       batch_size=num_graphs)
-    assert isinstance(ipu_dataloader, IPUFixedSizeDataLoader)
-    pyg_dataloader = create_fixed_batch_dataloader(dataset,
-                                                   num_nodes=num_nodes,
-                                                   batch_size=num_graphs)
-    assert not isinstance(pyg_dataloader, IPUFixedSizeDataLoader)
+
+    pyg_dataloader = FixedSizeDataLoader(dataset,
+                                         num_nodes=num_nodes,
+                                         batch_size=num_graphs)
+
+    mro = inspect.getmro(type(pyg_dataloader))
+    # MRO is longer but it's enough to check these classes.
+    expected_mro = (type(pyg_dataloader), FixedSizeDataLoader,
+                    CustomFixedSizeDataLoader, torch.utils.data.DataLoader)
+    num_classes = len(expected_mro)
+    assert mro[:num_classes] == expected_mro
+
+    ipu_dataloader = IPUFixedSizeDataLoader(dataset=dataset,
+                                            num_nodes=num_nodes,
+                                            batch_size=num_graphs)
+    mro = inspect.getmro(type(ipu_dataloader))
+    # MRO is longer but it's enough to check these classes.
+    expected_mro = (type(ipu_dataloader), IPUFixedSizeDataLoader,
+                    FixedSizeDataLoader, IPUCustomFixedSizeDataLoader,
+                    CustomFixedSizeDataLoader, poptorch.DataLoader,
+                    torch.utils.data.DataLoader)
+    num_classes = len(expected_mro)
+    assert mro[:num_classes] == expected_mro
 
 
 @pytest.mark.parametrize('loader', [
-    FixedSizeDataLoader,
-    dict(loader_cls=IPUFixedSizeDataLoader, device_iterations=3),
-    dict(loader_cls=IPUFixedSizeDataLoader)
+    CustomFixedSizeDataLoader,
+    dict(loader_cls=IPUCustomFixedSizeDataLoader, device_iterations=3),
+    dict(loader_cls=IPUCustomFixedSizeDataLoader)
 ])
 @pytest.mark.parametrize('use_batch_sampler', [True, False])
 def test_fixed_size_dataloader(
@@ -170,7 +190,7 @@ def test_fixed_size_dataloader(
         fake_molecular_dataset,
         batch_size=10,
 ):
-    ipu_dataloader = loader is not FixedSizeDataLoader
+    ipu_dataloader = loader is not CustomFixedSizeDataLoader
     # CombinedBatchingCollater adds an additional 0-th dimension.
     dim_offset = 1 if ipu_dataloader else 0
 
@@ -246,32 +266,34 @@ def test_fixed_size_dataloader(
     benchmark(loop)
 
 
-@pytest.mark.parametrize('use_factory', [True, False])
+@pytest.mark.parametrize('custom_loader', [True, False])
 @pytest.mark.parametrize('num_edges', [None, 500])
 @pytest.mark.parametrize('num_graphs', [2, 10])
-def test_dataloader_produces_fixed_sizes(use_factory, num_edges, num_graphs,
+def test_dataloader_produces_fixed_sizes(custom_loader, num_edges, num_graphs,
                                          fake_molecular_dataset):
     num_nodes = num_graphs * 30
     dataset_size = 123
     dataset = fake_molecular_dataset[:dataset_size]
 
-    if use_factory:
-        train_dataloader = create_fixed_batch_dataloader(
+    if custom_loader:
+        train_dataloader = CustomFixedSizeDataLoader(dataset,
+                                                     num_nodes=num_nodes,
+                                                     batch_size=num_graphs,
+                                                     collater_args={
+                                                         'add_masks_to_batch':
+                                                         True,
+                                                         'num_edges':
+                                                         num_edges,
+                                                         'trim_nodes': True,
+                                                         'trim_edges': True,
+                                                     })
+    else:
+        train_dataloader = FixedSizeDataLoader(
             dataset,
             num_nodes=num_nodes,
             batch_size=num_graphs,
             num_edges=num_edges,
             collater_args={'add_masks_to_batch': True})
-    else:
-        train_dataloader = FixedSizeDataLoader(dataset,
-                                               num_nodes=num_nodes,
-                                               batch_size=num_graphs,
-                                               collater_args={
-                                                   'add_masks_to_batch': True,
-                                                   'num_edges': num_edges,
-                                                   'trim_nodes': True,
-                                                   'trim_edges': True,
-                                               })
 
     batch = next(iter(train_dataloader))
     attrs = [
@@ -376,22 +398,21 @@ def test_dataloader_with_sampler_num_nodes(allow_skip_data,
     with pytest.raises(AssertionError,
                        match=r'Argument `num_nodes` \(= 100\) should ' \
                              r'be greater'):
-        dataloader = FixedSizeDataLoader(dataset,
-                                         batch_sampler=sampler,
-                                         num_nodes=100)
+        dataloader = CustomFixedSizeDataLoader(dataset,
+                                               batch_sampler=sampler,
+                                               num_nodes=100)
 
     num_nodes = 101
-    dataloader = FixedSizeDataLoader(dataset,
-                                     batch_sampler=sampler,
-                                     num_nodes=num_nodes)
+    dataloader = CustomFixedSizeDataLoader(dataset,
+                                           batch_sampler=sampler,
+                                           num_nodes=num_nodes)
 
     for batch in dataloader:
         assert batch.num_nodes == num_nodes
 
 
-@pytest.mark.parametrize(
-    'create_loader',
-    [create_fixed_batch_dataloader, ipu_create_fixed_batch_dataloader])
+@pytest.mark.parametrize('create_loader',
+                         [FixedSizeDataLoader, IPUFixedSizeDataLoader])
 def test_fixed_size_dataloader_num_created_batches(create_loader):
     total_num_graphs = 100
     ds = FakeDataset(num_graphs=total_num_graphs, avg_num_nodes=10)
@@ -462,21 +483,21 @@ def test_num_nodes_default_value():
     padded_batch_size = batch_size + 1
     # The default value of `num_nodes` should be large enough so it's possible
     # to always pick 10 graphs and create additional padding graph.
-    loader = FixedSizeDataLoader(ds, batch_size=padded_batch_size)
+    loader = CustomFixedSizeDataLoader(ds, batch_size=padded_batch_size)
     expected_batches = 10
 
     num_batches = sum(1 for _ in loader)
     assert expected_batches == num_batches
 
-    # The same when using create_fixed_batch_dataloader.
-    loader = create_fixed_batch_dataloader(ds, batch_size=padded_batch_size)
+    # The same when using FixedSizeDataLoader.
+    loader = FixedSizeDataLoader(ds, batch_size=padded_batch_size)
 
     num_batches = sum(1 for _ in loader)
     assert expected_batches == num_batches
 
     # DataLoader should correctly capture the number of nodes from sampler.
     sampler = FixedBatchSampler(ds, num_graphs=batch_size)
-    loader = FixedSizeDataLoader(ds, batch_sampler=sampler)
+    loader = CustomFixedSizeDataLoader(ds, batch_sampler=sampler)
 
     num_batches = 0
     for batch in loader:

@@ -8,11 +8,10 @@ from torch_geometric.data import Dataset
 
 import poptorch
 from poptorch_geometric.collate import CombinedBatchingCollater
+from poptorch_geometric.pyg_dataloader import CustomFixedSizeDataLoader as PyGCustomFixedSizeDataLoader
 from poptorch_geometric.pyg_dataloader import DataLoader as PyGDataLoader
 from poptorch_geometric.pyg_dataloader import FixedSizeDataLoader as PyGFixedSizeDataLoader
 from poptorch_geometric.pyg_dataloader import TorchDataLoaderMeta
-from poptorch_geometric.pyg_dataloader import \
-    create_fixed_batch_dataloader as pyg_create_fixed_batch_dataloader
 
 
 class PopTorchDataLoaderMeta(TorchDataLoaderMeta):
@@ -75,8 +74,8 @@ class DataLoader(PyGDataLoader, metaclass=PopTorchDataLoaderMeta):
 
 
 # pylint: disable=invalid-metaclass
-class FixedSizeDataLoader(PyGFixedSizeDataLoader,
-                          metaclass=PopTorchDataLoaderMeta):
+class CustomFixedSizeDataLoader(PyGCustomFixedSizeDataLoader,
+                                metaclass=PopTorchDataLoaderMeta):
     r"""A data loader which merges data objects from a
     :class:`poptorch.Dataset` to a mini-batch and pads node and edge features
     so tensors across all batches have constant shapes.
@@ -152,26 +151,23 @@ class FixedSizeDataLoader(PyGFixedSizeDataLoader,
                                         collater=base_collater)
 
 
-def create_fixed_batch_dataloader(
-        dataset: Dataset,
-        num_nodes: Optional[int] = None,
-        num_edges: Optional[int] = None,
-        batch_size: int = 2,
-        options: Optional[poptorch.Options] = None,
-        follow_batch: Optional[Union[List[str], Tuple[str, ...]]] = None,
-        exclude_keys: Optional[Union[List[str], Tuple[str, ...]]] = None,
-        collater_args: Optional[Dict[str, Union[int, float]]] = None,
-        sampler: Optional[Union[Sampler[int], Iterable[int]]] = None,
-        allow_skip_data: bool = False,
-        **kwargs,
-) -> FixedSizeDataLoader:
-    r"""Creates a :class:`FixedSizeDataLoader` with :class:`FixedBatchSampler`
-    for graph datasets.
+# pylint: disable=invalid-metaclass
+class FixedSizeDataLoader(PyGFixedSizeDataLoader,
+                          CustomFixedSizeDataLoader,
+                          metaclass=PopTorchDataLoaderMeta):
+    r"""A data loader which merges data objects from a
+    :class:`poptorch.Dataset` to a mini-batch and pads node and edge features
+    so tensors across all batches have constant shapes.
+    The data loader uses :class:`FixedBatchSampler` underneath.
+
+    If not specified, :obj:`num_nodes` and :obj:`num_edges` are set to the
+    batch size times the maximum number of nodes and edges, respectively.
 
     Args:
         dataset (Dataset): The :class:`~torch_geometric.data.Dataset` instance
             from which to load the graph examples for the IPU.
         num_nodes (int, optional): Number of nodes in a batch.
+            (default: :obj:`None`)
         num_edges (int, optional): Number of edges in a batch.
             (default: :obj:`None`)
         batch_size (int, optional): How many graph examples to load in each
@@ -198,19 +194,31 @@ def create_fixed_batch_dataloader(
             (default: :obj:`False`)
         **kwargs (optional): Additional arguments of
             :class:`poptorch.DataLoader`.
-    Returns:
-        An instance of the :class:`FixedSizeDataLoader` class with the
-        :class:`FixedBatchSampler` sampler.
     """
-    return pyg_create_fixed_batch_dataloader(dataset,
-                                             num_nodes=num_nodes,
-                                             num_edges=num_edges,
-                                             batch_size=batch_size,
-                                             loader_cls=FixedSizeDataLoader,
-                                             follow_batch=follow_batch,
-                                             exclude_keys=exclude_keys,
-                                             collater_args=collater_args,
-                                             sampler=sampler,
-                                             allow_skip_data=allow_skip_data,
-                                             options=options,
-                                             **kwargs)
+
+    def __init__(
+            self,
+            dataset: Dataset,
+            num_nodes: Optional[int] = None,
+            num_edges: Optional[int] = None,
+            batch_size: int = 2,
+            options: Optional[poptorch.Options] = None,
+            follow_batch: Optional[Union[List[str], Tuple[str, ...]]] = None,
+            exclude_keys: Optional[Union[List[str], Tuple[str, ...]]] = None,
+            collater_args: Optional[Dict[str, Union[int, float]]] = None,
+            sampler: Optional[Union[Sampler[int], Iterable[int]]] = None,
+            allow_skip_data: bool = False,
+            **kwargs,
+    ) -> None:
+
+        super().__init__(dataset=dataset,
+                         num_nodes=num_nodes,
+                         num_edges=num_edges,
+                         batch_size=batch_size,
+                         follow_batch=follow_batch,
+                         exclude_keys=exclude_keys,
+                         collater_args=collater_args,
+                         sampler=sampler,
+                         allow_skip_data=allow_skip_data,
+                         options=options,
+                         **kwargs)

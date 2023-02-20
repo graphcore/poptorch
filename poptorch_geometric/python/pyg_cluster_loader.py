@@ -42,8 +42,8 @@ class FixedSizeClusterLoader(metaclass=TorchDataLoaderMeta):
 
         collater_args = collater_args if collater_args else {}
         assert 'num_nodes' not in collater_args, \
-            '`FixedSizeDataLoader` uses argument `num_nodes` passed directly' \
-            'to the initializer. They should not be included' \
+            '`FixedSizeClusterLoader` uses argument `num_nodes` passed ' \
+            ' directly to the initializer. They should not be included' \
             'in `collater_args`.'
 
         self.cluster_data = cluster_data

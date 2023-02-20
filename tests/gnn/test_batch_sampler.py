@@ -11,7 +11,7 @@ from torch_geometric.datasets import FakeDataset
 
 from poptorch_geometric.batch_sampler import FixedBatchSampler, make_fixed_batch_generator
 from poptorch_geometric.collate import CombinedBatchingCollater, FixedSizeCollater
-from poptorch_geometric.dataloader import create_fixed_batch_dataloader
+from poptorch_geometric.dataloader import FixedSizeDataLoader
 
 
 def test_fixed_batch_sampler_default_params():
@@ -184,14 +184,13 @@ def test_fixed_batch_sampler_should_be_usable_with_torch_data_loader(
             "edge_pad_value": 0.0,
             "graph_pad_value": 0.0
         }
-        dataloader = create_fixed_batch_dataloader(
-            dataset,
-            num_nodes=batch_num_nodes,
-            num_edges=batch_num_edges,
-            batch_size=num_graphs,
-            collater_args=collater_args,
-            sampler=base_sampler,
-            allow_skip_data=allow_skip_data)
+        dataloader = FixedSizeDataLoader(dataset,
+                                         num_nodes=batch_num_nodes,
+                                         num_edges=batch_num_edges,
+                                         batch_size=num_graphs,
+                                         collater_args=collater_args,
+                                         sampler=base_sampler,
+                                         allow_skip_data=allow_skip_data)
 
     expected_x_shape = torch.Size([1, batch_num_nodes, num_channels])
     expected_batch_shape = torch.Size([1, batch_num_nodes])
