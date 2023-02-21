@@ -88,7 +88,6 @@ short_tests = [
     "gnn/test_dataloader.py",
     "gnn/test_masker.py",
     "gnn/test_model_args.py",
-    "gnn/test_transforms.py",
 ]
 
 # The only tests that should be run in doc-only builds.

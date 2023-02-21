@@ -5,6 +5,7 @@ import pytest
 import torch
 from torch_geometric.data import Batch, Data
 from torch_geometric.datasets import FakeDataset
+from torch_geometric.transforms import Pad
 
 import utils
 from poptorch_geometric.batch_sampler import FixedBatchSampler
@@ -13,7 +14,6 @@ from poptorch_geometric.dataloader import DataLoader as IPUDataLoader
 from poptorch_geometric.dataloader import FixedSizeDataLoader as IPUFixedSizeDataLoader
 from poptorch_geometric.dataloader import \
     create_fixed_batch_dataloader as ipu_create_fixed_batch_dataloader
-from poptorch_geometric.pad import Pad
 from poptorch_geometric.pyg_collate import Collater
 from poptorch_geometric.pyg_dataloader import (DataLoader, FixedSizeDataLoader,
                                                TorchDataLoaderMeta,
