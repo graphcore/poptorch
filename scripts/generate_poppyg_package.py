@@ -30,7 +30,7 @@ output_dir = os.path.realpath(args.output_dir)
 python_dir = os.path.realpath(args.python_dir)
 
 VERSION = utils.PkgInfo.load_from_file(must_exist=False,
-                                       path='../poptorch').version_long
+                                       path='..').version_long
 
 # https://www.python.org/dev/peps/pep-0425/
 # The platform tag is simply distutils.util.get_platform() with all hyphens - and periods . replaced with underscore _.
@@ -91,7 +91,6 @@ def configure(src_filename, dst_filename):
 # Create a temporary directory and copy the files to package to it.
 with tempfile.TemporaryDirectory() as tmp_dir:
     os.chdir(tmp_dir)
-    shutil.copytree(os.path.join(src_dir, 'python'), 'src')
     shutil.copytree(python_dir, PROJ_NAME)
     shutil.copy(os.path.join(src_dir, 'MANIFEST.in'), '.')
 
