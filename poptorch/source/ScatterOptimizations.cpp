@@ -93,7 +93,8 @@ void groupScatterReduceNodes(torch::jit::Graph *graph) {
 
   using ScatterKind =
       std::tuple<std::int64_t /*reduction*/, at::ScalarType /*input_type*/,
-                 bool /*with_update*/>;
+                 bool /*index_broadcast_enabled*/, bool /*with_update*/>;
+  static constexpr auto with_update_idx = 3;
   std::map<ScatterKind, torch::jit::node_list> scatters;
 
   std::size_t num_scatters_in_queue = 0;
@@ -120,7 +121,11 @@ void groupScatterReduceNodes(torch::jit::Graph *graph) {
                                                    ->scalarType();
 
             const bool with_update = num_user_inputs == 3;
-            const ScatterKind key{reduction, input_type, with_update};
+            const bool index_broadcast_enabled =
+                user->i(c10::Symbol::attr("enable_index_broadcast")) != 0;
+
+            const ScatterKind key{reduction, input_type,
+                                  index_broadcast_enabled, with_update};
             scatters[key].push_back(user);
           }
         }
@@ -149,7 +154,7 @@ void groupScatterReduceNodes(torch::jit::Graph *graph) {
       // Merge scatters that have been encountered twice.
       for (auto &&[scatter_kind, scatter_vec] : scatters) {
         if (scatter_vec.size() > 1) {
-          const bool with_update = std::get<bool>(scatter_kind);
+          const bool with_update = std::get<with_update_idx>(scatter_kind);
           const auto &merged_scatters =
               dispatchScatters(graph, scatter_vec, with_update);
           for (torch::jit::Node *scatter_node : merged_scatters) {
@@ -199,6 +204,8 @@ void removeScatterAddIndexExpansion(torch::jit::Graph *graph) {
     logging::trace("Removing index expansion node: {}",
                    nodeToString(index_producer));
     node->replaceInputWith(index, original_index);
+    node->i_(c10::Symbol::attr("enable_index_broadcast"), 1);
+
     to_delete.push_back(index_producer);
   }
 
@@ -419,8 +426,12 @@ createGroupedScatterReduceNode(torch::jit::Graph *graph,
   const auto old_axis = node_with_attributes->i(c10::Symbol::attr("axis"));
   const auto reduction =
       node_with_attributes->i(c10::Symbol::attr("reduction"));
+  const bool enable_index_broadcast =
+      node_with_attributes->i(c10::Symbol::attr("enable_index_broadcast")) != 0;
+
   return createGroupedscatterreduce(graph, inputs, axis_size, old_axis + 1,
-                                    reduction, num_groups);
+                                    num_groups, enable_index_broadcast,
+                                    reduction);
 }
 
 void unpackGroupedScatterReduceOutputs(

@@ -232,14 +232,14 @@ torch::jit::Node *indexPutHandler(torch::jit::Graph *graph,
     return createWhere(graph, {indices[0], v, x});
   }
 
-  auto fn_gen_none = [graph]() {
+  const auto fn_gen_none = [graph]() {
     torch::jit::Value *none = graph->create(c10::prim::Constant)->output();
     none->setType(c10::NoneType::get());
     return none;
   };
-  auto shape = shapeFromTensor(x);
-  auto vectorized_dim = canVectorizeInDim(indices);
-  auto v_shape = shapeFromTensor(v);
+  const auto shape = shapeFromTensor(x);
+  const auto vectorized_dim = canVectorizeInDim(indices);
+  const auto v_shape = shapeFromTensor(v);
   if (vectorized_dim) {
     logging::trace(
         "Using vectorized ScatterReduce with none reduction in dim {}",
@@ -252,9 +252,12 @@ torch::jit::Node *indexPutHandler(torch::jit::Graph *graph,
       v = createExpand(graph, {v, intVectorToIrConstant(graph, new_shape)})
               ->output();
     }
-    const auto none_reduce = static_cast<std::int32_t>(ScatterReduction::None);
+    static constexpr auto none_reduce =
+        static_cast<std::int32_t>(ScatterReduction::None);
+    static constexpr bool enable_index_broadcast = true;
     auto *out = createScatterreduce(graph, {v, indices[*vectorized_dim], x},
-                                    shape[0], *vectorized_dim, none_reduce);
+                                    shape[0], *vectorized_dim,
+                                    enable_index_broadcast, none_reduce);
     applyInplaceSlice(node, out);
     return out;
   }

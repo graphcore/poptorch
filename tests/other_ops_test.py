@@ -262,6 +262,8 @@ def test_scatter_reduce_should_not_apply_grouped_fuse(reduce, include_self):
     poptorch_model = poptorch.inferenceModel(model)
     poptorch_model.compile(inp, index, src)
 
+    default_assert_fn(model(inp, index, src), poptorch_model(inp, index, src))
+
     all_ops = json.loads(poptorch_model._debugGetPopartIR())['maingraph']  # pylint: disable=protected-access
     scatter_reduce_ops = [
         op for op in all_ops if op['type'] == 'ScatterReduce'

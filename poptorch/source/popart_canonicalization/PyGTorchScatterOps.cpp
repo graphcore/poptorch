@@ -12,25 +12,29 @@
 
 namespace poptorch {
 namespace {
-std::int32_t getReductionMethod(torch::jit::Node *node) {
-  auto kind = node->kind();
+std::int32_t getReductionMethod(const torch::jit::Node *node) {
+  const auto kind = node->kind();
+
   if (kind == torch_scatter::scatter_max) {
     return 1;
   }
   if (kind == torch_scatter::scatter_min) {
     return 2;
   }
+
   ERROR("Unsupported reduction for node: " << nodeToString(node));
 }
 
 torch::jit::Node *scatterMaxMinHandler(torch::jit::Graph *graph,
                                        torch::jit::Node *node) {
+  static constexpr bool enable_index_broadcast = true;
+
   // Signatures for scatter_max and scatter_min:
   // (Tensor src, Tensor index, int dim, Tensor? out, int? dim_size)
   auto *src = node->input(0);
   auto *index = node->input(1);
-  auto t = src->type()->expect<c10::TensorType>();
-  auto axis = handleDimensionParam(node->input(2), t);
+  const auto src_type = src->type()->expect<c10::TensorType>();
+  const auto axis = handleDimensionParam(node->input(2), src_type);
 
   auto *opt_out = node->input(3);
   ERROR_ON_MSG(!isNone(opt_out),
@@ -45,8 +49,9 @@ torch::jit::Node *scatterMaxMinHandler(torch::jit::Graph *graph,
     shape[axis] = axissize;
   }
 
-  auto *result = createScatterreduce(graph, {src, index}, axissize, axis,
-                                     getReductionMethod(node));
+  auto *result =
+      createScatterreduce(graph, {src, index}, axissize, axis,
+                          enable_index_broadcast, getReductionMethod(node));
 
   // Both scatter_max and scatter_min return two outputs where the second one
   // is the index but most often this second output is simply ignored.
@@ -57,12 +62,12 @@ torch::jit::Node *scatterMaxMinHandler(torch::jit::Graph *graph,
   }
 
   // Calculate the indices of the max/min
-  auto ishape = shapeFromTensor(src);
+  const auto ishape = shapeFromTensor(src);
   std::vector<int64_t> index_range_shape(ishape.size(), 1);
   index_range_shape[axis] = ishape[axis];
 
-  auto gather_handler = getHandler(c10::aten::gather);
-  result->output()->setType(t->withSizes(shape));
+  const auto gather_handler = getHandler(c10::aten::gather);
+  result->output()->setType(src_type->withSizes(shape));
   auto *gather =
       createHandlerOperation(graph, gather_handler,
                              {result->output(), node->input(2), index})
@@ -81,10 +86,12 @@ torch::jit::Node *scatterMaxMinHandler(torch::jit::Graph *graph,
   auto *index_of_result =
       createWhere(graph, {mask, index_range, not_chosen})->output();
   // Apply the same scattering to our index tensor as we did to the input tensor
-  const auto min_reduce = static_cast<std::int32_t>(ScatterReduction::Min);
-  auto *arg_scatter = createScatterreduce(graph, {index_of_result, index},
-                                          axissize, axis, min_reduce)
-                          ->output();
+  static constexpr std::int32_t min_reduce =
+      static_cast<std::int32_t>(ScatterReduction::Min);
+  auto *arg_scatter =
+      createScatterreduce(graph, {index_of_result, index}, axissize, axis,
+                          enable_index_broadcast, min_reduce)
+          ->output();
   // Now we've got a tensor of 1-based indices, with zeroes where no index
   // was scattered. We need to transform this to zero-based indices, with
   // ishape[axis] where no index was scattered.
