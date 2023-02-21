@@ -2,4 +2,5 @@ build
 __pycache__
 .linters
 .cache
+.vscode
 test_data
