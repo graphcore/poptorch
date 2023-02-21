@@ -17,8 +17,7 @@ from poptorch_geometric.dataloader import \
     FixedSizeDataLoader as IPUFixedSizeDataLoader
 from poptorch_geometric.pyg_collate import Collater
 from poptorch_geometric.pyg_dataloader import (CustomFixedSizeDataLoader,
-                                               DataLoader, TorchDataLoaderMeta,
-                                               FixedSizeDataLoader)
+                                               DataLoader, FixedSizeDataLoader)
 from poptorch_geometric.types import PyGArgsParser
 import poptorch
 
@@ -65,28 +64,6 @@ def test_collater(molecule):
         utils.assert_equal(actual=batch[key], expected=getattr(molecule, key))
         utils.assert_equal(actual=getattr(batch, key),
                            expected=getattr(molecule, key))
-
-
-def test_inject_base_dataloader():
-    r"""Test ensures the loader's metaclass API doesn't change as external
-    libraries depend on that."""
-
-    class DummyBaseDataLoader:
-        def __init__(self):
-            pass
-
-    class DummyDataLoaderMeta(TorchDataLoaderMeta):
-        base_loader = DummyBaseDataLoader
-
-    class DummyLoader(CustomFixedSizeDataLoader,
-                      metaclass=DummyDataLoaderMeta):  # pylint: disable=invalid-metaclass
-        def __init__(self):
-            pass
-
-    loader = DummyLoader()
-
-    assert issubclass(type(loader), DummyBaseDataLoader)
-    assert not issubclass(type(loader), TorchDataLoaderMeta.base_loader)
 
 
 def test_multiple_collater(molecule):
@@ -159,8 +136,8 @@ def test_simple_fixed_size_data_loader_mro(num_graphs=2, num_nodes=30):
 
     mro = inspect.getmro(type(pyg_dataloader))
     # MRO is longer but it's enough to check these classes.
-    expected_mro = (type(pyg_dataloader), FixedSizeDataLoader,
-                    CustomFixedSizeDataLoader, torch.utils.data.DataLoader)
+    expected_mro = (FixedSizeDataLoader, CustomFixedSizeDataLoader,
+                    torch.utils.data.DataLoader)
     num_classes = len(expected_mro)
     assert mro[:num_classes] == expected_mro
 
@@ -169,10 +146,9 @@ def test_simple_fixed_size_data_loader_mro(num_graphs=2, num_nodes=30):
                                             batch_size=num_graphs)
     mro = inspect.getmro(type(ipu_dataloader))
     # MRO is longer but it's enough to check these classes.
-    expected_mro = (type(ipu_dataloader), IPUFixedSizeDataLoader,
-                    FixedSizeDataLoader, IPUCustomFixedSizeDataLoader,
-                    CustomFixedSizeDataLoader, poptorch.DataLoader,
-                    torch.utils.data.DataLoader)
+    expected_mro = (IPUFixedSizeDataLoader, FixedSizeDataLoader,
+                    IPUCustomFixedSizeDataLoader, CustomFixedSizeDataLoader,
+                    poptorch.DataLoader, torch.utils.data.DataLoader)
     num_classes = len(expected_mro)
     assert mro[:num_classes] == expected_mro
 

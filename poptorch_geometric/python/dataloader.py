@@ -11,18 +11,9 @@ from poptorch_geometric.collate import CombinedBatchingCollater
 from poptorch_geometric.pyg_dataloader import CustomFixedSizeDataLoader as PyGCustomFixedSizeDataLoader
 from poptorch_geometric.pyg_dataloader import DataLoader as PyGDataLoader
 from poptorch_geometric.pyg_dataloader import FixedSizeDataLoader as PyGFixedSizeDataLoader
-from poptorch_geometric.pyg_dataloader import TorchDataLoaderMeta
 
 
-class PopTorchDataLoaderMeta(TorchDataLoaderMeta):
-    r"""Injects the :obj:`poptorch.DataLoader` class as a base class of class
-    that uses the `PopTorchDataLoaderMeta` metaclass.
-    """
-    base_loader = poptorch.DataLoader
-
-
-# pylint: disable=invalid-metaclass
-class DataLoader(PyGDataLoader, metaclass=PopTorchDataLoaderMeta):
+class DataLoader(PyGDataLoader, poptorch.DataLoader):
     r"""A data loader which merges data objects from a
     :class:`torch_geometric.data.Dataset` to a mini-batch.
     Data objects can be either of type :class:`~torch_geometric.data.Data` or
@@ -73,9 +64,8 @@ class DataLoader(PyGDataLoader, metaclass=PopTorchDataLoaderMeta):
                                         collater=base_collater)
 
 
-# pylint: disable=invalid-metaclass
 class CustomFixedSizeDataLoader(PyGCustomFixedSizeDataLoader,
-                                metaclass=PopTorchDataLoaderMeta):
+                                poptorch.DataLoader):
     r"""A data loader which merges data objects from a
     :class:`poptorch.Dataset` to a mini-batch and pads node and edge features
     so tensors across all batches have constant shapes.
@@ -151,10 +141,7 @@ class CustomFixedSizeDataLoader(PyGCustomFixedSizeDataLoader,
                                         collater=base_collater)
 
 
-# pylint: disable=invalid-metaclass
-class FixedSizeDataLoader(PyGFixedSizeDataLoader,
-                          CustomFixedSizeDataLoader,
-                          metaclass=PopTorchDataLoaderMeta):
+class FixedSizeDataLoader(PyGFixedSizeDataLoader, CustomFixedSizeDataLoader):
     r"""A data loader which merges data objects from a
     :class:`poptorch.Dataset` to a mini-batch and pads node and edge features
     so tensors across all batches have constant shapes.

@@ -6,14 +6,12 @@ from typing import Dict, Optional, Union
 from torch_geometric.loader import ClusterData
 
 from poptorch_geometric.collate import CombinedBatchingCollater
-from poptorch_geometric.dataloader import PopTorchDataLoaderMeta
 from poptorch_geometric.pyg_cluster_loader import \
     FixedSizeClusterLoader as PyGFixedSizeClusterLoader
 import poptorch
 
 
-class FixedSizeClusterLoader(PyGFixedSizeClusterLoader,
-                             metaclass=PopTorchDataLoaderMeta):
+class FixedSizeClusterLoader(PyGFixedSizeClusterLoader, poptorch.DataLoader):
     r"""A data loader which merges data objects from a
     :class:`torch_geometric.loader.ClusterData` to a mini-batch of clusters
     and pads node and edge features so tensors across all batches have constant

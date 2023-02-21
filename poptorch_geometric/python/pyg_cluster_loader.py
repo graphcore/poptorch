@@ -1,13 +1,13 @@
 # Copyright (c) 2022 Graphcore Ltd. All rights reserved.
 from typing import Dict, Optional, Union
 
+import torch
 from torch_geometric.loader import ClusterData, ClusterLoader
 
 from poptorch_geometric.collate import FixedSizeCollater
-from poptorch_geometric.pyg_dataloader import TorchDataLoaderMeta
 
 
-class FixedSizeClusterLoader(metaclass=TorchDataLoaderMeta):
+class FixedSizeClusterLoader(torch.utils.data.DataLoader):
     r"""A data loader which merges data objects from a
     :class:`torch_geometric.loader.ClusterData` to a mini-batch of clusters
     and pads node and edge features so tensors across all batches have constant

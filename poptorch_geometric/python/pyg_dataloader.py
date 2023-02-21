@@ -12,52 +12,9 @@ from poptorch_geometric.collate import FixedSizeCollater
 from poptorch_geometric.pyg_collate import Collater
 
 
-class TorchDataLoaderMeta(type):
-    r"""Injects the :obj:`torch.utils.data.DataLoader` class as a base class
-    of class that uses the :class:`TorchDataLoaderMeta` metaclass.
-
-    This metaclass can be used when a dataloader needs to be aware of
-    platform-specific features or limitations.
-    In such case this metaclass allows to inject custom dataloader as a base
-    class for :class:`CustomFixedSizeDataLoader`. To achieve that, create a
-    subclass of this metaclass, override its :obj:`base_loader` field and use
-    that new class as a metaclass for subclass of
-    :class:`CustomFixedSizeDataLoader`.
-
-    Example:
-
-        # Creating a fixed size dataloader with CustomDataLoader as a base
-        # class:
-
-        >>> class CustomDataLoaderMeta(TorchDataLoaderMeta):
-        ...     base_loader = CustomDataLoader
-
-        >>> class MyFixedSizeDataLoader(CustomFixedSizeDataLoader,
-        ...                             metaclass=CustomDataLoaderMeta):
-        ...     def __init__(self, *args, *kwargs):
-        ...         super().__init__(*args, **kwargs)
-
-    """
-    base_loader = torch.utils.data.DataLoader
-
-    def __call__(cls, *args, **kwargs):
-        base_cls = cls.base_loader
-        name = f"{cls.__name__}_{base_cls.__module__}.{base_cls.__name__}"
-
-        class MetaResolver(type(cls), type(base_cls)):  # pylint: disable=duplicate-bases
-
-            pass
-
-        if name not in globals():
-            globals()[name] = MetaResolver(name, (cls, base_cls), {})
-        new_cls = globals()[name]
-
-        return super(TorchDataLoaderMeta, new_cls).__call__(*args, **kwargs)
-
-
-# ==== Copied from PyG and changed to use metaclass, have
-# `_create_collater` method and pass arguments to `__init__`` as keyword ones.
-class DataLoader(metaclass=TorchDataLoaderMeta):
+# ==== Copied from PyG and changed to have `_create_collater` method and
+# pass arguments to `__init__`` as keyword ones.
+class DataLoader(torch.utils.data.DataLoader):
     r"""A data loader which merges data objects from a
     :class:`torch_geometric.data.Dataset` to a mini-batch.
     Data objects can be either of type :class:`~torch_geometric.data.Data` or
@@ -111,7 +68,7 @@ class DataLoader(metaclass=TorchDataLoaderMeta):
 # ==== End of copied code
 
 
-class CustomFixedSizeDataLoader(metaclass=TorchDataLoaderMeta):
+class CustomFixedSizeDataLoader(torch.utils.data.DataLoader):
     r"""A data loader which merges data objects from a
     :class:`torch_geometric.data.Dataset` to a mini-batch and pads node and
     edge features so tensors across all batches have constant shapes.
