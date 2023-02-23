@@ -13,7 +13,7 @@ import poptorch
 
 class FixedSizeClusterLoader(PyGFixedSizeClusterLoader, poptorch.DataLoader):
     r"""A data loader which merges data objects from a
-    :class:`torch_geometric.loader.ClusterData` to a mini-batch of clusters
+    :py:class:`torch_geometric.loader.ClusterData` to a mini-batch of clusters
     and pads node and edge features so tensors across all batches have constant
     shapes.
 
@@ -23,13 +23,13 @@ class FixedSizeClusterLoader(PyGFixedSizeClusterLoader, poptorch.DataLoader):
         batch_size (int, optional): The number of samples per batch to load.
             (default: :obj:`1`)
         collater_args (dict, optional): The additional arguments passed to
-            :class:`FixedSizeCollater`. They should not contain
-            :obj:`num_nodes` as it should be passed directly to the initializer
-            method. (default: :obj:`None`)
+            :py:class:`poptorch_geometric.collate.FixedSizeCollater`. They
+            should not contain :obj:`num_nodes` as it should be passed directly
+            to the initializer method. (default: :obj:`None`)
         options (poptorch.Options, optional): The additional PopTorch options
-            to be passed to :obj:`poptorch.DataLoader`. (default: :obj:`None`)
+            to be passed to :py:class:`poptorch.DataLoader`. (default: :obj:`None`)
         **kwargs (optional): The additional arguments of
-            :class:`poptorch.DataLoader`.
+            :py:class:`poptorch.DataLoader`.
     """
 
     def __init__(

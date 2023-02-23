@@ -81,6 +81,7 @@ class PkgInfo:
             self.os_type = self.os_type.value
         self.package_os_type = package_os_type or _get_package_os_type()
         self.doc_name = doc_name or "poptorch-user-guide"
+        self.poptorch_geometric_doc_name = "poptorch-geometric-user-guide"
         self.project_name = project_name or "poptorch"
         self.version_long = self.version
         self.poptorch_hash = _get_poptorch_hash()
@@ -90,11 +91,15 @@ class PkgInfo:
         self.__dict__.update(kwargs)
         logger.info("PkgInfo initialised: %s", str(self.__dict__))
 
-    def pdf_filename(self):
-        return f"{self.doc_name}-{self.version}-{self.snapshot}.pdf"
+    def pdf_filename(self, poptorch_geometric=False):
+        doc_name = self.poptorch_geometric_doc_name if poptorch_geometric \
+            else self.doc_name
+        return f"{doc_name}-{self.version}-{self.snapshot}.pdf"
 
-    def html_filename(self):
-        return f"{self.doc_name}-html-{self.version}-{self.snapshot}.zip"
+    def html_filename(self, poptorch_geometric=False):
+        doc_name = self.poptorch_geometric_doc_name if poptorch_geometric \
+            else self.doc_name
+        return f"{doc_name}-html-{self.version}-{self.snapshot}.zip"
 
     def prodinfo_filename(self):
         return f"{self.project_name}-{self.version}-{self.snapshot}.yml"

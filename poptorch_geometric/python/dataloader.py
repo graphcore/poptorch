@@ -15,9 +15,9 @@ from poptorch_geometric.pyg_dataloader import FixedSizeDataLoader as PyGFixedSiz
 
 class DataLoader(PyGDataLoader, poptorch.DataLoader):
     r"""A data loader which merges data objects from a
-    :class:`torch_geometric.data.Dataset` to a mini-batch.
-    Data objects can be either of type :class:`~torch_geometric.data.Data` or
-    :class:`~torch_geometric.data.HeteroData`.
+    :py:class:`torch_geometric.data.Dataset` to a mini-batch.
+    Data objects can be either of type :py:class:`~torch_geometric.data.Data` or
+    :py:class:`~torch_geometric.data.HeteroData`.
 
     Args:
         dataset (Dataset): The dataset from which to load the data.
@@ -30,9 +30,9 @@ class DataLoader(PyGDataLoader, poptorch.DataLoader):
         exclude_keys (List[str], optional): Will exclude each key in the
             list. (default: :obj:`None`)
         options (poptorch.Options, optional): The additional PopTorch options
-            to be passed to :obj:`poptorch.DataLoader`. (default: :obj:`None`)
+            to be passed to :py:class:`poptorch.DataLoader`. (default: :obj:`None`)
         **kwargs (optional): Additional arguments of
-            :class:`poptorch.DataLoader`.
+            :py:class:`poptorch.DataLoader`.
     """
 
     def __init__(
@@ -67,10 +67,10 @@ class DataLoader(PyGDataLoader, poptorch.DataLoader):
 class CustomFixedSizeDataLoader(PyGCustomFixedSizeDataLoader,
                                 poptorch.DataLoader):
     r"""A data loader which merges data objects from a
-    :class:`poptorch.Dataset` to a mini-batch and pads node and edge features
+    :py:class:`poptorch.Dataset` to a mini-batch and pads node and edge features
     so tensors across all batches have constant shapes.
-    Data objects can be either of type :class:`~torch_geometric.data.Data` or
-    :class:`~torch_geometric.data.HeteroData`.
+    Data objects can be either of type :py:class:`~torch_geometric.data.Data` or
+    :py:class:`~torch_geometric.data.HeteroData`.
 
     Args:
         dataset (Dataset): The dataset from which to load the data.
@@ -93,14 +93,14 @@ class CustomFixedSizeDataLoader(PyGCustomFixedSizeDataLoader,
         exclude_keys (list or tuple, optional): The keys to exclude from the
             input data object. (default: :obj:`None`)
         collater_args (dict, optional): The additional arguments passed to
-            :class:`FixedSizeCollater`. They should not contain
-            :obj:`num_nodes`, :obj:`follow_batch` and :obj:`exclude_keys` as
-            those should be passed directly to the initializer method.
-            (default: :obj:`None`)
+            :py:class:`poptorch_geometric.collate.FixedSizeCollater`. They
+            should not contain :obj:`num_nodes`, :obj:`follow_batch` and
+            :obj:`exclude_keys` as those should be passed directly to the
+            initializer method. (default: :obj:`None`)
         options (poptorch.Options, optional): The additional PopTorch options
-            to be passed to :obj:`poptorch.DataLoader`. (default: :obj:`None`)
+            to be passed to :py:class:`poptorch.DataLoader`. (default: :obj:`None`)
         **kwargs (optional): The additional arguments of
-            :class:`poptorch.DataLoader`.
+            :py:class:`poptorch.DataLoader`.
     """
 
     def __init__(
@@ -143,15 +143,16 @@ class CustomFixedSizeDataLoader(PyGCustomFixedSizeDataLoader,
 
 class FixedSizeDataLoader(PyGFixedSizeDataLoader, CustomFixedSizeDataLoader):
     r"""A data loader which merges data objects from a
-    :class:`poptorch.Dataset` to a mini-batch and pads node and edge features
+    :py:class:`poptorch.Dataset` to a mini-batch and pads node and edge features
     so tensors across all batches have constant shapes.
-    The data loader uses :class:`FixedBatchSampler` underneath.
+    The data loader uses
+    :py:class:`poptorch_geometric.batch_sampler.FixedBatchSampler` underneath.
 
     If not specified, :obj:`num_nodes` and :obj:`num_edges` are set to the
     batch size times the maximum number of nodes and edges, respectively.
 
     Args:
-        dataset (Dataset): The :class:`~torch_geometric.data.Dataset` instance
+        dataset (Dataset): The :py:class:`~torch_geometric.data.Dataset` instance
             from which to load the graph examples for the IPU.
         num_nodes (int, optional): Number of nodes in a batch.
             (default: :obj:`None`)
@@ -160,27 +161,27 @@ class FixedSizeDataLoader(PyGFixedSizeDataLoader, CustomFixedSizeDataLoader):
         batch_size (int, optional): How many graph examples to load in each
             batch. This should be at least :obj:`2` to allow for creating at
             least one padding graph. (default: :obj:`2`)
-        options (poptorch.Options, optional): The :class:`poptorch.Options`
-            used by the :class:`poptorch.DataLoader`. Will use the default
+        options (poptorch.Options, optional): The :py:class:`poptorch.Options`
+            used by the :py:class:`poptorch.DataLoader`. Will use the default
             options if not provided. (default: :obj:`None`)
         follow_batch (list or tuple, optional): Creates assignment batch
             vectors for each key in the list. (default: :obj:`None`)
         exclude_keys (list or tuple, optional): Keys to exclude from the
             batch. (default: :obj:`None`)
         collater_args (dict, optional): The additional arguments passed to
-            :class:`FixedSizeCollater`. They should not contain
-            :obj:`num_nodes`, :obj:`follow_batch` and :obj:`exclude_keys` as
-            those should be passed directly to the initializer method.
-            (default: :obj:`None`)
+            :py:class:`poptorch_geometric.collate.FixedSizeCollater`. They
+            should not contain :obj:`num_nodes`, :obj:`follow_batch` and
+            :obj:`exclude_keys` as those should be passed directly to the
+            initializer method. (default: :obj:`None`)
         sampler (Sampler or Iterable, optional): Base sampler. Can be any
             iterable object. (default: :obj:`None`)
         allow_skip_data (bool, optional): Allow skip :obj:`data_source` item,
-            otherwise throw :class:`RuntimeError` when the sampler is not able
+            otherwise throw :py:exc:`RuntimeError` when the sampler is not able
             to form a single item batch from :obj:`data_source`, because
             :obj:`Data` exceeds the maximum batch requirements.
             (default: :obj:`False`)
         **kwargs (optional): Additional arguments of
-            :class:`poptorch.DataLoader`.
+            :py:class:`poptorch.DataLoader`.
     """
 
     def __init__(
