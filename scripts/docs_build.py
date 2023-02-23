@@ -16,16 +16,24 @@ _utils.set_logger(logger)
 
 
 class DocumentationBuilder:
-    def __init__(self, pkg_info, install_dir=None):
+    def __init__(self, pkg_info, install_dir=None, poptorch_geometric=False):
         self.pkg_info = pkg_info
-        self.output_dir = "docs"
+        self.pdf_filename = pkg_info.pdf_filename(poptorch_geometric)
+        self.html_filename = pkg_info.html_filename(poptorch_geometric)
+        self.doc_name = pkg_info.poptorch_geometric_doc_name if \
+            poptorch_geometric else pkg_info.doc_name
+
+        self.output_dir = os.path.join(
+            "docs", "poptorch_geometric") if poptorch_geometric else "docs"
         self.output_pdf_dir = os.path.join(self.output_dir, "pdf")
         self.output_html_dir = os.path.join(self.output_dir, "html")
         self.output_guide_dir = os.path.join(self.output_html_dir,
-                                             pkg_info.doc_name)
-        self.docs_src_dir = os.path.join(_utils.sources_dir(), "docs",
+                                             self.doc_name)
+        src_dir = os.path.join(
+            "docs", "poptorch_geometric") if poptorch_geometric else "docs"
+        self.docs_src_dir = os.path.join(_utils.sources_dir(), src_dir,
                                          "user_guide")
-        self.sphinx_conf_dir = os.path.join(_utils.sources_dir(), "docs",
+        self.sphinx_conf_dir = os.path.join(_utils.sources_dir(), src_dir,
                                             "common")
         self.title = _utils.get_first_line(
             os.path.join(self.docs_src_dir, "index.rst"))
@@ -70,7 +78,7 @@ class DocumentationBuilder:
 
     def package_html(self):
         archive = zipfile.ZipFile(
-            os.path.join(self.install_dir, self.pkg_info.html_filename()), "w",
+            os.path.join(self.install_dir, self.html_filename), "w",
             zipfile.ZIP_DEFLATED)
         excluded_dirs = [".doctrees", "_sources"]
         excluded_files = ["objects.inv", ".buildinfo"]
@@ -88,13 +96,12 @@ class DocumentationBuilder:
                 archive.write(os.path.join(root, file),
                               arcname=os.path.join(new_root, file))
         archive.close()
-        logger.info("%s was successfully generated",
-                    self.pkg_info.html_filename())
+        logger.info("%s was successfully generated", self.html_filename)
 
     def build_pdf(self):
         self.assert_poptorch_in_path()
         args = self.common_sphinx_flags + [
-            "-b", "latex", "-D", f"project={self.pkg_info.doc_name}", "-D",
+            "-b", "latex", "-D", f"project={self.doc_name}", "-D",
             f"release=v{self.pkg_info.version_long}", "-D",
             f"version=v{self.pkg_info.version_long}", self.docs_src_dir,
             self.output_pdf_dir
@@ -105,11 +112,9 @@ class DocumentationBuilder:
             "(See above for details)")
         subprocess.check_output(["make", "LATEXMKOPTS=\"-silent\""],
                                 cwd=self.output_pdf_dir)
-        shutil.copyfile(
-            os.path.join(self.output_pdf_dir, "doc.pdf"),
-            os.path.join(self.install_dir, self.pkg_info.pdf_filename()))
-        logger.info("%s was successfully generated",
-                    self.pkg_info.pdf_filename())
+        shutil.copyfile(os.path.join(self.output_pdf_dir, "doc.pdf"),
+                        os.path.join(self.install_dir, self.pdf_filename))
+        logger.info("%s was successfully generated", self.pdf_filename)
 
 
 if __name__ == "__main__":
@@ -139,11 +144,22 @@ if __name__ == "__main__":
             logger.debug("Adding %s", path)
             sys.path.insert(0, path)
 
-    builder = DocumentationBuilder(
-        _utils.PkgInfo.load_from_file(must_exist=False), args.install_dir)
+    poptorch_builder = DocumentationBuilder(
+        _utils.PkgInfo.load_from_file(must_exist=False),
+        install_dir=args.install_dir)
+
+    poptorch_geometric_builder = DocumentationBuilder(
+        _utils.PkgInfo.load_from_file(must_exist=False),
+        install_dir=args.install_dir,
+        poptorch_geometric=True)
+
     if not args.no_pdf:
-        builder.build_pdf()
+        poptorch_builder.build_pdf()
+        poptorch_geometric_builder.build_pdf()
 
     if not args.no_html:
-        builder.build_html()
-        builder.package_html()
+        poptorch_builder.build_html()
+        poptorch_builder.package_html()
+
+        poptorch_geometric_builder.build_html()
+        poptorch_geometric_builder.package_html()

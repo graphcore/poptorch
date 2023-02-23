@@ -14,8 +14,8 @@ __all__ = ['FixedBatchSampler', 'make_fixed_batch_generator']
 
 
 class FixedBatchSampler(Sampler[List[int]]):
-    r""""Wraps another sampler to yield a mini-batch of indices.
-    :class:`FixedBatchSampler` forms batches by adding graphs to the batch one
+    r"""Wraps another sampler to yield a mini-batch of indices.
+    :py:class:`FixedBatchSampler` forms batches by adding graphs to the batch one
     at a time without exceeding the maximum number of nodes, edges, or graphs.
     This gives similar results to packing without requiring the dataset to be
     preprocessed.
@@ -31,7 +31,7 @@ class FixedBatchSampler(Sampler[List[int]]):
         sampler (Sampler or Iterable, optional): Base sampler. Can be any
             iterable object. (default: RandomSampler(data_source))
         allow_skip_data (bool, optional): Allow skip :obj:`data_source` item,
-            otherwise throw :class:`RuntimeError` when the sampler is not able
+            otherwise throw :py:exc:`RuntimeError` when the sampler is not able
             to form a single item batch from :obj:`data_source`, because
             the iterated data exceeds the maximum batch requirements.
             (default :obj:`False`)

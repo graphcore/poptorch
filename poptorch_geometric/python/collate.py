@@ -234,14 +234,14 @@ def _(value: dict) -> bool:
 
 class FixedSizeCollater(Collater):
     r"""Collates a batch of graphs as a
-    :class:`torch_geometric.data.Batch` of fixed-size tensors.
+    :py:class:`torch_geometric.data.Batch` of fixed-size tensors.
 
     Calling an instance of this class adds an additional graphs with the
     necessary number of nodes and edges to pad the batch so that tensors have
     the size corresponding to the maximum numbers of graphs, nodes and edges
     specified during initialisation.
 
-    Calling an instance of this class can result in :obj:`RuntimeError` if
+    Calling an instance of this class can result in :py:exc:`RuntimeError` if
     the number of graphs (if set), nodes or edges in the batch is larger than
     the requested limits.
 
