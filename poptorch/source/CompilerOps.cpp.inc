@@ -618,6 +618,12 @@ torch::jit::Node* createGather(torch::jit::Graph *graph,  const std::vector<torc
 new_node->i_(c10::Symbol::attr("axis"),axis);
 return new_node;
 }
+torch::jit::Node* createGroupedgather(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,int64_t axis,int64_t group_size) {
+ torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::groupedgather, args, ImplicitCast::None, OutputType::AsFirstInput);
+new_node->i_(c10::Symbol::attr("axis"),axis);
+new_node->i_(c10::Symbol::attr("group_size"),group_size);
+return new_node;
+}
 torch::jit::Node* createGlobalaveragepool(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args) {
  torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::globalaveragepool, args, ImplicitCast::None, OutputType::AsFirstInput);
 return new_node;

@@ -118,6 +118,7 @@ torch::jit::Node* createElu(torch::jit::Graph *graph,  const std::vector<torch::
 torch::jit::Node* createExp(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args);
 torch::jit::Node* createFloor(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args);
 torch::jit::Node* createGather(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,int64_t axis);
+torch::jit::Node* createGroupedgather(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,int64_t axis,int64_t group_size);
 torch::jit::Node* createGlobalaveragepool(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args);
 torch::jit::Node* createGloballppool(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,int64_t p);
 torch::jit::Node* createGlobalmaxpool(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args);

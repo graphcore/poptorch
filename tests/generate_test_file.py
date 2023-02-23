@@ -130,11 +130,12 @@ serial_test_files = [
 serial_tests = [
     "half_test.py::test_resnet",
 ]
+cpp_tests = ["cpp/GNNOptimizationsTest"]
 #pylint: enable=line-too-long
 
 
-def add_test(output, test, root_folder, folder, test_id, test_properties,
-             extra_args):
+def add_pytest(output, test, root_folder, folder, test_id, test_properties,
+               extra_args):
     extra = " ".join([f"\"{a}\"" for a in extra_args])
     output.write(
         f"add_test({test} \"{root_folder}/timeout_handler.py\" \"python3\""
@@ -147,13 +148,22 @@ def add_test(output, test, root_folder, folder, test_id, test_properties,
     output.write(f"set_tests_properties({test} PROPERTIES\n{props_string})\n")
 
 
+def add_cpp_test(output, test, root_folder, folder, test_properties):
+    output.write(f"add_test({test} \"{root_folder}/timeout_handler.py\" "
+                 f"\"{folder}/{test}\" )\n")
+
+    props_string = " ".join(f"{k} {v}" for k, v in test_properties.items())
+
+    output.write(f"set_tests_properties({test} PROPERTIES\n{props_string})\n")
+
+
 work_dir = os.getcwd()
 
 with open(args.output_file, "w") as output:
     test_id = 0
     # Add the short_tests files
     for test in short_tests:
-        add_test(output, test, args.test_dir, args.test_dir, test_id, {
+        add_pytest(output, test, args.test_dir, args.test_dir, test_id, {
             "LABELS": "short",
             "WORKING_DIRECTORY": work_dir
         }, extra_args)
@@ -202,6 +212,22 @@ with open(args.output_file, "w") as output:
             if labels:
                 test_properties['LABELS'] = ";".join(labels)
 
-            add_test(output, test_name, args.test_dir, dir_path, test_id,
-                     test_properties, extra_args)
+            add_pytest(output, test_name, args.test_dir, dir_path, test_id,
+                       test_properties, extra_args)
             test_id += 1
+
+    # Process the list of cpp tests
+    for test in cpp_tests:
+        test_properties = {"WORKING_DIRECTORY": work_dir}
+        # Mark tests as timed out 1 second after TEST_TIMEOUT appears in
+        # their output (see tests/timeout_handler.py)
+        test_properties["TIMEOUT_AFTER_MATCH"] = "\"1;TEST_TIMEOUT\""
+        # Use os.path.basename() to ensure we only have
+        # the filename
+        test_file = os.path.basename(test)
+
+        dir_path = os.path.join(work_dir, "tests", test)
+        dir_path = os.path.dirname(dir_path)
+
+        add_cpp_test(output, test_file, args.test_dir, dir_path,
+                     test_properties)

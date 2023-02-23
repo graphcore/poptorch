@@ -1,4 +1,5 @@
 add_subdirectory(custom_ops)
+add_subdirectory(cpp)
 
 # Copy tests to the build folder if requested.
 if(COPY_TESTS)

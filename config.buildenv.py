@@ -6,6 +6,7 @@ _llvm_version = "13.0.1"
 
 installers.add(
     CondaPackages(
+        "boost-cpp=1.72.0",
         "ccache=4.3",
         "cmake=3.18.2",
         "libstdcxx-ng=11.2.0",

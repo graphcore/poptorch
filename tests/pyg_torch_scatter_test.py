@@ -31,56 +31,6 @@ else:
         pass
 
 
-def torch_scatter_fusible_model(func, src, index, dtype):
-
-    # We do the shape inference from scatter here because we don't support
-    # dynamic shaped tensors on the ipu
-    dim_size = int(index.max()) + 1
-
-    class Model(torch.nn.Module):
-        def forward(self, src, index, dtype):
-            ones = torch.ones_like(src, dtype=dtype)
-            two = torch.ones_like(src) * 2
-            out = func(src, index, dim_size=dim_size)
-            out_ones = func(ones, index, dim_size=dim_size)
-            out_two = func(two, index, dim_size=dim_size)
-            if isinstance(out, tuple):
-                out = out[0]
-                out_ones = out_ones[0]
-                out_two = out_two[0]
-
-            src_updated = src - torch.sum(out)
-            out_updated, _ = scatter_max(src_updated, index, dim_size=dim_size)
-
-            return (out_ones + out_two) / torch.sum(out_updated)
-
-    model = Model()
-    options = poptorch.Options()
-    poptorch_model = poptorch.inferenceModel(model, options=options)
-
-    ones = torch.ones_like(src, dtype=dtype)
-    two = torch.ones_like(src) * 2
-
-    native_out = func(src, index, dim_size=dim_size)
-    native_out_ones = func(ones, index, dim_size=dim_size)
-    native_out_two = func(two, index, dim_size=dim_size)
-    if isinstance(native_out, tuple):
-        native_out = native_out[0]
-        native_out_ones = native_out_ones[0]
-        native_out_two = native_out_two[0]
-
-    src_updated = src - torch.sum(native_out)
-    native_out_updated, _ = scatter_max(src_updated, index, dim_size=dim_size)
-
-    expected_nat = (native_out_ones +
-                    native_out_two) / torch.sum(native_out_updated)
-
-    ipu_out = poptorch_model(src, index, dtype)
-
-    helpers.assert_allclose(actual=torch.nan_to_num(ipu_out),
-                            expected=torch.nan_to_num(expected_nat))
-
-
 def torch_scatter_harness(func, src, index):
 
     dim_size = int(index.max()) + 1
@@ -144,22 +94,3 @@ def test_scatter_max(shape):
     ind = torch.randint(3, shape)
 
     torch_scatter_harness(scatter_max, x, ind)
-
-
-@pytest.mark.parametrize("shape", [(5, ), (2, 5), (2, 5, 5)])
-@pytest.mark.parametrize("func", [
-    scatter, scatter_add, scatter_max, scatter_softmax, scatter_log_softmax,
-    scatter_std
-])
-@pytest.mark.parametrize("dtype", [torch.float32, torch.float16, torch.int])
-def test_scatter_fuse(shape, func, dtype):
-    if dtype != torch.float32 and func in [
-            scatter_softmax, scatter_log_softmax, scatter_std
-    ]:
-        pytest.skip("can only be computed with fp32 data types")
-
-    torch.manual_seed(0)
-    x = torch.rand(shape)
-    ind = torch.randint(3, shape)
-
-    torch_scatter_fusible_model(func, x, ind, dtype)
