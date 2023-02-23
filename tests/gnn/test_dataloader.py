@@ -490,9 +490,20 @@ def test_dataloader(dataset, request, batch_size=10):
         # Split batch to the list of data and compare with the data from the
         # dataset.
         data_list = batch.to_data_list()
-        for original, new in zip(dataset[idx_range], data_list):
 
+        def check_data_types(original, new):
+            if isinstance(original, torch.Tensor):
+                assert original.dtype == new.dtype
+            else:
+                for o, n in zip(original.values(), new.values()):
+                    check_data_types(o, n)
+
+        for original, new in zip(dataset[idx_range], data_list):
             assert set(new.keys) == set(original.keys)
+
+            for o, n in zip(original.to_dict().values(),
+                            new.to_dict().values()):
+                check_data_types(o, n)
 
             for key in original.keys:
                 if not isinstance(original[key], torch.Tensor):

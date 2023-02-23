@@ -92,7 +92,7 @@ def _reset_attr(value: Any, key: str = None) -> Any:
         # NOTE: It has to be torch.zeros - creating a Tensor directly
         # (through torch.tensor) with 0 in shape ends up in creating a
         # tensor with wrong dimensions.
-        return torch.zeros(_reset_dim(value.shape, key))
+        return torch.zeros(_reset_dim(value.shape, key), dtype=value.dtype)
     return type(value)()
 
 
