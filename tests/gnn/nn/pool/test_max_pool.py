@@ -6,7 +6,7 @@ import torch
 from torch_geometric.data import Batch, Data
 from torch_geometric.nn import max_pool, max_pool_neighbor_x, max_pool_x
 
-from pool_utils import op_harness
+from pool_utils import pool_harness
 
 
 def test_max_pool_x(request):
@@ -21,7 +21,7 @@ def test_max_pool_x(request):
     x = torch.Tensor([[1, 2], [3, 4], [5, 6], [7, 8], [9, 10], [11, 12]])
     batch = torch.tensor([0, 0, 0, 0, 1, 1])
 
-    out = op_harness(max_pool_x, [cluster, x, batch])
+    out = pool_harness(max_pool_x, [cluster, x, batch])
     assert out[0].tolist() == [[5, 6], [7, 8], [11, 12]]
     assert out[1].tolist() == [0, 0, 1]
 
@@ -36,7 +36,7 @@ def test_max_pool_x_size_2(request):
     x = torch.Tensor([[1, 2], [3, 4], [5, 6], [7, 8], [9, 10], [11, 12]])
     batch = torch.tensor([0, 0, 0, 0, 1, 1])
 
-    out, _ = op_harness(max_pool_x, [cluster, x, batch, 2])
+    out, _ = pool_harness(max_pool_x, [cluster, x, batch, 2])
     assert out.tolist() == [[5, 6], [7, 8], [11, 12], [0, 0]]
 
 
@@ -59,7 +59,7 @@ def test_max_pool(request):
                  edge_attr=edge_attr,
                  batch=batch)
 
-    data = op_harness(max_pool, [cluster, data, lambda x: x])
+    data = pool_harness(max_pool, [cluster, data, lambda x: x])
 
     assert data.x.tolist() == [[5, 6], [7, 8], [11, 12]]
     assert data.pos.tolist() == [[1, 1], [2, 2], [4.5, 4.5]]
@@ -82,7 +82,7 @@ def test_max_pool_neighbor_x(request, input_type):
     batch = torch.tensor([0, 0, 0, 0, 1, 1])
 
     data = input_type(x=x, edge_index=edge_index, batch=batch)
-    data = op_harness(max_pool_neighbor_x, [data])
+    data = pool_harness(max_pool_neighbor_x, [data])
 
     assert data.x.tolist() == [
         [7, 8],

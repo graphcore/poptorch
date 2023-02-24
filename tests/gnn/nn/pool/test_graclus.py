@@ -6,7 +6,7 @@ import torch
 from torch_geometric.nn import graclus
 from torch_geometric.testing import withPackage
 
-from pool_utils import op_harness
+from pool_utils import pool_harness
 
 
 @withPackage('torch_cluster')
@@ -28,5 +28,5 @@ def test_graclus(request):
         "Will be enabled after AFS-144 is fixed.")
 
     edge_index = torch.tensor([[0, 1], [1, 0]])
-    out = op_harness(graclus, [edge_index])
+    out = pool_harness(graclus, [edge_index])
     assert out.tolist() == [0, 0]

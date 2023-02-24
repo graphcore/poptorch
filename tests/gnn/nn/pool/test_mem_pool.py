@@ -6,7 +6,7 @@ import torch
 from torch_geometric.nn import MemPooling
 from torch_geometric.utils import to_dense_batch
 
-from pool_utils import op_harness
+from pool_utils import pool_harness
 
 
 def test_mem_pool(request):
@@ -22,7 +22,7 @@ def test_mem_pool(request):
     batch = torch.tensor([0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 4, 4, 4])
     _, mask = to_dense_batch(x, batch)
 
-    out1, S = op_harness(mpool1, [x, batch])
+    out1, S = pool_harness(mpool1, [x, batch])
     loss = MemPooling.kl_loss(S)
     with torch.autograd.set_detect_anomaly(True):
         loss.backward()
@@ -49,6 +49,6 @@ def test_mem_pool_chain(request):
     batch = torch.tensor([0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 4, 4, 4])
 
     out1, _ = mpool1(x, batch)
-    out2, _ = op_harness(mpool2, [out1])
+    out2, _ = pool_harness(mpool2, [out1])
 
     assert out2.size() == (5, 1, 4)

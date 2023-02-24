@@ -12,7 +12,7 @@ from torch_geometric.nn.pool.connect import Connect
 from torch_geometric.nn.pool.select import Select
 from torch_geometric.utils import scatter
 
-from pool_utils import op_harness
+from pool_utils import pool_harness
 
 
 class DummySelect(Select):
@@ -64,14 +64,14 @@ def test_pooling(request):
     edge_attr = torch.empty(0, 4)
     batch = torch.tensor([0, 0, 0, 0, 0, 1, 1, 1, 1, 1])
 
-    out = op_harness(pool, [x, edge_index])
+    out = pool_harness(pool, [x, edge_index])
     assert isinstance(out, PoolingOutput)
     assert torch.allclose(out.x, x.max(dim=0, keepdim=True)[0])
     assert out.edge_index.size() == (2, 0)
     assert out.edge_attr is None
     assert out.batch is None
 
-    out = op_harness(pool, [x, edge_index, edge_attr, batch])
+    out = pool_harness(pool, [x, edge_index, edge_attr, batch])
     assert isinstance(out, PoolingOutput)
     assert torch.allclose(out.x, scatter(x, batch, reduce='max'))
     assert out.edge_index.size() == (2, 0)

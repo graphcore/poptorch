@@ -5,7 +5,7 @@ import torch
 
 from torch_geometric.nn import ASAPooling, GCNConv, GraphConv
 
-from pool_utils import op_harness
+from pool_utils import pool_harness
 
 
 def test_asap(request):
@@ -25,18 +25,18 @@ def test_asap(request):
                           GNN=GNN,
                           add_self_loops=False)
         assert pool.__repr__() == ('ASAPooling(16, ratio=0.5)')
-        out = op_harness(pool, [x, edge_index])
+        out = pool_harness(pool, [x, edge_index])
         assert out[0].size() == (num_nodes // 2, in_channels)
         assert out[1].size() == (2, 2)
 
         pool = ASAPooling(in_channels, ratio=0.5, GNN=GNN, add_self_loops=True)
         assert pool.__repr__() == ('ASAPooling(16, ratio=0.5)')
-        out = op_harness(pool, [x, edge_index])
+        out = pool_harness(pool, [x, edge_index])
         assert out[0].size() == (num_nodes // 2, in_channels)
         assert out[1].size() == (2, 4)
 
         pool = ASAPooling(in_channels, ratio=2, GNN=GNN, add_self_loops=False)
         assert pool.__repr__() == ('ASAPooling(16, ratio=2)')
-        out = op_harness(pool, [x, edge_index])
+        out = pool_harness(pool, [x, edge_index])
         assert out[0].size() == (2, in_channels)
         assert out[1].size() == (2, 2)

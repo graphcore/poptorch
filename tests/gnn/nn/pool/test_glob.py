@@ -9,7 +9,7 @@ from torch_geometric.nn import (
     global_mean_pool,
 )
 
-from pool_utils import op_harness
+from pool_utils import pool_harness
 
 
 def test_global_pool(request):
@@ -22,25 +22,25 @@ def test_global_pool(request):
     x = torch.randn(N_1 + N_2, 4)
     batch = torch.tensor([0 for _ in range(N_1)] + [1 for _ in range(N_2)])
 
-    out = op_harness(global_add_pool, [x, batch])
+    out = pool_harness(global_add_pool, [x, batch])
     assert out.size() == (2, 4)
     assert out[0].tolist() == x[:4].sum(dim=0).tolist()
     assert out[1].tolist() == x[4:].sum(dim=0).tolist()
 
-    out = op_harness(global_add_pool, [x, None])
+    out = pool_harness(global_add_pool, [x, None])
     assert out.size() == (1, 4)
     assert out.tolist() == x.sum(dim=0, keepdim=True).tolist()
 
-    out = op_harness(global_mean_pool, [x, batch])
+    out = pool_harness(global_mean_pool, [x, batch])
     assert out.size() == (2, 4)
     assert out[0].tolist() == x[:4].mean(dim=0).tolist()
     assert out[1].tolist() == x[4:].mean(dim=0).tolist()
 
-    out = op_harness(global_mean_pool, [x, None])
+    out = pool_harness(global_mean_pool, [x, None])
     assert out.size() == (1, 4)
     assert out.tolist() == x.mean(dim=0, keepdim=True).tolist()
 
-    out = op_harness(global_max_pool, [x, batch])
+    out = pool_harness(global_max_pool, [x, batch])
     assert out.size() == (2, 4)
     assert out[0].tolist() == x[:4].max(dim=0)[0].tolist()
     assert out[1].tolist() == x[4:].max(dim=0)[0].tolist()
@@ -56,7 +56,7 @@ def test_global_max_pool_no_batch(request):
     N_1, N_2 = 4, 6
     x = torch.randn(N_1 + N_2, 4)
 
-    out = op_harness(global_max_pool, [x, None])
+    out = pool_harness(global_max_pool, [x, None])
     assert out.size() == (1, 4)
     assert out.tolist() == x.max(dim=0, keepdim=True)[0].tolist()
 
@@ -77,17 +77,17 @@ def test_permuted_global_pool(request):
     px1 = px[pbatch == 0]
     px2 = px[pbatch == 1]
 
-    out = op_harness(global_add_pool, [px, pbatch])
+    out = pool_harness(global_add_pool, [px, pbatch])
     assert out.size() == (2, 4)
     assert torch.allclose(out[0], px1.sum(dim=0))
     assert torch.allclose(out[1], px2.sum(dim=0))
 
-    out = op_harness(global_mean_pool, [px, pbatch])
+    out = pool_harness(global_mean_pool, [px, pbatch])
     assert out.size() == (2, 4)
     assert torch.allclose(out[0], px1.mean(dim=0))
     assert torch.allclose(out[1], px2.mean(dim=0))
 
-    out = op_harness(global_max_pool, [px, pbatch])
+    out = pool_harness(global_max_pool, [px, pbatch])
     assert out.size() == (2, 4)
     assert torch.allclose(out[0], px1.max(dim=0)[0])
     assert torch.allclose(out[1], px2.max(dim=0)[0])
@@ -95,5 +95,5 @@ def test_permuted_global_pool(request):
 
 def test_dense_global_pool():
     x = torch.randn(3, 16, 32)
-    out = op_harness(global_add_pool, [x, None])
+    out = pool_harness(global_add_pool, [x, None])
     assert torch.allclose(out, x.sum(dim=1))

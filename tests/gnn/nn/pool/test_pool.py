@@ -8,7 +8,7 @@ from torch import Tensor
 
 from torch_geometric.nn import radius_graph
 
-from pool_utils import op_harness
+from pool_utils import pool_harness
 
 
 def test_radius_graph(request):
@@ -26,4 +26,4 @@ def test_radius_graph(request):
     x = torch.tensor([[-1, -1], [-1, 1], [1, -1], [1, 1]], dtype=torch.float)
     batch = torch.tensor([0, 0, 0, 0])
 
-    op_harness(Net, [x, batch])
+    pool_harness(Net, [x, batch])

@@ -5,7 +5,7 @@ import torch
 
 from torch_geometric.nn.pool.decimation import decimation_indices
 
-from pool_utils import op_harness
+from pool_utils import pool_harness
 
 
 def test_decimation_basic(request):
@@ -18,9 +18,9 @@ def test_decimation_basic(request):
     decimation_factor = 2
     ptr = torch.tensor([0, N_1, N_1 + N_2])
 
-    idx_decim, ptr_decim = op_harness(decimation_indices,
-                                      [ptr, decimation_factor],
-                                      assert_func=lambda x, y: True)
+    idx_decim, ptr_decim = pool_harness(decimation_indices,
+                                        [ptr, decimation_factor],
+                                        assert_func=lambda x, y: True)
 
     expected_size = (N_1 // decimation_factor) + (N_2 // decimation_factor)
     assert idx_decim.size(0) == expected_size
@@ -39,8 +39,8 @@ def test_decimation_single_cloud(request):
     decimation_factor = 2
     ptr = torch.tensor([0, N_1])
 
-    idx_decim, ptr_decim = op_harness(decimation_indices,
-                                      [ptr, decimation_factor])
+    idx_decim, ptr_decim = pool_harness(decimation_indices,
+                                        [ptr, decimation_factor])
 
     expected_size = N_1 // decimation_factor
     assert idx_decim.size(0) == expected_size
@@ -57,8 +57,8 @@ def test_decimation_almost_empty(request):
     decimation_factor = 666  # greater than N_1
     ptr = torch.tensor([0, N_1])
 
-    idx_decim, ptr_decim = op_harness(decimation_indices,
-                                      [ptr, decimation_factor])
+    idx_decim, ptr_decim = pool_harness(decimation_indices,
+                                        [ptr, decimation_factor])
 
     assert idx_decim.size(0) == 1
     assert torch.equal(ptr_decim, torch.tensor([0, 1]))

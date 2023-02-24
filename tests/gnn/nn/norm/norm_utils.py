@@ -4,7 +4,6 @@ import torch
 
 import helpers
 from torch_geometric.data import Batch, Data
-from torch_geometric.nn.pool.base import PoolingOutput
 
 from gnn.nn.nn_utils import op_harness
 
@@ -26,11 +25,6 @@ def assert_(native_out, poptorch_out):
             assert x.keys == y.keys, "Objects have different keys."
             for k in x.keys:
                 check_inner_field(x[k], y[k])
-        elif isinstance(x, PoolingOutput):
-            for att in dir(x):
-                x_field = getattr(x, att, None)
-                if not callable(x_field) and isinstance(x_field, torch.Tensor):
-                    check_inner_field(x_field, getattr(y, att, None))
         elif x is not None:
             assert False, f"Unsupported types: x type={type(x)}, y type=" \
                 f"{type(y)}"
@@ -38,7 +32,7 @@ def assert_(native_out, poptorch_out):
     check_inner_field(native_out, poptorch_out)
 
 
-def pool_harness(op, inputs, assert_func=None):
+def norm_harness(op, inputs, assert_func=None):
 
     if assert_func is None:
         assert_func = assert_

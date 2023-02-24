@@ -5,7 +5,7 @@ import torch
 
 from torch_geometric.nn import PANConv, PANPooling
 
-from pool_utils import op_harness
+from pool_utils import pool_harness
 
 
 def test_pan_pooling(request):
@@ -25,7 +25,7 @@ def test_pan_pooling(request):
     assert str(pool) == 'PANPooling(32, ratio=0.5, multiplier=1.0)'
 
     x, M = conv(x, edge_index)
-    h, edge_index, edge_weight, _, perm, score = op_harness(pool, [x, M])
+    h, edge_index, edge_weight, _, perm, score = pool_harness(pool, [x, M])
 
     assert h.size() == (2, 32)
     assert edge_index.size() == (2, 4)
