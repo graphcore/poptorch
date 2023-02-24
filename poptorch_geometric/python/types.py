@@ -1,6 +1,9 @@
 # Copyright (c) 2022 Graphcore Ltd. All rights reserved.
 from itertools import chain
-from functools import singledispatchmethod
+try:
+    from functools import singledispatchmethod
+except ImportError:
+    from singledispatchmethod import singledispatchmethod
 from typing import Any, Generator, Union, Iterable, List
 
 import torch

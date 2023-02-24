@@ -1,7 +1,11 @@
 # Copyright (c) 2022-2023 Graphcore Ltd. All rights reserved.
 
 from typing import Any, Dict, Generator, List, Optional, Tuple, Union
-from functools import singledispatch, singledispatchmethod
+from functools import singledispatch
+try:
+    from functools import singledispatchmethod
+except ImportError:
+    from singledispatchmethod import singledispatchmethod
 from itertools import chain
 
 import torch
