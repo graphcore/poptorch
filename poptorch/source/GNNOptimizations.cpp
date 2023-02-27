@@ -171,6 +171,7 @@ void groupScatterReduceAndGatherNodes(torch::jit::Graph *graph) {
 
   const auto merge_gathers = [&]() {
     for (auto &&[_, gather_vec] : gathers) {
+      UNUSED(_);
       if (gather_vec.size() > 1) {
         const auto &merged_gathers =
             dispatch(graph, gather_vec, createGroupedGatherNode);
