@@ -562,6 +562,17 @@ def test_scatter_scalar(dim):
     op_harness(op, input, indices)
 
 
+def test_scatter_different_src_index_shapes():
+    indices = torch.tensor([[0, 1, 2, 0]]).long()
+    input = torch.zeros(3, 5, dtype=torch.float32)
+    dim = 0
+
+    op = lambda inp, idx: inp.scatter_(
+        dim, idx,
+        torch.arange(1, 11, dtype=torch.float32).reshape((2, 5)))
+    op_harness(op, input, indices, test_training=False)
+
+
 def test_reshape():
     op = lambda x: torch.reshape(x, (1, 1, 2, 2))
 
