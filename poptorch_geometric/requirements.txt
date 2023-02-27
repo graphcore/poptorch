@@ -4,14 +4,13 @@
 
 pyg-nightly==2.3.0.dev20230222
 
-pytest-benchmark==4.0.0
-pytest-cov==4.0.0
-
 torch-scatter==2.1.0+pt113cpu
 torch-sparse==0.6.16+pt113cpu
 torch-cluster==1.6.0+pt113cpu
 torch-spline-conv==1.2.1+pt113cpu
 
+pytest-benchmark==4.0.0
+pytest-cov==4.0.0
 nbconvert==7.2.9
 nbformat==5.7.3
 
