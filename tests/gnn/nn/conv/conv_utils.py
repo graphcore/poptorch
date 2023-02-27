@@ -2,12 +2,11 @@
 
 import torch
 
-from poptorch_geometric import TrainingStepper, set_aggregation_dim_size
+from poptorch_geometric import TrainingStepper
 
 
 def conv_harness(conv,
                  dataset=None,
-                 edge_index_max=None,
                  post_proc=None,
                  loss_fn=torch.nn.MSELoss(),
                  num_steps=4,
@@ -36,9 +35,6 @@ def conv_harness(conv,
 
     if batch is None and dataset is not None:
         batch = (dataset.x, dataset.edge_index)
-
-    if edge_index_max is None:
-        set_aggregation_dim_size(model, int(dataset.edge_index.max()) + 1)
 
     stepper = TrainingStepper(model, atol=atol, rtol=rtol)
 

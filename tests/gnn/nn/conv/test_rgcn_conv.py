@@ -24,4 +24,4 @@ def test_rgcn_conv(rgcn):
                 add_self_loops=False)
 
     batch = (None, edge_index, edge_type)
-    conv_harness(conv, edge_index_max=3, batch=batch)
+    conv_harness(conv, batch=batch)
