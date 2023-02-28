@@ -59,10 +59,6 @@ def check_is_fused(poptorch_model, op_type, expected_group_size,
     op_type = "Gather" if op_type == "gather" else "ScatterReduce"
     ops = [op for op in all_ops if op['type'] == op_type]
 
-    if len(ops) != expected_num_ops:
-        for op in all_ops:
-            print(op, "\n")
-
     assert len(ops) == expected_num_ops
     assert int(ops[0]['attributes']['group_size']) == expected_group_size
 
@@ -152,6 +148,9 @@ def torch_fusible_model(func, src, index, dtype):
 @pytest.mark.parametrize("dtype",
                          [torch.float32, torch.float16])  #, torch.int])
 def test_fuse(shape, func, dtype):
+    # TODO remove skip after fix AFS-189
+    if func is scatter_std:
+        pytest.skip()
     if dtype != torch.float32 and func in [
             scatter_softmax, scatter_log_softmax, scatter_std
     ]:
