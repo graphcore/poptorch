@@ -6,7 +6,7 @@ from poptorch_geometric import TrainingStepper
 
 
 def dense_harness(dense,
-                  dataset=None,
+                  batch=None,
                   post_proc=None,
                   loss_fn=torch.nn.MSELoss(),
                   num_steps=4,
@@ -34,4 +34,4 @@ def dense_harness(dense,
 
     stepper = TrainingStepper(model, atol=atol, rtol=rtol)
 
-    stepper.run(num_steps, dataset)
+    stepper.run(num_steps, batch)
