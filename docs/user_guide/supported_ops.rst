@@ -394,6 +394,13 @@ Support nearest and bicubic mode.
 * ``torch.nn.Upsample``
 
 
+PyTorch Scatter functions
+
+* ``torch_scatter.scatter``
+* ``torch_scatter.composite.scatter_log_softmax``
+* ``torch_scatter.composite.scatter_softmax``
+* ``torch_scatter.composite.scatter_std``
+
 .. _float_16_op_support:
 
 16-bit float operations
