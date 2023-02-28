@@ -12,11 +12,12 @@ from datasets import DataSets
 from models import GAT, GCN, GIN, PNA, RGCN, SAGE
 from torch_geometric.loader import DataLoader
 from torch_geometric.nn import PNAConv
+from torch_geometric.transforms import Pad
 from utils import all_formats, merge_results, print_results
 
 import poptorch
-import poptorch_geometric as poppyg
 from poptorch_geometric import TrainingStepper, set_aggregation_dim_size
+from poptorch_geometric.dataloader import DataLoader as IPUDataLoader, FixedSizeDataLoader
 
 supported_sets = {
     'Cora': [GCN, GAT, GIN, PNA, SAGE],
@@ -28,9 +29,10 @@ supported_sets = {
 
 all_models = list(set(m.__name__ for v in supported_sets.values() for m in v))
 all_datasets = list(supported_sets.keys())
-all_loaders = ['torch', 'poptorch']
+all_loaders = ['torch', 'poptorch', 'poptorch_fixed_size']
+all_transforms = [None, 'Pad']
 
-Config = namedtuple('Config', ['Model', 'ds', 'bs', 'loader'])
+Config = namedtuple('Config', ['Model', 'ds', 'bs', 'loader', 'transform'])
 
 
 def run_benchmark(args, configs):
@@ -40,10 +42,21 @@ def run_benchmark(args, configs):
 
     results = []
     for cfg in configs:
+        if cfg.transform == 'Pad':
+            max_num_nodes = args['max_num_nodes']
+            max_num_edges = args['max_num_edges']
+            assert max_num_nodes is not None and max_num_edges is not None
+
+            cfg.ds.transform = Pad(max_num_nodes=max_num_nodes,
+                                   max_num_edges=max_num_edges)
         if cfg.loader == 'torch':
             loader = DataLoader(cfg.ds, batch_size=cfg.bs, shuffle=False)
+        elif cfg.loader == 'poptorch':
+            loader = IPUDataLoader(cfg.ds, batch_size=cfg.bs)
         else:
-            loader = poppyg.create_dataloader(cfg.ds, batch_size=cfg.bs)
+            loader = FixedSizeDataLoader(dataset=cfg.ds,
+                                         num_nodes=cfg.ds[0].num_nodes,
+                                         batch_size=cfg.bs)
 
         d = next(iter(loader))
 
@@ -100,85 +113,107 @@ def run_benchmark(args, configs):
 
 
 def add_main_arguments(parser):
-    group = parser.add_argument_group('Main')
+    main_group = parser.add_argument_group('Main')
 
-    group.add_argument('--cfg',
-                       type=str,
-                       default=None,
-                       metavar='file',
-                       help="Configuration file")
+    main_group.add_argument('--cfg',
+                            type=str,
+                            default=None,
+                            metavar='file',
+                            help="Configuration file")
 
-    group.add_argument('--print-cfg',
-                       type=str,
-                       default=None,
-                       metavar='file',
-                       help="Show configuration file content")
+    main_group.add_argument('--print-cfg',
+                            type=str,
+                            default=None,
+                            metavar='file',
+                            help="Show configuration file content")
 
-    group.add_argument('--model',
-                       nargs='+',
-                       default=all_models,
-                       help='Models to test')
+    main_group.add_argument('--model',
+                            nargs='+',
+                            default=all_models,
+                            help='Models to test')
 
-    group.add_argument('--dataset',
-                       nargs='+',
-                       default=all_datasets,
-                       help='Datasets to use for testing')
+    main_group.add_argument('--dataset',
+                            nargs='+',
+                            default=all_datasets,
+                            help='Datasets to use for testing')
 
-    group.add_argument('--ipu',
-                       action='store_true',
-                       default=True,
-                       help="Run on IPU")
+    main_group.add_argument('--ipu',
+                            action='store_true',
+                            default=True,
+                            help="Run on IPU")
 
-    group.add_argument('--cpu',
-                       action='store_true',
-                       default=False,
-                       help="Run on CPU")
+    main_group.add_argument('--cpu',
+                            action='store_true',
+                            default=False,
+                            help="Run on CPU")
 
-    group.add_argument('--gpu',
-                       action='store_true',
-                       default=False,
-                       help="Run on GPU")
+    main_group.add_argument('--gpu',
+                            action='store_true',
+                            default=False,
+                            help="Run on GPU")
 
-    group.add_argument('--iters',
-                       type=int,
-                       default=200,
-                       help="Number of iterations")
+    main_group.add_argument('--iters',
+                            type=int,
+                            default=200,
+                            help="Number of iterations")
 
-    group.add_argument('--bs',
-                       nargs='+',
-                       default=[1],
-                       type=int,
-                       help="Number of graphs in batch.")
+    main_group.add_argument('--bs',
+                            nargs='+',
+                            default=[1],
+                            type=int,
+                            help="Number of graphs in batch.")
 
-    group.add_argument('--check-values',
-                       action='store_true',
-                       default=False,
-                       help='Run checks to make sure the results are'
-                       'correct. Models run without dropout layers.')
+    main_group.add_argument('--check-values',
+                            action='store_true',
+                            default=False,
+                            help='Run checks to make sure the results are'
+                            'correct. Models run without dropout layers.')
 
-    group.add_argument('--synthetic-data',
-                       action='store_true',
-                       default=False,
-                       help='Use synthetic data on IPU (no data transfers to '
-                       'device)')
+    main_group.add_argument(
+        '--synthetic-data',
+        action='store_true',
+        default=False,
+        help='Use synthetic data on IPU (no data transfers to '
+        'device)')
 
-    group.add_argument('--loader',
-                       nargs='+',
-                       default=['torch'],
-                       help='Dataloader, possible values: [torch, poptorch]')
+    main_group.add_argument(
+        '--loader',
+        nargs='+',
+        default=['torch'],
+        help=
+        'Dataloader, possible values: [torch, poptorch, poptorch_fixed_size]')
 
-    group.add_argument('--fmt',
-                       type=str,
-                       default='rounded_outline',
-                       help=f'Output format, one of: {all_formats}')
+    main_group.add_argument(
+        '--transform',
+        nargs='+',
+        default=[None],
+        help='Dataloader, possible values: [None, Pad]. Pass the required '
+        'transformation parameters, for example: --max-num-nodes=30')
 
-    group.add_argument('--output',
-                       type=str,
-                       default=None,
-                       help='Store JSON output file with configuration and '
-                       'results. You can load such file later using '
-                       '--cfg option.')
+    main_group.add_argument('--fmt',
+                            type=str,
+                            default='rounded_outline',
+                            help=f'Output format, one of: {all_formats}')
 
+    main_group.add_argument(
+        '--output',
+        type=str,
+        default=None,
+        help='Store JSON output file with configuration and '
+        'results. You can load such file later using '
+        '--cfg option.')
+
+    transform_group = parser.add_argument_group('Arguments for Pad transform')
+    transform_group.add_argument(
+        '--max-num-nodes',
+        type=int,
+        default=None,
+        help='Pad transform argument. The number of nodes after padding')
+    transform_group.add_argument(
+        '--max-num-edges',
+        type=int,
+        default=None,
+        help='Pad transform argument. The edges of nodes after padding')
     return parser
 
 
@@ -215,6 +250,8 @@ def get_args():
     assert all(m in all_models for m in args['model']), 'Unknown model'
     assert all(ld in all_loaders
                for ld in args['loader']), 'Unknown dataloader'
+    assert all(t in all_transforms
+               for t in args['transform']), 'Unknown transform'
 
     return args, loaded_args
 
@@ -233,8 +270,10 @@ def get_tst_configs(args):
     models = [globals()[name] for name in args['model']]
     batch_sizes = args['bs']
     loaders = args['loader']
+    transforms = args['transform']
 
-    configs = starmap(Config, product(models, datasets, batch_sizes, loaders))
+    configs = starmap(
+        Config, product(models, datasets, batch_sizes, loaders, transforms))
 
     def is_supported(cfg):
         return cfg.Model in supported_sets[cfg.ds.name]
