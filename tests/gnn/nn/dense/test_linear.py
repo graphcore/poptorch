@@ -4,7 +4,7 @@ from itertools import product
 
 import pytest
 import torch
-from torch_geometric.nn import Linear
+from torch_geometric.nn import HeteroLinear, Linear
 
 from dense_utils import dense_harness
 
@@ -18,3 +18,14 @@ def test_linear(weight, bias):
     x = torch.randn(1, 4, 16)
 
     dense_harness(lin, x)
+
+
+def test_hetero_linear():
+    pytest.skip("TODO AFS-190")
+
+    x = torch.randn(3, 16)
+    type_vec = torch.tensor([0, 1, 2])
+
+    lin = HeteroLinear(16, 32, num_types=3)
+
+    dense_harness(lin, (x, type_vec))
