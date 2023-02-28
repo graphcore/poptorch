@@ -93,6 +93,8 @@ with tempfile.TemporaryDirectory() as tmp_dir:
     os.chdir(tmp_dir)
     shutil.copytree(python_dir, PROJ_NAME)
     shutil.copy(os.path.join(src_dir, 'MANIFEST.in'), '.')
+    shutil.copy(os.path.join(src_dir, 'License.txt'), '.')
+    shutil.copy(os.path.join(src_dir, 'setup.cfg'), '.')
 
     configure(os.path.join(src_dir, 'setup.py'), 'setup.py')
 

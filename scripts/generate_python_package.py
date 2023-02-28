@@ -116,6 +116,10 @@ with tempfile.TemporaryDirectory() as tmp_dir:
         distutils.dir_util.copy_tree(lib_dir, "poptorch/lib")
     shutil.copytree(include_dir, "include")
     shutil.copy(os.path.join(src_dir, "MANIFEST.in"), ".")
+    shutil.copy(os.path.join(src_dir, 'setup.cfg'), '.')
+    shutil.copy(os.path.join(src_dir, 'License.txt'), '.')
+    shutil.copy(os.path.join(src_dir, 'poptorch_third_party_licenses.txt'),
+                '.')
 
     configure(os.path.join(src_dir, "setup.py"), "setup.py")
     configure(os.path.join(src_dir, "pyproject.toml"), "pyproject.toml")
