@@ -65,11 +65,11 @@ class Installer:
     """Common interface for all installers"""
 
     def install(self, env):
-        raise Exception(f"Must be implemented by child class {type(self)}")
+        raise Exception("Must be implemented by child class")
 
     def hashString(self):
         """Unique string identifying this version of the installer."""
-        raise Exception(f"Must be implemented by child class {type(self)}")
+        raise Exception("Must be implemented by child class")
 
 
 class CondaPackages(Installer):
@@ -78,14 +78,6 @@ class CondaPackages(Installer):
     def __init__(self, *packages):
         assert all(isinstance(p, str) for p in packages)
         self.packages = packages
-
-
-class CondaChannels(Installer):
-    """Enable extra Conda channels."""
-
-    def __init__(self, *channels):
-        assert all(isinstance(c, str) for c in channels)
-        self.channels = channels
 
 
 class PipPackages(Installer):
@@ -195,7 +187,6 @@ class BuildenvManager:
         self.cache_dir = cache_dir or _default_cache_dir()
         self.buildenv_dir = os.path.join(self.output_dir, "buildenv")
         self.conda_packages = [f"python={python_version}"]
-        self.conda_channels = []
         if not empty_env:
             self.conda_packages.append("conda-pack=0.5.0")
 
@@ -281,8 +272,6 @@ class BuildenvManager:
         for i in installers():
             if isinstance(i, CondaPackages):
                 self.conda_packages += i.packages
-            elif isinstance(i, CondaChannels):
-                self.conda_channels += i.channels
             else:
                 other_installers.append(i)
 
@@ -395,12 +384,8 @@ class BuildenvManager:
         stderr_handler = None if is_retry else check_corruption
         try:
             _utils.rmdir_if_exists(self.buildenv_dir)
-
-            def getChannels():
-                return "".join(f" -c {c}" for c in self.conda_channels)
-
             self.env.run_commands(
-                f"conda create --prefix {self.buildenv_dir}{getChannels()} "
+                f"conda create --prefix {self.buildenv_dir} -c conda-forge "
                 f"-y {' '.join(self.conda_packages)}",
                 stderr_handler=stderr_handler)
         except AssertionError:
@@ -499,10 +484,10 @@ class BuildenvManager:
             self._append_to_activate_buildenv(f". {conda_sh}")
             return
 
-        conda_install_dir = os.path.join(self.cache_dir, "mambaforge")
-        conda_sh = os.path.join(conda_install_dir, "etc", "profile.d",
+        miniconda_install_dir = os.path.join(self.cache_dir, "miniconda")
+        conda_sh = os.path.join(miniconda_install_dir, "etc", "profile.d",
                                 "conda.sh")
-        installer = os.path.join(self.cache_dir, "Mambaforge_installer.sh")
+        installer = os.path.join(self.cache_dir, "Miniconda_installer.sh")
         with self.cache_lock():
             if os.path.isfile(conda_sh) and not force_reinstall:
                 logger.info(
@@ -524,8 +509,8 @@ class BuildenvManager:
                         raise RuntimeError(
                             "Unknown OS. Please download the "
                             "installer for your platform from "
-                            "https://github.com/conda-forge/miniforge#mambaforge"
-                            f" and save it as ${installer}")
+                            "https://repo.anaconda.com/miniconda/ and save it "
+                            f"as ${installer}")
                     arch_type = _utils.get_arch_type()
                     # Use Conda 4.12 instead of "latest" while we wait for
                     # https://github.com/conda/conda/issues/12250 to be fixed.
@@ -534,22 +519,20 @@ class BuildenvManager:
                     # python used by Conda, it is not a system requirement
                     # and does not affect the python version inside the
                     # buildenv.
-                    url = ("https://github.com/conda-forge/miniforge/"
-                           "releases/latest/download/Mambaforge-"
-                           f"{conda_os}-{arch_type}.sh")
+                    url = ("https://repo.anaconda.com/miniconda/"
+                           f"Miniconda3-py38_4.12.0-{conda_os}-{arch_type}.sh")
                     urllib.request.urlretrieve(url, installer)
-                _utils.rmdir_if_exists(conda_install_dir)
+                _utils.rmdir_if_exists(miniconda_install_dir)
                 _utils.run_commands(
-                    f"bash {installer} -b -p {conda_install_dir}")
+                    f"bash {installer} -b -p {miniconda_install_dir}")
         assert os.path.isfile(conda_sh)
         self._append_to_activate_buildenv(f". {conda_sh}")
 
     def _compute_environment_hash(self, installers):
         hashes = [i.hashString() for i in installers]
         return str(
-            hashlib.md5(
-                " ".join(self.conda_packages + hashes +
-                         self.conda_channels).encode("utf-8")).hexdigest())
+            hashlib.md5(" ".join(self.conda_packages +
+                                 hashes).encode("utf-8")).hexdigest())
 
 
 if __name__ == "__main__":

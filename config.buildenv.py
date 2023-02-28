@@ -1,12 +1,8 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 
+# IMPORTANT: Keep requirements in sync with ./requirements.txt.
+
 _llvm_version = "13.0.1"
-
-config.setDefault(build_documentation=True)
-
-installers.add(PipRequirements("requirements.txt"))
-
-installers.add(PipRequirements("poptorch_geometric/requirements.txt"))
 
 installers.add(
     CondaPackages(
@@ -17,30 +13,24 @@ installers.add(
         "make=4.3",
         "ninja=1.10.2",
         "pybind11=2.6.1",
+        "pytest=6.2.5",
         "pyyaml=5.3.1",
-        # Mamba overwrites that package, so it must explicitly
-        # appear here with the correct version.
         "setuptools=58.0.4",
         "spdlog=1.8.0",
-        # Mamba overwrites that package, so it must explicitly
-        # appear here with the correct version.
+        "typing_extensions=4.1.1",
         "wheel=0.34.2",
         "zip=3.0",
     ))
 
-if config.build_documentation:
-    installers.add(
-        CondaPackages(
-            "breathe=4.25.1",
-            "docutils==0.16",
-            "hunspell=1.7.0",
-            # Indirect dependency of sphinx which
-            # doesn't get automatically installed.
-            "jinja2=3.0.3",
-            "latexmk=4.55",
-            "sphinx=3.3.1",
-            "sphinx_rtd_theme=0.5.0",
-        ))
+if not config.is_aarch64:
+    # These packages don't exist on AArch64 but they're only needed to
+    # build the documentation
+    installers.add(CondaPackages(
+        "hunspell=1.7.0",
+        "latexmk=4.55",
+    ))
+
+installers.add(PipRequirements("requirements.txt"))
 
 if config.install_linters:
     installers.add(
@@ -72,3 +62,5 @@ class DownloadExternalDatasets(Installer):
 
 
 installers.add(DownloadExternalDatasets())
+
+installers.add(PipRequirements("poptorch_geometric/requirements.txt"))
