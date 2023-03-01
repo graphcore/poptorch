@@ -527,16 +527,17 @@ class BuildenvManager:
                             "https://github.com/conda-forge/miniforge#mambaforge"
                             f" and save it as ${installer}")
                     arch_type = _utils.get_arch_type()
-                    # Use Conda 4.12 instead of "latest" while we wait for
-                    # https://github.com/conda/conda/issues/12250 to be fixed.
-                    # (Issue with paths > 128 characters)
+                    # Use Mamba that is not relied on Conda with version > 4.14.0
+                    # while we wait for https://github.com/conda/conda/issues/12250
+                    # to be fixed. (Issue with paths > 128 characters)
+                    # As soon as it will be fixed we can use "latest" release.
                     # Note: py38 only refers to the self-contained version of
                     # python used by Conda, it is not a system requirement
                     # and does not affect the python version inside the
                     # buildenv.
                     url = ("https://github.com/conda-forge/miniforge/"
-                           "releases/latest/download/Mambaforge-"
-                           f"{conda_os}-{arch_type}.sh")
+                           "releases/download/4.14.0-0/Mambaforge-"
+                           f"4.14.0-0-{conda_os}-{arch_type}.sh")
                     urllib.request.urlretrieve(url, installer)
                 _utils.rmdir_if_exists(conda_install_dir)
                 _utils.run_commands(

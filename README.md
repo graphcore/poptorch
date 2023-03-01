@@ -107,7 +107,7 @@ More information can be found in the [PopTorch User Guide](https://docs.graphcor
 
 ## Build instructions
 
-Like [PyTorch](https://pytorch.org/) we use [Anaconda](https://anaconda.org/anaconda/conda) as build environment manager.
+We use [Mambaforge](https://github.com/conda-forge/miniforge#mambaforge) as build environment manager.
 
 1. Clone the PopTorch repository
 
