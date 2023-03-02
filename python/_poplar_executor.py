@@ -270,14 +270,25 @@ class PoplarExecutor:
                     environment where PopTorch is not installed.
                     """
                     out = collections.OrderedDict()
+                    out_cache = {}
+
                     for k, v in super().state_dict(*args, destination, prefix,
                                                    keep_vars).items():
-                        # If the object is wrapped then the shallow copy will
-                        # call _impl._pickleUnwrapObject and the new object will be in
-                        # the wrapped registry.
-                        v = copy.copy(v)
-                        # Unwrap the object if needed.
-                        out[k] = _impl.unwrapIfWrapped(v)
+                        v_id = id(v)
+
+                        # If the value occurs more than once, avoid multiple
+                        # copies.
+                        if v_id in out_cache:
+                            out[k] = out_cache[v_id]
+                        else:
+                            # If the object is wrapped then the shallow copy will
+                            # call _impl._pickleUnwrapObject and the new object will be in
+                            # the wrapped registry.
+                            # Unwrap the object if needed.
+                            v_copy = _impl.unwrapIfWrapped(copy.copy(v))
+                            out[k] = v_copy
+                            out_cache[v_id] = v_copy
+
                     return out
 
             _utils.assert_signatures_match(PoptorchModel.state_dict,
