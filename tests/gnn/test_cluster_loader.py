@@ -13,11 +13,9 @@ import poptorch
 @pytest.mark.parametrize('loader_cls',
                          [FixedSizeClusterLoader, IPUFixedSizeClusterLoader])
 @pytest.mark.parametrize('batch_size', [1, 2, 4])
-def test_fixed_size_dataloader_with_cluster_data(
-        loader_cls,
-        batch_size,
-        benchmark,
-):
+@pytest.mark.parametrize('task', ['graph', 'node'])
+def test_fixed_size_dataloader_with_cluster_data(loader_cls, batch_size,
+                                                 benchmark, task):
     ipu_dataloader = loader_cls is IPUFixedSizeClusterLoader
 
     avg_degree = 3
@@ -29,7 +27,7 @@ def test_fixed_size_dataloader_with_cluster_data(
         avg_num_nodes=128,
         avg_degree=avg_degree,
         num_channels=4,
-        task='graph',
+        task=task,
     )[0]
 
     # Get a sensible value for the the maximum number of nodes.
@@ -51,6 +49,10 @@ def test_fixed_size_dataloader_with_cluster_data(
     # Special case for edge_index which is of shape [2, num_edges].
     expected_sizes['edge_index'] = (padded_num_edges, 1)
 
+    # Special case for `y` being graph-lvl label
+    if not data.is_node_attr('y'):
+        expected_sizes['y'] = (2, 0)
+
     # Create a fixed size dataloader.
     kwargs = {
         'cluster_data': cluster_data,
@@ -66,7 +68,6 @@ def test_fixed_size_dataloader_with_cluster_data(
     loader = loader_cls(**kwargs)
 
     # Check that each batch matches the expected size.
-
     for batch in loader:
         sizes_match = all(
             getattr(batch, k).shape[dim] == size
