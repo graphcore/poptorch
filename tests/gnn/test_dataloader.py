@@ -252,14 +252,14 @@ def test_simple_fixed_size_data_loader_mro(num_graphs=2, num_nodes=30):
     dict(loader_cls=IPUCustomFixedSizeDataLoader)
 ])
 @pytest.mark.parametrize('use_batch_sampler', [True, False])
-def test_fixed_size_dataloader(
-        loader,
-        use_batch_sampler,
-        benchmark,
-        fake_molecular_dataset,
-        batch_size=10,
-):
-    dataset = fake_molecular_dataset
+@pytest.mark.parametrize('dataset', ['pyg_qm9', 'fake_node_task_dataset'])
+def test_fixed_size_dataloader(loader,
+                               use_batch_sampler,
+                               benchmark,
+                               dataset,
+                               request,
+                               batch_size=10):
+    dataset = request.getfixturevalue(dataset)
 
     ipu_dataloader = loader is not CustomFixedSizeDataLoader
     # CombinedBatchingCollater adds an additional 0-th dimension.
@@ -270,8 +270,8 @@ def test_fixed_size_dataloader(
         poptorch.Options().device_iterations) if ipu_dataloader else 1
 
     # Get a sensible value for the the maximum number of nodes.
-    padded_num_nodes = dataset.avg_num_nodes * (batch_size + 10)
-    padded_num_edges = dataset.avg_degree * padded_num_nodes
+    padded_num_nodes = dataset[0].num_nodes * (batch_size + 20)
+    padded_num_edges = dataset[0].num_edges * padded_num_nodes
 
     # Define the expected tensor sizes in the output.
     data = dataset[0]
@@ -284,6 +284,10 @@ def test_fixed_size_dataloader(
     }
     # Special case for edge_index which is of shape [2, num_edges].
     expected_sizes['edge_index'] = (device_iterations * 2, dim_offset)
+
+    # Special case for `y` being graph-lvl label
+    if not data.is_node_attr('y'):
+        expected_sizes['y'] = (batch_size * device_iterations, dim_offset)
 
     # Create a fixed size dataloader.
     kwargs = {
@@ -312,7 +316,10 @@ def test_fixed_size_dataloader(
     loader = loader(**kwargs)
 
     # Check that each batch matches the expected size.
-    for batch in loader:
+    loader_iter = iter(loader)
+    repeats = 10
+    for _ in range(repeats):
+        batch = next(loader_iter)
         assert hasattr(batch, 'batch')
         assert hasattr(batch, 'ptr')
 
@@ -335,8 +342,9 @@ def test_fixed_size_dataloader(
         assert sizes_match
 
     def loop():
-        for _ in loader:
-            pass
+        loader_iter = iter(loader)
+        for _ in range(repeats):
+            next(loader_iter)
 
     benchmark(loop)
 
@@ -347,14 +355,17 @@ def test_fixed_size_dataloader(
     dict(loader_cls=IPUCustomFixedSizeDataLoader)
 ])
 @pytest.mark.parametrize('use_batch_sampler', [True, False])
+@pytest.mark.parametrize(
+    'dataset', ['fake_hetero_dataset', 'fake_node_task_hetero_dataset'])
 def test_fixed_size_heterodataloader(
         loader,
         use_batch_sampler,
         benchmark,
-        fake_hetero_dataset,
+        dataset,
+        request,
         batch_size=10,
 ):
-    dataset = fake_hetero_dataset
+    dataset = request.getfixturevalue(dataset)
     num_node_types = 2
     num_edge_types = 5
     ipu_dataloader = loader is not CustomFixedSizeDataLoader
@@ -404,6 +415,9 @@ def test_fixed_size_heterodataloader(
 
         assert batch.num_nodes == padded_num_nodes
         assert batch.num_edges == padded_num_edges
+
+        if 'y' in batch._node_store_dict.keys():
+            assert batch.y.shape[0] == batch_size * device_iterations
 
         assert sum(node_attr.batch.shape[0]
                    for node_attr in filter(is_iterable, batch.node_stores)

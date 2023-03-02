@@ -1,5 +1,6 @@
 # Copyright (c) 2022-2023 Graphcore Ltd. All rights reserved.
 
+from enum import Enum
 from typing import Any, Dict, Generator, List, Optional, Tuple, Union
 from functools import singledispatch
 try:
@@ -19,7 +20,7 @@ from poptorch_geometric.utils import DataBatch, HeteroDataBatch
 
 from poptorch._utils import combine_batch_tensors_gen
 
-from . import types, utils
+from . import types
 
 __all__ = ['FixedSizeCollater', 'CombinedBatchingCollater']
 
@@ -84,6 +85,8 @@ def _reset_dim(shape: torch.Size, key: str = None) -> List[int]:
     shape = list(shape)
     if len(shape) > 1:
         shape[1 if key == 'edge_index' else 0] = 0
+    else:
+        return list([0])
     return shape
 
 
@@ -98,35 +101,6 @@ def _reset_attr(value: Any, key: str = None) -> Any:
         # tensor with wrong dimensions.
         return torch.zeros(_reset_dim(value.shape, key), dtype=value.dtype)
     return type(value)()
-
-
-@singledispatch
-def _create_structure_dict(data):
-    """Create a dict representing the structure of the input data. Dict keys
-    correspond to the 'data' keys, its values are all defaulted.
-    """
-    raise ValueError(f'Unsupported data type: {type(data)}')
-
-
-@_create_structure_dict.register(Data)
-def _(data: Data) -> Dict[NodeType, Any]:
-    out = dict()
-    for key, val in data.to_dict().items():
-        out[key] = _reset_attr(val, key)
-    return out
-
-
-@_create_structure_dict.register(HeteroData)
-def _(data: HeteroData) -> Dict[Union[NodeType, EdgeType], Any]:
-    out = dict()
-    for key, attr in data._global_store.to_dict().items():  # pylint: disable=protected-access
-        out[key] = _reset_attr(attr)
-    for key, attr in chain(data.node_items(), data.edge_items()):
-        out[key] = {
-            k: torch.zeros(_reset_dim(v.shape, k))
-            for k, v in attr.to_dict().items() if isinstance(v, torch.Tensor)
-        }
-    return out
 
 
 def _make_node_slices_gen(data_list: List[BaseData]) -> List[slice]:
@@ -349,11 +323,28 @@ class FixedSizeCollater(Collater):
         self.trim_edges = trim_edges
         self.pad_graph_defaults = ({} if pad_graph_defaults is None else
                                    pad_graph_defaults)
-        self.attribute_cacher = utils.AttributeTypeCache()
+        self.labels_type = None
+
+    class LabelsType(Enum):
+        GRAPH_LVL = 0
+        NODE_LVL = 1
 
     def __call__(self, data_list: List[BaseData]) -> Batch:
         if not isinstance(data_list, list):
             raise TypeError(f'Expected list, got {type(data_list).__name__}.')
+
+        if isinstance(data_list[0], Data) and hasattr(data_list[0], 'y'):
+            y0_equal_num_nodes = all(data.y.shape[0] == data.num_nodes
+                                     for data in data_list)
+            y0_equal_ones = all(data.y.shape[0] == 1 for data in data_list)
+
+            if y0_equal_num_nodes and not y0_equal_ones:
+                self.labels_type = self.LabelsType.NODE_LVL
+            elif y0_equal_ones and not y0_equal_num_nodes:
+                self.labels_type = self.LabelsType.GRAPH_LVL
+            else:
+                assert False, "Incorrect input data. Labels `y` have" \
+                              "uncompatible shapes!"
 
         num_real_graphs = len(data_list)
         num_pad_graphs = 1 if self.num_graphs is None \
@@ -395,7 +386,7 @@ class FixedSizeCollater(Collater):
             pad_nodes_by_graph, pad_edges_by_graph = _divide_evenly(
                 data, num_pad_graphs, num_pad_nodes, num_pad_edges)
 
-            data_to_pad_dict = _create_structure_dict(data)
+            data_to_pad_dict = self._create_structure_dict(data)
             for nodes, edges in zip(pad_nodes_by_graph, pad_edges_by_graph):
                 padded_data = self._create_padded_data(data_list,
                                                        data_to_pad_dict, nodes,
@@ -586,6 +577,42 @@ class FixedSizeCollater(Collater):
                                                      node_slices)
 
     @singledispatchmethod
+    def _create_structure_dict(self, data):
+        """Create a dict representing the structure of the input data. Dict keys
+        correspond to the 'data' keys, its values are all defaulted.
+        """
+        raise ValueError(f'Unsupported data type: {type(data)}')
+
+    @_create_structure_dict.register(Data)
+    def _(self, data: Data) -> Dict[NodeType, Any]:
+        if self.labels_type == self.LabelsType.NODE_LVL:
+            check = lambda key: (key == 'y' and self.labels_type == self.
+                                 LabelsType.NODE_LVL) or (data.is_node_attr(
+                                     key) or data.is_edge_attr(key))
+        else:
+            check = lambda key: data.is_node_attr(key) or data.is_edge_attr(key
+                                                                            )
+
+        out = dict()
+        for key, val in data.to_dict().items():
+            if check(key):
+                out[key] = _reset_attr(val, key)
+        return out
+
+    @_create_structure_dict.register(HeteroData)
+    def _(self, data: HeteroData) -> Dict[Union[NodeType, EdgeType], Any]:
+        out = dict()
+        for key, attr in data._global_store.to_dict().items():  # pylint: disable=protected-access
+            out[key] = _reset_attr(attr)
+        for key, attr in chain(data.node_items(), data.edge_items()):
+            out[key] = {
+                k: torch.zeros(_reset_dim(v.shape, k))
+                for k, v in attr.to_dict().items()
+                if isinstance(v, torch.Tensor)
+            }
+        return out
+
+    @singledispatchmethod
     def _pad_graph_values(self, padded_data, original_data):
         raise ValueError(
             f'Unsupported pair of data types: {type(padded_data)}, '
@@ -593,11 +620,19 @@ class FixedSizeCollater(Collater):
 
     @_pad_graph_values.register(Data)
     def _(self, padded_data: Data, original_data: Data) -> None:
+        if self.labels_type == self.LabelsType.NODE_LVL:
+            check = lambda key: (
+                key == 'y' and self.labels_type == self.LabelsType.GRAPH_LVL
+            ) or not (original_data.is_node_attr(key) or original_data.
+                      is_edge_attr(key))
+        else:
+            check = lambda key: not (original_data.is_node_attr(key) or
+                                     original_data.is_edge_attr(key))
+
         for key, value in original_data():
             if key in self.exclude_keys:
                 continue
-            if not (self.attribute_cacher.is_node_attr(padded_data, key)
-                    or self.attribute_cacher.is_edge_attr(padded_data, key)):
+            if check(key):
                 self._pad_graph_values_body(padded_data, original_data, key,
                                             value)
 

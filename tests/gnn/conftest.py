@@ -38,12 +38,32 @@ def fake_large_dataset() -> pyg.datasets.FakeDataset:
 
 
 @pytest.fixture(scope="module")
+def fake_node_task_dataset() -> pyg.datasets.FakeDataset:
+    pyg.seed_everything(42)
+    dataset = pyg.datasets.FakeDataset(num_graphs=500,
+                                       avg_num_nodes=10,
+                                       task='node')
+    return dataset
+
+
+@pytest.fixture(scope="module")
 def fake_hetero_dataset() -> pyg.datasets.FakeHeteroDataset:
     pyg.seed_everything(1410)
     dataset = pyg.datasets.FakeHeteroDataset(num_graphs=100,
                                              num_node_types=2,
                                              num_edge_types=5,
                                              avg_num_nodes=50)
+    return dataset
+
+
+@pytest.fixture(scope="module")
+def fake_node_task_hetero_dataset() -> pyg.datasets.FakeHeteroDataset:
+    pyg.seed_everything(1410)
+    dataset = pyg.datasets.FakeHeteroDataset(num_graphs=100,
+                                             num_node_types=2,
+                                             num_edge_types=5,
+                                             avg_num_nodes=50,
+                                             task='node')
     return dataset
 
 
