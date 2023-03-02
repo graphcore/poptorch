@@ -145,12 +145,8 @@ def torch_fusible_model(func, src, index, dtype):
     scatter, scatter_add, scatter_max, scatter_softmax, scatter_log_softmax,
     scatter_std, gather
 ])
-@pytest.mark.parametrize("dtype",
-                         [torch.float32, torch.float16])  #, torch.int])
+@pytest.mark.parametrize("dtype", [torch.float32, torch.float16, torch.int])
 def test_fuse(shape, func, dtype):
-    # TODO remove skip after fix AFS-189
-    if func is scatter_std:
-        pytest.skip()
     if dtype != torch.float32 and func in [
             scatter_softmax, scatter_log_softmax, scatter_std
     ]:

@@ -70,7 +70,8 @@ void unpackGroupedOutputs(torch::jit::Graph *graph,
  * 3. Add outputs to queue and remove scatters and gathers.
  * 4. If queue is not empty go to step 1.
  */
-void groupScatterReduceAndGatherNodes(torch::jit::Graph *graph) {
+void groupScatterReduceAndGatherNodes(torch::jit::Graph *graph,
+                                      const bool optimizeScatters) {
   logging::LogContext const ctx{"groupScatterReduceAndGatherNodes"};
 
   // Queue contains fully reached nodes.
@@ -122,7 +123,8 @@ void groupScatterReduceAndGatherNodes(torch::jit::Graph *graph) {
 
         if (num_user_visited_inputs == num_user_inputs) {
           queue.push(user);
-          if (user->kind() == symbols::popart::scatterreduce) {
+          if (user->kind() == symbols::popart::scatterreduce &&
+              optimizeScatters) {
             ++optimization_candidates;
             const std::int64_t reduction =
                 user->i(c10::Symbol::attr("reduction"));
@@ -138,7 +140,8 @@ void groupScatterReduceAndGatherNodes(torch::jit::Graph *graph) {
             const ScatterKind key{reduction, input_type,
                                   index_broadcast_enabled, with_update};
             scatters[key].push_back(user);
-          } else if (user->kind() == symbols::popart::gather) {
+          } else if (user->kind() == symbols::popart::gather &&
+                     !optimizeScatters) {
             ++optimization_candidates;
             const at::ScalarType input_type = *user->input(0)
                                                    ->type()
@@ -191,8 +194,8 @@ void groupScatterReduceAndGatherNodes(torch::jit::Graph *graph) {
     const torch::jit::Symbol kind = node->kind();
 
     // If scatter or gather, push back.
-    if (kind == symbols::popart::scatterreduce ||
-        kind == symbols::popart::gather) {
+    if ((kind == symbols::popart::scatterreduce && optimizeScatters) ||
+        (kind == symbols::popart::gather && !optimizeScatters)) {
       queue.push(node);
     } else {
       add_children_to_queue(node);
@@ -204,8 +207,11 @@ void groupScatterReduceAndGatherNodes(torch::jit::Graph *graph) {
       queue = std::queue<torch::jit::Node *>();
       optimization_candidates = 0;
       // Merge scatters and gathers that have been encountered twice.
-      merge_scatters();
-      merge_gathers();
+      if (optimizeScatters) {
+        merge_scatters();
+      } else {
+        merge_gathers();
+      }
     }
   }
 }
