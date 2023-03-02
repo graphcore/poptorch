@@ -147,10 +147,8 @@ def torch_fusible_model(func, src, index, dtype):
 ])
 @pytest.mark.parametrize("dtype",
                          [torch.float32, torch.float16])  #, torch.int])
+@helpers.overridePoptorchLogLevel('TRACE')
 def test_fuse(shape, func, dtype):
-    # TODO remove skip after fix AFS-189
-    if func is scatter_std:
-        pytest.skip()
     if dtype != torch.float32 and func in [
             scatter_softmax, scatter_log_softmax, scatter_std
     ]:

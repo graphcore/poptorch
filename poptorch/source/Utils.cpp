@@ -52,7 +52,7 @@ bool isNondeterministic(const torch::jit::Node &node) {
 
 std::string nodeToString(const torch::jit::Node *node) {
   std::stringstream ss;
-  node->print(ss, 0, nullptr, true, false, false, false);
+  node->print(ss, 0, nullptr, true, true, false, false);
   std::string node_str = ss.str();
   return node_str;
 }
