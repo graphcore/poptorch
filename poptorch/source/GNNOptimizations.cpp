@@ -73,12 +73,6 @@ void unpackGroupedOutputs(torch::jit::Graph *graph,
 void groupScatterReduceAndGatherNodes(torch::jit::Graph *graph) {
   logging::LogContext const ctx{"groupScatterReduceAndGatherNodes"};
 
-  // Temporary graph trace. Remove after fix AFS-189
-  logging::trace("Before fuse:\n");
-  for (auto *node : graph->nodes()) {
-    logging::trace(&nodeToString(node)[0]);
-  }
-
   // Queue contains fully reached nodes.
   std::queue<torch::jit::Node *> queue;
   // Add roots to queue.
@@ -213,11 +207,6 @@ void groupScatterReduceAndGatherNodes(torch::jit::Graph *graph) {
       merge_scatters();
       merge_gathers();
     }
-  }
-  // Temporary graph trace. Remove after fix AFS-189
-  logging::trace("After fuse:\n");
-  for (auto *node : graph->nodes()) {
-    logging::trace(&nodeToString(node)[0]);
   }
 }
 
