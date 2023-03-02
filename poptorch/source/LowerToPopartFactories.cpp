@@ -63,7 +63,10 @@ poptorch::LowerToPopart lowerToPopartFromDispatch(
   logging::trace("Graph before PopART canonicalisation:\n{}", *graph);
   poptorch::canonicalize(graph.get());
 
-  poptorch::groupScatterReduceAndGatherNodes(graph.get());
+  poptorch::groupScatterReduceAndGatherNodes(graph.get(),
+                                             true /*optimize_scatters*/);
+  poptorch::groupScatterReduceAndGatherNodes(graph.get(),
+                                             false /*optimize_scatters*/);
 
   poptorch::annotateSubgraphs(graph.get(), graph->nodes().front());
 

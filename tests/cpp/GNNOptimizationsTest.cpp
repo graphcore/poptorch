@@ -58,7 +58,8 @@ BOOST_AUTO_TEST_CASE(GroupScatterReduceAndGatherNodes0) {
         return(%6)
   )IR";
   parseIR(input, graph.get());
-  poptorch::groupScatterReduceAndGatherNodes(graph.get());
+  poptorch::groupScatterReduceAndGatherNodes(graph.get(), true);
+  poptorch::groupScatterReduceAndGatherNodes(graph.get(), false);
   constexpr std::size_t tensor_constant = 4;
   constexpr std::size_t unsqueeze = 8;
   constexpr std::size_t concat = 4;
@@ -103,7 +104,8 @@ BOOST_AUTO_TEST_CASE(GroupScatterReduceAndGatherNodes1) {
         return(%8)
   )IR";
   parseIR(input, graph.get());
-  poptorch::groupScatterReduceAndGatherNodes(graph.get());
+  poptorch::groupScatterReduceAndGatherNodes(graph.get(), true);
+  poptorch::groupScatterReduceAndGatherNodes(graph.get(), false);
   constexpr std::size_t tensor_constant = 6;
   constexpr std::size_t unsqueeze = 8;
   constexpr std::size_t concat = 4;
