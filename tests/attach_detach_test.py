@@ -184,3 +184,46 @@ def test_on_demand_attach(capfd):
     # Devices 0 & 1 are in use so we'll get device 2.
     log.findNext("Attached to device 2")
     log.findNext("Finished Poplar compilation")
+
+
+@pytest.mark.ipuHardwareRequired
+def test_attach_detach_tied_weights():
+    torch.manual_seed(42)
+
+    input = torch.randn(10, 10)
+
+    class Model(torch.nn.Module):
+        def __init__(self, inp=10, out=100):
+            super().__init__()
+            self.encoder = torch.nn.Linear(inp, out, bias=False)
+            self.encoder_tied = torch.nn.Linear(inp, out, bias=False)
+            self.encoder_tied.weight = self.encoder.weight
+
+        def forward(self, data):
+            out = self.encoder(data) + self.encoder_tied(data)
+            out = torch.nn.functional.linear(out, self.encoder.weight.t())
+            if self.training:
+                return out, poptorch.identity_loss(out, reduction="mean")
+            return out
+
+    model = Model()
+    model.train()
+
+    optimizer = torch.optim.AdamW(model.parameters(), lr=0.001)
+    training_opts = poptorch.Options()
+    training_model = poptorch.trainingModel(model,
+                                            options=training_opts,
+                                            optimizer=optimizer)
+    training_model.compile(input)
+    training_model.detachFromDevice()
+
+    model.eval()
+    inference_opts = poptorch.Options()
+    inference_model = poptorch.inferenceModel(model, options=inference_opts)
+    inference_model.compile(input)
+
+    for _ in range(5):
+        inference_model.detachFromDevice()
+        training_model.attachToDevice()
+        training_model.detachFromDevice()
+        inference_model.attachToDevice()
