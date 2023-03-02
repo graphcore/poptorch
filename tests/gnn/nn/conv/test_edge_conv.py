@@ -18,8 +18,8 @@ def test_edge_conv(dataset):
     conv_harness(conv, dataset)
 
 
-# TODO: #110 Investigate this failure
-@pytest.mark.xfail(reason='Compilation error')
+# TODO:  AFS-195, AFS-41
+@pytest.mark.xfail(reason='RuntimeError: x.device().is_cpu()')
 def test_dynamic_edge_conv(dataset):
     in_channels = dataset.num_node_features
     nn = Seq(Lin(in_channels * 2, in_channels), ReLU(),

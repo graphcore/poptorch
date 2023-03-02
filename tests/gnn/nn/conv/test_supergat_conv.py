@@ -8,8 +8,9 @@ out_channels = 16
 
 @pytest.mark.parametrize('att_type', ['MX', 'SD'])
 def test_supergat_conv(dataset, att_type):
-    # TODO: issue #122
-    pytest.skip("IPU to CPU copy triggered before the end of the graph")
+    # TODO: AFS-36
+    pytest.skip('RuntimeError: Expected out tensor to have dtype long int, '
+                'but got int instead')
 
     in_channels = dataset.num_node_features
     conv = SuperGATConv(in_channels,
