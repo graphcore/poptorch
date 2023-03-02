@@ -1,6 +1,7 @@
 // Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 #include "../PoptorchStaticInit.hpp"
 #include "PopartCanonicalizationUtils.hpp"
+#include "ScatterReduction.hpp"
 
 #include "poptorch/DispatchTracer.hpp"
 #include "poptorch/OpBuilder.hpp"
@@ -332,13 +333,17 @@ torch::jit::Node *scatterHandler(torch::jit::Graph *graph,
     src = createExpand(graph, {src, shape})->output();
   }
 
-  ERROR_ON_MSG(node->inputs().size() > 4,
-               "Reductions supplied to torch.scatter are currently "
-               "unsupported; consider using torch.scatter_add for 'add' "
-               "reductions.");
+  if (node->inputs().size() < 4) {
+    return createScatter(graph, {input, index, src}, dim);
+  }
 
-  // scatter(input, index, src, dimension(dim, TensorType(input)))
-  return createScatter(graph, {input, index, src}, dim);
+  const auto reduce = getReductionMethod(node->input(4)->node());
+  const auto input_shape = shapeFromTensor(input);
+  const auto axis_size = input_shape.at(dim);
+  static constexpr bool enable_index_broadcast = false;
+
+  return createScatterreduce(graph, {src, index, input}, axis_size, dim,
+                             enable_index_broadcast, reduce);
 }
 
 torch::jit::Node *fullCommon(torch::jit::Graph *graph, torch::jit::Value *v,

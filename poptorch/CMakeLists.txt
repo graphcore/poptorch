@@ -57,6 +57,7 @@ add_library(poptorch SHARED
   "source/popart_canonicalization/ReshapeOps.cpp"
   "source/popart_canonicalization/SliceOps.cpp"
   "source/popart_canonicalization/SoftmaxOps.cpp"
+  "source/popart_canonicalization/ScatterReduction.cpp"
   "source/popart_canonicalization/TensorOps.cpp"
   "source/type_and_constant_canonicalization/AddListNumElements.cpp"
   "source/type_and_constant_canonicalization/CanonicaliseConstants.cpp"

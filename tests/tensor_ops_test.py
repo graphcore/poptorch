@@ -521,7 +521,8 @@ def test_gather_5dim(dim, larger_index):
 
 
 @pytest.mark.parametrize("dim", range(-3, 3))
-def test_scatter(dim):
+@pytest.mark.parametrize("reduce", [None, "add", "multiply"])
+def test_scatter(dim, reduce):
     torch.manual_seed(42)
     dim_length = 3
     shape = (dim_length, ) * 3
@@ -530,12 +531,13 @@ def test_scatter(dim):
     indices = torch.randint(dim_length, shape)
     source = torch.randn(shape)
 
-    op = lambda inp, idx, src: inp.scatter(dim, idx, src)
+    op = lambda inp, idx, src: inp.scatter(dim, idx, src, reduce)
     op_harness(op, input, indices, source)
 
 
 @pytest.mark.parametrize("dim", range(-3, 3))
-def test_scatter_(dim):
+@pytest.mark.parametrize("reduce", [None, "add", "multiply"])
+def test_scatter_(dim, reduce):
     torch.manual_seed(42)
     dim_length = 3
     shape = (dim_length, ) * 3
@@ -544,12 +546,13 @@ def test_scatter_(dim):
     indices = torch.randint(dim_length, shape)
     source = torch.randn(shape)
 
-    op = lambda inp, idx, src: inp.scatter_(dim, idx, src)
+    op = lambda inp, idx, src: inp.scatter_(dim, idx, src, reduce)
     op_harness(op, input, indices, source)
 
 
 @pytest.mark.parametrize("dim", range(-3, 3))
-def test_scatter_scalar(dim):
+@pytest.mark.parametrize("reduce", [None, "add", "multiply"])
+def test_scatter_scalar(dim, reduce):
     torch.manual_seed(42)
     dim_length = 3
     shape = (dim_length, ) * 3
@@ -558,18 +561,19 @@ def test_scatter_scalar(dim):
     indices = torch.randint(dim_length, shape)
     source = 5.0
 
-    op = lambda inp, idx: inp.scatter(dim, idx, source)
+    op = lambda inp, idx: inp.scatter(dim, idx, source, reduce)
     op_harness(op, input, indices)
 
 
-def test_scatter_different_src_index_shapes():
+@pytest.mark.parametrize("reduce", [None, "add", "multiply"])
+def test_scatter_different_src_index_shapes(reduce):
     indices = torch.tensor([[0, 1, 2, 0]]).long()
     input = torch.zeros(3, 5, dtype=torch.float32)
     dim = 0
 
     op = lambda inp, idx: inp.scatter_(
         dim, idx,
-        torch.arange(1, 11, dtype=torch.float32).reshape((2, 5)))
+        torch.arange(1, 11, dtype=torch.float32).reshape((2, 5)), reduce)
     op_harness(op, input, indices, test_training=False)
 
 
