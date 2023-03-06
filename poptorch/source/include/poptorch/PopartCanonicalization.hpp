@@ -54,8 +54,7 @@ void addDetachOperations(torch::jit::Graph *graph);
 void removeScatterAddIndexExpansion(torch::jit::Graph *graph);
 
 // Combine possibly scatter operations to execute a grouped version.
-void groupScatterReduceAndGatherNodes(torch::jit::Graph *graph,
-                                      bool optimizeScatters);
+void groupScatterReduceAndGatherNodes(torch::jit::Graph *graph);
 
 // PyTorch's `gather` works differently to PopART's (aka. PyTorch's
 // `index_select`), but in certain cases when the indices tensor has been

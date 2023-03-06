@@ -29,6 +29,9 @@ using GroupedOpFactory = std::function<torch::jit::Node *(
     torch::jit::Graph *, const torch::jit::node_list &,
     const std::vector<torch::jit::Value *> &)>;
 
+void groupScatterReduceNodes(torch::jit::Graph *graph);
+void groupGatherNodes(torch::jit::Graph *graph);
+void initQueue(torch::jit::Graph *graph, std::queue<torch::jit::Node *> &queue);
 std::vector<torch::jit::Value *>
 concatGroupedInputs(torch::jit::Graph *graph, GroupedInputArgs &grouped_inputs,
                     bool with_update);
@@ -70,150 +73,9 @@ void unpackGroupedOutputs(torch::jit::Graph *graph,
  * 3. Add outputs to queue and remove scatters and gathers.
  * 4. If queue is not empty go to step 1.
  */
-void groupScatterReduceAndGatherNodes(torch::jit::Graph *graph,
-                                      const bool optimizeScatters) {
-  logging::LogContext const ctx{"groupScatterReduceAndGatherNodes"};
-
-  // Queue contains fully reached nodes.
-  std::queue<torch::jit::Node *> queue;
-  // Add roots to queue.
-  std::unordered_set<torch::jit::Node *> added;
-  for (torch::jit::Node *node : graph->nodes()) {
-    if (node->inputs().empty()) {
-      if (added.find(node) == added.end()) {
-        queue.push(node);
-        added.insert(node);
-      }
-    }
-  }
-  for (torch::jit::Value *input : graph->inputs()) {
-    auto *node = input->node();
-    if (added.find(node) == added.end()) {
-      queue.push(node);
-      added.insert(node);
-    }
-  }
-
-  // The unordered_map elements represent the number of times the node was
-  // reached.
-  std::unordered_map<torch::jit::Node *, std::size_t> node_num_visited_inputs;
-  // The unordered_set elements mean that children have been added to the queue.
-
-  using ScatterKind =
-      std::tuple<std::int64_t /*reduction*/, at::ScalarType /*input_type*/,
-                 bool /*index_broadcast_enabled*/, bool /*with_update*/>;
-  using GatherKind = std::tuple<at::ScalarType /*input_type*/>;
-
-  static constexpr auto with_update_idx = 3;
-
-  std::map<ScatterKind, torch::jit::node_list> scatters;
-  std::map<GatherKind, torch::jit::node_list> gathers;
-
-  std::size_t optimization_candidates = 0;
-
-  // Lambda to add the children of the vertex.
-  const auto add_children_to_queue = [&](const torch::jit::Node *node) {
-    for (const torch::jit::Value *output : node->outputs()) {
-      for (const torch::jit::Use &use : output->uses()) {
-        torch::jit::Node *user = use.user;
-        const auto num_user_inputs = user->inputs().size();
-
-        auto &num_user_visited_inputs = node_num_visited_inputs[user];
-        ++num_user_visited_inputs;
-
-        if (num_user_visited_inputs == num_user_inputs) {
-          queue.push(user);
-          if (user->kind() == symbols::popart::scatterreduce &&
-              optimizeScatters) {
-            ++optimization_candidates;
-            const std::int64_t reduction =
-                user->i(c10::Symbol::attr("reduction"));
-            const at::ScalarType input_type = *user->input(0)
-                                                   ->type()
-                                                   ->expect<c10::TensorType>()
-                                                   ->scalarType();
-
-            const bool with_update = num_user_inputs == 3;
-            const bool index_broadcast_enabled =
-                user->i(c10::Symbol::attr("enable_index_broadcast")) != 0;
-
-            const ScatterKind key{reduction, input_type,
-                                  index_broadcast_enabled, with_update};
-            scatters[key].push_back(user);
-          } else if (user->kind() == symbols::popart::gather &&
-                     !optimizeScatters) {
-            ++optimization_candidates;
-            const at::ScalarType input_type = *user->input(0)
-                                                   ->type()
-                                                   ->expect<c10::TensorType>()
-                                                   ->scalarType();
-
-            const GatherKind key{input_type};
-            gathers[key].push_back(user);
-          }
-        }
-      }
-    }
-  };
-
-  const auto merge_scatters = [&]() {
-    for (auto &&[scatter_kind, scatter_vec] : scatters) {
-      if (scatter_vec.size() > 1) {
-        const bool with_update = std::get<with_update_idx>(scatter_kind);
-        const auto &merged_scatters = dispatch(
-            graph, scatter_vec, createGroupedScatterReduceNode, with_update);
-        for (torch::jit::Node *scatter_node : merged_scatters) {
-          add_children_to_queue(scatter_node);
-        }
-      } else {
-        add_children_to_queue(scatter_vec.front());
-      }
-    }
-    scatters.clear();
-  };
-
-  const auto merge_gathers = [&]() {
-    for (auto &&[_, gather_vec] : gathers) {
-      UNUSED(_);
-      if (gather_vec.size() > 1) {
-        const auto &merged_gathers =
-            dispatch(graph, gather_vec, createGroupedGatherNode);
-        for (torch::jit::Node *gather_node : merged_gathers) {
-          add_children_to_queue(gather_node);
-        }
-      } else {
-        add_children_to_queue(gather_vec.front());
-      }
-    }
-    gathers.clear();
-  };
-
-  while (!queue.empty()) {
-    auto *node = queue.front();
-    queue.pop();
-    const torch::jit::Symbol kind = node->kind();
-
-    // If scatter or gather, push back.
-    if ((kind == symbols::popart::scatterreduce && optimizeScatters) ||
-        (kind == symbols::popart::gather && !optimizeScatters)) {
-      queue.push(node);
-    } else {
-      add_children_to_queue(node);
-    }
-
-    // If all elements of the queue are scatters and gathers.
-    if (queue.size() == optimization_candidates) {
-      // Clear queue.
-      queue = std::queue<torch::jit::Node *>();
-      optimization_candidates = 0;
-      // Merge scatters and gathers that have been encountered twice.
-      if (optimizeScatters) {
-        merge_scatters();
-      } else {
-        merge_gathers();
-      }
-    }
-  }
+void groupScatterReduceAndGatherNodes(torch::jit::Graph *graph) {
+  groupScatterReduceNodes(graph);
+  groupGatherNodes(graph);
 }
 
 void removeScatterAddIndexExpansion(torch::jit::Graph *graph) {
@@ -262,6 +124,204 @@ void removeScatterAddIndexExpansion(torch::jit::Graph *graph) {
 }
 
 namespace {
+void groupScatterReduceNodes(torch::jit::Graph *graph) {
+  logging::LogContext const ctx{"groupScatterReduceNodes"};
+
+  // Queue contains fully reached nodes.
+  std::queue<torch::jit::Node *> queue;
+  initQueue(graph, queue);
+
+  // The unordered_map elements represent the number of times the node was
+  // reached.
+  std::unordered_map<torch::jit::Node *, std::size_t> node_num_visited_inputs;
+  // The unordered_set elements mean that children have been added to the queue.
+
+  static constexpr auto with_update_idx = 3;
+
+  using ScatterKind =
+      std::tuple<std::int64_t /*reduction*/, at::ScalarType /*input_type*/,
+                 bool /*index_broadcast_enabled*/, bool /*with_update*/>;
+  std::map<ScatterKind, torch::jit::node_list> scatters;
+
+  std::size_t optimization_candidates = 0;
+
+  // Lambda to add the children of the vertex.
+  const auto add_children_to_queue = [&](const torch::jit::Node *node) {
+    for (const torch::jit::Value *output : node->outputs()) {
+      for (const torch::jit::Use &use : output->uses()) {
+        torch::jit::Node *user = use.user;
+        const auto num_user_inputs = user->inputs().size();
+
+        auto &num_user_visited_inputs = node_num_visited_inputs[user];
+        ++num_user_visited_inputs;
+
+        if (num_user_visited_inputs == num_user_inputs) {
+          queue.push(user);
+          if (user->kind() == symbols::popart::scatterreduce) {
+            ++optimization_candidates;
+            const std::int64_t reduction =
+                user->i(c10::Symbol::attr("reduction"));
+            const at::ScalarType input_type = *user->input(0)
+                                                   ->type()
+                                                   ->expect<c10::TensorType>()
+                                                   ->scalarType();
+
+            const bool with_update = num_user_inputs == 3;
+            const bool index_broadcast_enabled =
+                user->i(c10::Symbol::attr("enable_index_broadcast")) != 0;
+
+            const ScatterKind key{reduction, input_type,
+                                  index_broadcast_enabled, with_update};
+            scatters[key].push_back(user);
+          }
+        }
+      }
+    }
+  };
+
+  const auto merge_scatters = [&]() {
+    for (auto &&[scatter_kind, scatter_vec] : scatters) {
+      if (scatter_vec.size() > 1) {
+        const bool with_update = std::get<with_update_idx>(scatter_kind);
+        const auto &merged_scatters = dispatch(
+            graph, scatter_vec, createGroupedScatterReduceNode, with_update);
+        for (torch::jit::Node *scatter_node : merged_scatters) {
+          add_children_to_queue(scatter_node);
+        }
+      } else {
+        add_children_to_queue(scatter_vec.front());
+      }
+    }
+    scatters.clear();
+  };
+
+  while (!queue.empty()) {
+    auto *node = queue.front();
+    queue.pop();
+    const torch::jit::Symbol kind = node->kind();
+
+    // If scatter or gather, push back.
+    if (kind == symbols::popart::scatterreduce) {
+      queue.push(node);
+    } else {
+      add_children_to_queue(node);
+    }
+
+    // If all elements of the queue are scatters and gathers.
+    if (queue.size() == optimization_candidates) {
+      // Clear queue.
+      queue = std::queue<torch::jit::Node *>();
+      optimization_candidates = 0;
+      // Merge scatters and gathers that have been encountered twice.
+      merge_scatters();
+    }
+  }
+}
+
+void groupGatherNodes(torch::jit::Graph *graph) {
+  logging::LogContext const ctx{"groupGatherNodes"};
+
+  // Queue contains fully reached nodes.
+  std::queue<torch::jit::Node *> queue;
+  initQueue(graph, queue);
+
+  // The unordered_map elements represent the number of times the node was
+  // reached.
+  std::unordered_map<torch::jit::Node *, std::size_t> node_num_visited_inputs;
+  // The unordered_set elements mean that children have been added to the queue.
+
+  using GatherKind = std::tuple<at::ScalarType /*input_type*/>;
+  std::map<GatherKind, torch::jit::node_list> gathers;
+
+  std::size_t optimization_candidates = 0;
+
+  // Lambda to add the children of the vertex.
+  const auto add_children_to_queue = [&](const torch::jit::Node *node) {
+    for (const torch::jit::Value *output : node->outputs()) {
+      for (const torch::jit::Use &use : output->uses()) {
+        torch::jit::Node *user = use.user;
+        const auto num_user_inputs = user->inputs().size();
+
+        auto &num_user_visited_inputs = node_num_visited_inputs[user];
+        ++num_user_visited_inputs;
+
+        if (num_user_visited_inputs == num_user_inputs) {
+          queue.push(user);
+          if (user->kind() == symbols::popart::gather) {
+            ++optimization_candidates;
+            const at::ScalarType input_type = *user->input(0)
+                                                   ->type()
+                                                   ->expect<c10::TensorType>()
+                                                   ->scalarType();
+
+            const GatherKind key{input_type};
+            gathers[key].push_back(user);
+          }
+        }
+      }
+    }
+  };
+
+  const auto merge_gathers = [&]() {
+    for (auto &&[_, gather_vec] : gathers) {
+      UNUSED(_);
+      if (gather_vec.size() > 1) {
+        const auto &merged_gathers =
+            dispatch(graph, gather_vec, createGroupedGatherNode);
+        for (torch::jit::Node *gather_node : merged_gathers) {
+          add_children_to_queue(gather_node);
+        }
+      } else {
+        add_children_to_queue(gather_vec.front());
+      }
+    }
+    gathers.clear();
+  };
+
+  while (!queue.empty()) {
+    auto *node = queue.front();
+    queue.pop();
+    const torch::jit::Symbol kind = node->kind();
+
+    // If scatter or gather, push back.
+    if (kind == symbols::popart::gather) {
+      queue.push(node);
+    } else {
+      add_children_to_queue(node);
+    }
+
+    // If all elements of the queue are scatters and gathers.
+    if (queue.size() == optimization_candidates) {
+      // Clear queue.
+      queue = std::queue<torch::jit::Node *>();
+      optimization_candidates = 0;
+      // Merge scatters and gathers that have been encountered twice.
+      merge_gathers();
+    }
+  }
+}
+
+void initQueue(torch::jit::Graph *graph,
+               std::queue<torch::jit::Node *> &queue) {
+  // Add roots to queue.
+  std::unordered_set<torch::jit::Node *> added;
+  for (torch::jit::Node *node : graph->nodes()) {
+    if (node->inputs().empty()) {
+      if (added.find(node) == added.end()) {
+        queue.push(node);
+        added.insert(node);
+      }
+    }
+  }
+  for (torch::jit::Value *input : graph->inputs()) {
+    auto *node = input->node();
+    if (added.find(node) == added.end()) {
+      queue.push(node);
+      added.insert(node);
+    }
+  }
+}
+
 torch::jit::node_list dispatch(torch::jit::Graph *graph,
                                torch::jit::node_list &nodes,
                                const GroupedOpFactory &createGroupedOpFn,
