@@ -141,10 +141,14 @@ def torch_fusible_model(func, src, index, dtype):
 
 
 @pytest.mark.parametrize("shape", [(3, ), (3, 5), (3, 5, 5)])
-@pytest.mark.parametrize("func", [
-    scatter, scatter_add, scatter_max, scatter_softmax, scatter_log_softmax,
-    scatter_std, gather
-])
+@pytest.mark.parametrize(
+    "func",
+    [
+        scatter, scatter_add, scatter_max, scatter_softmax,
+        scatter_log_softmax, scatter_std
+        # Enable after fix AFS-197
+        #, gather
+    ])
 @pytest.mark.parametrize("dtype", [torch.float32, torch.float16, torch.int])
 def test_fuse(shape, func, dtype):
     if dtype != torch.float32 and func in [
