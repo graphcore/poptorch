@@ -16,20 +16,23 @@ std::int32_t getReductionMethod(const torch::jit::Node *node) {
   const auto kind = node->kind();
 
   if (kind == torch_scatter::scatter_max) {
-    return 1;
+    return static_cast<std::int32_t>(ScatterReduction::Max);
   }
   if (kind == torch_scatter::scatter_min) {
-    return 2;
+    return static_cast<std::int32_t>(ScatterReduction::Min);
+  }
+  if (kind == torch_scatter::scatter_mul) {
+    return static_cast<std::int32_t>(ScatterReduction::Mul);
   }
 
   ERROR("Unsupported reduction for node: " << nodeToString(node));
 }
 
-torch::jit::Node *scatterMaxMinHandler(torch::jit::Graph *graph,
-                                       torch::jit::Node *node) {
+torch::jit::Node *torchScatterHandler(torch::jit::Graph *graph,
+                                      torch::jit::Node *node) {
   static constexpr bool enable_index_broadcast = true;
 
-  // Signatures for scatter_max and scatter_min:
+  // Signatures for scatter_max, scatter_min, scatter_mul:
   // (Tensor src, Tensor index, int dim, Tensor? out, int? dim_size)
   auto *src = node->input(0);
   auto *index = node->input(1);
@@ -41,17 +44,20 @@ torch::jit::Node *scatterMaxMinHandler(torch::jit::Graph *graph,
                "Providing the optional output is not currently supported.");
 
   auto shape = shapeFromTensor(node->output(0));
-  auto axissize = shape.at(axis);
+  auto axis_size = shape.at(axis);
 
-  auto *opt_axissize = node->input(4);
-  if (!isNone(opt_axissize)) {
-    axissize = constantToInt(opt_axissize->node());
-    shape[axis] = axissize;
+  auto *opt_axis_size = node->input(4);
+  if (!isNone(opt_axis_size)) {
+    axis_size = constantToInt(opt_axis_size->node());
   }
 
   auto *result =
-      createScatterreduce(graph, {src, index}, axissize, axis,
+      createScatterreduce(graph, {src, index}, axis_size, axis,
                           enable_index_broadcast, getReductionMethod(node));
+
+  if (node->outputs().size() == 1) {
+    return result;
+  }
 
   // Both scatter_max and scatter_min return two outputs where the second one
   // is the index but most often this second output is simply ignored.
@@ -89,7 +95,7 @@ torch::jit::Node *scatterMaxMinHandler(torch::jit::Graph *graph,
   static constexpr std::int32_t min_reduce =
       static_cast<std::int32_t>(ScatterReduction::Min);
   auto *arg_scatter =
-      createScatterreduce(graph, {index_of_result, index}, axissize, axis,
+      createScatterreduce(graph, {index_of_result, index}, axis_size, axis,
                           enable_index_broadcast, min_reduce)
           ->output();
   // Now we've got a tensor of 1-based indices, with zeroes where no index
@@ -108,8 +114,9 @@ torch::jit::Node *scatterMaxMinHandler(torch::jit::Graph *graph,
 } // namespace
 
 __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
-  registerHandler(torch_scatter::scatter_max, scatterMaxMinHandler);
-  registerHandler(torch_scatter::scatter_min, scatterMaxMinHandler);
+  registerHandler(torch_scatter::scatter_max, torchScatterHandler);
+  registerHandler(torch_scatter::scatter_min, torchScatterHandler);
+  registerHandler(torch_scatter::scatter_mul, torchScatterHandler);
 }
 
 } // namespace poptorch

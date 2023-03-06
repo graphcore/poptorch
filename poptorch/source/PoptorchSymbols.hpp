@@ -86,6 +86,7 @@ c10::Symbol getOverlapSymbol(const char *suffix, unsigned int num);
 namespace torch_scatter {
 extern c10::Symbol scatter_max;
 extern c10::Symbol scatter_min;
+extern c10::Symbol scatter_mul;
 } // namespace torch_scatter
 
 #endif // SOURCE_POPTORCH_SYMBOLS_H

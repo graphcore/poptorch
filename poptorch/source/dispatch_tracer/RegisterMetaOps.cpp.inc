@@ -82,7 +82,7 @@ at::Tensor countNonzero(const at::Tensor &self, at::IntArrayRef dim) {
     auto sorted_dims = dim_vec;
     std::sort(sorted_dims.begin(), sorted_dims.end(), std::greater<>{});
 
-    ERROR_ON_MSG(std::adjacent_find(sorted_dims.begin(), sorted_dims.end()) != sorted_dims.end(), 
+    ERROR_ON_MSG(std::adjacent_find(sorted_dims.begin(), sorted_dims.end()) != sorted_dims.end(),
                   "The dimensions to count must be unique");
 
     for (auto d : sorted_dims) {
@@ -187,9 +187,13 @@ std::tuple<at::Tensor, at::Tensor> scatterMinMax(at::Tensor src,
     ERROR_ON_MSG(*dim_size != out_shape[dim], "dim_size expected to be the same as out.shape()[dim]");
   }
 
-  auto output = at::meta::empty(out_shape, src.scalar_type());
-  auto argminmax = at::meta::empty(out_shape, c10::ScalarType::Long);
+  const auto output = at::meta::empty(out_shape, src.scalar_type());
+  const auto argminmax = at::meta::empty(out_shape, c10::ScalarType::Long);
   return {output, argminmax};
+}
+
+at::Tensor scatterMul(at::Tensor src,at::Tensor index, int64_t dim, c10::optional<at::Tensor> out, c10::optional<int64_t> dim_size) {
+  return std::get<0>(scatterMinMax(src, index, dim, out, dim_size));
 }
 
 // poptorch
@@ -285,6 +289,7 @@ TORCH_LIBRARY_IMPL(aten, Meta, m) {
 TORCH_LIBRARY_IMPL(torch_scatter, Meta, m) {
   m.impl("scatter_max", PTC(poptorch::meta::scatterMinMax));
   m.impl("scatter_min", PTC(poptorch::meta::scatterMinMax));
+  m.impl("scatter_mul", PTC(poptorch::meta::scatterMul));
 }
 
 TORCH_LIBRARY_IMPL(poptorch, Meta, m) {
@@ -299,7 +304,7 @@ TORCH_LIBRARY_IMPL(poptorch, Meta, m) {
   m.impl("clear_attribute", PTC_BOXED(poptorch::meta::opWithoutOutputs));
   m.impl("begin_multi_conv", PTC_BOXED(poptorch::meta::opWithoutOutputs));
   m.impl("end_multi_conv", PTC_BOXED(poptorch::meta::opWithoutOutputs));
-  
+
   m.impl("end_cpu_op", PTC_BOXED(poptorch::meta::opReturningFirstArgument));
   m.impl("end_for_loop", PTC_BOXED(poptorch::meta::opReturningFirstArgument));
   m.impl("internal_cast", PTC_BOXED(poptorch::meta::opReturningFirstArgument));
@@ -364,4 +369,5 @@ TORCH_LIBRARY_IMPL(aten, AutogradMeta, m) {
 TORCH_LIBRARY_IMPL(torch_scatter, AutogradMeta, m) {
   m.impl("scatter_max", torch::autograd::autogradNotImplementedFallback());
   m.impl("scatter_min", torch::autograd::autogradNotImplementedFallback());
+  m.impl("scatter_mul", torch::autograd::autogradNotImplementedFallback());
 }

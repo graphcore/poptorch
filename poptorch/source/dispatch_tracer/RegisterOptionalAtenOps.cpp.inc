@@ -152,4 +152,5 @@ TORCH_LIBRARY_IMPL(aten, IPU, m) {
 TORCH_LIBRARY_IMPL(torch_scatter, IPU, m) {
   m.impl("scatter_max", PTC_BOXED(poptorch::fallback));
   m.impl("scatter_min", PTC_BOXED(poptorch::fallback));
+  m.impl("scatter_mul", PTC_BOXED(poptorch::fallback));
 }

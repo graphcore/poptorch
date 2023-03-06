@@ -24,6 +24,7 @@ namespace torch_scatter {
 
 c10::Symbol scatter_max; // NOLINT
 c10::Symbol scatter_min; // NOLINT
+c10::Symbol scatter_mul; // NOLINT
 
 // clang-format off
   __attribute__((constructor(SYMBOL_INIT_PRIORITY)))
@@ -32,6 +33,7 @@ c10::Symbol scatter_min; // NOLINT
   poptorch::logging::trace("Initializing torch_scatter symbols");
   SYMBOL_INIT(torch_scatter, scatter_max);
   SYMBOL_INIT(torch_scatter, scatter_min);
+  SYMBOL_INIT(torch_scatter, scatter_mul);
 }
 
 } // namespace torch_scatter

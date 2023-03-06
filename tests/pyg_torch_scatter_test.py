@@ -9,7 +9,7 @@ import helpers
 import poptorch
 
 if helpers.is_running_tests:
-    from torch_scatter import scatter, scatter_log_softmax, scatter_softmax, scatter_std, scatter_add, scatter_max
+    from torch_scatter import scatter, scatter_log_softmax, scatter_softmax, scatter_std, scatter_add, scatter_max, scatter_min, scatter_mul
 else:
 
     def scatter():
@@ -30,6 +30,12 @@ else:
     def scatter_max():
         pass
 
+    def scatter_min():
+        pass
+
+    def scatter_mul():
+        pass
+
 
 def torch_scatter_harness(func, src, index):
 
@@ -47,7 +53,7 @@ def torch_scatter_harness(func, src, index):
     helpers.assert_allclose(actual=ipu_out, expected=native_out)
 
 
-@pytest.mark.parametrize("reduce", ['sum', 'mean', 'max', 'min'])
+@pytest.mark.parametrize("reduce", ['sum', 'mean', 'max', 'min', 'mul'])
 def test_scatter(reduce):
     func = partial(scatter, reduce=reduce)
     src = torch.tensor([1, 3, 2, 4, 5, 6]).float()
@@ -88,9 +94,10 @@ def test_scatter_add_nd_expand_removed(capfd):
 
 
 @pytest.mark.parametrize("shape", [(5, ), (2, 5), (2, 5, 5)])
-def test_scatter_max(shape):
+@pytest.mark.parametrize("func", [scatter_max, scatter_min, scatter_mul])
+def test_scatter_overloads(shape, func):
     torch.manual_seed(0)
     x = torch.rand(shape)
     ind = torch.randint(3, shape)
 
-    torch_scatter_harness(scatter_max, x, ind)
+    torch_scatter_harness(func, x, ind)
