@@ -531,10 +531,6 @@ class BuildenvManager:
                     # while we wait for https://github.com/conda/conda/issues/12250
                     # to be fixed. (Issue with paths > 128 characters)
                     # As soon as it will be fixed we can use "latest" release.
-                    # Note: py38 only refers to the self-contained version of
-                    # python used by Conda, it is not a system requirement
-                    # and does not affect the python version inside the
-                    # buildenv.
                     url = ("https://github.com/conda-forge/miniforge/"
                            "releases/download/4.14.0-0/Mambaforge-"
                            f"4.14.0-0-{conda_os}-{arch_type}.sh")
