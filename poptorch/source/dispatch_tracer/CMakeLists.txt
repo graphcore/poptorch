@@ -6,6 +6,7 @@ add_library(dispatch_tracer STATIC
   CommonHelperFunctions.cpp
   dispatchers/IDispatch.cpp
   dispatchers/JitDispatch.cpp
+  InplaceAliasMapper.cpp
   ValueMapper.cpp
   Tensor.cpp
   TypeInferenceHandler.cpp

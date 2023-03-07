@@ -184,7 +184,7 @@ std::tuple<at::Tensor, at::Tensor> scatterMinMax(at::Tensor src,
   }
 
   if (dim_size.has_value()) {
-    ERROR_ON_MSG(*dim_size != out_shape[dim], "dim_size expected to be the same as out.shape()[dim]");
+    ERROR_ON_MSG(*dim_size != out_shape[dim], "dim_size = " << *dim_size << " expected to be the same as out.shape()[dim] = " << out_shape[dim] << ", dim = " << dim );
   }
 
   const auto output = at::meta::empty(out_shape, src.scalar_type());

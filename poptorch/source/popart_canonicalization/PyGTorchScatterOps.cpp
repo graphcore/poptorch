@@ -40,8 +40,11 @@ torch::jit::Node *torchScatterHandler(torch::jit::Graph *graph,
   const auto axis = handleDimensionParam(node->input(2), src_type);
 
   auto *opt_out = node->input(3);
-  ERROR_ON_MSG(!isNone(opt_out),
-               "Providing the optional output is not currently supported.");
+
+  std::vector<torch::jit::Value *> args{src, index};
+  if (!isNone(opt_out)) {
+    args.push_back(opt_out);
+  }
 
   auto shape = shapeFromTensor(node->output(0));
   auto axis_size = shape.at(axis);
@@ -52,8 +55,8 @@ torch::jit::Node *torchScatterHandler(torch::jit::Graph *graph,
   }
 
   auto *result =
-      createScatterreduce(graph, {src, index}, axis_size, axis,
-                          enable_index_broadcast, getReductionMethod(node));
+      createScatterreduce(graph, args, axis_size, axis, enable_index_broadcast,
+                          getReductionMethod(node));
 
   if (node->outputs().size() == 1) {
     return result;
@@ -108,7 +111,7 @@ torch::jit::Node *torchScatterHandler(torch::jit::Graph *graph,
   replaceOutputUse(node->output(0), result->output());
   replaceOutputUse(node->output(1), arg_scatter);
   markNodeForDeletion(node);
-  return nullptr;
+  return result;
 }
 
 } // namespace

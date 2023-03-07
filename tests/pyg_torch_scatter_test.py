@@ -9,7 +9,7 @@ import helpers
 import poptorch
 
 if helpers.is_running_tests:
-    from torch_scatter import scatter, scatter_log_softmax, scatter_softmax, scatter_std, scatter_add, scatter_max, scatter_min, scatter_mul
+    from torch_scatter import scatter, scatter_log_softmax, scatter_softmax, scatter_std, scatter_logsumexp, scatter_add, scatter_max, scatter_min, scatter_mul
 else:
 
     def scatter():
@@ -36,21 +36,41 @@ else:
     def scatter_mul():
         pass
 
+    def scatter_logsumexp():
+        pass
 
-def torch_scatter_harness(func, src, index):
+
+def torch_scatter_harness(func, src, index, out=None):
 
     dim_size = int(index.max()) + 1
 
     class Model(torch.nn.Module):
-        def forward(self, src, index):
-            return func(src, index, dim_size=dim_size)
+        def forward(self, src, index, out=None):
+            if out is None:
+                return func(src, index, dim_size=dim_size)
+            return func(src, index, out=out, dim_size=dim_size)
 
     model = Model()
     poptorch_model = poptorch.inferenceModel(model)
 
-    native_out = func(src, index, dim_size=dim_size)
-    ipu_out = poptorch_model(src, index)
+    out_in_plac_native = None
+
+    if out is not None:
+        out_in_plac_native = out.clone()
+        native_out = func(src,
+                          index,
+                          out=out_in_plac_native,
+                          dim_size=dim_size)
+        ipu_out = poptorch_model(src, index, out=out)
+    else:
+        native_out = func(src, index, dim_size=dim_size)
+        ipu_out = poptorch_model(src, index)
+
     helpers.assert_allclose(actual=ipu_out, expected=native_out)
+    if out is not None:
+        helpers.assert_allclose(actual=out, expected=out_in_plac_native)
+
+    poptorch_model.destroy()
 
 
 @pytest.mark.parametrize("reduce", ['sum', 'mean', 'max', 'min', 'mul'])
@@ -61,12 +81,21 @@ def test_scatter(reduce):
     torch_scatter_harness(func, src, index)
 
 
-@pytest.mark.parametrize("func",
-                         [scatter_log_softmax, scatter_softmax, scatter_std])
+@pytest.mark.parametrize(
+    "func",
+    [scatter_log_softmax, scatter_logsumexp, scatter_softmax, scatter_std])
 def test_composites(func):
     src = torch.tensor([1, 3, 2, 4, 5, 6]).float()
-    index = torch.tensor([0, 1, 0, 1, 1, 3]).long()
+    index = torch.tensor([0, 1, 0, 1, 5, 3]).long()
     torch_scatter_harness(func, src, index)
+
+
+@pytest.mark.parametrize("func", [scatter_max, scatter_min, scatter_mul])
+def test_scatter_inplace(func):
+    src = torch.tensor([1, 3, 2, 4, 5, 6]).float()
+    index = torch.tensor([0, 1, 4, 2, 3, 5]).long()
+    out = torch.tensor([10, 1, 11, 1, 23, 1]).float()
+    torch_scatter_harness(func, src, index, out)
 
 
 @helpers.printCapfdOnExit

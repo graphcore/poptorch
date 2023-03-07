@@ -400,6 +400,7 @@ PyTorch Scatter functions
 * ``torch_scatter.composite.scatter_log_softmax``
 * ``torch_scatter.composite.scatter_softmax``
 * ``torch_scatter.composite.scatter_std``
+* ``torch_scatter.composite.scatter_logsumexp``
 
 .. _float_16_op_support:
 

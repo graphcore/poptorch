@@ -33,6 +33,7 @@ private:
 
   static constexpr c10::optional<std::size_t>
   indexArgToUpcast(std::string_view schema_key) {
+
     if (schema_key == "aten::argmax.out" || schema_key == "aten::argmin.out") {
       return 3;
     }
@@ -42,7 +43,10 @@ private:
         schema_key == "aten::scatter_add" ||
         schema_key == "aten::scatter_add_" ||
         schema_key == "aten::scatter_reduce.two" ||
-        schema_key == "aten::scatter_reduce_.two") {
+        schema_key == "aten::scatter_reduce_.two" ||
+        schema_key == "torch_scatter::scatter_max" ||
+        schema_key == "torch_scatter::scatter_min" ||
+        schema_key == "torch_scatter::scatter_mul") {
       return 2;
     }
     if (schema_key == "aten::index.Tensor") {

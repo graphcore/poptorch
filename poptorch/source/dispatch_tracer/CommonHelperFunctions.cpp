@@ -10,14 +10,14 @@
 #include <unordered_set>
 
 #include "../popart_canonicalization/PopartCanonicalizationUtils.hpp"
+#include "InplaceAliasMapper.hpp"
+#include "ValueMapper.hpp"
 #include "poptorch/DispatchTracer.hpp"
 #include "poptorch/OpBuilder.hpp"
 #include "poptorch/PopartCanonicalization.hpp"
 #include "poptorch/TypeAndConstantCanonicalization.hpp"
 #include "poptorch/Utils.hpp"
 #include "poptorch_logging/Logging.hpp"
-
-#include "ValueMapper.hpp"
 
 namespace poptorch {
 
@@ -197,6 +197,9 @@ std::vector<at::Tensor> getInplaceArguments(const c10::Stack &stack,
 
   std::vector<at::Tensor> results;
 
+  const auto inplace_arg_id =
+      InplaceArgAliasMapper::getInplaceArg(schema.name());
+
   for (std::size_t arg = 0; arg < schema.arguments().size(); ++arg) {
     const c10::Argument &argument = schema.arguments()[arg];
     c10::IValue value = stack[arg];
@@ -209,8 +212,9 @@ std::vector<at::Tensor> getInplaceArguments(const c10::Stack &stack,
         continue;
       }
 
-      if ((argument.alias_info() != nullptr) &&
-          argument.alias_info()->isWrite()) {
+      if (((argument.alias_info() != nullptr) &&
+           argument.alias_info()->isWrite()) ||
+          inplace_arg_id == arg) {
         logging::trace("[DISPATCHER][JIT] Found inplace argument, tensor ptr "
                        "{}, tensor {}",
                        reinterpret_cast<void *>(tensor.unsafeGetTensorImpl()),
