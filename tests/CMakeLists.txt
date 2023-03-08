@@ -4,14 +4,7 @@ add_subdirectory(cpp)
 # Copy tests to the build folder if requested.
 if(COPY_TESTS)
   # NOTE: Collapsing the hierarchy like this may cause conflicts.
-  file(GLOB TEST_FILES "${CMAKE_CURRENT_SOURCE_DIR}/*.py"
-                       "${CMAKE_CURRENT_SOURCE_DIR}/gnn/*.py"
-                       "${CMAKE_CURRENT_SOURCE_DIR}/gnn/nn/*.py"
-                       "${CMAKE_CURRENT_SOURCE_DIR}/gnn/nn/aggr/*.py"
-                       "${CMAKE_CURRENT_SOURCE_DIR}/gnn/nn/conv/*.py"
-                       "${CMAKE_CURRENT_SOURCE_DIR}/gnn/nn/dense/*.py"
-                       "${CMAKE_CURRENT_SOURCE_DIR}/gnn/nn/norm/*.py"
-                       "${CMAKE_CURRENT_SOURCE_DIR}/gnn/nn/pool/*.py")
+  file(GLOB_RECURSE TEST_FILES "${CMAKE_CURRENT_SOURCE_DIR}/*.py")
   install(FILES ${TEST_FILES} DESTINATION "${CMAKE_CURRENT_BINARY_DIR}")
   set(TESTS_PATH "${CMAKE_CURRENT_BINARY_DIR}")
 else()
