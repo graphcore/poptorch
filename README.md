@@ -13,7 +13,7 @@ PopTorch Geometric is a set of extensions for PyTorch Geometric, enabling Graph
 Neural Network models to be trained, evaluated and used on the Graphcore IPU.
 PopTorch Geometric depends on the functionality provided by PopTorch.
 
-More information can be found in the [PopTorch User Guide](https://docs.graphcore.ai/projects/poptorch-geometric-user-guide).
+More information can be found in the [PopTorch Geometric User Guide](https://docs.graphcore.ai/projects/poptorch-geometric-user-guide).
 
 
 ## Prerequisites
