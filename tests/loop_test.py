@@ -294,3 +294,36 @@ def test_loop_with_constant_inputs_only():
     helpers.assert_allequal(actual=poptorch_model(),
                             expected=(torch.tensor([32., 64.]),
                                       torch.tensor([8., 8.])))
+
+
+def test_loop_with_same_trip_count_on_multiple_ipus():
+    class Model(torch.nn.Module):
+        def forward(self, x, y):
+            def func(x, y):
+                x = x + y
+                return x, y
+
+            # Note: both trip_count equal to 5
+            with poptorch.Block("0", ipu_id=0):
+                x, y = poptorch.for_loop(5, func, [x, y])
+
+            with poptorch.Block("1", ipu_id=1):
+                x, y = poptorch.for_loop(5, func, [x, y])
+
+            return x, y
+
+    native = Model()
+    stages = [poptorch.Stage(f"{k}") for k in range(0, 2)]
+    strategy = poptorch.ShardedExecution(*stages)
+
+    opts = poptorch.Options()
+    opts.setExecutionStrategy(strategy)
+    ipu = poptorch.inferenceModel(native, opts)
+
+    x = torch.tensor([1., 2.])
+    y = torch.tensor([1., 2.])
+
+    ipu_out = ipu(x, y)[0]
+    native_out = x + 10 * y
+
+    helpers.assert_allclose(actual=ipu_out, expected=native_out)
