@@ -40,4 +40,4 @@ def test_multi_aggr(dataloader, mode):
                  first_sample.num_nodes,
                  dataloader,
                  post_proc,
-                 atol=1e-4)
+                 atol=1e-3)

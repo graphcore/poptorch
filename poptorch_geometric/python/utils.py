@@ -96,7 +96,14 @@ class TrainingStepper:
             self.training_model.copyWeightsToHost()
         return out, loss
 
-    def run(self, num_steps, batch):
+    def run(self, *args):
+        if len(args) == 2:
+            self._run_common_input(*args)
+        elif len(args) == 3:
+            self._run_separate_inputs(*args)
+        assert True, f"Wrong number of args ({len(args)}!)"
+
+    def _run_common_input(self, num_steps, batch):
         cpu_loss = torch.empty(num_steps)
         ipu_loss = torch.empty(num_steps)
 
@@ -106,6 +113,20 @@ class TrainingStepper:
             self.assert_close(actual=ipu_out, expected=cpu_out, id="Output")
             self.check_parameters()
 
+        self.assert_close(actual=ipu_loss, expected=cpu_loss, id="loss")
+
+    def _run_separate_inputs(self, num_steps, cpu_batch, ipu_batch):
+        cpu_loss = torch.empty(num_steps)
+        ipu_loss = torch.empty(num_steps)
+
+        for i in range(num_steps):
+            cpu_out, cpu_loss[i] = self.cpu_step(cpu_batch)
+            ipu_out, ipu_loss[i] = self.ipu_step(ipu_batch)
+            min_shape = min(cpu_out.shape[0], ipu_out.shape[0])
+            self.assert_close(actual=ipu_out[:min_shape],
+                              expected=cpu_out[:min_shape],
+                              id="Output")
+            self.check_parameters()
         self.assert_close(actual=ipu_loss, expected=cpu_loss, id="loss")
 
     def assert_close(self, actual, expected, id):

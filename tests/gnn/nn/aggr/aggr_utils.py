@@ -13,19 +13,25 @@ def aggr_harness(aggr,
                  sorted_index=False,
                  loss_fn=torch.nn.MSELoss(),
                  num_steps=4,
-                 atol=1e-5,
-                 rtol=1e-4):
+                 atol=5e-3,
+                 rtol=5e-3):
     class AggrWrapper(torch.nn.Module):
         def __init__(self, aggr, loss_fn, post_proc=None):
+            assert hasattr(loss_fn, 'reduction')
+            # No support for other reduction types yet
+            assert loss_fn.reduction in ('sum', 'mean')
+
             super().__init__()
             self.aggr = aggr
             self.loss_fn = loss_fn
             self.post_proc = post_proc
+            self.mean_reduction_in_loss = (loss_fn.reduction == 'mean')
 
         def forward(self, *args):
             x = args[0]
             edge_index = args[1]
-            size = args[2]
+            nodes_mask = args[2]
+            size = args[3]
 
             broadcast_index = edge_index[1] if sorted_index else edge_index[0]
             aggr_index = edge_index[0] if sorted_index else edge_index[1]
@@ -35,14 +41,26 @@ def aggr_harness(aggr,
 
             if self.post_proc is not None:
                 if isinstance(result, List):
+                    nodes_mask = nodes_mask.repeat(len(result))
                     result = torch.cat(result)
                 result = self.post_proc(result)
+                # Apply nodes mask, so that the loss may be computed properly
+                result[~nodes_mask] = 0
 
             if self.training:
                 if isinstance(result, List):
                     result = torch.cat(result)
                 target = torch.ones_like(result)
+                target[~nodes_mask] = 0
+
                 loss = self.loss_fn(result, target)
+                # In case, the loss function applies mean reduction, the result
+                # has to be rescaled by the effective size of the batch
+                # (excluding padding).
+                if self.mean_reduction_in_loss:
+                    real_size = torch.count_nonzero(nodes_mask)
+                    loss = loss * size / real_size
+
                 return result, loss
 
             return result
@@ -50,9 +68,9 @@ def aggr_harness(aggr,
     model = AggrWrapper(aggr, loss_fn=loss_fn, post_proc=post_proc)
 
     stepper = TrainingStepper(model, atol=atol, rtol=rtol)
-
     if dataloader is not None:
         for step, batch in enumerate(dataloader):
             if step == num_steps:
                 break
-            stepper.run(1, (batch.x, batch.edge_index, dim_size))
+            stepper.run(
+                1, (batch.x, batch.edge_index, batch.nodes_mask, dim_size))

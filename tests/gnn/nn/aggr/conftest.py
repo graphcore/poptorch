@@ -18,6 +18,7 @@ def dataloader():
                           transform=NormalizeFeatures(),
                           num_channels=8)
 
-    dataloader = FixedSizeDataLoader(dataset, num_nodes=12)
+    dataloader = FixedSizeDataLoader(
+        dataset, num_nodes=12, collater_args={'add_masks_to_batch': True})
 
     return dataloader
