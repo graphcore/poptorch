@@ -1470,16 +1470,15 @@ TensorId Compiler::endForLoop(std::int32_t trip_count, std::int64_t num_outputs,
   _impl->active_builder = _impl->active_builder->getParent();
   auto ai_onnx = _impl->active_builder->aiOnnxOpset10();
 
-  const PopartConstant popart_const(PopartType::INT32, &trip_count, {});
-  const popart::TensorId trip_count_as_tensor =
-      _impl->tensorConstant({}, popart_const);
-
+  popart::ConstVoidData trip_count_data(&trip_count, {"INT32", popart::Shape{}});
   popart::ConstVoidData the_data;
 
   const bool true_const = true;
   the_data.data = &true_const;
   the_data.info = {"BOOL", popart::Shape{}};
 
+  const popart::TensorId trip_count_as_tensor =
+      ai_onnx.constant(trip_count_data);
   const popart::TensorId condition = ai_onnx.constant(the_data);
 
   std::vector<popart::TensorId> transformed_ins = {trip_count_as_tensor,
