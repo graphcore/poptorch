@@ -166,8 +166,8 @@ rst_epilog = ("\n".join(pod_definitions) + "\n" + "\n".join(bow_definitions) +
     indicated otherwise.
 
 .. |LEGAL:TRADEMARkS| replace::
-    Graphcloud®, Graphcore® and Poplar® are registered trademarks of Graphcore
-    Ltd.
+    Graphcloud®, Graphcore®, Poplar® and PopVision® are registered trademarks
+    of Graphcore Ltd.
     :raw-html:`<br></br>`
     Bow™,
     Bow-2000™,
@@ -186,7 +186,6 @@ rst_epilog = ("\n".join(pod_definitions) + "\n" + "\n".join(bow_definitions) +
     PopDist™,
     PopLibs™,
     PopRun™,
-    PopVision™,
     PopTorch™,
     Streaming Memory™
     and Virtual-IPU™
