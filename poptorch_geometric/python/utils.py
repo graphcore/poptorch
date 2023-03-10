@@ -13,49 +13,6 @@ DataBatch = type(Batch(_base_cls=Data))
 HeteroDataBatch = type(Batch(_base_cls=HeteroData))
 
 
-class AttributeTypeCache:
-    """ A class for caching the result of ``Data.is_edge_attr`` and
-    ``Data.is_node_attr`` from PyTorch Geometric
-    """
-
-    def __init__(self) -> None:
-        self._attr_cache = {'node': set(), 'edge': set(), 'other': set()}
-
-    def _put_key(self, data: Data, key: str):
-        """insert into cache the result of calling:
-            data.is_node_attr(key)
-            data.is_edge_attr(key)
-        """
-        if data.is_node_attr(key):
-            self._attr_cache['node'].add(key)
-        elif data.is_edge_attr(key):
-            self._attr_cache['edge'].add(key)
-        else:
-            self._attr_cache['other'].add(key)
-
-    def is_node_attr(self, data: Data, key: str) -> bool:
-        """cached lookup for data.is_node_attr(key)"""
-        if key in self._attr_cache['node']:
-            return True
-
-        if key in self._attr_cache['edge'] or key in self._attr_cache['other']:
-            return False
-
-        self._put_key(data, key)
-        return self.is_node_attr(data, key)
-
-    def is_edge_attr(self, data: Data, key: str) -> bool:
-        """cached lookup for data.is_edge_attr(key)"""
-        if key in self._attr_cache['edge']:
-            return True
-
-        if key in self._attr_cache['node'] or key in self._attr_cache['other']:
-            return False
-
-        self._put_key(data, key)
-        return self.is_edge_attr(data, key)
-
-
 def set_aggregation_dim_size(model: torch.nn.Module, dim_size: int):
     """Sets the dim_size argument used in the aggregate step of message passing
 
