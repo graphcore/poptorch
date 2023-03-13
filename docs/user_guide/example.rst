@@ -1,16 +1,14 @@
 Examples
 ========
 
-You can find PyTorch examples and tutorials in the Graphcore GitHub repositories:
+You can find PyTorch examples and tutorials in the Graphcore GitHub `examples repository <https://github.com/graphcore/examples>`__.
+This contains
 
-* `Examples of popular machine learning models for training and inference <https://github.com/graphcore/examples>`_
-
-* `Tutorials repo <https://github.com/graphcore/tutorials>`_ with:
-
-  - :tutorials-repo:`Tutorials <tutorials/pytorch>`
-  - :tutorials-repo:`Examples of PopTorch and IPU features <feature_examples/pytorch>`
-  - :tutorials-repo:`Examples of simple models <simple_applications/pytorch>`
-  - Source code from videos, blogs and other documents
+* Examples of popular machine learning models for training and inference
+* :tutorials-repo:`Tutorials <tutorials/pytorch>`
+* :tutorials-repo:`Examples of PopTorch and IPU features <feature_examples/pytorch>`
+* :tutorials-repo:`Examples of simple models <simple_applications/pytorch>`
+* Source code from videos, blogs and other documents
 
 MNIST example
 _____________
