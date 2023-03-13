@@ -9,6 +9,12 @@ REQUIRES = [
     '@TORCH_SCATTER_DEPENDENCY@',
     '@TORCH_SPARSE_DEPENDENCY@',
 ]
+
+python_version = f'{sys.version_info.major}.{sys.version_info.minor}'
+
+if python_version == '3.7':
+    REQUIRES.append('singledispatchmethod==1.0')
+
 VERSION = '@VERSION@'
 
 LONG_DESCRIPTION = (
@@ -36,5 +42,5 @@ setup(name='poptorch_geometric',
       ],
       platforms='@PLATFORM@',
       install_requires=REQUIRES,
-      python_requires=f'=={sys.version_info.major}.{sys.version_info.minor}.*',
+      python_requires=f'=={python_version}.*',
       packages=find_packages())
