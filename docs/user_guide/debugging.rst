@@ -59,7 +59,7 @@ the two tensors we have anchored previously.
   :end-before: tensor_retrieve_end
   :emphasize-lines: 4, 5
 
-For a more practical understanding around observing tensors, Graphcore's tutorials
+For a more practical understanding around observing tensors, Graphcore's examples
 repository contains a tutorial you can follow about observing tensors, using anchoring and generating a gradient histogram:
 :tutorials-repo:`PopTorch tutorial: Observing tensors <tutorials/pytorch/observing_tensors>`.
 

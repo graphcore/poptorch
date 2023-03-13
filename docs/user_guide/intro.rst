@@ -127,7 +127,6 @@ The following constraints apply when using PopTorch:
 Other resources
 ===============
 
-Please see Graphcore's website for `How-to Videos <https://www.graphcore.ai/resources/how-to-videos>`_, `Graphcore's examples GitHub repository <https://github.com/graphcore/examples>`_ for PopTorch applications,
-and `Graphcore's tutorials GitHub repository <https://github.com/graphcore/tutorials>`_ for :tutorials-repo:`feature examples <feature_examples/pytorch>`,
+Please see Graphcore's website for `How-to Videos <https://www.graphcore.ai/resources/how-to-videos>`_ and `Graphcore's examples GitHub repository <https://github.com/graphcore/examples>`_ for PopTorch applications, :tutorials-repo:`feature examples <feature_examples/pytorch>`,
 :tutorials-repo:`tutorials <tutorials/pytorch>` and :tutorials-repo:`simple applications <simple_applications/pytorch>`.
 Further developer resources can be found on `Graphcore's developer portal <https://www.graphcore.ai/developer>`_.

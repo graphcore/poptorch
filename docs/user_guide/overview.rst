@@ -1057,7 +1057,7 @@ do this, see the `Custom operators
 <https://docs.graphcore.ai/projects/popart-user-guide/en/latest/custom_ops.html>`__
 chapter of the PopART User Guide.
 
-You can find some examples of PopART custom ops in the :tutorials-repo:`Graphcore GitHub tutorials repository <feature_examples/popart/custom_operators>`.
+You can find some examples of custom ops in the :tutorials-repo:`Graphcore GitHub examples repository <feature_examples/pytorch/custom_op/>`.
 
 Compiling the PopART custom op will create a dynamic library file, which you can
 use with your PyTorch code.
@@ -1100,7 +1100,7 @@ The custom op code will need to create the tensors that it returns.
 You can also call this custom op inside a training model using
 :py:class:`~poptorch.custom_op` and the backward op will be called automatically.
 
-The Graphcore tutorials repository contains a feature example demonstrating
+The Graphcore examples repository contains a feature example demonstrating
 how to load and in and use a custom op in a PopTorch model: :tutorials-repo:`PopTorch example: Custom op <feature_examples/pytorch/custom_op>`.
 
 Passing attributes to the custom op
