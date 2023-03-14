@@ -29,7 +29,10 @@ def op_harness(op, inputs, inference_test_fn=None):
     native_out, _ = model(tuple(inputs))
 
     # Run on IPU.
-    poptorch_model = poptorch.trainingModel(model)
+    # Setup IPU seed
+    opts = poptorch.Options()
+    opts.randomSeed(torch.initial_seed())
+    poptorch_model = poptorch.trainingModel(model, options=opts)
     poptorch_out, _ = poptorch_model(tuple(inputs))
 
     # Inference test - check outputs
