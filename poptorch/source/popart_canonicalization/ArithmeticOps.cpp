@@ -94,13 +94,24 @@ torch::jit::Node *trueDivideHandler(torch::jit::Graph *graph,
 
 torch::jit::Node *clampHandler(torch::jit::Graph *graph,
                                torch::jit::Node *node) {
+  // We can't use PopART clip because it doesn't support integers,
+  // so the following is used instead:
+  // output = min(max(x, min_value), max_value)
+
   auto *x = node->input(0);
   auto *min_val = node->input(1);
   auto *max_val = node->input(2);
 
-  // We can't use PopART clip because it doesn't support integers,
-  // so the following is used instead:
-  // output = min(max(x, min_value), max_value)
+  c10::ScalarType const x_type = getNodeScalarType(x);
+  if (x_type != c10::kInt) {
+    if (!isNone(min_val->node()) && getNodeScalarType(min_val) != x_type) {
+      min_val = createCast(graph, node->input(1), x_type)->output();
+    }
+    if (!isNone(max_val->node()) && getNodeScalarType(max_val) != x_type) {
+      max_val = createCast(graph, node->input(2), x_type)->output();
+    }
+  }
+
   auto *max =
       isNone(min_val->node()) ? x->node() : createMax(graph, {x, min_val});
   auto *min = isNone(max_val->node())

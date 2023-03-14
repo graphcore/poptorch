@@ -216,6 +216,26 @@ def test_clamp_(args):
     op_harness(op_clamp_, [input], assert_, test_training=True)
 
 
+@pytest.mark.parametrize("args", clamp_inputs)
+def test_clamp_mul_exp(args):
+    torch.manual_seed(42)
+
+    t = torch.randn([1, 2, 10, 10], dtype=torch.float16)
+
+    class Model(torch.nn.Module):
+        def forward(self, x):
+            x = x.clamp(**args)
+            x = torch.exp(0.5 * x)
+            return x
+
+    model = Model()
+    ipu_model = poptorch.inferenceModel(model)
+
+    actual_out = ipu_model(t)
+    expected_out = model(t.to(torch.float32))
+    helpers.assert_allclose(actual=actual_out, expected=expected_out)
+
+
 @pytest.mark.parametrize(
     "op",
     [torch.clamp_min, torch.clamp_min_, torch.clamp_max, torch.clamp_max_])
