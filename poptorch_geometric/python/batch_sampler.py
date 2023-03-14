@@ -4,7 +4,7 @@ import numbers
 from functools import lru_cache
 from typing import Any, Generator, Iterable, Iterator, List, Optional, Union
 
-from torch.utils.data.sampler import RandomSampler, Sampler
+from torch.utils.data.sampler import RandomSampler, Sampler, SequentialSampler
 from torch_geometric.data import Batch, Dataset
 from torch_geometric.data.data import BaseData
 
@@ -15,10 +15,10 @@ __all__ = ['FixedBatchSampler', 'make_fixed_batch_generator']
 
 class FixedBatchSampler(Sampler[List[int]]):
     r"""Wraps another sampler to yield a mini-batch of indices.
-    :py:class:`FixedBatchSampler` forms batches by adding graphs to the batch one
-    at a time without exceeding the maximum number of nodes, edges, or graphs.
-    This gives similar results to packing without requiring the dataset to be
-    preprocessed.
+    :py:class:`FixedBatchSampler` forms batches by adding graphs to the batch
+    one at a time without exceeding the maximum number of nodes, edges, or
+    graphs. This gives similar results to packing without requiring the dataset
+    to be preprocessed.
 
     Args:
         data_source (torch_geometric.data.Dataset): The source of data to
@@ -29,7 +29,7 @@ class FixedBatchSampler(Sampler[List[int]]):
         num_edges (int, optional): Number of edges in a batch.
             (default: :obj:`None`)
         sampler (Sampler or Iterable, optional): Base sampler. Can be any
-            iterable object. (default: RandomSampler(data_source))
+            iterable object. (default: SequentialSampler(data_source))
         allow_skip_data (bool, optional): Allow skip :obj:`data_source` item,
             otherwise throw :py:exc:`RuntimeError` when the sampler is not able
             to form a single item batch from :obj:`data_source`, because
@@ -61,7 +61,7 @@ class FixedBatchSampler(Sampler[List[int]]):
                                  for data in data_source) * num_graphs
 
         self.sampler = sampler if sampler is not None else \
-            RandomSampler(data_source)
+            SequentialSampler(data_source)
         self.allow_skip_data = allow_skip_data
 
     def _validate(self, sampler, num_nodes, num_edges, num_graphs):

@@ -217,7 +217,7 @@ def test_combined_batching_collater_invalid(molecule):
         collate_fn([molecule] * 9)
 
 
-def test_simple_fixed_size_data_loader_mro(num_graphs=2, num_nodes=30):
+def test_simple_fixed_size_data_loader_mro(num_graphs=2, num_nodes=40):
     # Check that MROs of the dataloader classes are correct. There are other
     # classes that inherit from `FixedSizeDataLoader` and would be
     # affected if the MRO changes here.
