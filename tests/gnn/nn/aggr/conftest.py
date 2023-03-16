@@ -10,7 +10,7 @@ from poptorch_geometric.dataloader import FixedSizeDataLoader
 
 @pytest.fixture
 def dataloader():
-    seed_everything(0)
+    seed_everything(42)
 
     dataset = FakeDataset(num_graphs=4,
                           avg_num_nodes=8,
