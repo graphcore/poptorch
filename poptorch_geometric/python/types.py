@@ -53,7 +53,8 @@ class PyGArgsParser(ICustomArgParser):
     def _setup_num_fields(
             batch: Union[DataBatch, HeteroDataBatch],
             original_structure: Union[DataBatch, HeteroDataBatch]):
-        batch._num_graphs = original_structure._num_graphs  # pylint: disable=protected-access
+        if hasattr(original_structure, '_num_graphs'):
+            batch._num_graphs = original_structure._num_graphs  # pylint: disable=protected-access
         batch['num_nodes'] = original_structure.num_nodes
         batch['num_edges'] = original_structure.num_edges
         if isinstance(batch, HeteroDataBatch):
