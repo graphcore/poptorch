@@ -53,6 +53,14 @@ def op_harness(op, *inputs, assert_fn=None, out_fn=None):
     return model, poptorch_model
 
 
+def op_harness_inference(model, *inputs):
+    poptorch_model = poptorch.inferenceModel(model)
+    native_out = model(*inputs)
+    poptorch_out = poptorch_model(*inputs)
+
+    default_assert_fn(native_out, poptorch_out)
+
+
 @pytest.mark.parametrize("params", params_einsum)
 @pytest.mark.parametrize("implicit_rhs", {True, False})
 def test_einsum(params, implicit_rhs):
@@ -525,3 +533,80 @@ def test_available_memory_scatter_add(capfd):
     # Check we have set_available_memory[...](%XX) where XX is the result of scatterreduce
     assert re.search(r"set_available_memory\[.*\]\(\{}\)".format(sa_var),
                      sam_line)
+
+
+basic_test_data = [
+    ([[3, 6, 9], [3, 6, 10], [-1, 0, 1], [8, 9, 140]], [1, 3, 5, 7, 9]),
+    ([[2, 5, 10], [6, 8, 3]], [1, 5, 7, 8, 10]),
+    (1, [1, 5, 7, 8, 10]),
+    ([1, 2, 3, 4, 5, 6, 7, 8, 9], [1, 2, 3, 4, 5, 6]),
+    ([[[1, 3, 5], [2, 4, 6]], [[1, 2, 3], [4, 5, 6]]], [1, 2, 3, 4, 5, 6]),
+    ([1, 2, 3, 4, 5, 6, 7, 8, 9], [1, 2, 3, 6, 4, 5]),
+]
+
+
+def bucketize_op_test_body(right, data, dtypes):
+    input_data, boundaries_data = data
+    input_dtype, boundaries_dtype = dtypes
+    input = torch.tensor(input_data, dtype=input_dtype)
+    boundaries = torch.tensor(boundaries_data, dtype=boundaries_dtype)
+
+    class Model(torch.nn.Module):
+        def __init__(self, right):
+            super().__init__()
+            self.right = right
+
+        def forward(self, input, boundaries):
+            return torch.bucketize(input, boundaries, right=self.right)
+
+    op_harness_inference(Model(right), input, boundaries)
+
+
+@pytest.mark.parametrize("right", [True, False])
+@pytest.mark.parametrize("dtypes", [(torch.float32, torch.float32),
+                                    (torch.float32, torch.float32),
+                                    (torch.int32, torch.float32),
+                                    (torch.float32, torch.int32)])
+@pytest.mark.parametrize("data", basic_test_data)
+def test_bucketize_basic(right, data, dtypes):
+    bucketize_op_test_body(right, data, dtypes)
+
+
+fp_test_data = [
+    ([1, 2, 3, 4, 5, 6, 7, 8, 9], [0.9, 1, 2, 2, 3, 3, 4, 4.1, 9, 9]),
+    (
+        [[[1, 3, 5], [2, 4, 6]], [[1, 2, 3], [4, 5, 6]]],
+        [0.9, 1, 2, 2, 3, 3, 4, 4.1, 9, 9],
+    ),
+]
+
+
+@pytest.mark.parametrize("right", [True, False])
+@pytest.mark.parametrize("data", basic_test_data)
+def test_bucketize_fp(right, data):
+    bucketize_op_test_body(right, data, (torch.float32, torch.int32))
+
+
+@pytest.mark.parametrize("out_int32", [True, False])
+def test_bucketize_inplace(out_int32):
+    input = torch.tensor([[2, 5, 10], [6, 8, 3]], dtype=torch.int32)
+    boundaries = torch.tensor([1, 5, 7, 8, 10], dtype=torch.int32)
+    out_dtype = torch.int32 if out_int32 else torch.int64
+    out_poptorch = torch.zeros(2, 3, dtype=out_dtype)
+    out_native = out_poptorch.clone()
+
+    class Model(torch.nn.Module):
+        def forward(self, input, boundaries, out):
+            return torch.bucketize(input,
+                                   boundaries,
+                                   out_int32=out_int32,
+                                   out=out)
+
+    model = Model()
+    returned_out_native = model(input, boundaries, out_native)
+    poptorch_model = poptorch.inferenceModel(model)
+    returned_out_poptorch = poptorch_model(input, boundaries, out_poptorch)
+
+    default_assert_fn(returned_out_poptorch, out_poptorch)
+    default_assert_fn(out_native, out_poptorch)
+    default_assert_fn(returned_out_native, returned_out_poptorch)

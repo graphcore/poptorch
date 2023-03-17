@@ -45,6 +45,8 @@ OP_DECL(popart, scatterreduce, scatterreduce, AiGraphcoreOpset1.scatterreduce, A
 OP_DECL(popart, groupedscatterreduce, groupedscatterreduce, AiGraphcoreOpset1.groupedscatterreduce, ARG(INT,axis_size) ARG(INT,axis) ARG(INT,reduction) ARG(INT,group_size) ARG(INT, enable_index_broadcast), BODY_ARG(axis_size) BODY_ARG(axis) BODY_ARG(static_cast<popart::ScatterReduction>(reduction)) BODY_ARG(group_size) BODY_ARG(enable_index_broadcast) BODY_ARG(DEBUG_CONTEXT("Scatterreduce")))
 OP_DECL(popart, groupedgather, groupedgather, AiGraphcoreOpset1.groupedgather, ARG(INT,axis) ARG(INT,group_size) , BODY_ARG(axis)  BODY_ARG(group_size) BODY_ARG(DEBUG_CONTEXT("GroupedGather")))
 OP_DECL(popart, swish, swish, AiGraphcoreOpset1.swish, NONE, BODY_ARG(DEBUG_CONTEXT("Swish")))
+OP_DECL(popart, bucketize, bucketize, AiGraphcoreOpset1.bucketize, ARG(INT,right) , BODY_ARG(right) BODY_ARG(DEBUG_CONTEXT("Bucketize")))
+
 // Ops from AiOnnxOpset10
 OP_DECL(popart, averagepool, averagepool, AiOnnxOpset10.averagepool, ARG(INT_VEC,kernel_shape) ARG(INT,ceil_mode) ARG(INT,count_include_pad) ARG(INT_VEC,pads) ARG(INT_VEC,strides) , BODY_ARG(kernel_shape) BODY_ARG(ceil_mode) BODY_ARG(count_include_pad) BODY_ARG(pads) BODY_ARG(strides) BODY_ARG(DEBUG_CONTEXT("Averagepool")))
 OP_DECL(popart, convinteger, convinteger, AiOnnxOpset10.convinteger, ARG(INT_VEC,dilations) ARG(INT,group) ARG(INT_VEC,kernel_shape) ARG(INT_VEC,pads) ARG(INT_VEC,strides) , BODY_ARG(dilations) BODY_ARG(group) BODY_ARG(kernel_shape) BODY_ARG(pads) BODY_ARG(strides) BODY_ARG(DEBUG_CONTEXT("Convinteger")))

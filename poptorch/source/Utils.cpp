@@ -222,13 +222,13 @@ size_t numTensorsForType(const c10::TypePtr &type) {
     return 1;
 
   case c10::TypeKind::ListType: {
-    auto list_type = type->cast<ListTypeWithNumElements>();
+    const auto list_type = type->cast<ListTypeWithNumElements>();
     ERROR_ON(!list_type);
     return list_type->numElements();
   }
   case c10::TypeKind::TupleType: {
     size_t num_tensors = 0;
-    auto tuple = type->expect<c10::TupleType>();
+    const auto tuple = type->expect<c10::TupleType>();
     for (const auto &element_type : tuple->elements()) {
       num_tensors += numTensorsForType(element_type);
     }
@@ -265,7 +265,7 @@ void searchAndPossiblyDestroyInternal(
     return;
   }
 
-  auto inputs = copyInputs(node);
+  const auto inputs = copyInputs(node);
   node->destroy();
   destroyed->insert(node);
 
@@ -302,18 +302,29 @@ std::unique_ptr<char[]> stringToUniquePtr(const std::string &str) {
 }
 
 // Convert that IR type into a C++ vector of ints.
-std::vector<std::int64_t> shapeFromTensor(torch::jit::Value *value) {
+std::vector<std::int64_t> shapeFromTensor(const torch::jit::Value *value) {
   // Extract the type from the pytorch IR.
-  c10::TensorTypePtr const as_tensor = value->type()->expect<c10::TensorType>();
-  c10::VaryingShape const dims = as_tensor->sizes();
+  const c10::TensorTypePtr as_tensor = value->type()->expect<c10::TensorType>();
+  const c10::VaryingShape varying_shape = as_tensor->sizes();
+  const auto &optional_shape_size = varying_shape.size();
+  const auto &optional_dims = varying_shape.sizes();
 
   // Convert that IR type into a C++ vector of ints.
   std::vector<std::int64_t> shape;
-  if (dims.sizes()) {
-    for (auto optional_int : *dims.sizes()) {
-      shape.push_back(*optional_int);
+
+  if (optional_shape_size) {
+    shape.reserve(optional_shape_size.value());
+  }
+
+  if (optional_dims) {
+    const auto &dims = optional_dims.value();
+    for (const auto &optional_dim : dims) {
+      if (optional_dim) {
+        shape.push_back(optional_dim.value());
+      }
     }
   }
+
   return shape;
 }
 
@@ -367,8 +378,8 @@ std::string JitTensorInfo::toString() const {
 
 void validateTensorShapeAndType(torch::jit::Value *value,
                                 const at::Tensor &tensor) {
-  JitTensorInfo jit(value);
-  JitTensorInfo torch(tensor);
+  const JitTensorInfo jit(value);
+  const JitTensorInfo torch(tensor);
   const bool match = std::tie(torch.scalar_type, torch.dims) ==
                      std::tie(jit.scalar_type, jit.dims);
   ERROR_ON_MSG(!match, "Shape/Type mismatch: JIT tensor %"

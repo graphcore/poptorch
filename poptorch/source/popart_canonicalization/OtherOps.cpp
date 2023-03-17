@@ -18,6 +18,20 @@
 
 namespace poptorch {
 namespace {
+
+torch::jit::Node *bucketizeHandler(torch::jit::Graph *graph,
+                                   torch::jit::Node *node) {
+
+  // aten::bucketize.Tensor(Tensor self, Tensor boundaries, *,
+  // bool out_int32=False, bool right=False) -> Tensor
+
+  const auto args =
+      poptorch::promoteTensors(graph, node->input(0), node->input(1));
+  const bool right = constantToBool(node->input(3)->node());
+
+  return createBucketize(graph, args, right);
+}
+
 torch::jit::Node *einsumHandler(torch::jit::Graph *graph,
                                 torch::jit::Node *node) {
   // aten::einsum(string equation, Tensor[] tensors) -> Tensor
@@ -421,6 +435,7 @@ torch::jit::Node *randomHandler(torch::jit::Graph *graph,
 } // namespace
 
 __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
+  registerHandler(c10::aten::bucketize, bucketizeHandler);
   registerHandler(c10::aten::einsum, einsumHandler);
   registerHandler(c10::aten::meshgrid, meshgridHandler);
   registerHandler(c10::aten::cartesian_prod, cartesianProdHandler);

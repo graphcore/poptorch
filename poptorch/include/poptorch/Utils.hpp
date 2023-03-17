@@ -46,7 +46,7 @@ void removeAndPossiblyDestroyAllInputs(torch::jit::Node *node);
 std::unique_ptr<char[]> stringToUniquePtr(const std::string &str);
 
 // Get the tensor shape as a vector of ints.
-std::vector<std::int64_t> shapeFromTensor(torch::jit::Value *value);
+std::vector<std::int64_t> shapeFromTensor(const torch::jit::Value *value);
 
 // Add casts as necessary such that weight and bias have the same scalar type
 // as input.

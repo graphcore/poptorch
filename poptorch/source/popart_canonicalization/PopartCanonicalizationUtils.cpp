@@ -39,8 +39,8 @@ bool registerHandler(c10::Symbol symbol, const SymbolHandler &handler) {
 // Return a pointer to a handler if one is registered for this kind of node or
 // an empty std::function otherwise.
 SymbolHandler getHandler(torch::jit::NodeKind kind) {
-  auto it = symbolHandlers().find(kind);
-  if (it != symbolHandlers().end()) {
+  const auto it = symbolHandlers().find(kind);
+  if (it != symbolHandlers().cend()) {
     return it->second;
   }
   return {};
@@ -54,7 +54,7 @@ bool allInputsOfType(torch::jit::Node *node, at::ScalarType type,
       continue;
     }
 
-    auto tensor_type = input->type()->cast<c10::TensorType>();
+    const auto tensor_type = input->type()->cast<c10::TensorType>();
     ERROR_ON(!tensor_type);
     ERROR_ON(!tensor_type->scalarType());
 
@@ -76,7 +76,7 @@ bool allInputsInteger(torch::jit::Node *node, int ignore_input) {
       continue;
     }
 
-    auto tensor = input->type()->cast<c10::TensorType>();
+    const auto tensor = input->type()->cast<c10::TensorType>();
     ERROR_ON(!tensor);
     ERROR_ON(!tensor->scalarType());
 
@@ -88,12 +88,9 @@ bool allInputsInteger(torch::jit::Node *node, int ignore_input) {
 }
 
 std::vector<torch::jit::Value *> handleTensorList(torch::jit::Node *node) {
-  std::vector<torch::jit::Value *> result;
-  // Just convert the node->inputs array ref to vector and return it.
-  for (torch::jit::Value *value : node->inputs()) {
-    result.push_back(value);
-  }
-  return result;
+  const auto inputs = node->inputs();
+  // // Just convert the node->inputs array ref to vector and return it.
+  return std::vector<torch::jit::Value *>(inputs.cbegin(), inputs.cend());
 }
 
 // Add a vector of ints to the IR as a constant.
@@ -124,7 +121,7 @@ at::ScalarType getNodeScalarType(const torch::jit::Value *tensor) {
 }
 
 bool hasUnityValue(torch::jit::Value *value) {
-  auto tensor = getNodeTensorAttrValue(value->node());
+  const auto tensor = getNodeTensorAttrValue(value->node());
   if (tensor.numel() != 1) {
     return false;
   }
@@ -136,7 +133,7 @@ bool isNone(torch::jit::Node *node) {
     return false;
   }
 
-  auto sym = c10::attr::value;
+  const auto sym = c10::attr::value;
   return !node->hasAttribute(sym);
 }
 
@@ -164,14 +161,16 @@ bool isAnyConstant(torch::jit::Node *node) {
 }
 
 bool isFloatingPointConstant(torch::jit::Node *node) {
-  auto tensor_type = node->output()->type()->cast<c10::TensorType>();
+  const auto tensor_type = node->output()->type()->cast<c10::TensorType>();
   if (tensor_type) {
-    auto scalar_type = *tensor_type->scalarType();
+    const auto scalar_type = *tensor_type->scalarType();
     return c10::isFloatingType(scalar_type);
   }
 
   ERROR_ON(!node->output()->type()->isSubtypeOf(c10::NumberType::get()));
-  return torch::jit::constant_as<at::Scalar>(node->output())->isFloatingPoint();
+  return torch::jit::constant_as<at::Scalar>(node->output())
+      .value()
+      .isFloatingPoint();
 }
 
 bool isTensorConstant(torch::jit::Node *node) {
@@ -200,8 +199,8 @@ float constantToFloat(torch::jit::Node *node) {
   }
 
   ERROR_ON(!node->output()->type()->isSubtypeOf(c10::NumberType::get()));
-  auto s = torch::jit::constant_as<at::Scalar>(node->output());
-  return s->toFloat();
+  const auto s = torch::jit::constant_as<at::Scalar>(node->output());
+  return s.value().toFloat();
 }
 
 torch::jit::Node *constantToLongConstant(torch::jit::Node *node) {
@@ -228,8 +227,8 @@ std::int32_t constantToInt(torch::jit::Node *node) {
   }
 
   ERROR_ON(!node->output()->type()->isSubtypeOf(c10::NumberType::get()));
-  auto s = torch::jit::constant_as<at::Scalar>(node->output());
-  return s->toInt();
+  const auto s = torch::jit::constant_as<at::Scalar>(node->output());
+  return s.value().toInt();
 }
 
 std::int64_t constantToLong(torch::jit::Node *node) {
@@ -243,14 +242,10 @@ std::int64_t constantToLong(torch::jit::Node *node) {
         .item<std::int64_t>();
   }
   ERROR_ON(!node->output()->type()->isSubtypeOf(c10::NumberType::get()));
-  auto s = torch::jit::constant_as<at::Scalar>(node->output());
-  std::int64_t const val = s->toLong();
+  const auto s = torch::jit::constant_as<at::Scalar>(node->output());
+  const std::int64_t val = s.value().toLong();
 
-  if (val == INT_MAX) {
-    return LONG_MAX;
-  }
-
-  return val;
+  return val == INT_MAX ? LONG_MAX : val;
 }
 
 std::vector<std::int64_t> constantToLongVec(torch::jit::Node *node) {
@@ -275,7 +270,7 @@ std::string constantToString(torch::jit::Node *node) {
   auto &&t = getNodeTensorAttrValue(node);
   ERROR_ON(!t.is_contiguous());
 
-  auto length = t.sizes().at(0);
+  const auto length = t.sizes().at(0);
   std::string s(reinterpret_cast<char *>(t.data_ptr()), length);
   return s;
 }
@@ -344,8 +339,7 @@ reduceHelperDimensionCreator(torch::jit::Value *value) {
   c10::VaryingShape const dims = as_tensor->sizes();
 
   // Convert that IR type into a C++ vector of ints.
-  std::vector<std::int64_t> shape;
-  shape.resize(dims.sizes()->size());
+  std::vector<std::int64_t> shape(dims.sizes()->size());
   // Fill the vector with sequentially incrementing values.
   std::iota(shape.begin(), shape.end(), 0);
 
@@ -358,7 +352,7 @@ bool attributeEqual(torch::jit::Node *a, torch::jit::Node *b,
     return false;
   }
 
-  auto attr_kind = a->kindOf(attr);
+  const auto attr_kind = a->kindOf(attr);
   if (b->kindOf(attr) != attr_kind) {
     return false;
   }
@@ -382,9 +376,9 @@ bool attributeEqual(torch::jit::Node *a, torch::jit::Node *b,
     if (a->ts(attr).size() != b->ts(attr).size()) {
       return false;
     }
-    auto a_it = a->ts(attr).begin();
-    auto b_it = b->ts(attr).begin();
-    for (; a_it != a->ts(attr).end(); a_it++, b_it++) {
+    auto a_it = a->ts(attr).cbegin();
+    auto b_it = b->ts(attr).cbegin();
+    for (; a_it != a->ts(attr).cend(); a_it++, b_it++) {
       if (!a_it->equal(*b_it)) {
         return false;
       }
@@ -408,6 +402,16 @@ bool attributeEqual(torch::jit::Node *a, torch::jit::Node *b,
   }
 
   ERROR("Invalid type in attributeSame.");
+}
+
+torch::jit::Value *castToPromoteType(torch::jit::Graph *graph,
+                                     torch::jit::Value *tensor,
+                                     c10::ScalarType promoteType) {
+  if (getNodeScalarType(tensor) != promoteType) {
+    return createCast(graph, tensor, promoteType)->output();
+  }
+
+  return tensor;
 }
 
 } // namespace poptorch

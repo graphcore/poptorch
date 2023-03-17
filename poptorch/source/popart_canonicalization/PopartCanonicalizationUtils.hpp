@@ -145,6 +145,40 @@ void replaceOutputUse(torch::jit::Node *oldNode, torch::jit::Node *new_node,
 bool attributeEqual(torch::jit::Node *a, torch::jit::Node *b,
                     c10::Symbol attrb);
 
+template <typename... Tail>
+c10::ScalarType promoteTypes(const c10::ScalarType &a, const c10::ScalarType &b,
+                             Tail &&...tail) {
+  if constexpr (sizeof...(tail) == 0) {
+    return c10::promoteTypes(a, b);
+  } else {
+    return promoteTypes(promoteTypes(a, b), std::forward<Tail>(tail)...);
+  }
+}
+
+template <typename... Tail>
+c10::ScalarType promoteTypes(const torch::jit::Value *a,
+                             const torch::jit::Value *b, Tail &&...tail) {
+  return promoteTypes(getNodeScalarType(a), getNodeScalarType(b),
+                      getNodeScalarType(std::forward<Tail>(tail))...);
+}
+
+torch::jit::Value *castToPromoteType(torch::jit::Graph *graph,
+                                     torch::jit::Value *tensor,
+                                     c10::ScalarType promoteType);
+
+template <typename... Tail>
+std::vector<torch::jit::Value *>
+promoteTensors(torch::jit::Graph *graph, torch::jit::Value *tensor_a,
+               torch::jit::Value *tensor_b, Tail &&...tail) {
+
+  const c10::ScalarType promote_type =
+      promoteTypes(tensor_a, tensor_b, std::forward<Tail>(tail)...);
+
+  return {castToPromoteType(graph, tensor_a, promote_type),
+          castToPromoteType(graph, tensor_b, promote_type),
+          castToPromoteType(graph, std::forward<Tail>(tail), promote_type)...};
+}
+
 } // namespace poptorch
 
 #endif // SOURCE_POPART_CANONICALIZATION_UTILS_H

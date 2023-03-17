@@ -4,6 +4,11 @@ TORCH_LIBRARY_IMPL(aten, IPU, m) {
   // These ops otherwise require direct access to the storage of an
   // `IpuTensorImpl`, so we must implement them ourselves.
   m.impl("alias", PTC_BOXED(poptorch::fallback));
+
+  m.impl("bucketize.Tensor", PTC_BOXED(poptorch::fallback));
+  m.impl("bucketize.Tensor_out", PTC_BOXED(poptorch::fallback));
+  m.impl("bucketize.Scalar", PTC_BOXED(poptorch::fallback));
+
   m.impl("copy_", PTC_BOXED(poptorch::copyInplace));
   m.impl("detach", PTC_BOXED(poptorch::detach));
   m.impl("_local_scalar_dense", PTC(poptorch::localScalarDense));

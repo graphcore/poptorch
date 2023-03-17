@@ -55,6 +55,7 @@ With a PopTorch model, you may take a slice of a tensor only if one of two condi
 
 PyTorch functions
 
+* ``torch.bucketize``
 * ``torch.cat``
 * ``torch.chunk``
 * ``torch.gather``

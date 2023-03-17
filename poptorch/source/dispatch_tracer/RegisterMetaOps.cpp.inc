@@ -36,6 +36,18 @@ at::Tensor ctcLoss(const at::Tensor &log_probs, const at::Tensor &/*targets*/,
   return at::meta::empty(shape, log_probs.scalar_type());
 }
 
+TORCH_API at::Tensor bucketize(const at::Tensor & self, const at::Tensor &, bool out_int32=false, bool right=false) {
+  UNUSED(right);
+  UNUSED(out_int32);
+
+  const auto input_shape = self.sizes().vec();
+  return at::meta::empty(input_shape, out_int32 ? c10::ScalarType::Int : c10::ScalarType::Long);
+}
+
+TORCH_API at::Tensor & bucketizeOut(const at::Tensor & , const at::Tensor & , bool , bool , at::Tensor & out) {
+  return out;
+}
+
 at::Tensor ctcLossTensor(const at::Tensor &log_probs, const at::Tensor &/*targets*/,
                             const at::Tensor &/*input_lengths*/, const at::Tensor &/*target_lengths*/,
                             int64_t /*blank*/, int64_t reduction, bool /*zero_infinity*/) {
@@ -272,8 +284,9 @@ void opReturningFirstArgument(const c10::OperatorHandle &/*op*/, c10::Stack *sta
 } // namespace poptorch::meta
 
 TORCH_LIBRARY_IMPL(aten, Meta, m) {
+  m.impl("bucketize.Tensor", PTC(poptorch::meta::bucketize));
+  m.impl("bucketize.Tensor_out", PTC(poptorch::meta::bucketizeOut));
   m.impl("rrelu_with_noise", PTC_BOXED(poptorch::meta::opReturningFirstArgument));
-
   m.impl("count_nonzero.dim_IntList", PTC(poptorch::meta::countNonzero));
   m.impl("ctc_loss.Tensor", PTC(poptorch::meta::ctcLossTensor));
   m.impl("ctc_loss.IntList", PTC(poptorch::meta::ctcLoss));
@@ -365,7 +378,11 @@ TORCH_LIBRARY_IMPL(aten, AutogradMeta, m) {
   m.impl("ctc_loss.IntList", torch::autograd::autogradNotImplementedFallback());
   m.impl("max_pool3d", torch::autograd::autogradNotImplementedFallback());
   m.impl("one_hot", torch::autograd::autogradNotImplementedFallback());
+  m.impl("bucketize.Tensor", torch::autograd::autogradNotImplementedFallback());
+  m.impl("bucketize.Tensor_out", torch::autograd::autogradNotImplementedFallback());
+  m.impl("bucketize.Scalar", torch::autograd::autogradNotImplementedFallback());
 }
+
 TORCH_LIBRARY_IMPL(torch_scatter, AutogradMeta, m) {
   m.impl("scatter_max", torch::autograd::autogradNotImplementedFallback());
   m.impl("scatter_min", torch::autograd::autogradNotImplementedFallback());
