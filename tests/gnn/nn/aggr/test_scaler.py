@@ -12,8 +12,6 @@ from aggr_utils import aggr_harness
                           ['linear'], ['inverse_linear']])
 @pytest.mark.parametrize('train_norm', [True, False])
 def test_degree_scaler_aggregation(dataloader, scaler, train_norm):
-    if scaler[0] == 'attenuation':
-        pytest.skip("TODO(AFS-180)")
 
     first_sample = next(iter(dataloader))
     in_channels = first_sample.num_node_features
