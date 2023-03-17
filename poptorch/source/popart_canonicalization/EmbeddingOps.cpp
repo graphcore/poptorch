@@ -1,4 +1,7 @@
 // Copyright (c) 2020 Graphcore Ltd. All rights reserved.
+#include <spdlog/fmt/fmt.h>
+#include <spdlog/fmt/ostr.h>
+
 #include "../PoptorchStaticInit.hpp"
 #include "../PoptorchSymbols.hpp"
 #include "PopartCanonicalizationUtils.hpp"
@@ -26,22 +29,21 @@ torch::jit::Node *embeddingHandler(torch::jit::Graph *graph,
 
   auto *weight = node->input(0);
   auto *indices = node->input(1);
-  auto padding_idx = constantToLong(node->input(2)->node());
+  const auto padding_idx = constantToLong(node->input(2)->node());
 
   if (padding_idx < 0) {
     // Default: padding_idx == -1 indicates no padding.
     return createGather(graph, {node->input(0), node->input(1)}, 0);
   }
 
-  std::stringstream ss;
-  ss << "{\"padding_idx\":" << std::to_string(padding_idx) << "}";
+  const std::string msg = fmt::format("{{\"padding_idx\":{}}}", padding_idx);
 
   auto *out = createCustomOperation(graph, {weight, indices}, "Embedding",
-                                    "poptorch.custom_ops", 1, 1, ss.str());
+                                    "poptorch.custom_ops", 1, 1, msg);
 
-  auto input_type = getNodeScalarType(weight);
-  auto out_type = c10::TensorType::create(input_type, c10::nullopt,
-                                          c10::nullopt, c10::nullopt);
+  const auto input_type = getNodeScalarType(weight);
+  const auto out_type = c10::TensorType::create(input_type, c10::nullopt,
+                                                c10::nullopt, c10::nullopt);
   out->output(0)->setType(out_type);
   return out;
 }
@@ -60,7 +62,7 @@ torch::jit::Node *embeddingBagHandler(torch::jit::Graph *graph,
                "Unsupported aten::embedding_bag operation");
 
   if (!isNone(padding_idx)) {
-    auto padding_idx_val = constantToInt(node->input(8)->node());
+    const auto padding_idx_val = constantToInt(node->input(8)->node());
     ERROR_ON_MSG(padding_idx_val >= 0,
                  "Unsupported aten::embedding_bag operation: padding_idx "
                  "parameter is unsupported.");
@@ -79,7 +81,7 @@ torch::jit::Node *embeddingBagHandler(torch::jit::Graph *graph,
   auto *per_sample_weights = node->input(6);
   const bool include_last_offset = constantToBool(node->input(7)->node());
 
-  auto reduction = [mode](torch::jit::Graph *g, torch::jit::Value *v) {
+  const auto reduction = [mode](torch::jit::Graph *g, torch::jit::Value *v) {
     if (mode == 0) {
       return createReducesum(g, {v}, {0}, 1)->output();
     }
@@ -99,7 +101,7 @@ torch::jit::Node *embeddingBagHandler(torch::jit::Graph *graph,
     offsets_tensor = at::cat({offsets_tensor, at::tensor(INT_MAX)});
   }
 
-  auto slices = offsets_tensor.accessor<int32_t, 1>();
+  const auto slices = offsets_tensor.accessor<int32_t, 1>();
   torch::jit::value_list values;
 
   // Use the offsets to extract each bag from the indices.

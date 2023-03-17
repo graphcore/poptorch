@@ -1,4 +1,7 @@
 // Copyright (c) 2020 Graphcore Ltd. All rights reserved.
+#include <spdlog/fmt/fmt.h>
+#include <spdlog/fmt/ostr.h>
+
 #include "../PoptorchStaticInit.hpp"
 #include "PopartCanonicalizationUtils.hpp"
 
@@ -11,7 +14,7 @@ namespace poptorch {
 namespace {
 torch::jit::Node *poolingHandler(torch::jit::Graph *graph,
                                  torch::jit::Node *node) {
-  torch::jit::Symbol kind = node->kind();
+  const torch::jit::Symbol kind = node->kind();
 
   // aten::max_pool2d(Tensor self, int[] kernel_size, int[] stride, int[]
   // padding, int[] dilation, bool ceil_mode) -> Tensor
@@ -25,8 +28,8 @@ torch::jit::Node *poolingHandler(torch::jit::Graph *graph,
   // ceil_mode=False) -> (Tensor, Tensor)
 
   torch::jit::Value *x = node->input(0);
-  auto kernel_size = constantToLongVec(node->input(1)->node());
-  auto stride = constantToLongVec(node->input(2)->node());
+  const auto kernel_size = constantToLongVec(node->input(1)->node());
+  const auto stride = constantToLongVec(node->input(2)->node());
   auto padding = constantToLongVec(node->input(3)->node());
   auto shape = shapeFromTensor(x);
   bool reshape_after = false;
@@ -44,7 +47,7 @@ torch::jit::Node *poolingHandler(torch::jit::Graph *graph,
 
   // If we reshape, the output shape will be (1, C, *out) but torch expects
   // (C, *out)
-  auto maybe_reshape_output = [&](torch::jit::Node *output) {
+  const auto maybe_reshape_output = [&](torch::jit::Node *output) {
     if (reshape_after) {
       return createReshape(graph, output->output(),
                            shapeFromTensor(node->output()));
@@ -70,8 +73,8 @@ torch::jit::Node *poolingHandler(torch::jit::Graph *graph,
                            kind == c10::aten::max_pool3d_with_indices;
 
   if (is_max_pool) {
-    auto dilations = constantToLongVec(node->input(4)->node());
-    auto ceil_mode = constantToLong(node->input(5)->node());
+    const auto dilations = constantToLongVec(node->input(4)->node());
+    const auto ceil_mode = constantToLong(node->input(5)->node());
 
     auto *output = createMaxpool(graph, {x}, 1, kernel_size, ceil_mode,
                                  dilations, padding, 0, stride);
@@ -80,9 +83,9 @@ torch::jit::Node *poolingHandler(torch::jit::Graph *graph,
 
   // divisor_override is ignored for now due to not being supported directly in
   // popart.
-  auto ceil_mode = constantToLong(node->input(4)->node());
+  const auto ceil_mode = constantToLong(node->input(4)->node());
 
-  bool count_include_pad = constantToBool(node->input(5)->node());
+  const bool count_include_pad = constantToBool(node->input(5)->node());
   // count_include_pad isn't supported in PopART so we check and pad manually if
   // the average pool is supposed to include the padding in its average.
   if (count_include_pad) {
@@ -92,7 +95,7 @@ torch::jit::Node *poolingHandler(torch::jit::Graph *graph,
   }
 
   // popart only supports float types for avgpool
-  auto input_type = getNodeScalarType(x);
+  const auto input_type = getNodeScalarType(x);
 
   if (input_type == c10::kFloat) {
     auto *output = createAveragepool(graph, {x}, kernel_size, ceil_mode, 0,
@@ -115,36 +118,34 @@ torch::jit::Node *adaptivePoolingHandler(torch::jit::Graph *graph,
   // aten::adaptive_avg_pool3d(Tensor self, int[] output_size) -> Tensor
 
   torch::jit::Value *x = node->input(0);
-  std::vector<std::int64_t> output_shape =
+  const std::vector<std::int64_t> output_shape =
       constantToLongVec(node->input(1)->node());
-  std::size_t n_output_dims = output_shape.size();
+  const std::size_t n_output_dims = output_shape.size();
 
-  std::vector<std::int64_t> input_shape = shapeFromTensor(x);
-  std::size_t input_offset = input_shape.size() - n_output_dims;
+  const std::vector<std::int64_t> input_shape = shapeFromTensor(x);
+  const std::size_t input_offset = input_shape.size() - n_output_dims;
 
   std::vector<std::int64_t> stride(n_output_dims);
   std::vector<std::int64_t> kernel_shape(n_output_dims);
   for (std::size_t i = 0; i < n_output_dims; i++) {
-    std::int64_t in_dim = input_shape[input_offset + i];
-    std::int64_t out_dim = output_shape[i];
+    const std::int64_t in_dim = input_shape[input_offset + i];
+    const std::int64_t out_dim = output_shape[i];
     // This matches PyTorch's implementation as long as each input dim is
     // divisible by the corresponding output dim. If this is not the case, the
     // shape will be correct but the output will differ.
     if (in_dim % out_dim != 0) {
-      std::stringstream ss;
-      ss << "Input dim " << i << " (" << in_dim
-         << ") is not divisible by the "
-            "corresponding output dim ("
-         << out_dim
-         << "). The results will differ "
-            "numerically from PyTorch's implementation.";
-      ERROR(ss.str());
+      const auto msg =
+          fmt::format("Input dim {} ({}) is not divisible by the corresponding "
+                      "output dim ({}). The results will differ numerically "
+                      "from PyTorch's implementation.",
+                      i, in_dim, out_dim);
+      ERROR(msg);
     }
     stride[i] = in_dim / out_dim;
     kernel_shape[i] = in_dim - (out_dim - 1) * stride[i];
   }
 
-  std::vector<std::int64_t> padding(n_output_dims * 2, 0);
+  const std::vector<std::int64_t> padding(n_output_dims * 2, 0);
   return createAveragepool(graph, {x}, kernel_shape, 0, 0, padding, stride);
 }
 

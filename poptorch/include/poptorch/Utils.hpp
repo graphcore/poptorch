@@ -71,11 +71,7 @@ public:
 
   size_t numElements() const { return _num_elements; }
 
-  std::string str() const override {
-    std::stringstream ss;
-    ss << "TensorList[" << _num_elements << "]";
-    return ss.str();
-  }
+  std::string str() const override;
 
   c10::ListTypePtr getOriginalListType() const {
     return c10::ListType::create(getElementType());

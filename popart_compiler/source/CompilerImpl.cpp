@@ -4,6 +4,9 @@
 #include <numeric>
 #include <vector>
 
+#include <spdlog/fmt/fmt.h>
+#include <spdlog/fmt/ostr.h>
+
 #include <popart/adam.hpp>
 #include <popart/adaptive.hpp>
 #include <popart/builder.hpp>
@@ -212,7 +215,7 @@ OptimizerParameters::OptimizerParameters(const Optimizer &opt, bool is_default)
   for (const auto &p : opt.parameters) {
     const std::string name = reinterpret_cast<const char *>(p.name);
     provided_names.push_back(name);
-    auto idx = indexOf(poptorch_names, name);
+    const auto idx = indexOf(poptorch_names, name);
     ERROR_ON_MSG(idx < 0,
                  "Unexpected "
                      << (is_default ? "" : "group ") << "attribute " << name
@@ -449,10 +452,9 @@ std::string CompilerImpl::checkSystemConfig() const {
     return "";
   }
   if (dm.enumerateDevices(options.sync_pattern, num_ipus).empty()) {
-    std::stringstream ss;
-    ss << "\nNo device found on the system with " << num_ipus
-       << " IPUs: the configuration needs changing";
-    return ss.str();
+    return fmt::format("\nNo device found on the system with {} IPUs: the "
+                       "configuration needs changing",
+                       num_ipus);
   }
   return "";
 }
@@ -581,8 +583,7 @@ CompilerImpl::tensorConstant(const std::vector<popart::TensorId> &tensors,
 
   // Reuse a tensor if an identical one exists already
   if (current_cache.count(constant.getPopartData()) != 0u) {
-    auto tensor = current_cache[constant.getPopartData()];
-    return tensor;
+    return current_cache[constant.getPopartData()];
   }
 
   // To preserve memory, use a clone of the data
@@ -630,7 +631,7 @@ CompilerImpl::createDevice(bool must_attach) {
 
   // Sometimes phased execution doesn't use all of the IPUs in a range, so check
   // the Ids too.
-  auto max_ipu_id = *std::max_element(used_ipus.begin(), used_ipus.end());
+  const auto max_ipu_id = *std::max_element(used_ipus.begin(), used_ipus.end());
   num_ipus = std::max(used_ipus.size(), max_ipu_id + 1) *
              popart_options.replicatedGraphCount;
   ERROR_ON_MSG(num_ipus == 0, "Your compiled model is empty (All the "
@@ -690,7 +691,7 @@ CompilerImpl::createDevice(bool must_attach) {
       ERROR_ON_MSG(!_device, "Failed to create offline IPU device");
     } else {
       // Round up number of ipus to a power of 2.
-      auto rounded_num_ipus = roundUpNumIPUs(num_ipus);
+      const auto rounded_num_ipus = roundUpNumIPUs(num_ipus);
 
       if (rounded_num_ipus != num_ipus) {
         std::string const common_msg(
@@ -928,7 +929,7 @@ CompilerImpl::randomNormal(const std::vector<popart::TensorId> &tensors,
                            float scale, const std::string &dtype) {
   UNUSED(tensors);
   auto ai_onnx = active_builder->aiOnnxOpset10();
-  auto pdt = popart::dataTypeFromString(dtype);
+  const auto pdt = popart::dataTypeFromString(dtype);
   return ai_onnx.randomnormal(shape, popart::getONNXDataTypeAsInt(pdt), mean,
                               scale, nonstd::optional<float>(),
                               getDebugContext("Randomnormal"));
@@ -940,7 +941,7 @@ CompilerImpl::randomUniform(const std::vector<popart::TensorId> &tensors,
                             float low, const std::string &dtype) {
   UNUSED(tensors);
   auto ai_onnx = active_builder->aiOnnxOpset10();
-  auto pdt = popart::dataTypeFromString(dtype);
+  const auto pdt = popart::dataTypeFromString(dtype);
   return ai_onnx.randomuniform(shape, popart::getONNXDataTypeAsInt(pdt), high,
                                low, nonstd::optional<float>(),
                                getDebugContext("Randomuniform"));
@@ -1255,7 +1256,7 @@ PopartType CompilerImpl::getPopartType(TensorId id) const {
   }
 
   popart::DataType dtype;
-  auto popart_id = ids[id];
+  const auto popart_id = ids[id];
   if (!session) {
     if (!active_builder->hasValueInfo(popart_id)) {
       return PopartType::UNDEFINED;

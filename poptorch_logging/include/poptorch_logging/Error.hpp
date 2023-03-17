@@ -22,6 +22,8 @@ struct ErrorImpl;
 // /a/b/c/poptorch/d/e/f.cpp -> poptorch/d/e/f.cpp
 const char *shortPoptorchFilename(const char *filename);
 
+#define UNLIKELY(var) __builtin_expect(var, 0)
+
 #define UNUSED(var) (void)(var)
 
 #define ERROR(msg)                                                             \
@@ -34,7 +36,7 @@ const char *shortPoptorchFilename(const char *filename);
 
 #define ERROR_ON_MSG(condition, msg)                                           \
   do {                                                                         \
-    if (__builtin_expect(static_cast<bool>(condition), 0)) {                   \
+    if (UNLIKELY(static_cast<bool>(condition))) {                              \
       ERROR(msg);                                                              \
     }                                                                          \
   } while (0)

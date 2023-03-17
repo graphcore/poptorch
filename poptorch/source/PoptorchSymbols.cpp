@@ -1,6 +1,9 @@
 // Copyright (c) 2020 Graphcore Ltd. All rights reserved
-#include "PoptorchSymbols.hpp"
+#include <spdlog/fmt/fmt.h>
+#include <spdlog/fmt/ostr.h>
+
 #include "PoptorchStaticInit.hpp"
+#include "PoptorchSymbols.hpp"
 #include "poptorch_logging/Logging.hpp"
 
 #define SYMBOL_INIT(Namespace, Name)                                           \
@@ -158,9 +161,8 @@ static void initializePoptorchSymbols() {
 } // namespace symbols
 
 c10::Symbol getOverlapSymbol(const char *suffix, unsigned int num) {
-  std::stringstream overlap_ss;
-  overlap_ss << "poptorch_overlap_for_" << suffix << num;
-  return c10::Symbol::attr(overlap_ss.str());
+  return c10::Symbol::attr(
+      fmt::format("poptorch_overlap_for_{}{}", suffix, num));
 }
 
 } // namespace poptorch

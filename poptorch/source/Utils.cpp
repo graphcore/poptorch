@@ -1,6 +1,9 @@
 // Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 #include <torch/csrc/jit/ir/ir.h>
 
+#include <spdlog/fmt/fmt.h>
+#include <spdlog/fmt/ostr.h>
+
 #include <cstring>
 #include <sstream>
 #include <unordered_set>
@@ -401,6 +404,10 @@ getNodeTensorAttrValue(const torch::jit::Node *node) {
   const auto &ts = node->ts(c10::attr::value);
   ERROR_ON(ts.size() != 1);
   return ts.at(0);
+}
+
+std::string ListTypeWithNumElements::str() const {
+  return fmt::format("TensorList[{}]", _num_elements);
 }
 
 } // namespace poptorch

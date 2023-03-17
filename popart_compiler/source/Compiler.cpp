@@ -8,6 +8,9 @@
 #include <string>
 #include <thread>
 
+#include <spdlog/fmt/fmt.h>
+#include <spdlog/fmt/ostr.h>
+
 #include <popart/graphtransformer.hpp>
 #include <popart/ndarraywrapper.hpp>
 #include <popart/optimizer.hpp>
@@ -258,7 +261,7 @@ TensorId Compiler::addInputTensor(const char *type,
   const popart::TensorInfo info{type, dims};
   popart::InputSettings settings;
 
-  auto tile_set_and_strat = exchangeStrToPopartEnum(overlap);
+  const auto tile_set_and_strat = exchangeStrToPopartEnum(overlap);
   if (tile_set_and_strat.second != popart::ExchangeStrategy::JustInTime) {
     _impl->using_overlapped_io = true;
   }
@@ -266,7 +269,7 @@ TensorId Compiler::addInputTensor(const char *type,
   settings.setTileSet(tile_set_and_strat.first);
   settings.setExchangeStrategy(tile_set_and_strat.second);
 
-  auto popart_id = _impl->active_builder->addInputTensor(info, settings);
+  const auto popart_id = _impl->active_builder->addInputTensor(info, settings);
   _impl->inputs.push_back(popart_id);
   _impl->ids.push_back(popart_id);
   return _impl->ids.size() - 1;
@@ -549,7 +552,7 @@ void Compiler::initSession(const std::vector<Optimizer> &optimizers,
     return;
   }
 
-  auto device = _impl->createDevice();
+  const auto device = _impl->createDevice();
   popart::SessionOptions &options = _impl->popart_options;
 
   if (options.engineOptions.count("debug.retainDebugInformation") == 0) {
@@ -677,32 +680,31 @@ void Compiler::initSession(const std::vector<Optimizer> &optimizers,
   _impl->setOptionIfNotSet(options.constantWeights, false, "constantWeights");
 
   if (_impl->options.execution_mode == detail::ExecutionMode::Pipelined) {
-    auto num_pipeline_stages = _impl->numPipelineStages();
+    const auto num_pipeline_stages = _impl->numPipelineStages();
 
     if (_impl->is_training) {
-      auto num_forward_stages = (num_pipeline_stages + 1) / 2;
-      auto num_backward_stages = (num_pipeline_stages - 1) / 2;
+      const auto num_forward_stages = (num_pipeline_stages + 1) / 2;
+      const auto num_backward_stages = (num_pipeline_stages - 1) / 2;
 
-      std::stringstream err_msg;
-      err_msg << "poptorch.Options().Training.gradientAccumulation must be "
-              << "greater than or equal to the number of pipeline stages ("
-              << num_pipeline_stages << ") when using "
-              << "poptorch.PipelinedExecution. Please note that a model with "
-              << num_forward_stages << " pipeline stages in PopTorch will have "
-              << "an additional " << num_backward_stages << " stages when "
-              << "training.";
+      const std::string err_msg = fmt::format(
+          "poptorch.Options().Training.gradientAccumulation must be greater "
+          "than or equal to the number of pipeline stages ({}) when using "
+          "poptorch.PipelinedExecution. Please note that a model with {} "
+          "pipeline stages in PopTorch will have an additional {} stages when "
+          "training.",
+          num_pipeline_stages, num_forward_stages, num_backward_stages);
 
       ERROR_ON_MSG(_impl->popart_options.accumulationFactor <
                        static_cast<int64_t>(num_pipeline_stages),
-                   err_msg.str());
+                   err_msg);
     } else {
-      std::stringstream err_msg;
-      err_msg << "poptorch.Options().deviceIterations must be greater than or "
-              << "equal to the number of pipeline stages ("
-              << num_pipeline_stages << ") when using "
-              << "PopTorch.PipelinedExecution.";
+      const std::string err_msg =
+          fmt::format("poptorch.Options().deviceIterations must be greater "
+                      "than or equal to the number of pipeline stages ({}) "
+                      "when using PopTorch.PipelinedExecution.",
+                      num_pipeline_stages);
 
-      ERROR_ON_MSG(_impl->options.steps < num_pipeline_stages, err_msg.str());
+      ERROR_ON_MSG(_impl->options.steps < num_pipeline_stages, err_msg);
     }
   }
 
@@ -727,7 +729,7 @@ void Compiler::initSession(const std::vector<Optimizer> &optimizers,
   }
 
   // Create the anchors, these are used to copy to the host.
-  auto data_flow = popart::DataFlow(_impl->options.steps, _impl->anchors);
+  const auto data_flow = popart::DataFlow(_impl->options.steps, _impl->anchors);
 
   // Save the initializers to an external file if requested.
   if (!_impl->options.external_initializers_file.empty()) {
@@ -740,7 +742,7 @@ void Compiler::initSession(const std::vector<Optimizer> &optimizers,
         _impl->options.external_initializers_file);
   }
 
-  auto model_name_set = _impl->options_set.count("model_name") > 0;
+  const auto model_name_set = _impl->options_set.count("model_name") > 0;
 
   // Tensor location in PopART includes a shardingDomain option which sets
   // which replicas to shard tensors across when using replicated tensor
@@ -879,7 +881,7 @@ void Compiler::loadEngineAndConnectStreams() {
   for (detail::CallbackInternalMetadata &cb_data : _impl->callbacks) {
     // For each input we create a special callback which tracks how many inputs
     // have been added and once they're all in it calls back into python.
-    auto to_size_bytes = [&](const auto &shape, const auto &type) {
+    const auto to_size_bytes = [&](const auto &shape, const auto &type) {
       const poplar::Type ptype =
           poptorch::popart_compiler::poplarTypeFromPoptorch(type);
 
@@ -904,7 +906,7 @@ void Compiler::loadEngineAndConnectStreams() {
                    cb_data.output_types.begin(), output_sizes.begin(),
                    to_size_bytes);
 
-    auto poplar_callback =
+    const auto poplar_callback =
         [input_sizes = std::move(input_sizes),
          output_sizes = std::move(output_sizes),
          &cb_data](const void *const *inputs, size_t number_of_inputs,
@@ -1016,27 +1018,26 @@ void Compiler::compileAndPrepareDevice() {
 }
 
 std::unique_ptr<char[]> Compiler::getExecutionInfo() const {
-  std::stringstream info;
+  std::string as_string;
   switch (_impl->options.execution_mode) {
   case detail::ExecutionMode::Pipelined: {
-    info << " mode(Pipelined), ipu(" << _impl->active_ipu << "), stage("
-         << _impl->active_stage << ")";
+    as_string = fmt::format(" mode(Pipelined), ipu({}), stage({})",
+                            _impl->active_ipu, _impl->active_stage);
     break;
   }
   case detail::ExecutionMode::Sharded: {
-    info << " mode(Sharded), ipu(" << _impl->active_ipu << "), stage("
-         << _impl->active_stage << ")";
+    as_string = fmt::format(" mode(Sharded), ipu({}), stage({})",
+                            _impl->active_ipu, _impl->active_stage);
     break;
   }
   case detail::ExecutionMode::Phased: {
-    info << " mode(Phased), ipu(" << _impl->active_ipu << "), phase("
-         << _impl->active_phase << ")";
+    as_string = fmt::format(" mode(Phased), ipu({}), phase({})",
+                            _impl->active_ipu, _impl->active_phase);
     break;
   }
   default:
     ERROR("Invalid ExecutionMode active");
   }
-  const std::string as_string = info.str();
 
   // Copy into a memory managed array to get around ABI.
   return stringToUniquePtr(as_string);
@@ -1470,7 +1471,8 @@ TensorId Compiler::endForLoop(std::int32_t trip_count, std::int64_t num_outputs,
   _impl->active_builder = _impl->active_builder->getParent();
   auto ai_onnx = _impl->active_builder->aiOnnxOpset10();
 
-  popart::ConstVoidData trip_count_data(&trip_count, {"INT32", popart::Shape{}});
+  popart::ConstVoidData trip_count_data(&trip_count,
+                                        {"INT32", popart::Shape{}});
   popart::ConstVoidData the_data;
 
   const bool true_const = true;
@@ -1662,8 +1664,8 @@ bool Compiler::isAttachedToDevice() const {
 }
 
 Timestamps Compiler::getTimestamps() const {
-  auto num_inputs = getNumInputs();
-  auto num_outputs = getNumOutputs();
+  const auto num_inputs = getNumInputs();
+  const auto num_outputs = getNumOutputs();
 
   Timestamps ts;
   ts.input.reserve(num_inputs);
@@ -1672,12 +1674,12 @@ Timestamps Compiler::getTimestamps() const {
   ts.output_complete.reserve(num_outputs);
 
   for (size_t i = 0; i < num_inputs; i++) {
-    auto id = _impl->inputs[i];
+    const auto id = _impl->inputs[i];
     ts.input.push_back(_impl->stepio.getInputTimestamps(id));
     ts.input_complete.push_back(_impl->stepio.getInputCompleteTimestamps(id));
   }
   for (size_t i = 0; i < num_outputs; i++) {
-    auto id = _impl->outputs[i];
+    const auto id = _impl->outputs[i];
     ts.output.push_back(_impl->stepio.getOutputTimestamps(id));
     ts.output_complete.push_back(_impl->stepio.getOutputCompleteTimestamps(id));
   }

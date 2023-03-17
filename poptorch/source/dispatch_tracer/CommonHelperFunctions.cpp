@@ -1,6 +1,9 @@
 // Copyright (c) 2021 Graphcore Ltd. All rights reserved.
 #include "CommonHelperFunctions.hpp"
 
+#include <spdlog/fmt/fmt.h>
+#include <spdlog/fmt/ostr.h>
+
 #include <ATen/core/function_schema.h>
 #include <ATen/core/interned_strings.h>
 #include <c10/core/TensorImpl.h>
@@ -177,8 +180,8 @@ at::ScalarType scalarTypeOrDefault(c10::optional<at::ScalarType> dtype) {
 
 at::Tensor copyAndCoerceType(const at::Tensor &tensor) {
   at::Tensor const copy;
-  auto scalar_type = tensor.scalar_type();
-  auto coerced_scalar_type = coerceToSupportedType(scalar_type);
+  const auto scalar_type = tensor.scalar_type();
+  const auto coerced_scalar_type = coerceToSupportedType(scalar_type);
   if (scalar_type != coerced_scalar_type) {
     static std::uint64_t log_repeat = 0;
     logging::warn(log_repeat,
@@ -202,10 +205,10 @@ std::vector<at::Tensor> getInplaceArguments(const c10::Stack &stack,
 
   for (std::size_t arg = 0; arg < schema.arguments().size(); ++arg) {
     const c10::Argument &argument = schema.arguments()[arg];
-    c10::IValue value = stack[arg];
+    const c10::IValue value = stack[arg];
 
     if (value.isTensor()) {
-      at::Tensor const tensor = value.toTensor();
+      at::Tensor const &tensor = value.toTensor();
 
       // Undefined tensors are optional tensors.
       if (!tensor.defined()) {
@@ -240,9 +243,7 @@ torch::jit::Node *lowerFromSchema(const c10::FunctionSchema &schema,
 }
 
 std::string toString(const at::Tensor &t) {
-  std::stringstream ss;
-  ss << "sizes=" << t.sizes() << ", type=" << t.scalar_type();
-  return ss.str();
+  return fmt::format("sizes={}, type={}", t.sizes(), t.scalar_type());
 }
 
 bool isHalfTensor(const at::Tensor &t) {
@@ -254,15 +255,13 @@ c10::Device deviceOrDefaultIpu(c10::optional<c10::Device> device) {
 }
 
 std::string getSchemaKey(const c10::FunctionSchema &schema) {
-  std::string schema_key;
   // Unfortunately we can't overload based only on the schema symbol as it does
   // not contain the overload info.
   if (schema.overload_name().empty()) {
-    schema_key = schema.name();
-  } else {
-    schema_key = schema.name() + "." + schema.overload_name();
+    return schema.name();
   }
-  return schema_key;
+
+  return schema.name() + "." + schema.overload_name();
 }
 
 } // namespace poptorch

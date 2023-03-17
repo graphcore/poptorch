@@ -255,9 +255,7 @@ public:
       return _value.cast<std::string>();
     }
     if (isInt()) {
-      std::stringstream ss;
-      ss << _value.cast<std::uint64_t>();
-      return ss.str();
+      return std::to_string(_value.cast<std::uint64_t>());
     }
     ERROR("Don't know how to convert type " << _value.get_type()
                                             << " to string");

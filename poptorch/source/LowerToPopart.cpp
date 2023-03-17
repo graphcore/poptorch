@@ -10,6 +10,9 @@
 #include <random>
 #include <utility>
 
+#include <spdlog/fmt/fmt.h>
+#include <spdlog/fmt/ostr.h>
+
 #include "PoptorchSymbols.hpp"
 #include "popart_compiler/Compiler.hpp"
 #include "popart_compiler/PopartEnums.hpp"
@@ -82,7 +85,7 @@ private:
 };
 
 popart_compiler::TensorId ValueMap::tensor(torch::jit::Value *value) const {
-  auto it = _map.find(value);
+  const auto it = _map.find(value);
   ERROR_ON_MSG(it == _map.end(), value->debugName()
                                      << " not found in ValueMap");
   ERROR_ON_MSG(it->second.type != popart_compiler::OutputElemType::Tensor,
@@ -93,7 +96,7 @@ popart_compiler::TensorId ValueMap::tensor(torch::jit::Value *value) const {
 
 const ValueMap::TensorList &
 ValueMap::listTuple(torch::jit::Value *value) const {
-  auto it = _map.find(value);
+  const auto it = _map.find(value);
   ERROR_ON_MSG(it == _map.end(), value->debugName()
                                      << " not found in ValueMap");
   ERROR_ON_MSG((it->second.type != popart_compiler::OutputElemType::Tuple &&
@@ -103,7 +106,7 @@ ValueMap::listTuple(torch::jit::Value *value) const {
 }
 
 const ValueMap::TensorList &ValueMap::tensors(torch::jit::Value *value) const {
-  auto it = _map.find(value);
+  const auto it = _map.find(value);
   ERROR_ON_MSG(it == _map.end(), value->debugName()
                                      << " not found in ValueMap");
   return it->second.tensors;
@@ -354,15 +357,15 @@ namespace {
 template <typename T>
 void maskVector(std::vector<T> *vec, const std::vector<bool> &mask,
                 size_t ignore_first = 0) {
-  auto predicate = [&mask, &vec, ignore_first](const T &val) {
-    auto idx = static_cast<std::size_t>(&val - &(*vec->begin()));
+  const auto predicate = [&mask, &vec, ignore_first](const T &val) {
+    const auto idx = static_cast<std::size_t>(&val - &(*vec->begin()));
     if (idx < ignore_first) {
       return false;
     }
     return !mask.at(idx - ignore_first);
   };
 
-  auto erase_begin = std::remove_if(vec->begin(), vec->end(), predicate);
+  const auto erase_begin = std::remove_if(vec->begin(), vec->end(), predicate);
   vec->erase(erase_begin, vec->end());
 }
 } // namespace
@@ -400,7 +403,7 @@ LowerToPopartImpl::loadExecutableFromFile(const std::string &input_filename) {
 
   std::vector<at::ScalarType> data_types;
   data_types.reserve(_output_tensor_hooks.size());
-  for (auto id : _output_tensor_hooks) {
+  for (const auto id : _output_tensor_hooks) {
     data_types.emplace_back(fromPopartType(_compiler.getPopartType(id)));
   }
 
@@ -454,7 +457,7 @@ void LowerToPopartImpl::lowerReturn() {
       break;
     }
     case c10::TypeKind::TupleType: {
-      auto tuple_type = type->expect<c10::TupleType>();
+      const auto tuple_type = type->expect<c10::TupleType>();
       _compiler.addOutputType(
           {popart_compiler::OutputElemType::Tuple,
            static_cast<std::int64_t>(tuple_type->elements().size())});
@@ -468,7 +471,7 @@ void LowerToPopartImpl::lowerReturn() {
       // tensors as enforced by torch JIT)
 
       // type->expect is static and always succeeds
-      auto list_type = type->cast<ListTypeWithNumElements>();
+      const auto list_type = type->cast<ListTypeWithNumElements>();
       ERROR_ON(!list_type);
 
       _compiler.addOutputType(
@@ -486,18 +489,18 @@ void LowerToPopartImpl::lowerReturn() {
   };
   logging::debug("  return (");
   for (torch::jit::Value *value : _graph.outputs()) {
-    auto tensors = _value_map.tensors(value);
-    std::ostringstream ss;
-    ss << "    output: %" << value->debugName() << " : " << *value->type()
-       << " ->";
-    logging::debug("{} {} [{}]", ss.str(), tensorNames(tensors),
+    const auto tensors = _value_map.tensors(value);
+    const auto msg = fmt::format("    output: %{} : {} ->", value->debugName(),
+                                 *value->type());
+
+    logging::debug("{} {} [{}]", msg, tensorNames(tensors),
                    tensorTypesAndShapes(tensors));
     if (value->type()->kind() == c10::TypeKind::ListType) {
       c10::TypeKind const elt_kind =
           value->type()->expect<c10::ListType>()->getElementType()->kind();
       ERROR_ON_MSG(elt_kind != c10::TypeKind::TensorType,
                    "Unsupported list type " << c10::typeKindToString(elt_kind));
-      std::int64_t const num_tensors =
+      const std::int64_t num_tensors =
           static_cast<std::int64_t>(tensors.size());
       _compiler.addOutputType(
           {popart_compiler::OutputElemType::List, num_tensors});
@@ -510,10 +513,10 @@ void LowerToPopartImpl::lowerReturn() {
     }
 
     uint64_t output_num = 0;
-    for (auto id : tensors) {
-      auto overlap_symbol = getOverlapSymbol("output", output_num);
+    for (const auto id : tensors) {
+      const auto overlap_symbol = getOverlapSymbol("output", output_num);
       ERROR_ON(!_graph.return_node()->hasAttribute(overlap_symbol));
-      auto overlap_str = _graph.return_node()->s(overlap_symbol);
+      const auto overlap_str = _graph.return_node()->s(overlap_symbol);
 
       _compiler.addOutputTensor(id, popart_compiler::PopartOutputMode::N, 1,
                                 overlap_str.c_str());
@@ -532,7 +535,7 @@ void LowerToPopartImpl::lowerReturn() {
     logging::debug("  anchor ( {} {}/{} )", name,
                    outputModeToString(output_mode), return_period);
 
-    auto id = _compiler.createTensorId(name);
+    const auto id = _compiler.createTensorId(name);
     _compiler.addOutputType({popart_compiler::OutputElemType::Tensor});
     _compiler.addOutputTensor(id);
     _output_tensor_hooks.push_back(id);
@@ -552,7 +555,7 @@ std::string
 LowerToPopartImpl::tensorNames(const ValueMap::TensorList &tensors) {
   std::string sep{};
   std::string names;
-  for (auto tensor : tensors) {
+  for (const auto tensor : tensors) {
     names += sep + _compiler.tensorName(tensor);
     sep = ", ";
   }
@@ -576,22 +579,22 @@ LowerToPopartImpl::tensorTypesAndShapes(const ValueMap::TensorList &tensors) {
 
   const char *shape_inf_failed = "(shape inference failed)";
 
-  for (auto tensor : tensors) {
+  for (const auto tensor : tensors) {
     std::ostringstream shape_str;
 
     try {
-      auto tensor_shape = _compiler.getSize(tensor);
+      const auto tensor_shape = _compiler.getSize(tensor);
 
-      auto dtype_chars = _compiler.getTensorDTypeString(tensor);
+      const auto dtype_chars = _compiler.getTensorDTypeString(tensor);
       shape_str << dtype_chars.get();
 
       if (tensor_shape == popart_compiler::Compiler::invalid_size) {
         shape_str << shape_inf_failed;
       } else {
         shape_str << "(";
-        for (auto it = tensor_shape.begin(); it != tensor_shape.end(); it++) {
+        for (auto it = tensor_shape.cbegin(); it != tensor_shape.cend(); it++) {
           shape_str << *it;
-          if (it + 1 != tensor_shape.end()) {
+          if (it + 1 != tensor_shape.cend()) {
             shape_str << ", ";
           }
         }
@@ -615,7 +618,7 @@ void LowerToPopartImpl::validateOutputShapeAndType(
 
   at::ScalarType const popart_type =
       fromPopartType(_compiler.getPopartType(output_tensor));
-  auto popart_size = _compiler.getSize(output_tensor);
+  const auto popart_size = _compiler.getSize(output_tensor);
   bool match = (popart_type == jit_output.scalar_type);
   // Only validate shape if PopART's shape inference worked.
   if (match && popart_size != popart_compiler::Compiler::invalid_size) {
@@ -868,34 +871,34 @@ void LowerToPopartImpl::lowerBody() {
     } else if (kind == symbols::poptorch::end_multi_conv) {
       // Extract multiconv options that are set as attributes on the
       // end_multi_conv instruction
-      auto amp = c10::Symbol::attr("available_memory_proportions");
+      const auto amp = c10::Symbol::attr("available_memory_proportions");
       if (node->hasAttribute(amp)) {
         _compiler.setMultiConvAvailableMemoryProportions(node->fs(amp));
       }
 
-      auto partials_types = c10::Symbol::attr("partials_types");
+      const auto partials_types = c10::Symbol::attr("partials_types");
       if (node->hasAttribute(partials_types)) {
         _compiler.setMultiConvPartialsTypes(node->is(partials_types));
       }
 
-      auto conv_ditherings = c10::Symbol::attr("enable_conv_dithering");
+      const auto conv_ditherings = c10::Symbol::attr("enable_conv_dithering");
       if (node->hasAttribute(conv_ditherings)) {
         _compiler.setMultiConvEnableConvDithering(node->is(conv_ditherings));
       }
 
-      auto plan_type = c10::Symbol::attr("plan_type");
+      const auto plan_type = c10::Symbol::attr("plan_type");
       if (node->hasAttribute(plan_type)) {
         _compiler.setMultiConvPlanType(node->i(plan_type));
       }
 
-      auto per_conv_reserved_tiles =
+      const auto per_conv_reserved_tiles =
           c10::Symbol::attr("per_conv_reserved_tiles");
       if (node->hasAttribute(per_conv_reserved_tiles)) {
         _compiler.setMultiConvPerConvReservedTiles(
             node->i(per_conv_reserved_tiles));
       }
 
-      auto cycle_back_off = c10::Symbol::attr("cycle_back_off");
+      const auto cycle_back_off = c10::Symbol::attr("cycle_back_off");
       if (node->hasAttribute(cycle_back_off)) {
         _compiler.setMultiConvCycleBackOff(node->f(cycle_back_off));
       }
@@ -1071,10 +1074,9 @@ void LowerToPopartImpl::lowerParameters() {
       _value_map.setTuple(value, tensors);
     }
 
-    std::ostringstream ss;
-    ss << "      input: %" << value->debugName() << " : " << *value->type()
-       << " ->";
-    logging::debug("{} {} [{}]", ss.str(), tensorNames(tensors),
+    const auto msg = fmt::format("      input: %{} : {} ->", value->debugName(),
+                                 *value->type());
+    logging::debug("{} {} [{}]", msg, tensorNames(tensors),
                    tensorTypesAndShapes(tensors));
 
     index++;
@@ -1085,10 +1087,9 @@ void LowerToPopartImpl::lowerParameters() {
     auto *value = parameter_values.at(index);
     auto &tensor(parameter_popart_ids.at(index));
 
-    std::ostringstream ss;
-    ss << "      param: %" << value->debugName() << " : " << *value->type()
-       << " ->";
-    logging::debug("{} {} [{}]", ss.str(), tensorNames(tensor, 1),
+    const auto msg = fmt::format("      param: %{} : {} ->", value->debugName(),
+                                 *value->type());
+    logging::debug("{} {} [{}]", msg, tensorNames(tensor, 1),
                    tensorTypesAndShapes(tensor, 1));
     _value_map.setTensor(value, tensor);
   }

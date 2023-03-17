@@ -1,4 +1,7 @@
 // Copyright (c) 2020 Graphcore Ltd. All rights reserved.
+#include <spdlog/fmt/fmt.h>
+#include <spdlog/fmt/ostr.h>
+
 #include "../PoptorchStaticInit.hpp"
 #include "PopartCanonicalizationUtils.hpp"
 
@@ -28,8 +31,8 @@ torch::jit::Node *gluHandler(torch::jit::Graph *graph, torch::jit::Node *node) {
   // Input
   torch::jit::Value *input = node->input(0);
   std::int64_t axis = constantToLong(node->input(1)->node());
-  std::vector<std::int64_t> shape_input = shapeFromTensor(input);
-  std::int64_t const size = shape_input.size();
+  const std::vector<std::int64_t> shape_input = shapeFromTensor(input);
+  const std::int64_t size = shape_input.size();
 
   // handle python's negative indices
   if (axis < 0) {
@@ -42,11 +45,10 @@ torch::jit::Node *gluHandler(torch::jit::Graph *graph, torch::jit::Node *node) {
   ERROR_ON_MSG(shape_input[axis] % 2,
                "Halving dimension" << axis << "must be even");
 
-  unsigned int half_size = static_cast<unsigned int>(shape_input[axis] / 2);
+  const unsigned int half_size =
+      static_cast<unsigned int>(shape_input[axis] / 2);
 
-  std::vector<std::int64_t> split_sizes;
-  split_sizes.push_back(half_size);
-  split_sizes.push_back(half_size);
+  const std::vector<std::int64_t> split_sizes = {half_size, half_size};
 
   torch::jit::Node *split = createSplit(graph, {input}, 2, axis, split_sizes);
   torch::jit::Node *sigmoid = createSigmoid(graph, {split->output(1)});
@@ -99,12 +101,11 @@ torch::jit::Node *softplusHandler(torch::jit::Graph *graph,
   auto input_type = getNodeScalarType(x);
   auto beta = constantToFloat(node->input(1)->node());
   auto threshold = constantToFloat(node->input(2)->node());
-  std::stringstream ss;
-  ss << "{\"beta\":" << std::to_string(beta)
-     << ",\"threshold\":" << std::to_string(threshold) << "}";
 
-  auto *output_node = createCustomOperation(
-      graph, {x}, "TorchSoftplus", "poptorch.custom_ops", 1, 1, ss.str());
+  const auto msg =
+      fmt::format("{{\"beta\":{},\"threshold\":{}}}", beta, threshold);
+  auto *output_node = createCustomOperation(graph, {x}, "TorchSoftplus",
+                                            "poptorch.custom_ops", 1, 1, msg);
 
   output_node->output(0)->setType(c10::TensorType::create(
       input_type, c10::nullopt, c10::nullopt, c10::nullopt));
@@ -148,7 +149,7 @@ torch::jit::Node *geluHandler(torch::jit::Graph *graph,
   const auto approximate = constantToString(node->input(1)->node());
 
   if (approximate == "tanh") {
-    // 0.5 * x * (1 + tanh(sqrt(2/π) * (x + 0.044715 * x^3)))
+    // 0.5 * x * (1 + tanh(sqrt(2/m_pi) * (x + 0.044715 * x^3)))
     auto *t0 = createConstantFloat32(graph, {3.0}, {})->output();
     auto *t1 = createPow(graph, {input, t0})->output();
 
