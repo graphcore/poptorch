@@ -58,23 +58,32 @@ class TrainingStepper:
         self.atol = atol
         self.enable_fp_exception = enable_fp_exception
         self.options = poptorch.Options() if options is None else options
+        self.training_model = None
+        self.inference_model = None
         self.setup_cpu(model, optimizer)
         self.setup_ipu(model, optimizer)
         self.check_parameters()
 
     def setup_cpu(self, model, optimizer):
         self.cpu_model = deepcopy(model)
-        self.optimizer = optimizer(self.cpu_model.parameters(), lr=self.lr)
+        parameters = list(self.cpu_model.parameters())
+        if parameters:
+            self.optimizer = optimizer(parameters, lr=self.lr)
 
     def setup_ipu(self, model, optimizer):
         self.ipu_model = deepcopy(model)
-        ipu_optimizer = optimizer(self.ipu_model.parameters(), lr=self.lr)
         options = self.options
         if self.enable_fp_exception:
             options.Precision.enableFloatingPointExceptions(True)
-        self.training_model = poptorch.trainingModel(self.ipu_model,
-                                                     optimizer=ipu_optimizer,
-                                                     options=options)
+
+        parameters = list(self.ipu_model.parameters())
+        if parameters:
+            ipu_optimizer = optimizer(parameters, lr=self.lr)
+            self.training_model = poptorch.trainingModel(
+                self.ipu_model, optimizer=ipu_optimizer, options=options)
+
+        self.inference_model = poptorch.inferenceModel(self.ipu_model,
+                                                       options=options)
 
     def check_parameters(self):
         for cpu, ipu in zip(self.cpu_model.named_parameters(),
@@ -97,11 +106,21 @@ class TrainingStepper:
         return out, loss
 
     def run(self, *args):
+        assert self.training_model, 'Training model was not created.'
+        self.cpu_model.train()
         if len(args) == 2:
             self._run_common_input(*args)
         elif len(args) == 3:
             self._run_separate_inputs(*args)
         assert True, f"Wrong number of args ({len(args)}!)"
+
+    def run_inference(self, batch):
+        self.cpu_model.eval()
+        with torch.no_grad():
+            cpu_out = self.cpu_model(*batch)
+
+        ipu_out, _ = self.inference_model(*batch)
+        self.assert_close(actual=ipu_out, expected=cpu_out, id="inference")
 
     def _run_common_input(self, num_steps, batch):
         cpu_loss = torch.empty(num_steps)

@@ -14,7 +14,8 @@ def conv_harness(conv,
                  num_steps=4,
                  atol=1e-5,
                  rtol=1e-4,
-                 batch=None):
+                 batch=None,
+                 training=True):
     class ConvWrapper(torch.nn.Module):
         def __init__(self, conv, loss_fn, post_proc=None):
             super().__init__()
@@ -43,8 +44,10 @@ def conv_harness(conv,
         batch = (dataset.x, dataset.edge_index)
 
     stepper = TrainingStepper(model, atol=atol, rtol=rtol)
-
-    stepper.run(num_steps, batch)
+    if training:
+        stepper.run(num_steps, batch)
+    else:
+        stepper.run_inference(batch)
 
 
 def generate_edge_index(num_src_nodes, num_dst_nodes, num_edges):
