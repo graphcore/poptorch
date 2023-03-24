@@ -270,8 +270,8 @@ void StepIO::computeStepDataInfo(const popart::TensorId &id,
     return;
   }
 
-  auto dtype = AccessorType::getArrayDataType(*array);
-  auto rank = AccessorType::getArrayRank(*array);
+  const auto dtype = AccessorType::getArrayDataType(*array);
+  const auto rank = AccessorType::getArrayRank(*array);
   std::vector<int64_t> shape;
 
   for (size_t i = 0; i < rank; ++i) {
@@ -520,7 +520,7 @@ void CompilerImpl::addOutputTensor(
 popart::TensorId
 CompilerImpl::reshape(const std::vector<popart::TensorId> &tensors,
                       const std::vector<int64_t> &shape) {
-  auto ai_onnx = active_builder->aiOnnxOpset10();
+  auto ai_onnx = active_builder->aiOnnxOpset11();
 
   popart::Shape const s = {static_cast<int64_t>(shape.size())};
   popart::TensorInfo const tensor_info("INT64", s);
@@ -594,9 +594,9 @@ CompilerImpl::tensorConstant(const std::vector<popart::TensorId> &tensors,
   popart::ConstVoidData const new_constant(new_buff,
                                            constant.getPopartData().info);
 
-  auto ai_onnx = active_builder->aiOnnxOpset10();
-  popart::TensorId tensor =
-      ai_onnx.constant(new_constant, getDebugContext("Constant"));
+  auto ai_onnx = active_builder->aiOnnxOpset11();
+  popart::TensorId tensor = ai_onnx.constant(
+      new_constant, false /*is_value_sparse*/, getDebugContext("Constant"));
 
   current_cache[new_constant] = tensor;
 
@@ -916,7 +916,7 @@ CompilerImpl::getPopartOptimizer(std::vector<Optimizer> optimizers) {
 
 popart::TensorId
 CompilerImpl::addNotInPlace(const std::vector<popart::TensorId> &in) {
-  auto ai_onnx = active_builder->aiOnnxOpset10();
+  auto ai_onnx = active_builder->aiOnnxOpset11();
   popart::TensorId output = ai_onnx.add(in, getDebugContext("AddNotInPlace"));
   active_builder->setInplacePreferences(
       output, {{"AddLhsInplace", -1}, {"AddRhsInplace", -1}});
@@ -928,7 +928,7 @@ CompilerImpl::randomNormal(const std::vector<popart::TensorId> &tensors,
                            const std::vector<int64_t> &shape, float mean,
                            float scale, const std::string &dtype) {
   UNUSED(tensors);
-  auto ai_onnx = active_builder->aiOnnxOpset10();
+  auto ai_onnx = active_builder->aiOnnxOpset11();
   const auto pdt = popart::dataTypeFromString(dtype);
   return ai_onnx.randomnormal(shape, popart::getONNXDataTypeAsInt(pdt), mean,
                               scale, nonstd::optional<float>(),
@@ -940,7 +940,7 @@ CompilerImpl::randomUniform(const std::vector<popart::TensorId> &tensors,
                             const std::vector<int64_t> &shape, float high,
                             float low, const std::string &dtype) {
   UNUSED(tensors);
-  auto ai_onnx = active_builder->aiOnnxOpset10();
+  auto ai_onnx = active_builder->aiOnnxOpset11();
   const auto pdt = popart::dataTypeFromString(dtype);
   return ai_onnx.randomuniform(shape, popart::getONNXDataTypeAsInt(pdt), high,
                                low, nonstd::optional<float>(),
@@ -1036,7 +1036,7 @@ CompilerImpl::unfold(const std::vector<popart::TensorId> &tensors,
       auto starts = state.scalarConstI64(start);
       auto ends = state.scalarConstI64(end);
 
-      return state.transform(state.builder->aiOnnxOpset10().slice(
+      return state.transform(state.builder->aiOnnxOpset11().slice(
           {state.tensor, starts, ends, dims}));
     }
 
@@ -1048,7 +1048,7 @@ CompilerImpl::unfold(const std::vector<popart::TensorId> &tensors,
       auto shape_tensor = state.shapeAsTensor(new_shape);
 
       return state.transform(
-          state.builder->aiOnnxOpset10().expand({state.tensor, shape_tensor}));
+          state.builder->aiOnnxOpset11().expand({state.tensor, shape_tensor}));
     }
 
     static InternalState reshape(const InternalState &state,
@@ -1056,7 +1056,7 @@ CompilerImpl::unfold(const std::vector<popart::TensorId> &tensors,
       auto shape_tensor = state.shapeAsTensor(shape);
 
       return state.transform(
-          state.builder->aiOnnxOpset10().reshape({state.tensor, shape_tensor}));
+          state.builder->aiOnnxOpset11().reshape({state.tensor, shape_tensor}));
     }
 
     static InternalState concat(const std::vector<InternalState> &states,
@@ -1070,7 +1070,7 @@ CompilerImpl::unfold(const std::vector<popart::TensorId> &tensors,
       }
 
       const auto &first = states.front();
-      return first.transform(first.builder->aiOnnxOpset10().concat(
+      return first.transform(first.builder->aiOnnxOpset11().concat(
           tensor_ids, static_cast<int64_t>(axis)));
     }
 
@@ -1080,7 +1080,7 @@ CompilerImpl::unfold(const std::vector<popart::TensorId> &tensors,
                                                   permutation.end());
       state.builder->setAttribute("perm", permutation_ints);
       auto new_tensor = state.transform(
-          state.builder->aiOnnxOpset10().transpose({state.tensor}));
+          state.builder->aiOnnxOpset11().transpose({state.tensor}));
       state.builder->clearAttribute("perm");
       return new_tensor;
     }
@@ -1128,12 +1128,12 @@ popart::TensorId CompilerImpl::prelu(std::vector<popart::TensorId> &tensors) {
                                              weight_shape.size() - 1);
     std::iota(unsqueeze_axes.begin(), unsqueeze_axes.end(),
               weight_shape.size());
-    weight = active_builder->aiOnnxOpset10().unsqueeze(
+    weight = active_builder->aiOnnxOpset11().unsqueeze(
         {weight}, unsqueeze_axes, getDebugContext("Unsqueeze"));
     setExecutionStrategyAttributes({weight});
   }
 
-  return active_builder->aiOnnxOpset10().prelu(tensors,
+  return active_builder->aiOnnxOpset11().prelu(tensors,
                                                getDebugContext("Prelu"));
 }
 

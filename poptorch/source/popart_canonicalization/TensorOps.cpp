@@ -334,7 +334,7 @@ torch::jit::Node *scatterHandler(torch::jit::Graph *graph,
   }
 
   if (node->inputs().size() < 4) {
-    return createScatter(graph, {input, index, src}, dim);
+    return createScatterElements(graph, {input, index, src}, dim);
   }
 
   const auto reduce = getReductionMethod(node->input(4)->node());

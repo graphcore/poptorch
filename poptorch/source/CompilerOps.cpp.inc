@@ -309,9 +309,15 @@ torch::jit::Node* createQuantizelinear(torch::jit::Graph *graph,  const std::vec
  torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::quantizelinear, args, ImplicitCast::None, OutputType::AlwaysUint8);
 return new_node;
 }
-torch::jit::Node* createResize(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,const std::string & mode) {
+torch::jit::Node* createResize(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,const std::string &coordinate_transformation_mode,float cubic_coeff_a,int64_t exclude_outside,float extrapolation_value,const std::string & mode,const std::string &nearest_mode) {
  torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::resize, args, ImplicitCast::None, OutputType::AsFirstInput);
+
+new_node->s_(c10::Symbol::attr("coordinate_transformation_mode"),coordinate_transformation_mode);
+new_node->f_(c10::Symbol::attr("cubic_coeff_a"),cubic_coeff_a);
+new_node->i_(c10::Symbol::attr("exclude_outside"),exclude_outside);
+new_node->f_(c10::Symbol::attr("extrapolation_value"),extrapolation_value);
 new_node->s_(c10::Symbol::attr("mode"),mode);
+new_node->s_(c10::Symbol::attr("nearest_mode"),nearest_mode);
 return new_node;
 }
 torch::jit::Node* createReversesequence(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,int64_t batch_axis,int64_t time_axis) {
@@ -334,9 +340,12 @@ torch::jit::Node* createThresholdedrelu(torch::jit::Graph *graph,  const std::ve
 new_node->f_(c10::Symbol::attr("alpha"),alpha);
 return new_node;
 }
-torch::jit::Node* createTopk(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,int64_t axis) {
+torch::jit::Node* createTopk(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,int64_t axis, bool largest, bool sorted) {
  torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::topk, args, ImplicitCast::None, OutputType::FirstAsFirstInputSecondAlwaysInt, 2);
 new_node->i_(c10::Symbol::attr("axis"),axis);
+new_node->i_(c10::Symbol::attr("largest"),static_cast<int32_t>(largest));
+new_node->i_(c10::Symbol::attr("sorted"),static_cast<int32_t>(sorted));
+
 return new_node;
 }
 torch::jit::Node* createUpsample(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,const std::string & mode) {
@@ -434,6 +443,11 @@ return new_node;
 }
 torch::jit::Node* createScatter(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,int64_t axis) {
  torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::scatter, args, ImplicitCast::None, OutputType::AsFirstInput);
+new_node->i_(c10::Symbol::attr("axis"),axis);
+return new_node;
+}
+torch::jit::Node* createScatterElements(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,int64_t axis) {
+ torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::scatterelements, args, ImplicitCast::None, OutputType::AsFirstInput);
 new_node->i_(c10::Symbol::attr("axis"),axis);
 return new_node;
 }
@@ -576,11 +590,9 @@ torch::jit::Node* createCeil(torch::jit::Graph *graph,  const std::vector<torch:
  torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::ceil, args, ImplicitCast::None, OutputType::AsFirstInput);
 return new_node;
 }
-torch::jit::Node* createClip(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,float max,float min) {
- torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::clip, args, ImplicitCast::All, OutputType::AsImplicitCastPromoted);
-new_node->f_(c10::Symbol::attr("max"),max);
-new_node->f_(c10::Symbol::attr("min"),min);
-return new_node;
+torch::jit::Node* createClip(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args) {
+ torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::clip, args, ImplicitCast::None, OutputType::AsImplicitCastPromoted);
+ return new_node;
 }
 torch::jit::Node* createConcat(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,int64_t axis) {
  torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::concat, args, ImplicitCast::All, OutputType::AsImplicitCastPromoted);
@@ -714,11 +726,9 @@ torch::jit::Node* createLogical_not(torch::jit::Graph *graph,  const std::vector
  torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::logical_not, args, ImplicitCast::None, OutputType::AlwaysBool);
 return new_node;
 }
-torch::jit::Node* createPad(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,const std::vector<int64_t> & pads,const std::string & mode,float value) {
+torch::jit::Node* createPad(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,const std::string & mode) {
  torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::pad, args, ImplicitCast::None, OutputType::AsFirstInput);
-new_node->is_(c10::Symbol::attr("pads"),pads);
 new_node->s_(c10::Symbol::attr("mode"),mode);
-new_node->f_(c10::Symbol::attr("value"),value);
 return new_node;
 }
 torch::jit::Node* createRandomnormallike(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,std::int32_t dtype,float mean,float scale,float seed) {

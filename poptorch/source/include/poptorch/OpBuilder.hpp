@@ -196,21 +196,21 @@ template <typename T> struct CreateCast {};
 
 template <> struct CreateCast<float> {
   torch::jit::Node *operator()(torch::jit::Graph *graph,
-                               torch::jit::Value *value) {
+                               torch::jit::Value *value) const {
     return createCast(graph, value, c10::kFloat);
   }
 };
 
 template <> struct CreateCast<std::int32_t> {
   torch::jit::Node *operator()(torch::jit::Graph *graph,
-                               torch::jit::Value *value) {
+                               torch::jit::Value *value) const {
     return createCast(graph, value, c10::kInt);
   }
 };
 
 template <> struct CreateCast<std::int64_t> {
   torch::jit::Node *operator()(torch::jit::Graph *graph,
-                               torch::jit::Value *value) {
+                               torch::jit::Value *value) const {
     return createCast(graph, value, c10::kLong);
   }
 };

@@ -291,7 +291,7 @@ torch::jit::Node *indexPutHandler(torch::jit::Graph *graph,
 
   // Scatter in first dimension using calculated indices into fully flattened
   // tensor
-  auto *scatter = createScatter(
+  auto *scatter = createScatterElements(
       graph, {info.x_partial_flat, info.indices_partial_flat, v}, 0);
   // Restore original input shape
   auto *out = createReshape(graph, scatter->output(), shape);

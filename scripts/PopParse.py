@@ -641,7 +641,7 @@ for opset in classes:
         opDecl += "popart, " + name + ", " + name
 
         if opset.startswith("AiOnnxOpset"):
-            opDecl += ", AiOnnxOpset10." + name
+            opDecl += ", AiOnnxOpset11." + name
         else:
             opDecl += ", " + opset + "." + name
 

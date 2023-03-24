@@ -35,10 +35,10 @@ torch::jit::Node *expandHandler(torch::jit::Graph *graph,
   c10::VaryingShape const self_dims = self_tensor->sizes();
 
   // Old shape
-  std::vector<std::int64_t> old_shape = shapeFromTensor(node->input(0));
+  const std::vector<std::int64_t> old_shape = shapeFromTensor(node->input(0));
 
   // Count the elems in the old shape.
-  std::int64_t const old_elem_count = std::accumulate(
+  const std::int64_t old_elem_count = std::accumulate(
       old_shape.begin(), old_shape.end(), 1, std::multiplies<std::int64_t>());
 
   // Get the target size for the expand.
@@ -70,7 +70,7 @@ torch::jit::Node *expandHandler(torch::jit::Graph *graph,
   }
 
   // Count the number of elements in the target shape.
-  std::int64_t const new_elem_count = std::accumulate(
+  const std::int64_t new_elem_count = std::accumulate(
       new_shape.begin(), new_shape.end(), 1, std::multiplies<std::int64_t>());
 
   // Elements don't change so just a reshape.
@@ -205,7 +205,7 @@ torch::jit::Node *selectHandler(torch::jit::Graph *graph,
   // aten::select(Tensor[] list, int idx) -> Tensor
   auto *input = node->input(0);
   std::int64_t dim = constantToLong(node->input(1)->node());
-  auto dims = shapeFromTensor(input);
+  const auto dims = shapeFromTensor(input);
   if (dim < 0) {
     dim += dims.size();
   }
@@ -229,7 +229,7 @@ torch::jit::Node *selectHandler(torch::jit::Graph *graph,
   }
 
   // Reshape to remove the singleton dimenson left in by slice
-  auto original_shape = shapeFromTensor(node->output());
+  const auto original_shape = shapeFromTensor(node->output());
   return createReshape(graph, slice_node->output(), original_shape);
 }
 
@@ -273,35 +273,35 @@ std::vector<int64_t> getGatherIndices(int64_t orig_rows, int64_t orig_cols,
                                       int64_t dilation_y, int64_t padding_x,
                                       int64_t padding_y, int64_t extra_padding,
                                       int64_t stride_x, int64_t stride_y) {
-  auto spatial_rows =
+  const auto spatial_rows =
       (orig_rows + 2 * padding_y - dilation_y * (kernel_size_y - 1) - 1) /
           stride_y +
       1;
-  auto spatial_cols =
+  const auto spatial_cols =
       (orig_cols + 2 * padding_x - dilation_x * (kernel_size_x - 1) - 1) /
           stride_x +
       1;
 
-  auto spatial_row_cols_product = spatial_rows * spatial_cols;
+  const auto spatial_row_cols_product = spatial_rows * spatial_cols;
 
-  auto numel = spatial_row_cols_product * kernel_size_x * kernel_size_y;
+  const auto numel = spatial_row_cols_product * kernel_size_x * kernel_size_y;
 
   std::vector<int64_t> indices;
   indices.reserve(numel);
 
   for (int64_t idx = 0; idx < numel; idx++) {
-    auto kernel_offset = idx / spatial_row_cols_product;
-    auto kernel_x_offset = (kernel_offset % kernel_size_x) * dilation_x;
-    auto kernel_y_offset = (kernel_offset / kernel_size_x) * dilation_y;
+    const auto kernel_offset = idx / spatial_row_cols_product;
+    const auto kernel_x_offset = (kernel_offset % kernel_size_x) * dilation_x;
+    const auto kernel_y_offset = (kernel_offset / kernel_size_x) * dilation_y;
 
-    auto spatial_offset = idx % spatial_row_cols_product;
-    auto spatial_x_offset = (spatial_offset % spatial_cols) * stride_x;
-    auto spatial_y_offset = (spatial_offset / spatial_cols) * stride_y;
+    const auto spatial_offset = idx % spatial_row_cols_product;
+    const auto spatial_x_offset = (spatial_offset % spatial_cols) * stride_x;
+    const auto spatial_y_offset = (spatial_offset / spatial_cols) * stride_y;
 
-    auto actual_x = spatial_x_offset + kernel_x_offset;
-    auto actual_y = spatial_y_offset + kernel_y_offset;
+    const auto actual_x = spatial_x_offset + kernel_x_offset;
+    const auto actual_y = spatial_y_offset + kernel_y_offset;
 
-    auto in_idx =
+    const auto in_idx =
         actual_y * (orig_cols + 2 * padding_x + extra_padding) + actual_x;
 
     if (actual_x < 0 || actual_y < 0) {
@@ -386,21 +386,23 @@ torch::jit::Node *im2colHandler(torch::jit::Graph *graph,
   //              int[2] padding, int[2] stride) -> Tensor
 
   torch::jit::Value *data = node->input(0);
-  std::vector<int64_t> data_shape = shapeFromTensor(data);
+  const std::vector<int64_t> data_shape = shapeFromTensor(data);
   ERROR_ON(data_shape.size() != 4);
 
-  std::vector<std::int64_t> kernel_shape =
+  const std::vector<std::int64_t> kernel_shape =
       constantToLongVec(node->input(1)->node());
   ERROR_ON(kernel_shape.size() != 2);
 
-  std::vector<std::int64_t> dilation =
+  const std::vector<std::int64_t> dilation =
       constantToLongVec(node->input(2)->node());
   ERROR_ON(dilation.size() != 2);
 
-  std::vector<std::int64_t> padding = constantToLongVec(node->input(3)->node());
+  const std::vector<std::int64_t> padding =
+      constantToLongVec(node->input(3)->node());
   ERROR_ON(padding.size() != 2);
 
-  std::vector<std::int64_t> strides = constantToLongVec(node->input(4)->node());
+  const std::vector<std::int64_t> strides =
+      constantToLongVec(node->input(4)->node());
   ERROR_ON(strides.size() != 2);
 
   // First zero-pad the input
@@ -422,6 +424,7 @@ torch::jit::Node *im2colHandler(torch::jit::Graph *graph,
 
   auto *padded =
       createConstantPad(graph, node->input(0), popart_padding, 0., true);
+  auto padded_shape = shapeFromTensor(padded->output());
 
   // Get the indices as if the spatial dimensions had been flattened
   auto indices =
@@ -430,12 +433,12 @@ torch::jit::Node *im2colHandler(torch::jit::Graph *graph,
                        padding[0], extra_padding, strides[1], strides[0]);
 
   // Calculate the last dim size as if it was flattened
-  auto last_dim_size = current_width * (data_shape[2] + padding[0] * 2);
+  const auto last_dim_size = current_width * (data_shape[2] + padding[0] * 2);
 
   // Reorder to allow fewer slices then each index became a slice
   auto *rearranged = reorderBasedOnStride(graph, padded->output(), data_shape,
                                           strides[1], last_dim_size, &indices);
-  auto slices_start_end = indicesToSlices(indices);
+  const auto slices_start_end = indicesToSlices(indices);
 
   // Slice and concat for the reordering
   std::vector<torch::jit::Value *> sliced;
@@ -470,7 +473,7 @@ at::Tensor getScatterReduceIndices(int64_t num_cols, int64_t orig_rows,
 
   // The last dim has a mix of all kernel and spatial positions. Calculate
   // the number of spatial columns.
-  auto spatial_cols =
+  const auto spatial_cols =
       ((orig_cols + 2 * padding_x - dilation_x * (kernel_size_x - 1) - 1) /
        stride_x) +
       1;
@@ -478,21 +481,22 @@ at::Tensor getScatterReduceIndices(int64_t num_cols, int64_t orig_rows,
   // spatial_rows*spatial_cols
   // (a short cut compared to calculating spatial_rows using the equivalent
   // expression used for spatial_cols)
-  auto spatial_row_cols_product = num_cols / (kernel_size_x * kernel_size_y);
+  const auto spatial_row_cols_product =
+      num_cols / (kernel_size_x * kernel_size_y);
 
   // Find the original co-ordinate (x, y) from which the value in col_idx was
   // copied and calculate what the index would be
   for (int64_t col_idx = 0; col_idx < num_cols; col_idx++) {
-    auto kernel_offset = col_idx / spatial_row_cols_product;
-    auto kernel_x_offset = (kernel_offset % kernel_size_x) * dilation_x;
-    auto kernel_y_offset = (kernel_offset / kernel_size_x) * dilation_y;
+    const auto kernel_offset = col_idx / spatial_row_cols_product;
+    const auto kernel_x_offset = (kernel_offset % kernel_size_x) * dilation_x;
+    const auto kernel_y_offset = (kernel_offset / kernel_size_x) * dilation_y;
 
-    auto spatial_offset = col_idx % (spatial_row_cols_product);
-    auto spatial_x_offset = (spatial_offset % spatial_cols) * stride_x;
-    auto spatial_y_offset = (spatial_offset / spatial_cols) * stride_y;
+    const auto spatial_offset = col_idx % (spatial_row_cols_product);
+    const auto spatial_x_offset = (spatial_offset % spatial_cols) * stride_x;
+    const auto spatial_y_offset = (spatial_offset / spatial_cols) * stride_y;
 
-    auto actual_x = spatial_x_offset + kernel_x_offset - padding_x;
-    auto actual_y = spatial_y_offset + kernel_y_offset - padding_y;
+    const auto actual_x = spatial_x_offset + kernel_x_offset - padding_x;
+    const auto actual_y = spatial_y_offset + kernel_y_offset - padding_y;
 
     auto index = actual_y * orig_cols + actual_x;
 
@@ -522,22 +526,24 @@ torch::jit::Node *col2imHandler(torch::jit::Graph *graph,
   std::vector<int64_t> data_shape = shapeFromTensor(data);
   ERROR_ON(data_shape.size() != 3 && data_shape.size() != 2);
 
-  std::vector<std::int64_t> output_size =
+  const std::vector<std::int64_t> output_size =
       constantToLongVec(node->input(1)->node());
   ERROR_ON(output_size.size() != 2);
 
-  std::vector<std::int64_t> kernel_shape =
+  const std::vector<std::int64_t> kernel_shape =
       constantToLongVec(node->input(2)->node());
   ERROR_ON(kernel_shape.size() != 2);
 
-  std::vector<std::int64_t> dilation =
+  const std::vector<std::int64_t> dilation =
       constantToLongVec(node->input(3)->node());
   ERROR_ON(dilation.size() != 2);
 
-  std::vector<std::int64_t> padding = constantToLongVec(node->input(4)->node());
+  const std::vector<std::int64_t> padding =
+      constantToLongVec(node->input(4)->node());
   ERROR_ON(padding.size() != 2);
 
-  std::vector<std::int64_t> stride = constantToLongVec(node->input(5)->node());
+  const std::vector<std::int64_t> stride =
+      constantToLongVec(node->input(5)->node());
   ERROR_ON(stride.size() != 2);
 
   // We can be given an unbatched input, with one less dimension -- just give it
@@ -550,13 +556,13 @@ torch::jit::Node *col2imHandler(torch::jit::Graph *graph,
 
   // The batch and original channel ordering is unaffected by im2col so we can
   // reshape to factor them out.
-  auto out_channels = data_shape[1] / (kernel_shape[0] * kernel_shape[1]);
-  auto num_cols = data_shape[2] * (kernel_shape[0] * kernel_shape[1]);
+  const auto out_channels = data_shape[1] / (kernel_shape[0] * kernel_shape[1]);
+  const auto num_cols = data_shape[2] * (kernel_shape[0] * kernel_shape[1]);
   auto *reshaped =
       createReshape(graph, data, {data_shape[0], out_channels, num_cols});
 
   // Use scatter reduce to add across the relevent positions
-  auto indices = getScatterReduceIndices(
+  const auto indices = getScatterReduceIndices(
       num_cols, output_size[0], output_size[1], kernel_shape[1],
       kernel_shape[0], dilation[1], dilation[0], padding[1], padding[0],
       stride[1], stride[0]);
@@ -564,7 +570,7 @@ torch::jit::Node *col2imHandler(torch::jit::Graph *graph,
 
   // The indices are shape (1, 1, num_cols) but need to be tiled for the
   // scatterreduce
-  auto repeats =
+  const auto repeats =
       at::ones({3}, at::dtype(at::ScalarType::Long)
                         .memory_format(c10::MemoryFormat::Contiguous));
   repeats[0] = data_shape[0];
@@ -637,7 +643,7 @@ torch::jit::Node *transposeHandler(torch::jit::Graph *graph,
 
 torch::jit::Node *numpyTHandler(torch::jit::Graph *graph,
                                 torch::jit::Node *node) {
-  auto shape = shapeFromTensor(node->input(0));
+  const auto shape = shapeFromTensor(node->input(0));
 
   if (shape.size() < 2) {
     return node->input(0)->node();
@@ -683,11 +689,11 @@ torch::jit::Node *splitChunkHandler(torch::jit::Graph *graph,
   if (kind == c10::aten::chunk || kind == c10::aten::unsafe_chunk) {
     // Chunk takes in the *number of chunks*. Canonicalise it to *size of
     // chunks*.
-    auto chunk_dim = *dims[axis];
+    const auto chunk_dim = *dims[axis];
     ERROR_ON_MSG(!split_size.has_value(),
                  "aten::chunk/aten::unsfe_chunk expect to receive "
                  "a single split_size");
-    auto n_chunks = *split_size;
+    const auto n_chunks = *split_size;
 
     // Integer division: (dim / n_chunks) with rounding up
     std::int64_t const slice_size = (chunk_dim + n_chunks - 1) / n_chunks;
@@ -749,7 +755,8 @@ torch::jit::Node *splitChunkHandler(torch::jit::Graph *graph,
   // Propagate types
   for (size_t i = 0; i < slices.size(); i++) {
     v[axis] = size_of_each_split[i];
-    auto type = slices[i]->type()->expect<c10::TensorType>()->withSizes(v);
+    const auto type =
+        slices[i]->type()->expect<c10::TensorType>()->withSizes(v);
     unpack->output(i)->setType(type);
   }
 
@@ -824,21 +831,21 @@ torch::jit::Node *upsampleHandler(torch::jit::Graph *graph,
   // aten::upsample_trilinear3d(Tensor self, int[] output_size, bool
   // align_corners, float? scales_d, float? scales_h, float? scales_w) -> Tensor
 
-  auto num_inputs = node->inputs().size();
+  const auto num_inputs = node->inputs().size();
   torch::jit::Value *input = node->input(0);
   torch::jit::Value *output_size = node->input(1);
   const bool is_bicubic = node->kind() == c10::aten::upsample_bicubic2d;
   size_t scales_idx = 2;
 
   if (is_bicubic) {
-    auto align_corners = constantToBool(node->input(2)->node());
+    const auto align_corners = constantToBool(node->input(2)->node());
     ERROR_ON_MSG(align_corners, "Only support align_corners=False.");
     scales_idx++;
   }
 
-  auto output_rank = shapeFromTensor(node->output()).size();
-  auto input_shape = shapeFromTensor(input);
-  auto input_rank = input_shape.size();
+  const auto output_rank = shapeFromTensor(node->output()).size();
+  const auto input_shape = shapeFromTensor(input);
+  const auto input_rank = input_shape.size();
 
   ERROR_ON_MSG(output_rank != input_rank,
                "Input / output rank mismatch: " << input_rank
@@ -856,7 +863,7 @@ torch::jit::Node *upsampleHandler(torch::jit::Graph *graph,
       }
     } else {
       // Otherwise it's upsample_bicubic2d.vec, just copy the vector of scales
-      auto scale_list = handleTensorList(scale1->node());
+      const auto scale_list = handleTensorList(scale1->node());
       if (!scale_list.empty()) {
         for (auto *s : scale_list) {
           scales.push_back(constantToFloat(s->node()));
@@ -865,7 +872,7 @@ torch::jit::Node *upsampleHandler(torch::jit::Graph *graph,
     }
   }
   if (scales.size() == 2) {
-    auto output_shape = handleTensorList(output_size->node());
+    const auto output_shape = handleTensorList(output_size->node());
     for (size_t dim = 2; dim < input_rank; ++dim) {
       scales.push_back(constantToFloat(output_shape[dim - 2]->node()) /
                        input_shape[dim]);
@@ -874,8 +881,23 @@ torch::jit::Node *upsampleHandler(torch::jit::Graph *graph,
 
   torch::jit::Node *scales_node = createConstantFloatLike(
       graph, input, scales, {static_cast<std::int64_t>(scales.size())});
+
+  torch::jit::Node *roi_node =
+      createConstantFloat32(graph, std::vector<double>(input_rank, 0.0f),
+                            {static_cast<int64_t>(input_rank)});
+
   const std::string resize_type = is_bicubic ? "cubic" : "nearest";
-  return createResize(graph, {input, scales_node->output()}, resize_type);
+
+  static constexpr const char *coordinate_transformation_mode = "half_pixel";
+  static constexpr float cubic_coeff_a = -0.75f;
+  static constexpr int64_t exclude_outside = 0;
+  static constexpr float extrapolation_value = 0.0f;
+  static constexpr const char *nearest_mode = "pytorch";
+
+  return createResize(graph, {input, roi_node->output(), scales_node->output()},
+                      coordinate_transformation_mode, cubic_coeff_a,
+                      exclude_outside, extrapolation_value, resize_type,
+                      nearest_mode);
 }
 
 torch::jit::Node *upsampleBilinear2dHandler(torch::jit::Graph *graph,
@@ -885,10 +907,10 @@ torch::jit::Node *upsampleBilinear2dHandler(torch::jit::Graph *graph,
   auto *output_scale = node->input(3);
 
   const bool align_corners = constantToBool(node->input(2)->node());
-  auto scalar_type = getNodeScalarType(input);
-  auto output_rank = shapeFromTensor(node->output()).size();
-  auto input_shape = shapeFromTensor(input);
-  auto input_rank = input_shape.size();
+  const auto scalar_type = getNodeScalarType(input);
+  const auto output_rank = shapeFromTensor(node->output()).size();
+  const auto input_shape = shapeFromTensor(input);
+  const auto input_rank = input_shape.size();
 
   ERROR_ON_MSG(output_rank != input_rank,
                "Input / output rank mismatch: " << input_rank
@@ -898,13 +920,13 @@ torch::jit::Node *upsampleBilinear2dHandler(torch::jit::Graph *graph,
   std::vector<double> scales{1.0, 1.0};
 
   if (!isNone(output_size)) {
-    auto output_shape = constantToLongVec(output_size->node());
+    const auto output_shape = constantToLongVec(output_size->node());
     for (size_t dim = 2; dim < input_rank; ++dim) {
       scales.push_back(static_cast<double>(output_shape[dim - 2]) /
                        input_shape[dim]);
     }
   } else {
-    auto scalesxy = constantToFloatVec(output_scale->node());
+    const auto scalesxy = constantToFloatVec(output_scale->node());
 
     ERROR_ON_MSG(scalesxy[0] != scalesxy[1],
                  "Non-uniform bilinear upsampling not supported");
@@ -941,7 +963,7 @@ torch::jit::Node *unsupportedUpsampleHandler(torch::jit::Graph *graph,
 
 torch::jit::Node *stackHandler(torch::jit::Graph *graph,
                                torch::jit::Node *node) {
-  std::int64_t const dim = constantToLong(node->input(1)->node());
+  const std::int64_t dim = constantToLong(node->input(1)->node());
 
   const std::vector<torch::jit::Value *> values =
       handleTensorList(node->input(0)->node());

@@ -1,10 +1,10 @@
 // Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 OP_DECL(popart, reshape_static_shape, reshape, _impl->reshape,
         ARG(INT_VEC, shape), BODY_ARG(shape))
-OP_DECL(poptorch, ipu_print_tensor, ipu_print_tensor, AiGraphcoreOpset1.printtensor, 
-        ARG(INT,print_gradient) ARG(STRING,title) ARG(INT,summariseThreshold) ARG(INT,edgeItems) 
+OP_DECL(poptorch, ipu_print_tensor, ipu_print_tensor, AiGraphcoreOpset1.printtensor,
+        ARG(INT,print_gradient) ARG(STRING,title) ARG(INT,summariseThreshold) ARG(INT,edgeItems)
         ARG(INT,maxLineWidth) ARG(INT,digits) ARG(INT,floatFormat) ARG(CHAR,separator) ARG(CHAR,openBracket) ARG(CHAR,closeBracket) ,
-        BODY_ARG(print_gradient) BODY_ARG(DEBUG_CONTEXT("Printtensor"))BODY_ARG(title) BODY_ARG(summariseThreshold) BODY_ARG(edgeItems) 
+        BODY_ARG(print_gradient) BODY_ARG(DEBUG_CONTEXT("Printtensor"))BODY_ARG(title) BODY_ARG(summariseThreshold) BODY_ARG(edgeItems)
         BODY_ARG(maxLineWidth) BODY_ARG(digits) BODY_ARG(floatFormat) BODY_ARG(separator) BODY_ARG(openBracket) BODY_ARG(closeBracket))
 OP_DECL(poptorch, tensor_constant, tensor_constant, _impl->tensorConstant,
         POPART_CONST_ARG(popartConstant), BODY_ARG(popartConstant))
@@ -13,14 +13,11 @@ OP_DECL(poptorch, host_side_tensor_constant, host_side_tensor_constant,
         HOST_SIDE_CONST_ARG(hostSideTensorConstant),
         BODY_ARG(hostSideTensorConstant))
 
-OP_DECL(poptorch, constant_pad, constant_pad, AiOnnxOpset10.pad,
-        ARG(INT_VEC, pads) ARG(FLOAT, value),
-        BODY_ARG(pads) BODY_ARG("constant") BODY_ARG(value)
-        BODY_ARG(DEBUG_CONTEXT("Constantpad")))
-OP_DECL(poptorch, reflection_pad, reflection_pad, AiOnnxOpset10.pad,
-        ARG(INT_VEC, pads), BODY_ARG(pads) BODY_ARG("reflect"))
-OP_DECL(poptorch, edge_pad, edge_pad, AiOnnxOpset10.pad, ARG(INT_VEC, pads),
-        BODY_ARG(pads) BODY_ARG("edge") BODY_ARG(0.0f)
+OP_DECL(poptorch, constant_pad, constant_pad, AiOnnxOpset11.pad,
+        NONE, BODY_ARG("constant") BODY_ARG(DEBUG_CONTEXT("Constantpad")))
+OP_DECL(poptorch, reflection_pad, reflection_pad, AiOnnxOpset11.pad,
+        NONE, BODY_ARG("reflect"))
+OP_DECL(poptorch, edge_pad, edge_pad, AiOnnxOpset11.pad, NONE, BODY_ARG("edge")
         BODY_ARG(DEBUG_CONTEXT("Reflectionpad")))
 
 OP_DECL(poptorch, add_not_in_place, add_not_in_place, _impl->addNotInPlace,
@@ -65,13 +62,13 @@ OP_DECL(poptorch, prelu, prelu, _impl->prelu, NONE, NONE)
 #define OPTIONAL_FLOAT nonstd::optional<float>()
 #define OPTIONAL_INT nonstd::optional<int64_t>()
 
-OP_DECL(poptorch, gru, gru, AiOnnxOpset10.gru, ARG(INT, hidden_size),
+OP_DECL(poptorch, gru, gru, AiOnnxOpset11.gru, ARG(INT, hidden_size),
         BODY_ARG(2) BODY_ARG(EMPTY_FLOAT_VEC) BODY_ARG(EMPTY_FLOAT_VEC)
         BODY_ARG(EMPTY_STRING_VEC) BODY_ARG(OPTIONAL_FLOAT)
         BODY_ARG("forward") BODY_ARG(hidden_size) BODY_ARG(1)
         BODY_ARG(DEBUG_CONTEXT("Gru")))
 
-OP_DECL(poptorch, rnn, rnn, AiOnnxOpset10.rnn, ARG(STRING_VEC, activations),
+OP_DECL(poptorch, rnn, rnn, AiOnnxOpset11.rnn, ARG(STRING_VEC, activations),
         BODY_ARG(2) BODY_ARG(EMPTY_FLOAT_VEC) BODY_ARG(EMPTY_FLOAT_VEC)
         BODY_ARG(activations) BODY_ARG(OPTIONAL_FLOAT) BODY_ARG("forward")
         BODY_ARG(OPTIONAL_INT)

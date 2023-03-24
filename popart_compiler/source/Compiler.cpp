@@ -301,7 +301,7 @@ TensorId Compiler::createTensorId(const char *name) {
 // Create a function decl with the given call and arguments.
 #define OP_DECL(ns, funcName, function, onnxImpl, Args, BodyArgs)              \
   TensorId Compiler::function(const std::vector<TensorId> &inputs Args) {      \
-    auto AiOnnxOpset10 = _impl->active_builder->aiOnnxOpset10();               \
+    auto AiOnnxOpset11 = _impl->active_builder->aiOnnxOpset11();               \
     auto AiGraphcoreOpset1 = _impl->active_builder->aiGraphcoreOpset1();       \
     const bool isLoss = IsLoss(#ns "::" #funcName);                            \
     std::vector<popart::TensorId> ins;                                         \
@@ -314,7 +314,7 @@ TensorId Compiler::createTensorId(const char *name) {
 // Create a function decl with the given call and arguments.
 #define OP_DECL_NO_RETURN(ns, funcName, function, onnxImpl, Args, BodyArgs)    \
   void Compiler::function(const std::vector<TensorId> &inputs Args) {          \
-    auto AiOnnxOpset10 = _impl->active_builder->aiOnnxOpset10();               \
+    auto AiOnnxOpset11 = _impl->active_builder->aiOnnxOpset11();               \
     auto AiGraphcoreOpset1 = _impl->active_builder->aiGraphcoreOpset1();       \
     std::vector<popart::TensorId> ins;                                         \
     std::transform(inputs.begin(), inputs.end(), std::back_inserter(ins),      \
@@ -350,9 +350,7 @@ Compiler::addInitializedInputTensor(const char *name, const char *type,
   const popart::TensorInfo info{type, dims};
 
   // Create the inital data for the variable.
-  popart::ConstVoidData the_data;
-  the_data.data = data;
-  the_data.info = info;
+  const popart::ConstVoidData the_data{data, info};
 
   _impl->ids.push_back(
       _impl->active_builder->addInitializedInputTensor(the_data, name));
@@ -371,9 +369,7 @@ TensorId Compiler::addInitializedInputTensor(
   const popart::TensorInfo info{type, dims};
 
   // Create the inital data for the variable.
-  popart::ConstVoidData the_data;
-  the_data.data = data;
-  the_data.info = info;
+  const popart::ConstVoidData the_data{data, info};
 
   const popart::VariableSettings settings(
       popart::CommGroup(popart::CommGroupType(comm_group_type), shards),
@@ -405,7 +401,7 @@ void Compiler::addOutputTensor(TensorId output, PopartOutputMode output_mode,
     }
   }
 
-  auto tile_set_and_strat = exchangeStrToPopartEnum(overlap);
+  const auto tile_set_and_strat = exchangeStrToPopartEnum(overlap);
   if (tile_set_and_strat.second != popart::ExchangeStrategy::JustInTime) {
     _impl->using_overlapped_io = true;
   }
@@ -610,7 +606,8 @@ void Compiler::initSession(const std::vector<Optimizer> &optimizers,
                              "enablePipelining");
     graph_mode = popart::VirtualGraphMode::ExecutionPhases;
     std::uint64_t num_phases = _impl->max_phase + 1;
-    std::uint64_t num_stages;
+    const std::uint64_t num_stages =
+        _impl->options.serial_phases_execution ? 1 : 2;
     if (_impl->options.tensors_liveness != detail::Liveness::AlwaysLive) {
       // We want to send the tensors off chip: Tensors stay live through
       // phases N, N+1, N+2 so we need to have a gap of 3 before the bwd
@@ -621,11 +618,7 @@ void Compiler::initSession(const std::vector<Optimizer> &optimizers,
       // Make sure the backward pass will start with a new phase.
       num_phases += 1;
     }
-    if (_impl->options.serial_phases_execution) {
-      num_stages = 1;
-    } else {
-      num_stages = 2;
-    }
+
     _impl->setOptionIfNotSet(options.executionPhaseSettings.phases, num_phases,
                              "executionPhaseSettings.phases");
     _impl->setOptionIfNotSet(options.executionPhaseSettings.stages, num_stages,
@@ -885,11 +878,11 @@ void Compiler::loadEngineAndConnectStreams() {
       const poplar::Type ptype =
           poptorch::popart_compiler::poplarTypeFromPoptorch(type);
 
-      auto it = host_sizes.find(ptype);
-      ERROR_ON_MSG(it == host_sizes.end(), "Unsupported host op type");
+      const auto it = host_sizes.find(ptype);
+      ERROR_ON_MSG(it == host_sizes.cend(), "Unsupported host op type");
 
       const std::size_t number_of_elems = std::accumulate(
-          shape.begin(), shape.end(), 1, std::multiplies<std::size_t>());
+          shape.cbegin(), shape.cend(), 1, std::multiplies<std::size_t>());
 
       return number_of_elems * it->second;
     };
@@ -897,12 +890,12 @@ void Compiler::loadEngineAndConnectStreams() {
     // Store the amount of data to be transferred for each of the function's
     // input and output arguments.
     std::vector<std::size_t> input_sizes(cb_data.input_shapes.size());
-    std::transform(cb_data.input_shapes.begin(), cb_data.input_shapes.end(),
+    std::transform(cb_data.input_shapes.cbegin(), cb_data.input_shapes.cend(),
                    cb_data.input_types.begin(), input_sizes.begin(),
                    to_size_bytes);
 
     std::vector<std::size_t> output_sizes(cb_data.output_shapes.size());
-    std::transform(cb_data.output_shapes.begin(), cb_data.output_shapes.end(),
+    std::transform(cb_data.output_shapes.cbegin(), cb_data.output_shapes.cend(),
                    cb_data.output_types.begin(), output_sizes.begin(),
                    to_size_bytes);
 
@@ -1192,7 +1185,7 @@ std::vector<std::int64_t> Compiler::getSize(TensorId id) const {
     return _impl->session->getInfo(_impl->ids[id]).shape();
   }
 
-  auto popart_id = _impl->ids.at(id);
+  const auto popart_id = _impl->ids.at(id);
 
   if (!_impl->active_builder->hasValueInfo(popart_id)) {
     return invalid_size;
@@ -1206,7 +1199,7 @@ std::unique_ptr<char[]> Compiler::getTensorDTypeString(TensorId id) const {
   if (_impl->session) {
     type_str = _impl->session->getInfo(_impl->ids[id]).data_type();
   } else {
-    auto popart_id = _impl->ids.at(id);
+    const auto popart_id = _impl->ids.at(id);
     if (_impl->active_builder->hasValueInfo(popart_id)) {
       type_str = _impl->active_builder->getTensorDtypeString(popart_id);
     } else {
@@ -1294,8 +1287,8 @@ std::uint64_t Compiler::popartBatchDimForAnchor(TensorId id) const {
   const popart::TensorId &popart_id = _impl->ids[id];
 
   // Check what the anchor is supposed to return.
-  auto iterator = _impl->anchors.find(popart_id);
-  ERROR_ON_MSG(iterator == _impl->anchors.end(),
+  const auto iterator = _impl->anchors.find(popart_id);
+  ERROR_ON_MSG(iterator == _impl->anchors.cend(),
                "Internal Error: Output op doesn't have an anchor.");
 
   const popart::AnchorReturnType &return_type = iterator->second;
@@ -1319,7 +1312,7 @@ void Compiler::setAvailableMemoryProportion(
     float availableMemoryProportion) {
   for (const auto &ids : inputs) {
     std::set<popart::TensorId> popart_ids;
-    std::transform(std::begin(ids), std::end(ids),
+    std::transform(std::cbegin(ids), std::cend(ids),
                    std::inserter(popart_ids, std::begin(popart_ids)),
                    [this](const TensorId &id) { return _impl->ids[id]; });
     _impl->active_builder->setAvailableMemoryProportion(
@@ -1469,15 +1462,13 @@ TensorId Compiler::endForLoop(std::int32_t trip_count, std::int64_t num_outputs,
 
   // Switch back to main graph.
   _impl->active_builder = _impl->active_builder->getParent();
-  auto ai_onnx = _impl->active_builder->aiOnnxOpset10();
+  auto ai_onnx = _impl->active_builder->aiOnnxOpset11();
 
-  popart::ConstVoidData trip_count_data(&trip_count,
-                                        {"INT32", popart::Shape{}});
-  popart::ConstVoidData the_data;
+  const popart::ConstVoidData trip_count_data(&trip_count,
+                                              {"INT32", popart::Shape{}});
 
   const bool true_const = true;
-  the_data.data = &true_const;
-  the_data.info = {"BOOL", popart::Shape{}};
+  const popart::ConstVoidData the_data(&true_const, {"BOOL", popart::Shape{}});
 
   const popart::TensorId trip_count_as_tensor =
       ai_onnx.constant(trip_count_data);
@@ -1531,7 +1522,7 @@ void Compiler::addMultiConvPart(const std::vector<TensorId> &inputs,
                                 const std::vector<int64_t> &pads,
                                 const std::vector<int64_t> &strides) {
   std::vector<popart::TensorId> args;
-  std::transform(inputs.begin(), inputs.end(), std::back_inserter(args),
+  std::transform(inputs.cbegin(), inputs.cend(), std::back_inserter(args),
                  [&](TensorId index) { return _impl->ids[index]; });
   _impl->addMultiConvPart(args, dilations, kernel_shape, pads, strides);
 }

@@ -30,8 +30,9 @@ torch::jit::Node *onesZerosHandler(torch::jit::Graph *graph,
   //                 -> Tensor
 
   torch::jit::Symbol kind = node->kind();
-  bool is_ones = kind == c10::aten::ones || kind == c10::aten::ones_like ||
-                 kind == c10::aten::new_ones;
+  const bool is_ones = kind == c10::aten::ones ||
+                       kind == c10::aten::ones_like ||
+                       kind == c10::aten::new_ones;
 
   auto *output = node->output();
   auto *new_node = createAndInsertNode(
@@ -41,14 +42,14 @@ torch::jit::Node *onesZerosHandler(torch::jit::Graph *graph,
   if (kind != c10::aten::new_ones && kind != c10::aten::new_zeros) {
     new_node->is_(c10::attr::shape, shapeFromTensor(output));
   } else {
-    auto shape_list = handleTensorList(node->input(1)->node());
+    const auto shape_list = handleTensorList(node->input(1)->node());
     std::vector<int64_t> shape;
     for (auto *size : shape_list) {
       ERROR_ON_MSG(
           !isTensorConstant(size->node()),
           "Invalid shape for "
           "new_zeros or new_ones. Shape needs to be a static constant");
-      shape.push_back(constantToInt(size->node()));
+      shape.emplace_back(constantToInt(size->node()));
     }
     new_node->is_(c10::attr::shape, shape);
   }
@@ -115,13 +116,14 @@ torch::jit::Node *randpermHandler(torch::jit::Graph *graph,
   n->output()->inferTypeFrom(getNodeTensorAttrValue(n));
   auto *size_of_permutation = n->output();
 
-  auto shape = {constantToLong(n)};
-  auto dtype = c10::ScalarType::Float;
+  const auto shape = {constantToLong(n)};
+  const auto dtype = c10::ScalarType::Float;
 
   torch::jit::Value *uniform =
       createRandomUniform(graph, nullptr, shape, 1.0, 0.0, dtype)->output();
 
-  auto *topk = createTopk(graph, {uniform, size_of_permutation}, 0);
+  auto *topk = createTopk(graph, {uniform, size_of_permutation}, 0,
+                          true /*largest*/, true /*sorted*/);
 
   return createCast(graph, topk->output(1), c10::ScalarType::Int);
 }

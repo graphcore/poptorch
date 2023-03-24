@@ -8,7 +8,7 @@
 #include "poptorch/Utils.hpp"
 #include "poptorch_logging/Error.hpp"
 #include "poptorch_logging/Logging.hpp"
-
+#include <iostream>
 namespace poptorch {
 
 namespace {
@@ -242,12 +242,18 @@ torch::jit::Node *hardshrinkHandler(torch::jit::Graph *graph,
 torch::jit::Node *hardtanhHandler(torch::jit::Graph *graph,
                                   torch::jit::Node *node) {
   auto *x = node->input(0);
-  auto *b = node->input(2);
-  auto t0 = constantToFloat(b->node());
-  auto *a = node->input(1);
-  auto t1 = constantToFloat(a->node());
-  // clip(x, cfloat(b), cfloat(a))
-  return createClip(graph, {x}, t0, t1);
+
+  const CreateCast<float> cast_obj;
+
+  auto *t1 = node->input(1);
+  auto *t2 = node->input(2);
+
+  auto *a =
+      getNodeScalarType(t1) != c10::kFloat ? cast_obj(graph, t1)->output() : t1;
+  auto *b =
+      getNodeScalarType(t2) != c10::kFloat ? cast_obj(graph, t2)->output() : t2;
+  // clip(x, a, b)
+  return createClip(graph, {x, a, b});
 }
 
 torch::jit::Node *hingeEmbeddingLossHandler(torch::jit::Graph *graph,
@@ -720,8 +726,12 @@ torch::jit::Node *topkHandler(torch::jit::Graph *graph,
   auto *l = node->input(2);
   auto t2 = x->type()->expect<c10::TensorType>();
   auto t3 = handleDimensionParam(l, t2);
+
+  const bool largest = constantToBool(node->input(3)->node());
+  const bool sorted = constantToBool(node->input(4)->node());
+
   // topk(x, inplace_cast<long>(c), dimension(l, TensorType(x)))
-  return createTopk(graph, {x, t1}, t3);
+  return createTopk(graph, {x, t1}, t3, largest, sorted);
 }
 
 torch::jit::Node *uniformInPlaceHandler(torch::jit::Graph *graph,

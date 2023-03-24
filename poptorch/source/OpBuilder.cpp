@@ -8,6 +8,7 @@
 #include "poptorch/DispatchTracer.hpp"
 #include "poptorch/OpBuilder.hpp"
 #include "poptorch/PopartCanonicalization.hpp"
+
 #include "poptorch/Utils.hpp"
 
 #include "PoptorchSymbols.hpp"
@@ -300,8 +301,8 @@ torch::jit::Node *createConstant(torch::jit::Graph *graph,
                                  const std::vector<U> &data,
                                  const std::vector<int64_t> &new_shape,
                                  at::ScalarType scalar_type) {
-  auto total_size = static_cast<std::size_t>(std::accumulate(
-      new_shape.begin(), new_shape.end(), 1, std::multiplies<int64_t>()));
+  const auto total_size = static_cast<std::size_t>(std::accumulate(
+      new_shape.cbegin(), new_shape.cend(), 1, std::multiplies<int64_t>()));
 
   size_t stride = 0;
   if (data.size() != 1) {
@@ -312,8 +313,9 @@ torch::jit::Node *createConstant(torch::jit::Graph *graph,
       {new_shape},
       at::dtype(scalar_type).memory_format(c10::MemoryFormat::Contiguous));
 
+  auto *t_data = t.data_ptr<T>();
   for (size_t i = 0; i < total_size; i++) {
-    *(t.data_ptr<T>() + i) = static_cast<T>(data[i * stride]); // NOLINT
+    t_data[i] = static_cast<T>(data[i * stride]); // NOLINT
   }
 
   return tensorToConstant(graph, t);
@@ -411,15 +413,23 @@ torch::jit::Node *createConstantPad(torch::jit::Graph *graph,
                                     const std::vector<int64_t> &pad_shape,
                                     float constant,
                                     bool direct_pad_shape_input) {
-  torch::jit::Node *new_node =
-      createAndInsertNode(graph, symbols::poptorch::constant_pad, {A},
-                          ImplicitCast::None, OutputType::AsFirstInput);
-  new_node->is_(c10::Symbol::attr("pads"),
-                direct_pad_shape_input
-                    ? pad_shape
-                    : convertPytorchPads(shapeFromTensor(A), pad_shape));
-  new_node->f_(c10::Symbol::attr("value"), constant);
-  return new_node;
+
+  const auto converted_pad_shape =
+      direct_pad_shape_input
+          ? pad_shape
+          : convertPytorchPads(shapeFromTensor(A), pad_shape);
+
+  auto *pads_tensor =
+      createConstantLong(graph, converted_pad_shape,
+                         {static_cast<int64_t>(converted_pad_shape.size())})
+          ->output();
+
+  auto *constant_value_tensor =
+      createConstantFloat32(graph, {constant}, {1})->output();
+
+  return createAndInsertNode(graph, symbols::poptorch::constant_pad,
+                             {A, pads_tensor, constant_value_tensor},
+                             ImplicitCast::None, OutputType::AsFirstInput);
 }
 
 torch::jit::Value *wrapInConstantVec(torch::jit::Graph *graph,
@@ -431,24 +441,33 @@ torch::jit::Value *wrapInConstantVec(torch::jit::Graph *graph,
 
 torch::jit::Node *createEdgePad(torch::jit::Graph *graph, torch::jit::Value *A,
                                 const std::vector<int64_t> &pad_shape) {
-  torch::jit::Node *new_node =
-      createAndInsertNode(graph, symbols::poptorch::edge_pad, {A},
-                          ImplicitCast::None, OutputType::AsFirstInput);
-  new_node->is_(c10::Symbol::attr("pads"),
-                convertPytorchPads(shapeFromTensor(A), pad_shape));
-  return new_node;
+
+  const auto converted_pad_shape =
+      convertPytorchPads(shapeFromTensor(A), pad_shape);
+
+  auto *pads_tensor =
+      createConstantLong(graph, converted_pad_shape,
+                         {static_cast<int64_t>(converted_pad_shape.size())})
+          ->output();
+  return createAndInsertNode(graph, symbols::poptorch::edge_pad,
+                             {A, pads_tensor}, ImplicitCast::None,
+                             OutputType::AsFirstInput);
+  ;
 }
 
 torch::jit::Node *createReflectionPad(torch::jit::Graph *graph,
                                       torch::jit::Value *A,
                                       const std::vector<int64_t> &pad_shape) {
-  torch::jit::Node *new_node =
-      createAndInsertNode(graph, symbols::poptorch::reflection_pad, {A},
-                          ImplicitCast::None, OutputType::AsFirstInput);
-  new_node->is_(c10::Symbol::attr("pads"),
-                convertPytorchPads(shapeFromTensor(A), pad_shape));
 
-  return new_node;
+  const auto converted_pad_shape =
+      convertPytorchPads(shapeFromTensor(A), pad_shape);
+  auto *pads_tensor =
+      createConstantLong(graph, converted_pad_shape,
+                         {static_cast<int64_t>(converted_pad_shape.size())})
+          ->output();
+  return createAndInsertNode(graph, symbols::poptorch::reflection_pad,
+                             {A, pads_tensor}, ImplicitCast::None,
+                             OutputType::AsFirstInput);
 }
 
 torch::jit::Node *createAddNotInPlace(torch::jit::Graph *graph,

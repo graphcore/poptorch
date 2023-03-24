@@ -30,7 +30,7 @@ torch::jit::Node *reduceHandler(torch::jit::Graph *graph,
   torch::jit::Value *input = node->input(0);
 
   // sum and prod works even for bool types in PyTorch
-  auto tensor_type = input->type()->expect<c10::TensorType>();
+  const auto tensor_type = input->type()->expect<c10::TensorType>();
   if (tensor_type->scalarType() == at::ScalarType::Bool) {
     auto *cast_node = createCast(graph, input, c10::ScalarType::Int);
     input = cast_node->output();
@@ -126,7 +126,7 @@ torch::jit::Node *aMinMaxHandler(torch::jit::Graph *graph,
   // aten::min(Tensor self, int[] dim, int keepdim)
   auto *input = node->input(0);
   auto axes = constantToLongVec(node->input(1)->node());
-  auto keepdim = constantToLong(node->input(2)->node());
+  const auto keepdim = constantToLong(node->input(2)->node());
 
   if (axes.empty()) {
     input = createFlatten(graph, {input}, 0)->output();
@@ -183,19 +183,20 @@ torch::jit::Node *argsortHandler(torch::jit::Graph *graph,
                                  torch::jit::Node *node) {
   auto *x = node->input(0);
   auto t0 = x->type()->expect<c10::TensorType>();
-  std::vector<std::int64_t> shape = shapeFromTensor(node->input(0));
-  auto dim = handleDimensionParam(node->input(1), t0);
+  const std::vector<std::int64_t> shape = shapeFromTensor(node->input(0));
+  const auto dim = handleDimensionParam(node->input(1), t0);
 
   auto *size = createConstantLong(graph, {shape[dim]}, {1})->output();
 
-  auto *topk = createTopk(graph, {x, size}, dim);
+  auto *topk =
+      createTopk(graph, {x, size}, dim, true /*largest*/, true /*sorted*/);
   auto *indices = topk->output(1);
 
   // Onnx will output the indices long, so use a cast to revert the type.
   // PopART will remove it as an identity when topk resolves to output an int.
   indices = createCast(graph, indices, c10::ScalarType::Int)->output();
 
-  auto descending = constantToBool(node->input(2)->node());
+  const auto descending = constantToBool(node->input(2)->node());
   if (descending) {
     return indices->node();
   }
@@ -215,8 +216,8 @@ torch::jit::Node *minMaxWithIndicesHandler(torch::jit::Graph *graph,
     values = createIdentity(graph, {x})->output();
     indices = createConstantInt(graph, {0}, {})->output();
   } else {
-    auto dim = handleDimensionParam(node->input(1), t0);
-    auto keepdim = constantToBool(node->input(2)->node());
+    const auto dim = handleDimensionParam(node->input(1), t0);
+    const auto keepdim = constantToBool(node->input(2)->node());
     const bool negate = node->kind() == c10::aten::min;
 
     if (negate) {
@@ -224,7 +225,8 @@ torch::jit::Node *minMaxWithIndicesHandler(torch::jit::Graph *graph,
     }
 
     auto *one = tensorToConstant(graph, at::tensor(1L))->output();
-    auto *result = createTopk(graph, {x, one}, dim);
+    auto *result =
+        createTopk(graph, {x, one}, dim, true /*largest*/, true /*sorted*/);
     values = result->output(0);
     indices = result->output(1);
     // TopK returns UINT32 indices, but torch doesn't have unsigned
@@ -336,7 +338,7 @@ torch::jit::Node *tensorNormHandler(torch::jit::Graph *graph,
       axes = constantToLongVec(node->input(2)->node());
     }
     keepdim = constantToLong(node->input(3)->node());
-    auto shape = shapeFromTensor(input);
+    const auto shape = shapeFromTensor(input);
     // Empty axes array means reduce over all axes in PyTorch, but means
     // do nothing in PopART
     if (axes.empty()) {
@@ -417,11 +419,11 @@ torch::jit::Node *frobeniusnormHandler(torch::jit::Graph *graph,
   if (node->inputs().size() == 3) {
     auto *x = node->input(0);
     auto *l = node->input(1);
-    auto t0 = constantToLongVec(l->node());
-    auto t1 = reduceHelperDimensionCreator(x, t0);
+    const auto t0 = constantToLongVec(l->node());
+    const auto t1 = reduceHelperDimensionCreator(x, t0);
     auto *c = node->input(2);
-    auto t2 = constantToLong(c->node());
-    auto shape = shapeFromTensor(x);
+    const auto t2 = constantToLong(c->node());
+    const auto shape = shapeFromTensor(x);
     // If we're reducing over singleton dims and keeping them, the
     // behaviour of PopART reduce ops is to do nothing, but PyTorch will
     // still take the absolute value of the tensor, so we need to
@@ -479,19 +481,19 @@ torch::jit::Node *nanSumHandler(torch::jit::Graph *graph,
   } else if (isNone(dim)) {
     // We only get a node with Constant kind if `dim` is not
     // provided, so preform the sum over all the dimensions.
-    auto in_dim_count = shapeFromTensor(in_tensor).size();
+    const auto in_dim_count = shapeFromTensor(in_tensor).size();
     dims.resize(in_dim_count);
     std::iota(dims.begin(), dims.end(), 0);
   } else {
     ERROR("Popart Canonicalisation: UNREACHABLE reached in nansum handler.");
   }
 
-  auto keepdim = constantToLong(node->input(2)->node());
+  const auto keepdim = constantToLong(node->input(2)->node());
   auto *sum = createReducesum(graph, {non_nans->output(0)}, dims, keepdim);
 
   auto *dtype = node->input(3);
   if (!isNone(dtype)) {
-    auto type = constantToScalarType(dtype->node());
+    const auto type = constantToScalarType(dtype->node());
     return createCast(graph, sum->output(0), type);
   }
   return sum;
