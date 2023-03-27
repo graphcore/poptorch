@@ -56,8 +56,13 @@ expected_group_size_after_fuse = {
 def check_is_fused(poptorch_model, op_type, expected_group_size,
                    expected_num_ops):
     all_ops = json.loads(poptorch_model._debugGetPopartIR())['maingraph']  # pylint: disable=protected-access
-    op_type = "Gather" if op_type == "gather" else "ScatterReduce"
-    ops = [op for op in all_ops if op['type'] == op_type]
+    op_types = ("GroupedGather",
+                "Gather") if op_type == "gather" else ("ScatterReduce", )
+    ops = []
+    for grouped_op_type in op_types:
+        for op in all_ops:
+            if op['type'] == grouped_op_type:
+                ops.append(op)
 
     assert len(ops) == expected_num_ops
     assert int(ops[0]['attributes']['group_size']) == expected_group_size
