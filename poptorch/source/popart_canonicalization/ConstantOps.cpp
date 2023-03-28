@@ -116,7 +116,7 @@ torch::jit::Node *randpermHandler(torch::jit::Graph *graph,
   n->output()->inferTypeFrom(getNodeTensorAttrValue(n));
   auto *size_of_permutation = n->output();
 
-  const auto shape = {constantToLong(n)};
+  const std::vector<int64_t> shape = {constantToLong(n)};
   const auto dtype = c10::ScalarType::Float;
 
   torch::jit::Value *uniform =
