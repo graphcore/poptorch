@@ -4,6 +4,8 @@
 
 torch==1.13.1+cpu; sys_platform != "darwin" and platform_machine != "aarch64"
 torch==1.13.1; sys_platform == "darwin" or platform_machine == "aarch64"
+torchaudio==0.13.1+cpu; sys_platform != "darwin" and platform_machine != "aarch64"
+torchaudio==0.13.1; sys_platform == "darwin" or platform_machine == "aarch64"
 torchvision==0.14.1+cpu; sys_platform != "darwin" and platform_machine != "aarch64"
 torchvision==0.14.1; sys_platform == "darwin" or platform_machine == "aarch64"
 

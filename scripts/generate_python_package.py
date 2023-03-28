@@ -39,16 +39,26 @@ parser.add_argument("--output-dir",
 args = parser.parse_args()
 
 
-def get_torch_dependency():
+def get_version_from_requirements(package):
+    with open(os.path.join(src_dir, 'requirements.txt'), 'r') as f:
+        for line in f:
+            if package in line and not 'cpu' in line:
+                name_and_version = line.split(';')[0].split('=')
+                return name_and_version[-1]
+
+    return None
+
+
+def get_torch_dependency(package, version):
     if "aarch64" in utils.get_arch_type():
         # There is no +cpu variant of Torch on Arm
-        return f'torch=={TORCH_VERSION}'
+        return f'{package}=={version}'
     # For sdist packages we don't know ahead of time what the python version
     # will be, and there is no support for --find-links so we just have to
     # use the regular torch wheel instead.
     if args.target != "bdist_wheel":
-        return f'torch=={TORCH_VERSION}'
-    return f"torch @ https://download.pytorch.org/whl/cpu/torch-{TORCH_VERSION}%2Bcpu-{get_abbr_impl()}{get_impl_ver()}-{get_abi_tag()}-{PLATFORM}.whl"
+        return f'{package}=={version}'
+    return f"{package} @ https://download.pytorch.org/whl/cpu/{package}-{version}%2Bcpu-{get_abbr_impl()}{get_impl_ver()}-{get_abi_tag()}-{PLATFORM}.whl"
 
 
 def get_poptorch_version():
@@ -62,13 +72,22 @@ def get_poptorch_version():
 
 
 VERSION = get_poptorch_version()
-TORCH_VERSION = utils.get_required_torch_version()
 
 # https://www.python.org/dev/peps/pep-0425/
 # The platform tag is simply distutils.util.get_platform() with all hyphens - and periods . replaced with underscore _.
 PLATFORM = distutils.util.get_platform().replace(".", "_").replace("-", "_")
 
-TORCH_DEPENDENCY = get_torch_dependency()
+torch_ver = utils.get_required_torch_version()
+TORCH_DEPENDENCY = get_torch_dependency('torch', torch_ver)
+
+src_dir = utils.sources_dir()
+# torch{audio, vision} are added here to prevent the torch upgrade when other
+# packages depend on torch{audio, vision}.
+torchaudio_ver = get_version_from_requirements('torchaudio')
+TORCHAUDIO_DEPENDENCY = get_torch_dependency('torchaudio', torchaudio_ver)
+
+torchvision_ver = get_version_from_requirements('torchvision')
+TORCHVISION_DEPENDENCY = get_torch_dependency('torchvision', torchvision_ver)
 
 
 # Only keep files of a given extension
@@ -84,7 +103,6 @@ class ExtOnly:
         return [f for f in filenames if self._is_ignored(f)]
 
 
-src_dir = utils.sources_dir()
 include_dir = os.path.realpath(args.include_dir)
 lib_dirs = [os.path.realpath(args.lib_dir)]
 if args.standalone is not None:
@@ -98,8 +116,10 @@ def configure(src_filename, dst_filename):
         for line in open(src_filename):
             f.write(
                 line.replace("@VERSION@", VERSION) \
+                    .replace("@PLATFORM@", PLATFORM) \
                     .replace("@TORCH_DEPENDENCY@", TORCH_DEPENDENCY) \
-                    .replace("@PLATFORM@", PLATFORM)
+                    .replace("@TORCHAUDIO_DEPENDENCY@", TORCHAUDIO_DEPENDENCY) \
+                    .replace("@TORCHVISION_DEPENDENCY@", TORCHVISION_DEPENDENCY)
             )
 
 

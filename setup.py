@@ -9,7 +9,12 @@ from pybind11.setup_helpers import Pybind11Extension
 
 logging.basicConfig(level=logging.INFO)
 
-REQUIRES = ['tqdm', '@TORCH_DEPENDENCY@']
+# torch{audio, vision} are added here to prevent the torch upgrade when other
+# packages depend on torch{audio, vision}.
+REQUIRES = [
+    'tqdm', '@TORCH_DEPENDENCY@', '@TORCHAUDIO_DEPENDENCY@',
+    '@TORCHVISION_DEPENDENCY@'
+]
 VERSION = "@VERSION@"
 
 LONG_DESCRIPTION = (
