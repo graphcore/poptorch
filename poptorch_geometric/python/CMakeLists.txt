@@ -15,6 +15,7 @@ install(CODE
 
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/__init__.py DESTINATION "${INSTALL_POPPYG_PYDIR}")
 install(FILES ${poppyg_python_files} py.typed DESTINATION "${INSTALL_POPPYG_PYDIR}")
+install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/ops DESTINATION "${INSTALL_POPPYG_PYDIR}")
 
 install(CODE
    " execute_process(

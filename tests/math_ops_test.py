@@ -749,14 +749,13 @@ def test_compare_unity_operations(op):
     op_harness(operation, [input], assert_, test_training=True)
 
 
-# Support other arguments. TODO(T23319)
-def test_topk():
+@pytest.mark.parametrize("largest", [True, False])
+def test_topk(largest):
     torch.manual_seed(42)
-
     input = torch.randn([1, 2, 10, 10])
 
     def operation(x):
-        return torch.topk(x, k=10, dim=-1)
+        return torch.topk(x, k=10, dim=-1, largest=largest)
 
     def assert_(native_out, poptorch_out):
         helpers.assert_allclose(actual=poptorch_out[0],
