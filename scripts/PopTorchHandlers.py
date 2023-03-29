@@ -33,6 +33,10 @@ expand(
     "end_for_loop", lambda output, inputs, trip_count: op.endForLoop(
         output, inputs, clong(trip_count)))
 
+expand("start_if_block", op.startIfBlock)
+expand("start_else_block", op.startElseBlock)
+expand("end_if_block", op.endIfBlock)
+
 expand("nop", op.nop)
 
 # These are graph annotations: they don't take any arguments and don't return

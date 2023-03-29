@@ -183,6 +183,10 @@ public:
   // of the op_builder top level graph.
   popart::Builder *active_builder;
 
+  // Stacks for subgraphs realizing true/false branch paths.
+  std::stack<popart::Builder *> if_true_stack;
+  std::stack<popart::Builder *> if_false_stack;
+
   std::map<popart::TensorId, popart::AnchorReturnType> anchors;
 
   std::vector<popart::TensorId> ids;

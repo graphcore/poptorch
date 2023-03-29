@@ -326,6 +326,12 @@ public:
   TensorId endForLoop(std::int32_t trip_count, std::int64_t num_outputs,
                       const std::vector<TensorId> &inputs);
 
+  void startIfBlock();
+
+  void startElseBlock();
+
+  TensorId endIfBlock(const TensorId &condition, std::size_t num_outputs);
+
   void pushNameScope(const char *name);
 
   void popNameScope();

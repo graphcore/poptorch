@@ -1488,6 +1488,47 @@ TensorId Compiler::endForLoop(std::int32_t trip_count, std::int64_t num_outputs,
                                                        _impl.get());
 }
 
+void Compiler::startIfBlock() {
+  popart::Builder *subgraph = &_impl->active_builder->createSubgraphBuilder();
+  _impl->active_builder = subgraph;
+  _impl->if_true_stack.push(_impl->active_builder);
+}
+
+void Compiler::startElseBlock() {
+  // Else must by definition be added after an if block.
+  _impl->active_builder = _impl->active_builder->getParent();
+
+  popart::Builder *subgraph = &_impl->active_builder->createSubgraphBuilder();
+  _impl->active_builder = subgraph;
+  _impl->if_false_stack.push(_impl->active_builder);
+}
+
+TensorId Compiler::endIfBlock(const TensorId &condition,
+                              std::size_t num_outputs) {
+  ERROR_ON_MSG(_impl->is_training,
+               "poptorch.cond() is only supported in inference.");
+
+  // Pop back to the parent.
+  _impl->active_builder = _impl->active_builder->getParent();
+
+  // Pop the false branch off the stack.
+  popart::Builder *else_branch = _impl->if_false_stack.top();
+  _impl->if_false_stack.pop();
+
+  // Pop the true branch off the stack.
+  popart::Builder *then_branch = _impl->if_true_stack.top();
+  _impl->if_true_stack.pop();
+
+  const popart::TensorId cond_as_popart = _impl->ids.at(condition);
+
+  auto ai_onnx = _impl->active_builder->aiOnnxOpset11();
+  std::vector<popart::TensorId> outputs = ai_onnx.logical_if(
+      {cond_as_popart}, num_outputs, *else_branch, *then_branch);
+
+  return HandleOutput<std::vector<popart::TensorId>>{}(outputs, false,
+                                                       _impl.get());
+}
+
 void Compiler::pushNameScope(const char *name) {
   _impl->active_builder->pushNameScope(std::string(name));
 }

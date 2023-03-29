@@ -131,6 +131,28 @@ torch::jit::Node *startForLoopHandler(torch::jit::Graph *graph,
   return createStartForLoop(graph, inputs);
 }
 
+torch::jit::Node *startIfBlockHandler(torch::jit::Graph *graph,
+                                      torch::jit::Node *node) {
+  auto *condition = node->input(0);
+  // startIfBlockHandler(condition)
+  return createStartIfBlock(graph, condition);
+}
+
+torch::jit::Node *startElseBlockHandler(torch::jit::Graph *graph,
+                                        torch::jit::Node *node) {
+  auto *outputs_then = node->input(0);
+  // startElseBlockHandler(outputs_then)
+  return createStartElseBlock(graph, outputs_then);
+}
+
+torch::jit::Node *endIfBlockHandler(torch::jit::Graph *graph,
+                                    torch::jit::Node *node) {
+  auto *outputs_else = node->input(0);
+  auto *condition = node->input(1);
+  // startElseBlockHandler(outputs_else, condition)
+  return createEndIfBlock(graph, outputs_else, condition);
+}
+
 torch::jit::Node *updateParamInplaceHandler(torch::jit::Graph *graph,
                                             torch::jit::Node *node) {
   auto *i0 = node->input(0);
@@ -158,6 +180,9 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(symbols::poptorch::set_matmul_serialization,
                   setMatmulSerializationHandler);
   registerHandler(symbols::poptorch::start_for_loop, startForLoopHandler);
+  registerHandler(symbols::poptorch::start_if_block, startIfBlockHandler);
+  registerHandler(symbols::poptorch::start_else_block, startElseBlockHandler);
+  registerHandler(symbols::poptorch::end_if_block, endIfBlockHandler);
   registerHandler(symbols::poptorch::update_param_inplace,
                   updateParamInplaceHandler);
 }

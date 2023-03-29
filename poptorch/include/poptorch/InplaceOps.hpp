@@ -73,6 +73,8 @@ private:
 };
 
 void fixForLoopInputs(torch::jit::Graph &graph);
+
+void verifyIfElseBlocksOrder(const torch::jit::Graph &graph);
 } // namespace poptorch
 
 #endif // INCLUDE_POPTORCH_INPLACE_OPS_H

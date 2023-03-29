@@ -171,6 +171,16 @@ torch::jit::Node *createEndForLoop(torch::jit::Graph *graph,
                                    torch::jit::Value *inputs,
                                    std::int64_t trip_count);
 
+torch::jit::Node *createStartIfBlock(torch::jit::Graph *graph,
+                                     torch::jit::Value *condition);
+
+torch::jit::Node *createStartElseBlock(torch::jit::Graph *graph,
+                                       torch::jit::Value *outputs_then);
+
+torch::jit::Node *createEndIfBlock(torch::jit::Graph *graph,
+                                   torch::jit::Value *outputs_else,
+                                   torch::jit::Value *condition);
+
 torch::jit::Node *createAddUntypedInputTensor(torch::jit::Graph *graph,
                                               torch::jit::Value *input);
 

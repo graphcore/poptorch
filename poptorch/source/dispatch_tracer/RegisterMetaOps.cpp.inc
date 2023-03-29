@@ -311,6 +311,8 @@ TORCH_LIBRARY_IMPL(poptorch, Meta, m) {
   m.impl("begin_ipu_block", PTC_BOXED(poptorch::meta::opWithoutOutputs));
   m.impl("end_ipu_block", PTC_BOXED(poptorch::meta::opWithoutOutputs));
   m.impl("start_for_loop", PTC_BOXED(poptorch::meta::opWithoutOutputs));
+  m.impl("start_if_block", PTC_BOXED(poptorch::meta::opWithoutOutputs));
+  m.impl("start_else_block", PTC_BOXED(poptorch::meta::opWithoutOutputs));
   m.impl("optimizer_group", PTC_BOXED(poptorch::meta::opWithoutOutputs));
   m.impl("call_cpu_op", PTC_BOXED(poptorch::meta::opWithoutOutputs));
   m.impl("set_attribute", PTC_BOXED(poptorch::meta::opWithoutOutputs));
@@ -320,6 +322,7 @@ TORCH_LIBRARY_IMPL(poptorch, Meta, m) {
 
   m.impl("end_cpu_op", PTC_BOXED(poptorch::meta::opReturningFirstArgument));
   m.impl("end_for_loop", PTC_BOXED(poptorch::meta::opReturningFirstArgument));
+  m.impl("end_if_block", PTC_BOXED(poptorch::meta::opReturningFirstArgument));
   m.impl("internal_cast", PTC_BOXED(poptorch::meta::opReturningFirstArgument));
   m.impl("ipu_print_tensor", PTC_BOXED(poptorch::meta::opReturningFirstArgument));
   m.impl("nop", PTC_BOXED(poptorch::meta::opReturningFirstArgument));
@@ -350,6 +353,10 @@ TORCH_LIBRARY_IMPL(poptorch, AutogradMeta, m) {
   m.impl("identity_loss", torch::autograd::autogradNotImplementedFallback());
   m.impl("start_for_loop", torch::autograd::autogradNotImplementedFallback());
   m.impl("end_for_loop", torch::autograd::autogradNotImplementedFallback());
+  m.impl("start_if_block", torch::autograd::autogradNotImplementedFallback());
+  m.impl("start_else_block", torch::autograd::autogradNotImplementedFallback());
+  m.impl("end_if_block", torch::autograd::autogradNotImplementedFallback());
+
   m.impl("optimizer_group", torch::autograd::autogradNotImplementedFallback());
   m.impl("set_matmul_serialization",
          torch::autograd::autogradNotImplementedFallback());

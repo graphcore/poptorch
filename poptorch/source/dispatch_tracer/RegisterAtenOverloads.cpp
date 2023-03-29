@@ -887,6 +887,10 @@ TORCH_LIBRARY(poptorch, m) {
       "begin_ipu_block(int stage_id, int phase_id, int ipu_id) -> ()"));
   m.def(OP_WITHOUT_OUTPUTS("end_ipu_block() -> ()"));
   m.def(OP_WITHOUT_OUTPUTS("start_for_loop(Tensor[] inputs) -> ()"));
+
+  m.def(OP_WITHOUT_OUTPUTS("start_if_block(Tensor condition) -> ()"));
+  m.def(OP_WITHOUT_OUTPUTS("start_else_block(Tensor[] outputs_true) -> ()"));
+
   m.def(
       OP_WITHOUT_OUTPUTS("optimizer_group(int group, Tensor[] inputs) -> ()"));
   m.def(OP_WITHOUT_OUTPUTS("begin_multi_conv() -> ()"));
@@ -909,6 +913,8 @@ TORCH_LIBRARY(poptorch, m) {
   m.def("nop(Tensor self) -> Tensor");
   m.def("end_for_loop(Tensor[] outputs, Tensor[] "
         "inputs, int trip_count) -> Tensor[]");
+  m.def("end_if_block(Tensor[] outputs, Tensor condition) -> Tensor[]");
+
   m.def("set_matmul_serialization(Tensor matmul, str "
         "mode, int factor, bool keep_precision) -> Tensor");
   m.def("set_overlap_for_input(Tensor t, str mode) -> Tensor");
@@ -945,6 +951,7 @@ TORCH_LIBRARY(poptorch, m) {
 TORCH_LIBRARY_IMPL(poptorch, CPU, m) {
   // Operations returning the first argument
   m.impl("end_for_loop", PTC_BOXED(opReturningFirstArgument));
+  m.impl("end_if_block", PTC_BOXED(opReturningFirstArgument));
   m.impl("ipu_print_tensor", PTC_BOXED(opReturningFirstArgument));
   m.impl("nop", PTC_BOXED(opReturningFirstArgument));
   m.impl("recomputation_checkpoint", PTC_BOXED(opReturningFirstArgument));
@@ -987,6 +994,11 @@ TORCH_LIBRARY_IMPL(poptorch, AutogradIPU, m) {
   m.impl("identity_loss", torch::autograd::autogradNotImplementedFallback());
   m.impl("start_for_loop", torch::autograd::autogradNotImplementedFallback());
   m.impl("end_for_loop", torch::autograd::autogradNotImplementedFallback());
+
+  m.impl("start_if_block", torch::autograd::autogradNotImplementedFallback());
+  m.impl("start_else_block", torch::autograd::autogradNotImplementedFallback());
+  m.impl("end_if_block", torch::autograd::autogradNotImplementedFallback());
+
   m.impl("optimizer_group", torch::autograd::autogradNotImplementedFallback());
   m.impl("set_matmul_serialization",
          torch::autograd::autogradNotImplementedFallback());

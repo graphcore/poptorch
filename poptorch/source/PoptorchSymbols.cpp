@@ -100,6 +100,11 @@ c10::Symbol host_side_cast;
 
 c10::Symbol start_for_loop;
 c10::Symbol end_for_loop;
+
+c10::Symbol start_if_block;
+c10::Symbol start_else_block;
+c10::Symbol end_if_block;
+
 c10::Symbol push_name_scope;
 c10::Symbol pop_name_scope;
 c10::Symbol add_untyped_input_tensor;
@@ -141,6 +146,11 @@ static void initializePoptorchSymbols() {
 
   SYMBOL_INIT(poptorch, start_for_loop);
   SYMBOL_INIT(poptorch, end_for_loop);
+
+  SYMBOL_INIT(poptorch, start_if_block);
+  SYMBOL_INIT(poptorch, start_else_block);
+  SYMBOL_INIT(poptorch, end_if_block);
+
   SYMBOL_INIT(poptorch, push_name_scope);
   SYMBOL_INIT(poptorch, pop_name_scope);
   SYMBOL_INIT(poptorch, add_untyped_input_tensor);

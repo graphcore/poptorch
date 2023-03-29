@@ -62,6 +62,9 @@ extern c10::Symbol host_side_cast;
 
 extern c10::Symbol start_for_loop;
 extern c10::Symbol end_for_loop;
+extern c10::Symbol start_if_block;
+extern c10::Symbol start_else_block;
+extern c10::Symbol end_if_block;
 extern c10::Symbol push_name_scope;
 extern c10::Symbol pop_name_scope;
 extern c10::Symbol add_untyped_input_tensor;

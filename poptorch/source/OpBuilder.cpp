@@ -537,6 +537,32 @@ torch::jit::Node *createEndForLoop(torch::jit::Graph *graph,
   return new_node;
 }
 
+torch::jit::Node *createStartIfBlock(torch::jit::Graph *graph,
+                                     torch::jit::Value *condition) {
+  torch::jit::Node *new_node =
+      createAndInsertNode(graph, symbols::poptorch::start_if_block, condition,
+                          ImplicitCast::None, OutputType::Unknown, 0);
+  return new_node;
+}
+
+torch::jit::Node *createStartElseBlock(torch::jit::Graph *graph,
+                                       torch::jit::Value *outputs_then) {
+  torch::jit::Node *new_node = createAndInsertNode(
+      graph, symbols::poptorch::start_else_block, outputs_then,
+      ImplicitCast::None, OutputType::Unknown, 0);
+  return new_node;
+}
+
+torch::jit::Node *createEndIfBlock(torch::jit::Graph *graph,
+                                   torch::jit::Value *outputs_else,
+                                   torch::jit::Value *condition) {
+  torch::jit::Node *new_node = createAndInsertNode(
+      graph, symbols::poptorch::end_if_block, {outputs_else, condition});
+  const std::size_t num_outputs = outputs_else->node()->inputs().size();
+  new_node->i_(c10::Symbol::attr("num_outputs"), num_outputs);
+  return new_node;
+}
+
 torch::jit::Node *
 createRandomNormal(torch::jit::Graph *graph,
                    const std::vector<torch::jit::Value *> &possible_inputs,

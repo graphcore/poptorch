@@ -24,4 +24,7 @@ signatures = {
     'setMatMulSerialization': ['Args', ['cstr'], ['clong'], ['cint']],
     'startForLoop': ['Args'],
     'endForLoop': ['Args', ['clong']],
+    'startIfBlock': ['Args'],
+    'startElseBlock': ['Args'],
+    'endIfBlock': ['Args'],
 }

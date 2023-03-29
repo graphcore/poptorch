@@ -70,6 +70,7 @@ short_tests = [
     "custom_ops_test.py",
     "inputs_test.py",
     "loop_test.py",
+    "if_test.py",
     "lstm_test.py",
     "non_contiguous_tensors_test.py",
     "ops_test.py",

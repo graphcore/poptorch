@@ -705,17 +705,48 @@ void LowerToPopartImpl::lowerBody() {
           static_cast<std::int32_t>(node->i(c10::Symbol::attr("trip_count")));
 
       // Call the callback. This will pop the subgraphs from the stack.
-      popart_compiler::TensorId const first_output_tensor =
+      const popart_compiler::TensorId first_output_tensor =
           _compiler.endForLoop(trip_count, num_outputs, inputs);
 
       // The callback only returns the ID of the first tensor, but we know
       // the generated tensors have contiguous IDs, so we can infer the other
       // IDs.
-      std::vector<popart_compiler::TensorId> outs;
-      outs.resize(num_outputs);
+      std::vector<popart_compiler::TensorId> outs(num_outputs);
       for (std::uint64_t i = 0; i < num_outputs; ++i) {
         outs[i] = first_output_tensor + i;
       }
+
+      _value_map.setTuple(node->output(), outs);
+      printWasLoweredDebug(node, first_output_tensor);
+
+    } else if (kind == symbols::poptorch::start_if_block) {
+      // Starting the if block means changing the internal builder state to work
+      // with a new subgraph.
+      _compiler.startIfBlock();
+      logging::debug("{} was lowered", nodeToString(node));
+    } else if (kind == symbols::poptorch::start_else_block) {
+      // Starting the else block means changing the internal builder state to
+      // work with a new subgraph.
+      _compiler.startElseBlock();
+      logging::debug("{} was lowered", nodeToString(node));
+    } else if (kind == symbols::poptorch::end_if_block) {
+      // Process the if condition.
+      const auto &inputs = _value_map.tensors(node->input(0));
+      const auto &condition = inputs[0];
+      // Popart needs to know the number of outputs even though it's in the
+      // graph.
+      const std::size_t num_outputs =
+          node->i(c10::Symbol::fromQualString("attr::num_outputs"));
+
+      // Call the callback. This will pop the subgraphs from the stack.
+      const popart_compiler::TensorId first_output_tensor =
+          _compiler.endIfBlock(condition, num_outputs);
+
+      // The callback only returns the ID of the first tensor, but we know
+      // the generated tensors have contiguous IDs, so we can infer the other
+      // IDs.
+      std::vector<popart_compiler::TensorId> outs(num_outputs);
+      std::iota(outs.begin(), outs.end(), first_output_tensor);
 
       _value_map.setTuple(node->output(), outs);
       printWasLoweredDebug(node, first_output_tensor);

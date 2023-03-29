@@ -159,6 +159,20 @@ class OperatorFactory:
         check_operator_signature(value, poptorch.signatures)
         return value
 
+    def startIfBlock(self, condition):
+        value = no_tensor_braces(Value('startIfBlock', [condition]))
+        return value
+
+    def startElseBlock(self, outputs_then):
+        value = no_tensor_braces(Value('startElseBlock', [outputs_then]))
+        return value
+
+    def endIfBlock(self, outputs_else, condition):
+        value = no_tensor_braces(Value('endIfBlock',
+                                       [outputs_else, condition]))
+        check_operator_signature(value, poptorch.signatures)
+        return value
+
     def passThrough(self):
         return Value(None, [])
 

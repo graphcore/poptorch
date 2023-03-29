@@ -53,7 +53,7 @@ bool isUsedInTerminator(const torch::jit::Node *node) {
 bool markInputsAsComingFromParent(torch::jit::Graph *graph,
                                   torch::jit::Node *node, Subgraph *subgraph,
                                   const bool inputFromParent = true) {
-  bool changed = false;
+  bool used_in_subgraph = false;
   WithNodeMetadata meta(node);
 
   // If this node is NOT used in the terminator then we need to add it as an
@@ -61,19 +61,22 @@ bool markInputsAsComingFromParent(torch::jit::Graph *graph,
   for (torch::jit::Value *value : node->inputs()) {
     // If the user isn't used in this subgraph AND the node hasn't already
     // been marked an input.
-    if (subgraph->nodes.count(value->node()) == 0 &&
-        subgraph->added_inputs.count(value) == 0) {
-      if (!inputFromParent) {
-        torch::jit::Node *new_out = createAddUntypedInputTensor(graph, value);
-        subgraph->input_map.insert({new_out->output(), value});
-        subgraph->reverse_input_map.insert({value, new_out->output()});
+    if (subgraph->nodes.count(value->node()) == 0) {
+      if (subgraph->added_inputs.count(value) == 0) {
+        if (!inputFromParent) {
+          torch::jit::Node *new_out = createAddUntypedInputTensor(graph, value);
+          subgraph->input_map.insert({new_out->output(), value});
+          subgraph->reverse_input_map.insert({value, new_out->output()});
+        }
+        subgraph->added_inputs.insert(value);
+        used_in_subgraph = true;
       }
-      subgraph->added_inputs.insert(value);
-      changed = true;
+    } else {
+      used_in_subgraph = true;
     }
   }
 
-  return changed;
+  return used_in_subgraph;
 }
 
 void markOutputs(torch::jit::Graph *graph, torch::jit::Node *outputs,
@@ -81,14 +84,14 @@ void markOutputs(torch::jit::Graph *graph, torch::jit::Node *outputs,
   torch::jit::WithInsertPoint insert_point(outputs);
 
   // Sometimes the return might not be processed in this node.
-  bool not_used_in_subgraph =
+  const bool used_in_subgraph =
       markInputsAsComingFromParent(graph, outputs, subgraph);
 
   for (torch::jit::Value *output : outputs->inputs()) {
     WithNodeMetadata meta{output->node()};
     // Add an identity op in lieu if the op isn't used in the subgraph to make
     // sure popart handles the alias correctly.
-    if (not_used_in_subgraph) {
+    if (!used_in_subgraph) {
       torch::jit::Node *node = createIdentity(graph, {output});
       output = node->output();
     }
@@ -147,6 +150,42 @@ void annotateSubgraphs(torch::jit::Graph *graph, torch::jit::Node *start_node) {
       subgraph_nodes.pop();
 
       // We no longer need these inputs.
+      to_delete.insert(node->input(0)->node());
+      node->removeInput(0);
+    } else if (kind == symbols::poptorch::start_if_block) {
+      // Start tracking the new subgraph.
+      subgraph_nodes.push(Subgraph());
+
+      // Delete the input node (condition) as it is not needed anymore.
+      to_delete.insert(node->input(0)->node());
+      node->removeInput(0);
+    } else if (kind == symbols::poptorch::start_else_block) {
+      // Add the outputs of the if just before starting the else block.
+      markOutputs(graph, node->input(0)->node(), node, &subgraph_nodes.top());
+
+      // Remove the if subgraph.
+      subgraph_nodes.pop();
+
+      // Start tracking the new subgraph.
+      subgraph_nodes.push(Subgraph());
+
+      // Delete the input node (then_branch output), as it is not needed
+      // anymore.
+      to_delete.insert(node->input(0)->node());
+      node->removeInput(0);
+    } else if (kind == symbols::poptorch::end_if_block) {
+      // Mark the outputs of the else block.
+      markOutputs(graph, node->input(0)->node(), node, &subgraph_nodes.top());
+
+      // Remove the else subgraph.
+      subgraph_nodes.pop();
+
+      // Record the number of outputs.
+      const std::size_t num_outputs = node->input(0)->node()->inputs().size();
+      node->i_(c10::Symbol::fromQualString("attr::num_outputs"), num_outputs);
+
+      // Delete the 1st input node (else_branch output), as it is not needed
+      // anymore.
       to_delete.insert(node->input(0)->node());
       node->removeInput(0);
     } else if (kind == symbols::poptorch::add_untyped_input_tensor) {

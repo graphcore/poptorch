@@ -49,6 +49,8 @@ poptorch::LowerToPopart lowerToPopartFromDispatch(
 
   fixForLoopInputs(*graph);
 
+  verifyIfElseBlocksOrder(*graph);
+
   poptorch::type_and_constant_canonicalization::evaluateConstexprs(graph.get());
   logging::trace("Graph after evaluating constant expressions:\n{}", *graph);
 

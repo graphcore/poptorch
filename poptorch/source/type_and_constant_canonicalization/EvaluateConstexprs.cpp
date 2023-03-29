@@ -143,7 +143,9 @@ void ConstExprEvaluator::markSubgraphNodesForExclusion() {
   // a subgraph.
   int num_unclosed_subgraphs = 0;
   for (auto *node : _graph->nodes()) {
-    if (node->kind() == symbols::poptorch::start_for_loop) {
+    if (node->kind() == symbols::poptorch::start_for_loop ||
+        node->kind() == symbols::poptorch::start_if_block ||
+        node->kind() == symbols::poptorch::start_else_block) {
       num_unclosed_subgraphs++;
       // All nodes that eventually end up as subgraph inputs also need
       // to be excluded.
@@ -153,6 +155,12 @@ void ConstExprEvaluator::markSubgraphNodesForExclusion() {
     if (node->kind() == symbols::poptorch::end_for_loop) {
       ERROR_ON(num_unclosed_subgraphs <= 0);
       num_unclosed_subgraphs--;
+      continue;
+    }
+    if (node->kind() == symbols::poptorch::end_if_block) {
+      ERROR_ON(num_unclosed_subgraphs <= 0);
+      // if..else block stores 2 subgraphs, one for each branch.
+      num_unclosed_subgraphs -= 2;
       continue;
     }
     if (num_unclosed_subgraphs > 0) {

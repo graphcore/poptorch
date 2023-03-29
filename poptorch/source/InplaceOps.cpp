@@ -293,4 +293,30 @@ void fixForLoopInputs(torch::jit::Graph &graph) {
   }
 }
 
+void verifyIfElseBlocksOrder(const torch::jit::Graph &graph) {
+  // Verifies order of if...else blocks and generates friendly user error
+  // messages if the order is incorrect.
+  size_t if_cnt = 0;
+  size_t else_cnt = 0;
+  size_t end_cnt = 0;
+  for (const auto *node : graph.nodes()) {
+    if (node->kind() == symbols::poptorch::start_if_block) {
+      if_cnt++;
+    } else if (node->kind() == symbols::poptorch::start_else_block) {
+      ERROR_ON_MSG(if_cnt <= else_cnt,
+                   "[Internal] new poptorch::start_else_block "
+                   "encountered before previous poptorch::start_if_block");
+      else_cnt++;
+    } else if (node->kind() == symbols::poptorch::end_if_block) {
+      ERROR_ON_MSG(if_cnt < else_cnt || else_cnt <= end_cnt,
+                   "[Internal] poptorch::end_if_block "
+                   "encountered before poptorch::start_if_block and "
+                   "poptorch::start_else_block");
+      end_cnt++;
+    }
+  }
+  ERROR_ON_MSG(!(if_cnt == else_cnt && else_cnt == end_cnt),
+               "[Internal] no enclosing poptorch::end_if_block encountered");
+}
+
 } // namespace poptorch

@@ -198,6 +198,48 @@ def for_loop(count: int,
     return res
 
 
+def cond(condition: 'torch.Tensor',
+         then_body: Callable[[List['torch.Tensor']], List['torch.Tensor']],
+         then_inps: List['torch.Tensor'],
+         else_body: Callable[[List['torch.Tensor']], List['torch.Tensor']],
+         else_inps: List['torch.Tensor']) -> List['torch.Tensor']:
+
+    if not isinstance(then_inps, list) or not isinstance(else_inps, list):
+        raise ValueError(
+            ("poptorch.cond expects then_inps and else_inps tensors"
+             " to be a list of tensors. (Object is not list)"))
+
+    if not _impl.isRunningOnIpu():
+        # CPU execution path
+        if condition:
+            res = then_body(*then_inps)
+            return [res] if isinstance(res, torch.Tensor) else [*res]
+        res = else_body(*else_inps)
+        return [res] if isinstance(res, torch.Tensor) else [*res]
+
+    # Clone the inputs to make sure ir reflects the fact that
+    # body inputs are passed by value rather than by reference.
+    cloned_condition = condition.clone()
+
+    # Start the if block.
+    torch.ops.poptorch.start_if_block(cloned_condition)
+
+    outputs_then = then_body(*then_inps)
+    if not isinstance(outputs_then, list) and not isinstance(
+            outputs_then, tuple):
+        outputs_then = [outputs_then]
+
+    # Start the else block.
+    torch.ops.poptorch.start_else_block(outputs_then)
+
+    outputs_else = else_body(*else_inps)
+    if not isinstance(outputs_else, list) and not isinstance(
+            outputs_else, tuple):
+        outputs_else = [outputs_else]
+
+    return torch.ops.poptorch.end_if_block(outputs_else, cloned_condition)
+
+
 def nop(tensor: "torch.Tensor") -> "torch.Tensor":
     """A no-operation: it is functionally the same as an identity but is never
     eliminated by PopART patterns or inlining, so it is useful for
