@@ -31,7 +31,10 @@ using GroupedOpFactory = std::function<torch::jit::Node *(
 
 void groupScatterReduceNodes(torch::jit::Graph *graph);
 void groupGatherNodes(torch::jit::Graph *graph);
-void initQueue(torch::jit::Graph *graph, std::queue<torch::jit::Node *> &queue);
+void initQueue(torch::jit::Graph *graph, std::queue<torch::jit::Node *> &queue,
+               torch::jit::node_list &barriers);
+std::size_t deduceOpStage(const torch::jit::Node *node,
+                          const torch::jit::node_list &barriers);
 std::vector<torch::jit::Value *>
 concatGroupedInputs(torch::jit::Graph *graph, GroupedInputArgs &grouped_inputs,
                     bool with_update);
@@ -130,7 +133,8 @@ void groupScatterReduceNodes(torch::jit::Graph *graph) {
 
   // Queue contains fully reached nodes.
   std::queue<torch::jit::Node *> queue;
-  initQueue(graph, queue);
+  torch::jit::node_list barriers;
+  initQueue(graph, queue, barriers);
 
   // The unordered_map elements represent the number of times the node was
   // reached.
@@ -141,7 +145,8 @@ void groupScatterReduceNodes(torch::jit::Graph *graph) {
 
   using ScatterKind =
       std::tuple<std::int64_t /*reduction*/, at::ScalarType /*input_type*/,
-                 bool /*index_broadcast_enabled*/, bool /*with_update*/>;
+                 bool /*index_broadcast_enabled*/, bool /*with_update*/,
+                 std::size_t /*stage*/>;
   std::map<ScatterKind, torch::jit::node_list> scatters;
 
   std::size_t optimization_candidates = 0;
@@ -170,9 +175,9 @@ void groupScatterReduceNodes(torch::jit::Graph *graph) {
             const bool with_update = num_user_inputs == 3;
             const bool index_broadcast_enabled =
                 user->i(c10::Symbol::attr("enable_index_broadcast")) != 0;
-
+            const std::size_t stage = deduceOpStage(user, barriers);
             const ScatterKind key{reduction, input_type,
-                                  index_broadcast_enabled, with_update};
+                                  index_broadcast_enabled, with_update, stage};
             scatters[key].push_back(user);
           }
         }
@@ -224,14 +229,16 @@ void groupScatterReduceNodes(torch::jit::Graph *graph) {
 
   // Queue contains fully reached nodes.
   std::queue<torch::jit::Node *> queue;
-  initQueue(graph, queue);
+  torch::jit::node_list barriers;
+  initQueue(graph, queue, barriers);
 
   // The unordered_map elements represent the number of times the node was
   // reached.
   std::unordered_map<torch::jit::Node *, std::size_t> node_num_visited_inputs;
   // The unordered_set elements mean that children have been added to the queue.
 
-  using GatherKind = std::tuple<at::ScalarType /*input_type*/>;
+  using GatherKind =
+      std::tuple<at::ScalarType /*input_type*/, std::size_t /*stage*/>;
   std::map<GatherKind, torch::jit::node_list> gathers;
 
   std::size_t optimization_candidates = 0;
@@ -255,7 +262,8 @@ void groupScatterReduceNodes(torch::jit::Graph *graph) {
                                                    ->expect<c10::TensorType>()
                                                    ->scalarType();
 
-            const GatherKind key{input_type};
+            const std::size_t stage = deduceOpStage(user, barriers);
+            const GatherKind key{input_type, stage};
             gathers[key].push_back(user);
           }
         }
@@ -302,8 +310,8 @@ void groupScatterReduceNodes(torch::jit::Graph *graph) {
   }
 }
 
-void initQueue(torch::jit::Graph *graph,
-               std::queue<torch::jit::Node *> &queue) {
+void initQueue(torch::jit::Graph *graph, std::queue<torch::jit::Node *> &queue,
+               torch::jit::node_list &barriers) {
   // Add roots to queue.
   std::unordered_set<torch::jit::Node *> added;
   for (torch::jit::Node *node : graph->nodes()) {
@@ -313,6 +321,9 @@ void initQueue(torch::jit::Graph *graph,
         added.insert(node);
       }
     }
+    if (node->kind() == symbols::poptorch::begin_ipu_block) {
+      barriers.push_back(node);
+    }
   }
   for (torch::jit::Value *input : graph->inputs()) {
     auto *node = input->node();
@@ -321,6 +332,16 @@ void initQueue(torch::jit::Graph *graph,
       added.insert(node);
     }
   }
+}
+
+// Find which phase the fused operation is in
+std::size_t deduceOpStage(const torch::jit::Node *node,
+                          const torch::jit::node_list &barriers) {
+  std::size_t stage = 0;
+  while (stage < barriers.size() && !node->isBefore(barriers[stage])) {
+    stage++;
+  }
+  return stage;
 }
 
 torch::jit::node_list dispatch(torch::jit::Graph *graph,
@@ -436,10 +457,8 @@ void moveOutputNodesAfterInsertionPoint(
     }
   };
 
-  auto *tmp_insertion_point_node = insertion_point_node;
-
+  std::unordered_set<torch::jit::Node *> collected_nodes_to_move;
   for (torch::jit::Node *node : nodes) {
-
     if (node == insertion_point_node) {
       continue;
     }
@@ -447,14 +466,26 @@ void moveOutputNodesAfterInsertionPoint(
     std::queue<torch::jit::Node *> nodes_to_move;
     collect_output_nodes(node, nodes_to_move);
     while (!nodes_to_move.empty()) {
-      torch::jit::Node *moved_node = nodes_to_move.front();
+      torch::jit::Node *node_to_move = nodes_to_move.front();
       nodes_to_move.pop();
-      if (moved_node->isBefore(tmp_insertion_point_node)) {
-        moved_node->moveAfter(tmp_insertion_point_node);
-        tmp_insertion_point_node = moved_node;
-        collect_output_nodes(moved_node, nodes_to_move);
+      if (node_to_move->isBefore(insertion_point_node) &&
+          collected_nodes_to_move.find(node_to_move) ==
+              collected_nodes_to_move.end()) {
+        collected_nodes_to_move.insert(node_to_move);
+        collect_output_nodes(node_to_move, nodes_to_move);
       }
     }
+  }
+
+  torch::jit::node_list sorted_collected_nodes_to_move;
+  sorted_collected_nodes_to_move.insert(sorted_collected_nodes_to_move.end(),
+                                        collected_nodes_to_move.begin(),
+                                        collected_nodes_to_move.end());
+  sortInTopologicalOrder(sorted_collected_nodes_to_move);
+  auto *tmp_insertion_point_node = insertion_point_node;
+  for (auto *node_to_move : sorted_collected_nodes_to_move) {
+    node_to_move->moveAfter(tmp_insertion_point_node);
+    tmp_insertion_point_node = node_to_move;
   }
 }
 
