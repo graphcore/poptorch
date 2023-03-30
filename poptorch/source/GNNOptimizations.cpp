@@ -78,8 +78,7 @@ void unpackGroupedOutputs(torch::jit::Graph *graph,
  */
 void groupScatterReduceAndGatherNodes(torch::jit::Graph *graph) {
   groupScatterReduceNodes(graph);
-  // Enable after fix AFS-197
-  // groupGatherNodes(graph);
+  groupGatherNodes(graph);
 }
 
 void removeScatterAddIndexExpansion(torch::jit::Graph *graph) {
@@ -224,7 +223,7 @@ void groupScatterReduceNodes(torch::jit::Graph *graph) {
   }
 }
 
-[[maybe_unused]] void groupGatherNodes(torch::jit::Graph *graph) {
+void groupGatherNodes(torch::jit::Graph *graph) {
   logging::LogContext const ctx{"groupGatherNodes"};
 
   // Queue contains fully reached nodes.

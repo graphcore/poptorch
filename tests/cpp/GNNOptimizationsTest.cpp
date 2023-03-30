@@ -60,14 +60,14 @@ BOOST_AUTO_TEST_CASE(GroupScatterReduceAndGatherNodes0) {
   parseIR(input, graph.get());
   poptorch::groupScatterReduceAndGatherNodes(graph.get());
   constexpr std::size_t tensor_constant = 4;
-  constexpr std::size_t unsqueeze = 4;
-  constexpr std::size_t concat = 2;
+  constexpr std::size_t unsqueeze = 8;
+  constexpr std::size_t concat = 4;
   constexpr std::size_t groupedscatterreduce = 1;
+  constexpr std::size_t groupedgather = 1;
   constexpr std::size_t scatterreduce = 1;
-  // constexpr std::size_t groupedgather = 1;
-  // constexpr std::size_t gather = 1;
-  constexpr std::size_t slice = 2;
-  constexpr std::size_t squeeze = 2;
+  constexpr std::size_t gather = 1;
+  constexpr std::size_t slice = 4;
+  constexpr std::size_t squeeze = 4;
 
   std::string output_ir = parseGraphToStr(graph.get());
 
@@ -76,9 +76,8 @@ BOOST_AUTO_TEST_CASE(GroupScatterReduceAndGatherNodes0) {
   CHECK_OPS_IN_GRAPH(output_ir, concat);
   CHECK_OPS_IN_GRAPH(output_ir, groupedscatterreduce);
   CHECK_OPS_IN_GRAPH(output_ir, scatterreduce);
-  // Enable after fix AFS-197
-  // CHECK_OPS_IN_GRAPH(output_ir, groupedgather);
-  // CHECK_OPS_IN_GRAPH(output_ir, gather);
+  CHECK_OPS_IN_GRAPH(output_ir, groupedgather);
+  CHECK_OPS_IN_GRAPH(output_ir, gather);
   CHECK_OPS_IN_GRAPH(output_ir, slice);
   CHECK_OPS_IN_GRAPH(output_ir, squeeze);
   checkIsReturnUpdated(graph.get());
@@ -106,14 +105,14 @@ BOOST_AUTO_TEST_CASE(GroupScatterReduceAndGatherNodes1) {
   parseIR(input, graph.get());
   poptorch::groupScatterReduceAndGatherNodes(graph.get());
   constexpr std::size_t tensor_constant = 6;
-  constexpr std::size_t unsqueeze = 4;
-  constexpr std::size_t concat = 2;
+  constexpr std::size_t unsqueeze = 8;
+  constexpr std::size_t concat = 4;
   constexpr std::size_t groupedscatterreduce = 1;
+  constexpr std::size_t groupedgather = 1;
   constexpr std::size_t scatterreduce = 1;
-  // constexpr std::size_t groupedgather = 1;
-  // constexpr std::size_t gather = 1;
-  constexpr std::size_t slice = 2;
-  constexpr std::size_t squeeze = 2;
+  constexpr std::size_t gather = 1;
+  constexpr std::size_t slice = 4;
+  constexpr std::size_t squeeze = 4;
 
   std::string output_ir = parseGraphToStr(graph.get());
 
@@ -122,9 +121,8 @@ BOOST_AUTO_TEST_CASE(GroupScatterReduceAndGatherNodes1) {
   CHECK_OPS_IN_GRAPH(output_ir, concat);
   CHECK_OPS_IN_GRAPH(output_ir, groupedscatterreduce);
   CHECK_OPS_IN_GRAPH(output_ir, scatterreduce);
-  // Enable after fix AFS-197
-  // CHECK_OPS_IN_GRAPH(output_ir, groupedgather);
-  // CHECK_OPS_IN_GRAPH(output_ir, gather);
+  CHECK_OPS_IN_GRAPH(output_ir, groupedgather);
+  CHECK_OPS_IN_GRAPH(output_ir, gather);
   CHECK_OPS_IN_GRAPH(output_ir, slice);
   CHECK_OPS_IN_GRAPH(output_ir, squeeze);
   checkIsReturnUpdated(graph.get());
