@@ -8,7 +8,7 @@ from helpers import assert_allclose
 import poptorch
 
 
-@lru_cache
+@lru_cache(maxsize=None)
 def infer_model(model):
     return poptorch.inferenceModel(model)
 
