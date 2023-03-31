@@ -14,7 +14,10 @@ def knn_interpolate(x: torch.Tensor,
                     batch_x: OptTensor = None,
                     batch_y: OptTensor = None,
                     k: int = 3,
-                    num_workers: int = 1):
+                    num_workers: int = 1,
+                    *args,
+                    **kwargs):
+    # pylint: disable=unused-argument, keyword-arg-before-vararg
     r"""The k-NN interpolation from the `"PointNet++: Deep Hierarchical
     Feature Learning on Point Sets in a Metric Space"
     <https://arxiv.org/abs/1706.02413>`_ paper.

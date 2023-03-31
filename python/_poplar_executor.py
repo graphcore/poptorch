@@ -26,7 +26,6 @@ from ._utils import accessAttributes, flattenTensorStructure, reconstructTensorS
 from ._logging import logger
 from .options import Options, PipelinedExecution, ShardedExecution
 from .optim import Optimizer
-
 NO_EXECUTABLE_ERR = "Model has not been compiled or has been destroyed."
 
 
@@ -38,7 +37,7 @@ class _SetDefaultDeviceType:
         self.overrides = dict()
         self.saved_distribution_validate_args = None
 
-    def __enter__(self):
+    def replace(self):
         def create_wrapper(f):
             @functools.wraps(f)
             def _wrapper(*args, **kwargs):
@@ -52,11 +51,9 @@ class _SetDefaultDeviceType:
             return _wrapper
 
         # All the ops with FACTORY_PARAMS in <torch>/tools/pyi/gen_pyi.py
-        for name in [
-                "arange", "empty", "full", "full_like", "linspace", "logspace",
-                "ones", "rand", "randint", "randn", "randperm", "range",
-                "tensor", "zeros", "zeros_like"
-        ]:
+        for name in ("arange", "empty", "full", "full_like", "linspace",
+                     "logspace", "ones", "rand", "randint", "randn",
+                     "randperm", "range", "tensor", "zeros", "zeros_like"):
             func = getattr(torch, name)
 
             self.overrides[name] = func
@@ -88,19 +85,44 @@ class _SetDefaultDeviceType:
         # For example:
         # >>> if self._validate_args:
         # >>>    assert torch.lt(self.low, self.high).all()
+        # pylint: disable=protected-access
         self.saved_distribution_validate_args = \
-                torch.distributions.Distribution._validate_args
+            torch.distributions.Distribution._validate_args
         torch.distributions.Distribution.set_default_validate_args(False)
 
-        return self
-
-    def __exit__(self, exc_type, value, traceback):
+    def restore(self):
         # Restore the real Torch functions
         for name, real in self.overrides.items():
             setattr(torch, name, real)
 
         torch.distributions.Distribution.set_default_validate_args(
             self.saved_distribution_validate_args)
+
+
+class _OverwriteContextManager:
+
+    _subsitution_manager_types = [_SetDefaultDeviceType]
+
+    def __init__(self):
+        self.substitution_managers = [
+            manager_type() for manager_type in
+            _OverwriteContextManager._subsitution_manager_types
+        ]
+
+    def __enter__(self):
+        for overwriter in self.substitution_managers:
+            overwriter.replace()
+
+        return self
+
+    def __exit__(self, exc_type, value, traceback):
+        for overwriter in reversed(self.substitution_managers):
+            overwriter.restore()
+
+    @classmethod
+    def registerSubsitutionManager(cls, type):
+        if type not in cls._subsitution_manager_types:
+            cls._subsitution_manager_types.append(type)
 
 
 # pylint: disable=too-many-public-methods
@@ -639,7 +661,7 @@ class PoplarExecutor:
 
     @_impl.destroyDispatcherOnExit
     def _compileWithDispatch(self, in_tensors, executable_filename=None):
-        with _SetDefaultDeviceType():
+        with _OverwriteContextManager():
             module_namescope = None
             if self.options._module_namescope_enabled:  # pylint: disable=protected-access
                 module_namescope = _impl.NameScopeHook(self._model)
@@ -663,7 +685,6 @@ class PoplarExecutor:
                 cpu_params = dict(self._model.named_parameters())
                 cpu_buffers = dict(self._model.named_buffers())
                 cpu_state = self._model.state_dict(keep_vars=True)
-
                 # We need to remove the PoptorchBuffer and PoptorchParam annotations
                 # before compiling the model. In addition, we must unwrap the whole
                 # model to prevent IPU to CPU copies when accessing the state_dict.

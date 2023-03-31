@@ -7,10 +7,11 @@ import torch
 def knn(x: torch.Tensor,
         y: torch.Tensor,
         k: int,
-        batch_x=Optional[torch.Tensor],
-        batch_y=Optional[torch.Tensor],
+        batch_x: Optional[torch.Tensor] = None,
+        batch_y: Optional[torch.Tensor] = None,
+        *args,
         **kwargs):
-    # pylint: disable=unused-argument
+    # pylint: disable=unused-argument, keyword-arg-before-vararg
     r"""Finds for each element in `y` the `k` nearest points in `x`.
 
     Args:

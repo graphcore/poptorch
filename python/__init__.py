@@ -47,7 +47,7 @@ from .ops import *
 from .options import *
 from ._impl import isRunningOnIpu, createPoptorchError
 from ._utils import accessAttributes, getIpuTensorId
-from ._poplar_executor import PoplarExecutor, registerPreCompileHook, registerPostCompileHook
+from ._poplar_executor import PoplarExecutor, registerPreCompileHook, registerPostCompileHook, _OverwriteContextManager
 from ._printing import *
 from . import optim
 from . import profiling

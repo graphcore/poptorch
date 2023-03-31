@@ -5,8 +5,8 @@ import torch
 import torch_cluster
 
 import helpers
-import poptorch
 from poptorch_geometric.ops.knn import knn
+import poptorch
 
 
 def assert_fn(native_out, poptorch_out, x, y):
@@ -26,6 +26,7 @@ def assert_fn(native_out, poptorch_out, x, y):
 
 
 def op_harness(op, reference_op, x, y, k, batch_x=None, batch_y=None):
+
     native_out = reference_op(x, y, k, batch_x, batch_y)
 
     class Model(torch.nn.Module):
@@ -103,3 +104,25 @@ def test_knn_batch_skip():
 
     op_harness(knn, torch_cluster.knn, x, y, k, batch_x, batch_y)
     op_harness(knn, knn, x, y, k, batch_x, batch_y)
+
+
+@pytest.mark.parametrize("with_batch", [True, False])
+def test_knn_override(with_batch):
+    pos_x = torch.Tensor([[-1, 0], [0, 0], [1, 0], [-2, 0], [0, 0], [2, 0]])
+    pos_y = torch.Tensor([[-1, -1], [1, 1], [-2, -2], [2, 2]])
+    k = 2
+    if with_batch:
+        batch_x = torch.Tensor([0, 0, 0, 1, 1, 1])
+        batch_y = torch.Tensor([0, 0, 1, 1])
+    else:
+        batch_x = None
+        batch_y = None
+
+    class Model(torch.nn.Module):
+        def forward(self, *args):
+            return torch_cluster.knn(*args)
+
+    model = poptorch.inferenceModel(Model())
+    poptorch_out = model(pos_x, pos_y, k, batch_x, batch_y)
+    native_out = torch_cluster.knn(pos_x, pos_y, k, batch_x, batch_y)
+    assert_fn(native_out, poptorch_out, pos_x, pos_y)
