@@ -46,27 +46,8 @@ def test_constants():
     if_else_harness(Model(), args[0], args[1])
 
 
-@pytest.mark.skip(reason="Inplace op does not update model input (AFS-252)")
-def test_inplace_op():
-    class Model(torch.nn.Module):
-        def forward(self, condition, x, y):
-            def body_then(a):
-                return a.add_(a)
-
-            def body_else(b):
-                return b
-
-            return poptorch.cond(condition, body_then, [x], body_else, [y])[0]
-
-    or_x = 1.
-    x = torch.tensor([or_x])
-    y = torch.tensor([10.])
-    exp_then = x + y
-    exp_else = y
-    if_else_harness(Model(), exp_then, exp_else, x, y)
-    assert torch.tensor([or_x]) == x
-
-
+@pytest.mark.skip(
+    reason="Returning constant from model does not work in poptorch (AFS-251)")
 def test_operations_on_constants():
     constants = [[1., 2.], [3., 4.]]
 
@@ -94,6 +75,52 @@ def test_operations_on_constants():
     exp_else = torch.tensor(
         [a - 2 + b for a, b in zip(constants[0], constants[1])])
     if_else_harness(Model(), exp_then, exp_else, *args)
+
+
+@pytest.mark.skip(reason="Inplace op does not update model input (AFS-252)")
+def test_inplace_op():
+    class Model(torch.nn.Module):
+        def forward(self, condition, x, y):
+            def body_then(a):
+                return a.add_(a)
+
+            def body_else(b):
+                return b
+
+            return poptorch.cond(condition, body_then, [x], body_else, [y])[0]
+
+    or_x = 1.
+    x = torch.tensor([or_x])
+    y = torch.tensor([10.])
+    exp_then = x + y
+    exp_else = y
+    if_else_harness(Model(), exp_then, exp_else, x, y)
+    assert torch.tensor([or_x]) == x
+
+
+def test_operation_expecting_constant():
+    constant = [1.1, 2.3]
+
+    class Model(torch.nn.Module):
+        def forward(self, condition, z):
+            x = torch.tensor(constant)
+
+            def body_then(a, b):
+                b = a * torch.topk(b, 2)[0]
+                return b
+
+            def body_else(a, b):
+                a = a - 2
+                b = b[:2] + a
+                return b
+
+            return poptorch.cond(condition, body_then, [x, z], body_else,
+                                 [x, z])[0]
+
+    arg = torch.rand(4)
+    exp_then = torch.topk(torch.tensor(arg), 2)[0] * torch.tensor(constant)
+    exp_else = torch.tensor(constant) - 2 + arg[:2]
+    if_else_harness(Model(), exp_then, exp_else, arg)
 
 
 def test_body_args():
@@ -208,7 +235,7 @@ def test_call_outer_body():
 
 
 def test_args_internal():
-    internal_inps = [[10., -10.], [0, -2]]
+    internal_inps = [[10., -10.], [0., -2.]]
 
     class Model(torch.nn.Module):
         def forward(self, *args):
@@ -216,7 +243,7 @@ def test_args_internal():
             x = args[1]
 
             def body_then(a, b):
-                return a + b
+                return x + a + b
 
             def body_else(a):
                 return a + x
@@ -228,7 +255,8 @@ def test_args_internal():
 
     input_val = [5., -1.]
     args = [torch.tensor(input_val)]
-    exp_then = torch.tensor(internal_inps[0]) + torch.tensor(internal_inps[1])
+    exp_then = args[0] + torch.tensor(internal_inps[0]) + torch.tensor(
+        internal_inps[1])
     exp_else = torch.tensor(internal_inps[0]) + args[0]
     if_else_harness(Model(), exp_then, exp_else, *args)
 
