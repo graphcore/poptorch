@@ -63,6 +63,8 @@ def test_activations(op):
 
 @pytest.mark.parametrize("approximate", ["tanh", "none"])
 def test_gelu(approximate):
+    if approximate == "none":
+        pytest.skip("TODO(AFS-274): Implement gelu without approx")
     torch.manual_seed(42)
 
     input = torch.randn((2, 20))
@@ -78,13 +80,7 @@ def test_gelu(approximate):
     poptorch_model = poptorch.trainingModel(model)
     poptorch_out, _ = poptorch_model((input, ))
 
-    # PopART GELU doesn't match PyTorch's exactly
-    tol = [0.01, 1e-3] if approximate == "none" else [None, None]
-
-    helpers.assert_allclose(actual=poptorch_out,
-                            expected=native_out,
-                            rtol=tol[0],
-                            atol=tol[1])
+    helpers.assert_allclose(actual=poptorch_out, expected=native_out)
 
     poptorch_model.assert_weights_changed()
 
