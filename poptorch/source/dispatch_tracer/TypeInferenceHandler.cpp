@@ -19,7 +19,8 @@ void TypeInferenceHandler::inferOutputTypes(const c10::OperatorHandle &op,
   // https://github.com/pytorch/pytorch/issues/89560
   // As a workaround, we add a dummy channel dim to the input, and then remove
   // it again afterwards
-  const bool is_prelu = schema_key == "aten::prelu";
+  const bool is_prelu =
+      schema_key == "aten::prelu" || schema_key == "aten::_prelu_kernel";
   // Create a new operand stack with meta tensors
   c10::Stack meta_stack = createMetaStack(*ipu_stack, schema_key, is_prelu);
 
@@ -29,28 +30,59 @@ void TypeInferenceHandler::inferOutputTypes(const c10::OperatorHandle &op,
                    << " because the operator "
                       "doesn't have an implementation for the Meta backend.");
   logging::trace("[DISPATCHER] Using meta type inference for {}", schema_key);
+
   op.redispatchBoxed(meta_keys, &meta_stack);
 
   ipu_stack->clear();
   repopulateIpuStack(ipu_stack, meta_stack, is_prelu);
 }
 
+std::optional<TypeInferenceHandler::Workaround>
+TypeInferenceHandler::workaroundLookup(const std::string &schema_key) {
+  if (const auto &it = schema_to_workaround.find(schema_key);
+      it != schema_to_workaround.cend()) {
+    return it->second;
+  }
+
+  return std::nullopt;
+}
+
+c10::IValue TypeInferenceHandler::applyWorkaround(
+    const TypeInferenceHandler::Workaround &workaround, std::size_t value_index,
+    const c10::IValue &value, const c10::Stack &stack) {
+
+  if (workaround.predicate_fn(value_index, value, stack)) {
+    return workaround.transform_fn(value, stack);
+  }
+
+  return value;
+}
+
 c10::Stack TypeInferenceHandler::createMetaStack(const c10::Stack &ipu_stack,
-                                                 std::string_view schema_key,
+                                                 const std::string &schema_key,
                                                  bool is_prelu) {
   c10::Stack meta_stack;
+
+  const auto maybe_workaround = workaroundLookup(schema_key);
+
   // Create meta tensors and add them to the meta stack
   for (auto i = 0u; i < ipu_stack.size(); i++) {
-    const auto &v = ipu_stack[i];
+    // For various reasons, sometimes we have to transform the value before
+    // pushing it on the meta stack to workaround validation issues which are
+    // not the problem for the PopArt backend.
+    const auto &v = maybe_workaround
+                        ? applyWorkaround(maybe_workaround.value(), i,
+                                          ipu_stack[i], ipu_stack)
+                        : ipu_stack[i];
 
     // We coerce index tensor types from Long to Int during dispatch, but these
     // need to be converted back to Long before running with the Meta backend
     // otherwise they'll emit type errors
     bool should_upcast_to_long = false;
+
     if (auto opt_upcast_arg = indexArgToUpcast(schema_key)) {
       should_upcast_to_long = opt_upcast_arg.value() == i;
     }
-
     // Convert any IPU tensors to meta tensors
     if (v.isTensor()) {
       meta_stack.push_back(
@@ -140,4 +172,84 @@ at::Tensor TypeInferenceHandler::toMeta(const at::Tensor &tensor,
   }
   return out;
 }
+
+c10::optional<std::size_t>
+TypeInferenceHandler::indexArgToUpcast(const std::string &schema_key) {
+
+  if (schema_key == "aten::argmax.out" || schema_key == "aten::argmin.out") {
+    return 3;
+  }
+  if (schema_key == "aten::gather" || schema_key == "aten::scatter.src" ||
+      schema_key == "aten::scatter_.src" ||
+      schema_key == "aten::scatter.value" ||
+      schema_key == "aten::scatter_add" || schema_key == "aten::scatter_add_" ||
+      schema_key == "aten::scatter_reduce.two" ||
+      schema_key == "aten::scatter_reduce_.two" ||
+      schema_key == "torch_scatter::scatter_max" ||
+      schema_key == "torch_scatter::scatter_min" ||
+      schema_key == "torch_scatter::scatter_mul") {
+    return 2;
+  }
+  if (schema_key == "aten::index.Tensor" ||
+      schema_key == "aten::nll_loss_forward") {
+    return 1;
+  }
+  return c10::nullopt;
+}
+
+static bool reductionWorkaroundPredicate(const std::size_t value_index,
+                                         const c10::IValue &value,
+                                         const c10::Stack &ipu_stack,
+                                         const std::size_t dtype_index,
+                                         const std::size_t out_index) {
+
+  return value_index == dtype_index && value.isNone() &&
+         !ipu_stack.at(out_index).isNone();
+}
+
+static c10::IValue reductionTransform(const c10::IValue &transformed_value,
+                                      const c10::Stack &ipu_stack,
+                                      const std::size_t out_index) {
+  const auto &value = ipu_stack.at(out_index);
+  if (!value.isNone() && value.isTensor()) {
+    const auto tensor = value.toTensor();
+    return c10::IValue(c10::typeMetaToScalarType(tensor.dtype()));
+  }
+  return transformed_value;
+}
+
+static auto makeReductionWorkaround(const std::size_t dtype_index,
+                                    const std::size_t out_index) {
+
+  /* In case dtype is None, PyTorch meta backend assumes that it is int64_t for
+   * all integral tensors, causing validation issues when the output tensor has
+   * int32_t dtype.
+   */
+
+  const auto predicate = [=](const std::size_t value_index,
+                             const c10::IValue &value,
+                             const c10::Stack &ipu_stack) {
+    return reductionWorkaroundPredicate(value_index, value, ipu_stack,
+                                        dtype_index, out_index);
+  };
+
+  const auto transform_fn = [=](const c10::IValue &transformed_value,
+                                const c10::Stack &ipu_stack) {
+    return reductionTransform(transformed_value, ipu_stack, out_index);
+  };
+
+  return TypeInferenceHandler::Workaround{predicate, transform_fn};
+}
+const std::unordered_map<std::string, TypeInferenceHandler::Workaround>
+    TypeInferenceHandler::schema_to_workaround = {
+        {"aten::sum.IntList_out",
+         makeReductionWorkaround(3 /*dtype_index*/, 4 /*out_index*/)},
+        {"aten::cumsum.out",
+         makeReductionWorkaround(2 /*dtype_index*/, 3 /*out_index*/)},
+        {"aten::cumprod.out",
+         makeReductionWorkaround(2 /*dtype_index*/, 3 /*out_index*/)},
+        {"aten::sum.out",
+         makeReductionWorkaround(4 /*dtype_index*/, 0 /*out_index*/)},
+        {"aten::prod.out",
+         makeReductionWorkaround(4 /*dtype_index*/, 0 /*out_index*/)}};
 } // namespace poptorch

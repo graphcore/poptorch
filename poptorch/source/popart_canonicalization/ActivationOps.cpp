@@ -170,6 +170,7 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::hardsigmoid, hardsigmoidHandler);
   registerHandler(c10::aten::hardswish, hardswishHandler);
   registerHandler(c10::aten::prelu, preluHandler);
+  registerHandler(c10::aten::_prelu_kernel, preluHandler);
   registerHandler(c10::aten::gelu, geluHandler);
 }
 

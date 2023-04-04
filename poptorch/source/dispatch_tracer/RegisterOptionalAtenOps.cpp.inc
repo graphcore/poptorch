@@ -49,8 +49,10 @@ TORCH_LIBRARY_IMPL(aten, IPU, m) {
   m.impl("adaptive_avg_pool3d", PTC_BOXED(poptorch::fallback));
   m.impl("trunc", PTC_BOXED(poptorch::fallback));
   m.impl("min", PTC_BOXED(poptorch::fallback));
+  m.impl("amin", PTC_BOXED(poptorch::fallback));
   m.impl("minimum", PTC_BOXED(poptorch::fallback));
   m.impl("max", PTC_BOXED(poptorch::fallback));
+  m.impl("amax", PTC_BOXED(poptorch::fallback));
   m.impl("maximum", PTC_BOXED(poptorch::fallback));
   m.impl("argsort", PTC_BOXED(poptorch::fallback));
   m.impl("one_hot", PTC_BOXED(poptorch::fallback));
@@ -75,6 +77,8 @@ TORCH_LIBRARY_IMPL(aten, IPU, m) {
   m.impl("squeeze_", PTC_BOXED(poptorch::fallback));
   m.impl("squeeze.dim", PTC_BOXED(poptorch::fallback));
   m.impl("squeeze_.dim", PTC_BOXED(poptorch::fallback));
+  m.impl("squeeze.dims", PTC_BOXED(poptorch::fallback));
+  m.impl("squeeze_.dims", PTC_BOXED(poptorch::fallback));
   m.impl("unsqueeze", PTC_BOXED(poptorch::fallback));
   m.impl("permute", PTC_BOXED(poptorch::fallback));
   m.impl("select.int", PTC_BOXED(poptorch::fallback));
@@ -152,6 +156,11 @@ TORCH_LIBRARY_IMPL(aten, IPU, m) {
   m.impl("scatter_reduce.two", PTC_BOXED(poptorch::fallback));
   m.impl("scatter_reduce.two_out", PTC_BOXED(poptorch::fallback));
   m.impl("scatter_reduce_.two", PTC_BOXED(poptorch::fallback));
+
+  m.impl("select_scatter", PTC_BOXED(poptorch::fallback));
+  m.impl("select_scatter.out", PTC_BOXED(poptorch::fallback));
+
+  m.impl("_prelu_kernel", PTC_BOXED(poptorch::fallback));
 }
 
 TORCH_LIBRARY_IMPL(torch_scatter, IPU, m) {

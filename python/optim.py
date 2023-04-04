@@ -454,6 +454,8 @@ class AdamW(Optimizer, torch.optim.AdamW):
             maximize: Optional[bool] = None,
             foreach: Optional[bool] = None,
             capturable: Optional[bool] = None,
+            differentiable: Optional[bool] = None,
+            fused: Optional[bool] = None,
             loss_scaling: Optional[float] = None,
             bias_correction: Optional[bool] = None,
             accum_type: Optional[torch.dtype] = None,

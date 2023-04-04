@@ -44,8 +44,20 @@ TORCH_API at::Tensor bucketize(const at::Tensor & self, const at::Tensor &, bool
   return at::meta::empty(input_shape, out_int32 ? c10::ScalarType::Int : c10::ScalarType::Long);
 }
 
+TORCH_API at::Tensor& hardsigmoidOut(at::Tensor const&, at::Tensor& out) {
+  return out;
+}
+
+TORCH_API at::Tensor& siluOut(at::Tensor const&, at::Tensor& out) {
+  return out;
+}
+
 TORCH_API at::Tensor & bucketizeOut(const at::Tensor & , const at::Tensor & , bool , bool , at::Tensor & out) {
   return out;
+}
+
+TORCH_API bool equal(const at::Tensor &, const at::Tensor &) {
+  return {};
 }
 
 at::Tensor ctcLossTensor(const at::Tensor &log_probs, const at::Tensor &/*targets*/,
@@ -286,6 +298,8 @@ void opReturningFirstArgument(const c10::OperatorHandle &/*op*/, c10::Stack *sta
 TORCH_LIBRARY_IMPL(aten, Meta, m) {
   m.impl("bucketize.Tensor", PTC(poptorch::meta::bucketize));
   m.impl("bucketize.Tensor_out", PTC(poptorch::meta::bucketizeOut));
+  m.impl("equal", PTC(poptorch::meta::equal));
+  m.impl("hardsigmoid.out", PTC(poptorch::meta::hardsigmoidOut));
   m.impl("rrelu_with_noise", PTC_BOXED(poptorch::meta::opReturningFirstArgument));
   m.impl("count_nonzero.dim_IntList", PTC(poptorch::meta::countNonzero));
   m.impl("ctc_loss.Tensor", PTC(poptorch::meta::ctcLossTensor));
@@ -296,6 +310,7 @@ TORCH_LIBRARY_IMPL(aten, Meta, m) {
   m.impl("nll_loss2d_forward", PTC(poptorch::meta::nllLoss2dForward));
   m.impl("nonzero", PTC(poptorch::meta::nonzero));
   m.impl("one_hot", PTC(poptorch::meta::oneHot));
+  m.impl("silu.out", PTC(poptorch::meta::siluOut));
   m.impl("upsample_nearest3d.vec", PTC(poptorch::meta::upsampleNearest3d));
 }
 
