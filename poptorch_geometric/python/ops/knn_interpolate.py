@@ -61,12 +61,12 @@ def knn_interpolate(x: torch.Tensor,
 
         extended_y_idx = torch.where(y_idx == -1, pos_y.size(0), y_idx)
         extended_x_idx = torch.where(x_idx == -1, pos_x.size(0), x_idx)
-        posx_zeros = torch.zeros_like(pos_x[:1])
+        posx_zeros = torch.zeros_like(pos_x[:1], dtype=pos_x.dtype)
         extended_diff_x = torch.cat((pos_x, posx_zeros))
-        posy_zeros = torch.zeros_like(pos_y[:1])
+        posy_zeros = torch.zeros_like(pos_y[:1], dtype=pos_y.dtype)
         extended_diff_y = torch.cat((pos_y, posy_zeros))
 
-        x_zeros = torch.zeros_like(x[:1])
+        x_zeros = torch.zeros_like(x[:1], dtype=x.dtype)
         extended_x = torch.cat((x, x_zeros))
 
         diff = torch.index_select(extended_diff_x, 0,
