@@ -1073,6 +1073,35 @@ void Compiler::copyWeightsToDevice(const std::vector<void *> &host_buffers) {
   _impl->session->weightsFromHost();
 }
 
+void Compiler::registerUpdatableNamedBuffer(const TensorId &id) {
+  auto popart_id = _impl->ids.at(id);
+  ERROR_ON_MSG(!_impl->weights.contains(popart_id),
+               "Invalid updatable buffer " << popart_id);
+  const auto &buffers = _impl->popart_options.updatableNamedBuffers;
+
+  if (std::find(buffers.begin(), buffers.end(), popart_id) != buffers.end()) {
+    const auto &weight = _impl->weights.weight(popart_id);
+    _impl->updatable_named_buffers.registerParameter(popart_id, weight.info);
+  }
+}
+
+// Write the buffers into IPU memory from the pytorch tensor buffers in the
+// model.
+void Compiler::copyNamedBuffersToDevice(
+    const std::vector<void *> &host_buffers) {
+  if (!_impl->session) {
+    logging::trace("Skipping writing buffers from host to IPU memory.");
+    return;
+  }
+
+  logging::info("Writing named buffers from host to IPU memory.");
+  if (!host_buffers.empty()) {
+    _impl->updatable_named_buffers.updateData(host_buffers);
+    _impl->session->writeWeights(_impl->updatable_named_buffers);
+  }
+  _impl->session->buffersFromHost();
+}
+
 // Read the weights from IPU memory into the pytorch tensor buffers.
 void Compiler::copyWeightsToHost(const std::vector<void *> &host_buffers) {
   if (!_impl->session) {

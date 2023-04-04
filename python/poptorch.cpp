@@ -786,6 +786,23 @@ void copyWeightsToDeviceImpl(
   }
 }
 
+void copyNamedBuffersToDeviceImpl(
+    const std::shared_ptr<poptorch::PoplarExecutable> &executable,
+    const pybind11::tuple &buffer_names,
+    const pybind11::tuple &buffer_tensors) {
+  poptorch::logging::Tracepoint tp{"copyNamedBuffersToDevice"};
+  // Copy the named buffers or warn if this is before first time compilation.
+  if (!executable) {
+    logging::log(
+        logging::Level::Warn,
+        "Call to copyNamedBuffersToDevice ignored as model has not been "
+        "compiled (PopTorch will compile models on first invocation).");
+  } else {
+    executable->copyNamedBuffersToDevice(
+        getParameterBuffers(buffer_names, buffer_tensors));
+  }
+}
+
 std::string
 getPopartIR(const std::shared_ptr<poptorch::PoplarExecutable> &executable) {
   ERROR_ON_MSG(!executable, "No built executable");
@@ -1164,6 +1181,8 @@ PYBIND11_MODULE(poptorch_core, m) { // NOLINT
         PTC(poptorch::bindings::loadEngineAndConnectStreams));
   m.def("copyWeightsToDevice_impl",
         PTC(poptorch::bindings::copyWeightsToDeviceImpl));
+  m.def("copyNamedBuffersToDevice_impl",
+        PTC(poptorch::bindings::copyNamedBuffersToDeviceImpl));
   m.def("copyWeightsToHost_impl",
         PTC(poptorch::bindings::copyWeightsToHostImpl));
   m.def("ipuHardwareVersion",

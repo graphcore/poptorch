@@ -341,6 +341,10 @@ public:
   // model.
   void copyWeightsToDevice(const std::vector<void *> &host_buffers);
 
+  // Write the named buffers into IPU memory from the pytorch tensor buffers
+  // in the model.
+  void copyNamedBuffersToDevice(const std::vector<void *> &host_buffers);
+
   // Read the weights from IPU memory into the pytorch tensor buffers.
   void copyWeightsToHost(const std::vector<void *> &host_buffers);
 
@@ -424,6 +428,9 @@ public:
 
   size_t getNumInputs() const;
   size_t getNumOutputs() const;
+
+  // Mark named buffer as updatable
+  void registerUpdatableNamedBuffer(const TensorId &id);
 
 private:
   void assertTensorIs(PopartType dataType, TensorId id) const;

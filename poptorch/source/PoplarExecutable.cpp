@@ -205,6 +205,17 @@ void PoplarExecutable::copyWeightsToDevice(
   _compiler.copyWeightsToDevice(pointers);
 }
 
+// Tell popart to copy named buffers from host into IPU memory.
+void PoplarExecutable::copyNamedBuffersToDevice(
+    const std::map<std::string, void *> &buffers) {
+  std::vector<void *> pointers;
+  pointers.reserve(buffers.size());
+  for (const auto &buffer : buffers) {
+    pointers.push_back(buffer.second);
+  }
+  _compiler.copyNamedBuffersToDevice(pointers);
+}
+
 const std::vector<popart_compiler::OutputTypeShape> &
 PoplarExecutable::outputTypes() const {
   return _compiler.outputTypes();

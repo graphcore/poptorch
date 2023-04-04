@@ -1058,6 +1058,8 @@ void LowerToPopartImpl::lowerParameters() {
         id = _compiler.addInitializedInputTensor(
             name.c_str(), popart_type.c_str(), info.dims, data_ptr);
       }
+      // Compiler knows which buffers are updatable
+      _compiler.registerUpdatableNamedBuffer(id);
       parameter_values.push_back(value);
       parameter_popart_ids.push_back(id);
       param_index++;

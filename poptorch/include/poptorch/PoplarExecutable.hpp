@@ -49,6 +49,9 @@ public:
   // Tell popart to copy weights from host into IPU memory.
   void copyWeightsToDevice(const std::map<std::string, void *> &buffers);
 
+  // Tell popart to copy named buffers from host into IPU memory.
+  void copyNamedBuffersToDevice(const std::map<std::string, void *> &buffers);
+
   const std::vector<popart_compiler::OutputTypeShape> &outputTypes() const;
 
   // Get the IR from popart.

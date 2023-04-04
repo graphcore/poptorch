@@ -596,6 +596,37 @@ class PoplarExecutor:
                                                tuple(weights.keys()),
                                                tuple(weights.values()))
 
+    def copyNamedBuffersToDevice(self) -> None:
+        """Copies the buffers from ``model.parameters()`` to the IPU device.
+        """
+        if not self.isCompiled():
+            raise _impl.createPoptorchError(NO_EXECUTABLE_ERR)
+
+        # pylint: disable=protected-access
+        if 'updatableNamedBuffers' not in self._options._Popart.options:
+            raise _impl.createPoptorchError(
+                "No named buffers marked as updatable via "
+                "updatableNamedBuffers option")
+
+        # Don't trigger a copyToHost by accessing `named_parameters`
+        self._dirty_host_weights = False
+
+        # Trigger a IPU sync -> host if needed for
+        # the optimizer state.
+        if self._optimizer:
+            self._optimizer.state_dict()
+
+        buffers = {**dict(self._model.named_buffers())}
+        # pylint: disable=protected-access
+        updatable_buffers = \
+            self._options._Popart.options['updatableNamedBuffers']
+        updatable_buffer_pointers = tuple(buffers[b]
+                                          for b in updatable_buffers)
+
+        poptorch_core.copyNamedBuffersToDevice_impl(self._executable,
+                                                    tuple(updatable_buffers),
+                                                    updatable_buffer_pointers)
+
     def setOptimizer(self, optimizer: 'torch.optim.Optimizer'):
         """Sets the optimiser for a training model. Will overwrite the
         previous one. Supported optimisers: ``optim.SGD``, ``optim.Adam``,

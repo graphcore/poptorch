@@ -285,6 +285,7 @@ def test_set_popart_options(capfd):
     opts._Popart.set("enableExplicitIR", True)
     opts._Popart.set(
         "automaticLossScalingSettings.gradientTensorTrackingMethod", 1)
+    opts._Popart.set("updatableNamedBuffers", ["t1", "t2"])
 
     poptorch.poptorch_core._validateOptions(opts.toDict())
 
@@ -343,6 +344,8 @@ def test_set_popart_options(capfd):
     log.assert_contains(
         "poptorch.Options set "
         "automaticLossScalingSettings.gradientTensorTrackingMethod to value 1")
+    log.assert_contains("poptorch.Options added t1 to updatableNamedBuffers")
+    log.assert_contains("poptorch.Options added t2 to updatableNamedBuffers")
 
 
 def test_popart_patterns():

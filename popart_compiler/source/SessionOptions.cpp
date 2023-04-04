@@ -282,6 +282,11 @@ SessionOptionsImpl::SessionOptionsImpl() {
                    popart_options.gclOptions.emplace(p);
                  });
 
+  registerSetter(container_options, "updatableNamedBuffers",
+                 [&](const std::pair<std::string, std::string> &p) {
+                   popart_options.updatableNamedBuffers.push_back(p.first);
+                 });
+
 #define ADD_POPART_ENUM_OPTION(name, EnumType)                                 \
   registerSetter(uint64_options, #name, [&](std::uint64_t value) {             \
     ERROR_ON_MSG(value >= static_cast<std::uint64_t>(popart::EnumType::N),     \

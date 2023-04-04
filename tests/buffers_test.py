@@ -33,6 +33,84 @@ def test_constant_buffer_repeat():
     assert poptorch_model(torch.tensor([2])) == 15
 
 
+class UpdatableBuffer(torch.nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.register_buffer("buffer_1", torch.ones(1))
+        self.register_buffer("buffer_2", torch.ones(1))
+
+    def forward(self, x):
+        return torch.sum(x + self.buffer_1 + self.buffer_2)
+
+
+def test_copy_named_buffer_to_device_single_buffer():
+    model = UpdatableBuffer()
+    options = poptorch.Options()
+    options.updatableNamedBuffers(['buffer_1'])
+    poptorch_model = poptorch.inferenceModel(model, options=options)
+    x = torch.ones(3).float()
+
+    assert poptorch_model(x) == 9
+
+    poptorch_model.buffer_1.copy_(poptorch_model.buffer_1 + 1)
+    poptorch_model.copyNamedBuffersToDevice()
+
+    assert poptorch_model(x) == 12
+
+    poptorch_model.buffer_2.copy_(poptorch_model.buffer_2 + 1)
+    poptorch_model.copyNamedBuffersToDevice()
+
+    assert poptorch_model(x) == 12
+
+
+def test_copy_named_buffer_to_device_two_buffers():
+    model = UpdatableBuffer()
+    options = poptorch.Options()
+    options.updatableNamedBuffers(['buffer_1', 'buffer_2'])
+    poptorch_model = poptorch.inferenceModel(model, options=options)
+    x = torch.ones(3).float()
+
+    assert poptorch_model(x) == 9
+
+    poptorch_model.buffer_1.copy_(poptorch_model.buffer_1 + 1)
+    poptorch_model.copyNamedBuffersToDevice()
+
+    assert poptorch_model(x) == 12
+
+    poptorch_model.buffer_2.copy_(poptorch_model.buffer_2 + 1)
+    poptorch_model.copyNamedBuffersToDevice()
+
+    assert poptorch_model(x) == 15
+
+
+def test_copy_named_buffer_to_device_no_opt():
+    model = UpdatableBuffer()
+    options = poptorch.Options()
+
+    poptorch_model = poptorch.inferenceModel(model, options=options)
+    x = torch.ones(3).float()
+
+    assert poptorch_model(x) == 9
+
+    poptorch_model.buffer_1.copy_(poptorch_model.buffer_1 + 1)
+    with pytest.raises(poptorch.poptorch_core.Error):
+        poptorch_model.copyNamedBuffersToDevice()
+
+    assert poptorch_model(x) == 9
+
+
+def test_copy_named_buffer_to_device_invalid_opt():
+    model = UpdatableBuffer()
+    options = poptorch.Options()
+    options.updatableNamedBuffers(['non_existing_buffer'])
+
+    poptorch_model = poptorch.inferenceModel(model, options=options)
+    x = torch.ones(3).float()
+
+    with pytest.raises(poptorch.poptorch_core.Error):
+        poptorch_model(x)
+
+
 def test_training_then_inference():
     momentum = 0.1
 

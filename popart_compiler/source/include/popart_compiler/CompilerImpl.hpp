@@ -211,6 +211,7 @@ public:
 
   StepIO stepio;
   WeightsIO weights;
+  WeightsIO updatable_named_buffers;
   WeightsIO optim_state_tensors;
 
   bool is_training = false;
@@ -405,6 +406,10 @@ public:
   void clearAttribute(const std::string &attribute, const std::string &key);
 
   popart::DebugContext getDebugContext(const std::string &name);
+
+  // Mark named buffer as updatable
+  void registerUpdatableNamedBuffer(const TensorId &id,
+                                    const popart::TensorInfo &info);
 
 private:
   // Raise an error if cycle logging is enabled

@@ -1859,6 +1859,14 @@ class Options(_options_impl.OptionsDict):
         self._module_namescope_enabled = False
         return self
 
+    def updatableNamedBuffers(self, buffers: List[str]) -> "poptorch.Options":
+        """ List of model named buffers that can be updated with call to
+        buffersFromHost(). This allows to update just a subset of model weights
+        instead of all or them as it happens with weightsFromHost() call.
+        """
+        self._Popart.set('updatableNamedBuffers', buffers)
+        return self
+
     def toDict(self) -> Dict[str, Any]:
         """ Merge all the options, except for the JIT and Precision
         options, into a single dictionary to be serialised and passed to the C++
