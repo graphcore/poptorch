@@ -67,6 +67,14 @@ def test_learnable_channels_aggregation(dataloader, Aggregation):
     aggr = Aggregation(learn=True, channels=channels)
 
     if isinstance(aggr, PowerMeanAggregation):
-        pytest.skip("TODO(AFS-178)")
+        enable_fp_exception = False
+        equal_nan = True
+    else:
+        enable_fp_exception = True
+        equal_nan = False
 
-    aggr_harness(aggr, first_sample.num_nodes, dataloader)
+    aggr_harness(aggr,
+                 first_sample.num_nodes,
+                 dataloader,
+                 equal_nan=equal_nan,
+                 enable_fp_exception=enable_fp_exception)

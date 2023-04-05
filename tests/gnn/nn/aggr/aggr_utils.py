@@ -14,7 +14,9 @@ def aggr_harness(aggr,
                  loss_fn=torch.nn.MSELoss(),
                  num_steps=4,
                  atol=5e-3,
-                 rtol=5e-3):
+                 rtol=5e-3,
+                 equal_nan=False,
+                 enable_fp_exception=True):
     class AggrWrapper(torch.nn.Module):
         def __init__(self, aggr, loss_fn, post_proc=None):
             assert hasattr(loss_fn, 'reduction')
@@ -67,7 +69,12 @@ def aggr_harness(aggr,
 
     model = AggrWrapper(aggr, loss_fn=loss_fn, post_proc=post_proc)
 
-    stepper = TrainingStepper(model, atol=atol, rtol=rtol)
+    stepper = TrainingStepper(model,
+                              atol=atol,
+                              rtol=rtol,
+                              equal_nan=equal_nan,
+                              enable_fp_exception=enable_fp_exception)
+
     if dataloader is not None:
         for step, batch in enumerate(dataloader):
             if step == num_steps:

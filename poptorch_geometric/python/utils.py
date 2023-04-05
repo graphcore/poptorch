@@ -50,12 +50,14 @@ class TrainingStepper:
                  options=None,
                  rtol=None,
                  atol=None,
-                 enable_fp_exception=True):
+                 enable_fp_exception=True,
+                 equal_nan=False):
         super().__init__()
         model.train()
         self.lr = lr
         self.rtol = rtol
         self.atol = atol
+        self.equal_nan = equal_nan
         self.enable_fp_exception = enable_fp_exception
         self.options = poptorch.Options() if options is None else options
         self.training_model = None
@@ -156,7 +158,8 @@ class TrainingStepper:
                      expected=expected,
                      msg=msg_fn,
                      rtol=self.rtol,
-                     atol=self.atol)
+                     atol=self.atol,
+                     equal_nan=self.equal_nan)
 
     def benchmark(self, num_steps, batch, devices=('ipu')):
         results = {}
