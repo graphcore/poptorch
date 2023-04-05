@@ -9,5 +9,6 @@ PyTorch Geometric for the IPU: User Guide
     installation
     performance
     tutorials
+    supported_operations
     reference
     legal
