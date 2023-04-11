@@ -18,13 +18,9 @@ conv_kwargs_list = [{
 }]
 
 
+@pytest.mark.skip(reason="TODO(AFS-193)")
 @pytest.mark.parametrize('conv_kwargs', conv_kwargs_list)
-def test_dna_conv(conv_kwargs, request):
-    pytest.skip(
-        f'{request.node.nodeid}: AFS-193: poptorch.poptorch_core.Error: '
-        'In poptorch/source/ImplicitCasting.cpp:141: poptorch_cpp_error: '
-        'constant->kind() != symbols::poptorch::tensor_constant')
-
+def test_dna_conv(conv_kwargs):
     channels = 32
     num_layers = 3
     edge_index = torch.tensor([[0, 0, 0, 1, 2, 3], [1, 2, 3, 0, 0, 0]])

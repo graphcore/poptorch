@@ -6,10 +6,9 @@ from torch_geometric.nn import EquilibriumAggregation
 from aggr_utils import aggr_harness
 
 
+@pytest.mark.skip(reason="TODO(AFS-162)")
 @pytest.mark.parametrize('grad_iter', [0, 1, 5])
 def test_equilibrium(dataloader, grad_iter):
-    pytest.skip("TODO(AFS-162)")
-
     first_sample = next(iter(dataloader))
     channels = first_sample.num_node_features
 

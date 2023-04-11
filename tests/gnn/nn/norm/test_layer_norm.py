@@ -9,14 +9,10 @@ from torch_geometric.nn import LayerNorm
 
 @pytest.mark.parametrize('affine', [True, False])
 @pytest.mark.parametrize('mode', ['graph', 'node'])
-def test_layer_norm(request, affine, mode):
+def test_layer_norm(affine, mode):
 
     if mode == 'graph':
-        pytest.skip(
-            f"{request.node.nodeid}: Error: 'Could not run "
-            "'aten::_local_scalar_dense' with arguments from the 'Meta' "
-            "backend'."
-            " Will be enabled after AFS-144 is fixed.")
+        pytest.skip("TODO(AFS-242)")
 
     x = torch.randn(100, 16)
 
@@ -26,7 +22,7 @@ def test_layer_norm(request, affine, mode):
     out1 = norm_harness(norm, [x])
     assert out1.size() == (100, 16)
 
-    batch = torch.zeros(100, dtype=torch.float)
+    batch = torch.zeros(100, dtype=torch.int64)
     out2 = norm_harness(norm, [x, batch])
     assert out2.size() == (100, 16)
 

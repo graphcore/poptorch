@@ -9,29 +9,8 @@ from torch_geometric.nn import max_pool, max_pool_neighbor_x, max_pool_x
 from pool_utils import pool_harness
 
 
-def test_max_pool_x(request):
-    pytest.skip(
-        f"{request.node.nodeid}: Error: 'In "
-        "poptorch/source/dispatch_tracer/TypeInferenceHandler.cpp:26: "
-        "'poptorch_cpp_error': Type inference failed for aten::_unique2 "
-        "because the operator doesn't have an implementation for the Meta "
-        "backend'. Will be enabled after AFS-136 is fixed.")
-
-    cluster = torch.tensor([0, 1, 0, 1, 2, 2])
-    x = torch.Tensor([[1, 2], [3, 4], [5, 6], [7, 8], [9, 10], [11, 12]])
-    batch = torch.tensor([0, 0, 0, 0, 1, 1])
-
-    out = pool_harness(max_pool_x, [cluster, x, batch])
-    assert out[0].tolist() == [[5, 6], [7, 8], [11, 12]]
-    assert out[1].tolist() == [0, 0, 1]
-
-
-def test_max_pool_x_size_2(request):
-    pytest.skip(
-        f"{request.node.nodeid}: Error: 'NotImplementedError: Could "
-        "not run 'aten::_local_scalar_dense' with arguments from the 'Meta' "
-        "backend'. Will be enabled after AFS-144 is fixed.")
-
+@pytest.mark.skip(reason="TODO(AFS-243)")
+def test_max_pool_x():
     cluster = torch.tensor([0, 1, 0, 1, 2, 2])
     x = torch.Tensor([[1, 2], [3, 4], [5, 6], [7, 8], [9, 10], [11, 12]])
     batch = torch.tensor([0, 0, 0, 0, 1, 1])
@@ -40,11 +19,10 @@ def test_max_pool_x_size_2(request):
     assert out.tolist() == [[5, 6], [7, 8], [11, 12], [0, 0]]
 
 
-def test_max_pool(request):
-    pytest.skip(f"{request.node.nodeid}: Error: "
-                "'poptorch_geometric/types.py:51 AssertionError: Field `ptr` "
-                "missing'. Will be enabled after AFS-137 is fixed.")
-
+@pytest.mark.skip(
+    reason="max_pool uses torch.unique instruction which produces "
+    "tensor with dynamic shape. This is not supported for Mk2.")
+def test_max_pool():
     cluster = torch.tensor([0, 1, 0, 1, 2, 2])
     x = torch.Tensor([[1, 2], [3, 4], [5, 6], [7, 8], [9, 10], [11, 12]])
     pos = torch.Tensor([[0, 0], [1, 1], [2, 2], [3, 3], [4, 4], [5, 5]])
@@ -69,12 +47,9 @@ def test_max_pool(request):
 
 
 @pytest.mark.parametrize('input_type', [Data, Batch])
-def test_max_pool_neighbor_x(request, input_type):
+def test_max_pool_neighbor_x(input_type):
     if input_type == Batch:
-        pytest.skip(
-            f"{request.node.nodeid}: Error: "
-            "'poptorch_geometric/types.py:51 AssertionError: Field `ptr` "
-            "missing'. Will be enabled after AFS-137 is fixed.")
+        pytest.skip("TODO(AFS-231, AFS-229, AFS-230)")
 
     x = torch.Tensor([[1, 2], [3, 4], [5, 6], [7, 8], [9, 10], [11, 12]])
     edge_index = torch.tensor([[0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 5],

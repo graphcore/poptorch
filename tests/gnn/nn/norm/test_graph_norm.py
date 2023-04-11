@@ -7,13 +7,8 @@ from norm_utils import norm_harness
 from torch_geometric.nn import GraphNorm
 
 
-def test_graph_norm(request):
-
-    pytest.skip(
-        f"{request.node.nodeid}: Error: 'Could not run "
-        "'aten::_local_scalar_dense' with arguments from the 'Meta' backend'."
-        " Will be enabled after AFS-144 is fixed.")
-
+@pytest.mark.skip(reason="TODO(AFS-242)")
+def test_graph_norm():
     torch.manual_seed(42)
     x = torch.randn(200, 16)
     batch = torch.arange(4).view(-1, 1).repeat(1, 50).view(-1)

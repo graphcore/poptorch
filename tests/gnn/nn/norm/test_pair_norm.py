@@ -18,14 +18,9 @@ def test_pair_norm_no_batch(scale_individually):
     assert out1.size() == (100, 16)
 
 
+@pytest.mark.skip(reason="TODO(AFS-242)")
 @pytest.mark.parametrize('scale_individually', [False, True])
-def test_pair_norm(request, scale_individually):
-
-    pytest.skip(
-        f"{request.node.nodeid}: Error: 'Could not run "
-        "'aten::_local_scalar_dense' with arguments from the 'Meta' backend'."
-        " Will be enabled after AFS-144 is fixed.")
-
+def test_pair_norm(scale_individually):
     x = torch.randn(100, 16)
     batch = torch.zeros(100, dtype=torch.long)
 
@@ -36,7 +31,8 @@ def test_pair_norm(request, scale_individually):
     assert out1.size() == (100, 16)
 
     out2 = norm_harness(
-        norm, [torch.cat([x, x], dim=0),
-               torch.cat([batch, batch + 1], dim=0)])
+        norm,
+        [torch.cat([x, x], dim=0),
+         torch.cat([batch, batch + 1], dim=0), 2])
     assert torch.allclose(out1, out2[:100], atol=1e-04)
     assert torch.allclose(out1, out2[100:], atol=1e-04)

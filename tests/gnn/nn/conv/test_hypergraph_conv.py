@@ -6,11 +6,8 @@ from torch_geometric.nn import HypergraphConv
 from conv_utils import conv_harness
 
 
-def test_hypergraph_conv_with_more_nodes_than_edges(request):
-    pytest.skip(
-        f'{request.node.nodeid}: AFS-144: Could not run '
-        'aten::_local_scalar_dense with arguments from the Meta backend.')
-
+@pytest.mark.skip(reason="TODO(AFS-162)")
+def test_hypergraph_conv_with_more_nodes_than_edges():
     in_channels, out_channels = (16, 32)
     hyperedge_index = torch.tensor([[0, 0, 1, 1, 2, 3], [0, 1, 0, 1, 0, 1]])
     hyperedge_weight = torch.tensor([1.0, 0.5])
@@ -32,11 +29,8 @@ def test_hypergraph_conv_with_more_nodes_than_edges(request):
                  batch=(x, hyperedge_index, hyperedge_weight, hyperedge_attr))
 
 
-def test_hypergraph_conv_with_more_edges_than_nodes(request):
-    pytest.skip(
-        f'{request.node.nodeid}: AFS-144: Could not run '
-        'aten::_local_scalar_dense with arguments from the Meta backend.')
-
+@pytest.mark.skip(reason="TODO(AFS-162)")
+def test_hypergraph_conv_with_more_edges_than_nodes():
     in_channels, out_channels = (16, 32)
     hyperedge_index = torch.tensor([[0, 0, 1, 1, 2, 3, 3, 3, 2, 1, 2],
                                     [0, 1, 2, 1, 2, 1, 0, 3, 3, 4, 4]])

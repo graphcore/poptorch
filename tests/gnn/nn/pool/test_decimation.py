@@ -8,12 +8,9 @@ from torch_geometric.nn.pool.decimation import decimation_indices
 from pool_utils import pool_harness
 
 
-def test_decimation_basic(request):
-    pytest.skip(
-        f"{request.node.nodeid}: Error: 'NotImplementedError: Could not run "
-        "'aten::_local_scalar_dense' with arguments from the 'Meta' backend'. "
-        "Will be enabled after AFS-144 is fixed.")
-
+@pytest.mark.skip(reason="Algorithm uses tensors with dynamic shapes "
+                  "and reads tensor values during runtime")
+def test_decimation_basic():
     N_1, N_2 = 4, 6
     decimation_factor = 2
     ptr = torch.tensor([0, N_1, N_1 + N_2])
@@ -29,12 +26,9 @@ def test_decimation_basic(request):
     assert torch.equal(ptr_decim, expected)
 
 
-def test_decimation_single_cloud(request):
-    pytest.skip(
-        f"{request.node.nodeid}: Error: 'NotImplementedError: Could "
-        "not run 'aten::_local_scalar_dense' with arguments from the 'Meta' "
-        "backend.'. Will be enabled after AFS-144 is fixed.")
-
+@pytest.mark.skip(reason="Algorithm uses tensors with dynamic shapes "
+                  "and reads tensor values during runtime")
+def test_decimation_single_cloud():
     N_1 = 4
     decimation_factor = 2
     ptr = torch.tensor([0, N_1])
@@ -47,12 +41,9 @@ def test_decimation_single_cloud(request):
     assert torch.equal(ptr_decim, torch.tensor([0, expected_size]))
 
 
-def test_decimation_almost_empty(request):
-    pytest.skip(
-        f"{request.node.nodeid}: Error: 'NotImplementedError: Could "
-        "not run 'aten::_local_scalar_dense' with arguments from the 'Meta' "
-        "backend.'. Will be enabled after AFS-144 is fixed.")
-
+@pytest.mark.skip(reason="Algorithm uses tensors with dynamic shapes "
+                  "and reads tensor values during runtime")
+def test_decimation_almost_empty():
     N_1 = 4
     decimation_factor = 666  # greater than N_1
     ptr = torch.tensor([0, N_1])

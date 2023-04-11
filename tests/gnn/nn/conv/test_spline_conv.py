@@ -7,12 +7,9 @@ from torch_geometric.testing import withPackage
 from conv_utils import conv_harness
 
 
+@pytest.mark.skip(reason="TODO(AFS-216, AFS-218)")
 @withPackage('torch_spline_conv')
-def test_spline_conv(request):
-    pytest.skip(
-        f'{request.node.nodeid}: AFS-201: RuntimeError: INTERNAL ASSERT FAILED '
-        'at "csrc/cpu/basis_cpu.cpp":58, pseudo must be CPU tensor.')
-
+def test_spline_conv():
     x1 = torch.randn(4, 4)
     x2 = torch.randn(2, 8)
     edge_index = torch.tensor([[0, 1, 2, 3], [0, 0, 1, 1]])

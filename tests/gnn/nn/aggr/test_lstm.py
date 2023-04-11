@@ -6,9 +6,8 @@ from torch_geometric.nn import LSTMAggregation
 from aggr_utils import aggr_harness
 
 
+@pytest.mark.skip(reason="TODO(AFS-279)")
 def test_lstm_aggregation(dataloader):
-    pytest.skip("TODO(AFS-162)")
-
     first_sample = next(iter(dataloader))
     channels = first_sample.num_node_features
 

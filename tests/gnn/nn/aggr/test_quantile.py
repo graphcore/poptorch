@@ -9,11 +9,7 @@ from aggr_utils import aggr_harness
 
 @pytest.mark.parametrize('q', [0., .1, .2, .3, .4, .5, .6, .7, .8, .9, 1.])
 @pytest.mark.parametrize('interpolation', QuantileAggregation.interpolations)
-@pytest.mark.skip(
-    reason=
-    "The IPU cannot support dynamic output shapes. QuantileAggregation op " \
-    "uses torch.bincount operation which results dynamic output shape."
-)
+@pytest.mark.skip(reason="TODO(AFS-275, AFS-277, AFS-278)")
 def test_quantile_aggregation(dataloader, q, interpolation):
     first_sample = next(iter(dataloader))
     in_channels = first_sample.num_node_features
@@ -28,11 +24,8 @@ def test_quantile_aggregation(dataloader, q, interpolation):
                  post_proc,
                  sorted_index=True)
 
-@pytest.mark.skip(
-    reason=
-    "The IPU cannot support dynamic output shapes. MedianAggregation op " \
-    "uses torch.bincount operation which results dynamic output shape."
-)
+
+@pytest.mark.skip(reason="TODO(AFS-275, AFS-277, AFS-278)")
 def test_median_aggregation(dataloader):
     first_sample = next(iter(dataloader))
     in_channels = first_sample.num_node_features

@@ -8,11 +8,10 @@ from torch_geometric.nn.pool.topk_pool import TopKPooling, filter_adj, topk
 from pool_utils import pool_harness
 
 
-def test_topk(request):
-    pytest.skip(
-        f"{request.node.nodeid}: Error: 'NotImplementedError: Could not run "
-        "'aten::_local_scalar_dense' with arguments from the 'Meta' backend'. "
-        "Will be enabled after AFS-144 is fixed.")
+@pytest.mark.skip(reason="The class is using filter_adj which produces "
+                  "tensors with dynamic shapes. It is not supported "
+                  "on Mk2.")
+def test_topk():
     x = torch.Tensor([2, 4, 5, 6, 2, 9])
     batch = torch.tensor([0, 0, 1, 1, 1, 1])
 
@@ -32,27 +31,24 @@ def test_topk(request):
     assert batch[perm3].tolist() == [0, 0, 1, 1, 1]
 
 
-def test_filter_adj(request):
-    pytest.skip(
-        f"{request.node.nodeid}: Error: 'NotImplementedError: Could "
-        "not run 'aten::_local_scalar_dense' with arguments from the 'Meta' "
-        "backend'. Will be enabled after AFS-144 is fixed.")
+@pytest.mark.skip(reason="The class is using filter_adj which produces "
+                  "tensors with dynamic shapes. It is not supported "
+                  "on Mk2.")
+def test_filter_adj():
     edge_index = torch.tensor([[0, 0, 1, 1, 2, 2, 3, 3],
                                [1, 3, 0, 2, 1, 3, 0, 2]])
     edge_attr = torch.Tensor([1, 2, 3, 4, 5, 6, 7, 8])
-    perm = torch.tensor([2, 3])
+    perm = torch.tensor([1, 2, 3])
 
-    out = pool_harness(filter_adj, [edge_index, edge_attr, perm])
+    out = pool_harness(filter_adj, [edge_index, edge_attr, perm, 4])
     assert out[0].tolist() == [[0, 1], [1, 0]]
     assert out[1].tolist() == [6, 8]
 
 
-def test_topk_pooling(request):
-    pytest.skip(
-        f"{request.node.nodeid}: Error: 'NotImplementedError: Could "
-        "not run 'aten::_local_scalar_dense' with arguments from the 'Meta' "
-        "backend'. Will be enabled after AFS-144 is fixed.")
-
+@pytest.mark.skip(reason="The class is using filter_adj which produces "
+                  "tensors with dynamic shapes. It is not supported "
+                  "on Mk2.")
+def test_topk_pooling():
     in_channels = 16
     edge_index = torch.tensor([[0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 3],
                                [1, 2, 3, 0, 2, 3, 0, 1, 3, 0, 1, 2]])

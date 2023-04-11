@@ -10,14 +10,9 @@ from torch_geometric.testing import withPackage
 from pool_utils import pool_harness
 
 
+@pytest.mark.skip(reason="TODO(AFS-264, AFS-265)")
 @withPackage('torch_cluster')
-def test_voxel_grid(request):
-    pytest.skip(
-        f"{request.node.nodeid}: Error: "
-        "'torch_geometric/nn/pool/voxel_grid.py:69 RuntimeError: "
-        "pos.device().is_cpu() INTERNAL ASSERT FAILED at "
-        "\"csrc/cpu/grid_cpu.cpp\":9, please report a bug to PyTorch. pos must"
-        " be CPU tensor'. Will be enabled after AFS-146 is fixed.")
+def test_voxel_grid():
     pos = torch.Tensor([[0, 0], [11, 9], [2, 8], [2, 2], [8, 3]])
     batch = torch.tensor([0, 0, 0, 1, 1])
 
@@ -27,13 +22,9 @@ def test_voxel_grid(request):
     assert out.tolist() == [0, 5, 3, 0, 1]
 
 
+@pytest.mark.skip(reason="TODO(AFS-264, AFS-265)")
 @withPackage('torch_cluster')
-def test_voxel_grid_with_optional_args(request):
-    pytest.skip(
-        f"{request.node.nodeid}: Error: 'NotImplementedError: Could "
-        "not run 'aten::_local_scalar_dense' with arguments from the 'Meta' "
-        "backend'. Will be enabled after AFS-144 is fixed.")
-
+def test_voxel_grid_with_optional_args():
     pos = torch.Tensor([[0, 0], [11, 9], [2, 8], [2, 2], [8, 3]])
     batch = torch.tensor([0, 0, 0, 1, 1])
 
@@ -44,15 +35,9 @@ def test_voxel_grid_with_optional_args(request):
     assert cluster_no_batch.tolist() == [0, 10, 4, 0, 1]
 
 
+@pytest.mark.skip(reason="TODO(AFS-264, AFS-265)")
 @withPackage('torch_cluster')
-def test_single_voxel_grid(request):
-    pytest.skip(
-        f"{request.node.nodeid}: Error: "
-        "'torch_geometric/nn/pool/voxel_grid.py:69 RuntimeError: "
-        "pos.device().is_cpu() INTERNAL ASSERT FAILED at "
-        "\"csrc/cpu/grid_cpu.cpp\":9, please report a bug to PyTorch. pos must"
-        " be CPU tensor'. Will be enabled after AFS-146 is fixed.")
-
+def test_single_voxel_grid():
     pos = torch.Tensor([[0, 0], [1, 1], [2, 2], [3, 3], [4, 4]])
     edge_index = torch.tensor([[0, 0, 3], [1, 2, 4]])
     batch = torch.tensor([0, 0, 0, 1, 1])

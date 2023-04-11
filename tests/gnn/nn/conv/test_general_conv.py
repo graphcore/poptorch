@@ -31,8 +31,7 @@ conv_kwargs_list = [{
 def test_general_conv(dataset, conv_kwargs):
 
     if conv_kwargs.get('attention_type') == 'dot_product':
-        # TODO: AFS-37
-        pytest.skip("AFS-37: Currently failing ")
+        pytest.skip("TODO(AFS-37)")
 
     in_channels = dataset.num_node_features
     conv = GeneralConv(in_channels, out_channels, num_edge_attr, **conv_kwargs)

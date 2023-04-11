@@ -6,13 +6,9 @@ from torch_geometric.nn import HEATConv
 from conv_utils import conv_harness
 
 
+@pytest.mark.skip(reason="TODO(AFS-223)")
 @pytest.mark.parametrize('concat', [True, False])
-def test_heat_conv(concat, request):
-    pytest.skip(
-        f'{request.node.nodeid}: AFS-145: Operations using aten::nonzero '
-        'are unsupported because the output shape is determined by the '
-        'tensor values. The IPU cannot support dynamic output shapes')
-
+def test_heat_conv(concat):
     x = torch.randn(4, 8)
     edge_index = torch.tensor([[0, 1, 2, 3], [0, 0, 1, 1]])
     edge_attr = torch.randn((4, 2))

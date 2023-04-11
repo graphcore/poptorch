@@ -7,9 +7,8 @@ from torch_geometric.nn.aggr import SortAggregation
 from aggr_utils import aggr_harness
 
 
+@pytest.mark.skip(reason="TODO(AFS-279, AFS-277)")
 def test_sort_aggregation(dataloader):
-    pytest.skip("TODO(AFS-162)")
-
     first_sample = next(iter(dataloader))
     in_channels = first_sample.num_node_features
     out_channels = in_channels * 2

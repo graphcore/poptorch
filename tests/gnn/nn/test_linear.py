@@ -6,7 +6,7 @@ import pytest
 import torch
 from torch_geometric.nn import HeteroLinear, Linear
 
-from dense_utils import dense_harness
+from dense.dense_utils import dense_harness
 
 weight_inits = ['glorot', "uniform", 'kaiming_uniform', None]
 bias_inits = ['zeros', None]
@@ -20,9 +20,8 @@ def test_linear(weight, bias):
     dense_harness(lin, x)
 
 
+@pytest.mark.skip(reason="TODO(AFS-223)")
 def test_hetero_linear():
-    pytest.skip("TODO AFS-190")
-
     x = torch.randn(3, 16)
     type_vec = torch.tensor([0, 1, 2])
 

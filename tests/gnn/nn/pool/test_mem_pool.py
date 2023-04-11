@@ -9,12 +9,8 @@ from torch_geometric.utils import to_dense_batch
 from pool_utils import pool_harness
 
 
-def test_mem_pool(request):
-    pytest.skip(
-        f"{request.node.nodeid}: Error: 'NotImplementedError: Could "
-        "not run 'aten::_local_scalar_dense' with arguments from the 'Meta' "
-        "backend'. Will be enabled after AFS-144 is fixed.")
-
+@pytest.mark.skip(reason="TODO(AFS-256)")
+def test_mem_pool():
     mpool1 = MemPooling(4, 8, heads=3, num_clusters=2)
     assert mpool1.__repr__() == 'MemPooling(4, 8, heads=3, num_clusters=2)'
 
@@ -33,13 +29,8 @@ def test_mem_pool(request):
     assert float(loss) > 0
 
 
-def test_mem_pool_chain(request):
-    pytest.skip(
-        f"{request.node.nodeid}: Error: "
-        "'torch/_meta_registrations.py:708 TypeError: '>=' not supported "
-        "between instances of 'NoneType' and 'int''. Will be enabled after "
-        "AFS-141 is fixed.")
-
+@pytest.mark.skip(reason="TODO(AFS-256)")
+def test_mem_pool_chain():
     mpool1 = MemPooling(4, 8, heads=3, num_clusters=2)
     assert mpool1.__repr__() == 'MemPooling(4, 8, heads=3, num_clusters=2)'
     mpool2 = MemPooling(8, 4, heads=2, num_clusters=1)

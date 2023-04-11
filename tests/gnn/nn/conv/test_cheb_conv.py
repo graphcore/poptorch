@@ -6,12 +6,11 @@ from torch_geometric.nn import ChebConv
 from conv_utils import conv_harness
 
 
-def test_cheb_conv(dataset, request):
-    pytest.skip(
-        f'{request.node.nodeid}: AFS-145: Operations using aten::nonzero '
-        'are unsupported because the output shape is determined by the '
-        'tensor values. The IPU cannot support dynamic output shapes')
-
+@pytest.mark.skip(
+    reason="ChebConv won't work, because algorithm requires removing "
+    "self loops and we are adding self loops to ensure that "
+    "tensors have fixed size.")
+def test_cheb_conv(dataset):
     in_channels = dataset.num_node_features
     out_channels = 32
     conv = ChebConv(in_channels, out_channels, K=3, add_self_loops=False)

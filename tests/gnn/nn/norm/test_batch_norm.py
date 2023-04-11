@@ -18,13 +18,8 @@ def test_batch_norm(conf):
     assert out.size() == (100, 16)
 
 
-def test_batch_norm_single_element(request):
-
-    pytest.skip(f"{request.node.nodeid}: Error: 'BatchNorm Op \"101 "
-                "(ai.graphcore.BatchNormalization:1)\" has 1 output(s) "
-                "which means it is in inference mode, but its gradient "
-                "Op is being created.")
-
+@pytest.mark.skip(reason="TODO(AFS-290)")
+def test_batch_norm_single_element():
     x = torch.randn(1, 16)
 
     norm = BatchNorm(16, track_running_stats=True, allow_single_element=True)

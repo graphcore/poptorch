@@ -6,11 +6,8 @@ from torch_geometric.nn import MFConv
 from conv_utils import conv_harness
 
 
-def test_mf_conv(dataset, request):
-    pytest.skip(
-        f'{request.node.nodeid}: AFS-145: Operations using aten::nonzero '
-        'are unsupported because the output shape is determined by the '
-        'tensor values. The IPU cannot support dynamic output shapes')
+@pytest.mark.skip(reason="TODO(AFS-219)")
+def test_mf_conv(dataset):
     in_channels = dataset.num_node_features
     out_channels = 32
 

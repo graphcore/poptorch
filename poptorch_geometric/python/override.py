@@ -3,12 +3,22 @@ import functools
 import importlib
 
 import torch_geometric
+import torch_cluster
 from poptorch_geometric import ops
 
 
 class _TorchGeometricOpsSubstitutionManager:
 
     subsitutions = {
+        torch_cluster: {
+            "knn": ops.knn
+        },
+        torch_geometric.nn.conv.edge_conv: {  # pylint: disable=no-member
+            "knn": ops.knn
+        },
+        torch_geometric.nn.conv.gravnet_conv: {  # pylint: disable=no-member
+            "knn": ops.knn
+        },
         torch_geometric.nn: {
             "knn_interpolate": ops.knn_interpolate
         },

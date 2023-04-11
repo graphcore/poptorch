@@ -6,13 +6,9 @@ from torch_geometric.nn import GPSConv, SAGEConv
 from conv_utils import conv_harness
 
 
+@pytest.mark.skip(reason="TODO(AFS-279, AFS-162)")
 @pytest.mark.parametrize('norm', [None, 'batch_norm', 'layer_norm'])
-def test_gps_conv(norm, dataset, request):
-    pytest.skip(
-        f'{request.node.nodeid}: AFS-145: Operations using aten::nonzero '
-        'are unsupported because the output shape is determined by the '
-        'tensor values. The IPU cannot support dynamic output shapes')
-
+def test_gps_conv(norm, dataset):
     in_channels = dataset.num_node_features
     conv = GPSConv(in_channels,
                    conv=SAGEConv(16, 16, add_self_loops=False),
@@ -23,12 +19,9 @@ def test_gps_conv(norm, dataset, request):
     conv_harness(conv, dataset)
 
 
+@pytest.mark.skip(reason="TODO(AFS-279, AFS-162)")
 @pytest.mark.parametrize('norm', [None, 'batch_norm', 'layer_norm'])
-def test_gps_conv_with_batch_index_tensor(norm, dataset, request):
-    pytest.skip(
-        f'{request.node.nodeid}: AFS-144: Could not run '
-        'aten::_local_scalar_dense with arguments from the Meta backend.')
-
+def test_gps_conv_with_batch_index_tensor(norm, dataset):
     in_channels = dataset.num_node_features
     conv = GPSConv(in_channels,
                    conv=SAGEConv(16, 16, add_self_loops=False),

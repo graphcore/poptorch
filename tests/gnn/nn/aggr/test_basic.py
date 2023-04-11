@@ -50,9 +50,6 @@ def test_gen_aggregation(dataloader, Aggregation, learn):
     aggr = Aggregation(learn=learn)
     post_proc = torch.nn.Linear(in_channels, out_channels)
 
-    if learn is True and isinstance(aggr, PowerMeanAggregation):
-        pytest.skip("TODO(AFS-178)")
-
     aggr_harness(aggr, first_sample.num_nodes, dataloader, post_proc)
 
 

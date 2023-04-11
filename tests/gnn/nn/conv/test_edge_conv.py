@@ -1,5 +1,4 @@
 # Copyright (c) 2022 Graphcore Ltd. All rights reserved.
-import pytest
 from torch.nn import Linear as Lin
 from torch.nn import ReLU
 from torch.nn import Sequential as Seq
@@ -18,8 +17,6 @@ def test_edge_conv(dataset):
     conv_harness(conv, dataset)
 
 
-# TODO:  AFS-195, AFS-41
-@pytest.mark.xfail(reason='RuntimeError: x.device().is_cpu()')
 def test_dynamic_edge_conv(dataset):
     in_channels = dataset.num_node_features
     nn = Seq(Lin(in_channels * 2, in_channels), ReLU(),

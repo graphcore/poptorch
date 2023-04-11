@@ -8,13 +8,10 @@ from torch_geometric.nn import PANConv, PANPooling
 from pool_utils import pool_harness
 
 
-def test_pan_pooling(request):
-    pytest.skip(
-        f"{request.node.nodeid}: Error: "
-        "'torch_geometric/nn/pool/pan_pool.py:93 RuntimeError: Expected all "
-        "tensors to be on the same device, but found at least two devices, "
-        "ipu:0 and cpu!'. Will be enabled after AFS-142 is fixed.")
-
+@pytest.mark.skip(reason="The class is using filter_adj which produces "
+                  "tensors with dynamic shapes. It is not supported "
+                  "on Mk2.")
+def test_pan_pooling():
     edge_index = torch.tensor([[0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 3],
                                [1, 2, 3, 0, 2, 3, 0, 1, 3, 0, 1, 2]])
     num_nodes = edge_index.max().item() + 1
@@ -25,7 +22,9 @@ def test_pan_pooling(request):
     assert str(pool) == 'PANPooling(32, ratio=0.5, multiplier=1.0)'
 
     x, M = conv(x, edge_index)
-    h, edge_index, edge_weight, _, perm, score = pool_harness(pool, [x, M])
+    row, col, edge_weight = M.coo()
+    h, edge_index, edge_weight, _, perm, score = pool_harness(
+        pool, [x, row, col, edge_weight])
 
     assert h.size() == (2, 32)
     assert edge_index.size() == (2, 4)

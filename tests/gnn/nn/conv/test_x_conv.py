@@ -7,12 +7,9 @@ from torch_geometric.testing import withPackage
 from conv_utils import conv_harness
 
 
+@pytest.mark.skip(reason="TODO(AFS-273)")
 @withPackage('torch_cluster')
-def test_x_conv(request):
-    pytest.skip(
-        f'{request.node.nodeid}: AFS-195: RuntimeError: x.device().is_cpu() '
-        'INTERNAL ASSERT FAILED at "csrc/cpu/knn_cpu.cpp":12, x must be CPU '
-        'tensor')
+def test_x_conv():
     x = torch.randn(8, 16)
     pos = torch.rand(8, 5)
     batch = torch.tensor([0, 0, 0, 0, 1, 1, 1, 1])

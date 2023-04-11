@@ -6,9 +6,8 @@ from torch_geometric.nn.aggr import GraphMultisetTransformer
 from aggr_utils import aggr_harness
 
 
+@pytest.mark.skip(reason="TODO(AFS-279)")
 def test_graph_multiset_transformer(dataloader):
-    pytest.skip("TODO(AFS-162)")
-
     first_sample = next(iter(dataloader))
     channels = first_sample.num_node_features
 

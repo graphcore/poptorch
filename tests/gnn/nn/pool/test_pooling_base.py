@@ -43,14 +43,8 @@ class DummyConnect(Connect):
         return edge_index.new_empty(2, 0), edge_attr
 
 
-def test_pooling(request):
-    pytest.skip(
-        f"{request.node.nodeid}: Error: "
-        "'poptorch/_poplar_executor.py:856 poptorch.poptorch_core.Error: In "
-        "poptorch/source/dispatch_tracer/Tensor.cpp:318: 'poptorch_cpp_error':"
-        " Zero-sized tensors are unsupported (Got shape [2, 0])'. Will be "
-        "enabled after AFS-143 is fixed.")
-
+@pytest.mark.skip(reason="TODO(AFS-268)")
+def test_pooling():
     pool = Pooling(DummySelect(), MaxAggregation(), DummyConnect())
     pool.reset_parameters()
     assert str(pool) == ('Pooling(\n'

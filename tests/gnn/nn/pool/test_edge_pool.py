@@ -41,14 +41,10 @@ def test_compute_edge_score_sigmoid():
     assert torch.all(torch.argsort(raw) == torch.argsort(e))
 
 
-def test_edge_pooling(request):
-    pytest.skip(
-        f"{request.node.nodeid}: Error: "
-        "'In poptorch/source/dispatch_tracer/RegisterAtenOverloads.cpp:308: "
-        "'poptorch_cpp_error': Illegal move to CPU (via `.to(\"cpu\")`) when "
-        "using the dispatcher. Instead, return this output as an IPU tensor'. "
-        "Will be enabled after AFS-138 is fixed.")
-
+@pytest.mark.skip(
+    reason="Currently not possible to run on Mk2 due to the algorithm "
+    "used in the __merge_edges__ function")
+def test_edge_pooling():
     x = torch.Tensor([[0], [1], [2], [3], [4], [5], [-1]])
     edge_index = torch.tensor([[0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 5, 6],
                                [1, 2, 3, 0, 2, 3, 0, 1, 3, 0, 1, 2, 5, 4, 0]])
@@ -82,12 +78,7 @@ def test_edge_pooling(request):
     assert new_edge_index.tolist() == [[0, 1, 1, 2, 2], [0, 1, 2, 1, 2]]
 
 
-def test_edge_unpooling(request):
-    pytest.skip(
-        f"{request.node.nodeid}: Error: 'poptorch/_utils.py:131 "
-        "TypeError: __new__() missing 3 required positional arguments: "
-        "'cluster', 'batch', and 'new_edge_score''. Will be enabled after "
-        "AFS-139 is fixed.")
+def test_edge_unpooling():
 
     x = torch.Tensor([[0], [1], [2], [3], [4], [5], [-1]])
     edge_index = torch.tensor([[0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 5, 6],

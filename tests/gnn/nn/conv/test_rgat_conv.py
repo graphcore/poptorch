@@ -21,19 +21,15 @@ from conv_utils import conv_harness
     'additive-self-attention',
     'multiplicative-self-attention',
 ])
-def test_rgat_conv(mod, attention_mechanism, attention_mode, request):
+def test_rgat_conv(mod, attention_mechanism, attention_mode):
     seed_everything(0)
 
     if attention_mechanism == 'within-relation':
-        pytest.skip(
-            f'{request.node.nodeid}: AFS-145: Operations using aten::nonzero '
-            'are unsupported because the output shape is determined by the '
-            'tensor values. The IPU cannot support dynamic output shapes.')
+        pytest.skip("Condition from torch.nonzero is used to compute softmax. "
+                    "Fixed size tensor can change softmax result.")
 
-    elif mod != 'additive' or attention_mode != 'additive-self-attention':
-        pytest.skip(
-            f'{request.node.nodeid}: AFS-200: Various inconsistent failures '
-            'or crashes for many confgurations.')
+    if mod != 'additive' or attention_mode != 'additive-self-attention':
+        pytest.skip("TODO(AFS-200)")
 
     x = torch.randn(4, 8)
     edge_index = torch.tensor([[0, 1, 2, 3], [0, 0, 1, 1]])

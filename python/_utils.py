@@ -127,6 +127,8 @@ def reconstructTensorStructure(structure, values, filter_fn=lambda t: True):
         if isinstance(x, dict):
             return type(x)({k: copy_structure(x[k], it) for k in x.keys()})
         if isinstance(x, (tuple, list)):
+            if (hasattr(x, '_asdict') and hasattr(x, '_fields')):
+                return type(x)(*(copy_structure(e, it) for e in x))
             return type(x)(copy_structure(e, it) for e in x)
         if isinstance(x, torch.Tensor) and filter_fn(x):
             return next(it)

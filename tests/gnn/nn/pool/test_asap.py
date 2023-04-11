@@ -8,11 +8,8 @@ from torch_geometric.nn import ASAPooling, GCNConv, GraphConv
 from pool_utils import pool_harness
 
 
-def test_asap(request):
-    pytest.skip(
-        f"{request.node.nodeid}: Error: 'The IPU cannot support dynamic output"
-        " shapes'. Will be enabled after AFS-145 is fixed.")
-
+@pytest.mark.skip(reason="TODO(AFS-229, AFS-230, AFS-232, AFS-262)")
+def test_asap():
     in_channels = 16
     edge_index = torch.tensor([[0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 3],
                                [1, 2, 3, 0, 2, 3, 0, 1, 3, 0, 1, 2]])
