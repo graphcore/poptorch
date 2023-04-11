@@ -14,6 +14,9 @@ class _TorchGeometricOpsSubstitutionManager:
         },
         torch_geometric.nn.unpool: {
             "knn_interpolate": ops.knn_interpolate
+        },
+        torch_geometric.nn.ClusterGCNConv: {
+            "forward": ops.ClusterGCNConv.forward
         }
     }
 
