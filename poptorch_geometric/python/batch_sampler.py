@@ -1,4 +1,4 @@
-# Copyright (c) 2022-2023 Graphcore Ltd. All rights reserved.
+# Copyright (c) 2022 Graphcore Ltd. All rights reserved.
 
 import numbers
 from functools import lru_cache

@@ -1,4 +1,4 @@
-# Copyright (c) 2022-2023 Graphcore Ltd. All rights reserved.
+# Copyright (c) 2022 Graphcore Ltd. All rights reserved.
 # Note: The content of this file is going to be upstreamed to PyG.
 from typing import Dict, Iterable, List, Optional, Sequence, Tuple, Union
 

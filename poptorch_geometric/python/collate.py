@@ -1,4 +1,4 @@
-# Copyright (c) 2022-2023 Graphcore Ltd. All rights reserved.
+# Copyright (c) 2022 Graphcore Ltd. All rights reserved.
 
 from enum import Enum
 from typing import Any, Dict, Generator, List, Optional, Tuple, Union

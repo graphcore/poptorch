@@ -27,7 +27,8 @@ class FixedSizeClusterLoader(PyGFixedSizeClusterLoader, poptorch.DataLoader):
             should not contain :obj:`num_nodes` as it should be passed directly
             to the initializer method. (default: :obj:`None`)
         options (poptorch.Options, optional): The additional PopTorch options
-            to be passed to :py:class:`poptorch.DataLoader`. (default: :obj:`None`)
+            to be passed to :py:class:`poptorch.DataLoader`.
+            (default: :obj:`None`)
         **kwargs (optional): The additional arguments of
             :py:class:`poptorch.DataLoader`.
     """

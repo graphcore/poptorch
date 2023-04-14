@@ -1,4 +1,4 @@
-# Copyright (c) 2022-2023 Graphcore Ltd. All rights reserved.
+# Copyright (c) 2022 Graphcore Ltd. All rights reserved.
 from __future__ import annotations  # noqa: F407
 
 from typing import Dict, Iterable, List, Optional, Tuple, Union
@@ -30,7 +30,8 @@ class DataLoader(PyGDataLoader, poptorch.DataLoader):
         exclude_keys (List[str], optional): Will exclude each key in the
             list. (default: :obj:`None`)
         options (poptorch.Options, optional): The additional PopTorch options
-            to be passed to :py:class:`poptorch.DataLoader`. (default: :obj:`None`)
+            to be passed to :py:class:`poptorch.DataLoader`.
+            (default: :obj:`None`)
         **kwargs (optional): Additional arguments of
             :py:class:`poptorch.DataLoader`.
     """
@@ -98,7 +99,8 @@ class CustomFixedSizeDataLoader(PyGCustomFixedSizeDataLoader,
             :obj:`exclude_keys` as those should be passed directly to the
             initializer method. (default: :obj:`None`)
         options (poptorch.Options, optional): The additional PopTorch options
-            to be passed to :py:class:`poptorch.DataLoader`. (default: :obj:`None`)
+            to be passed to :py:class:`poptorch.DataLoader`.
+            (default: :obj:`None`)
         **kwargs (optional): The additional arguments of
             :py:class:`poptorch.DataLoader`.
     """
@@ -152,8 +154,8 @@ class FixedSizeDataLoader(PyGFixedSizeDataLoader, CustomFixedSizeDataLoader):
     batch size times the maximum number of nodes and edges, respectively.
 
     Args:
-        dataset (Dataset): The :py:class:`~torch_geometric.data.Dataset` instance
-            from which to load the graph examples for the IPU.
+        dataset (Dataset): The :py:class:`~torch_geometric.data.Dataset`
+            instance from which to load the graph examples for the IPU.
         num_nodes (int, optional): Number of nodes in a batch.
             (default: :obj:`None`)
         num_edges (int, optional): Number of edges in a batch.
