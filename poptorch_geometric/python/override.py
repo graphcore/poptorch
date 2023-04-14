@@ -17,6 +17,9 @@ class _TorchGeometricOpsSubstitutionManager:
         torch_geometric.nn.conv.gravnet_conv: {  # pylint: disable=no-member
             "knn": ops.knn
         },
+        torch_geometric.nn.conv.x_conv: {  # pylint: disable=no-member
+            "knn_graph": ops.knn_graph
+        },
         torch_geometric.nn: {
             "knn_interpolate": ops.knn_interpolate
         },
@@ -72,6 +75,7 @@ def registerOptionalOverrides():
                 _TorchGeometricOpsSubstitutionManager.subsitutions.setdefault(
                     torch_cluster, {})
             torch_cluster_overrides["knn"] = ops.knn
+            torch_cluster_overrides["knn_graph"] = ops.knn_graph
 
 
 registerOptionalOverrides()
