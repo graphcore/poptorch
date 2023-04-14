@@ -58,7 +58,7 @@ def get_pyg_hosted_dependency(pkg_name):
 
     pkg_ver = name_and_version.split('=')[-1]
     file_name = pkg_name.replace('-', '_')
-    pkg_whl = f'{pkg_name} @ https://data.pyg.org/whl/torch-1.13.0%2Bcpu/{file_name}-{pkg_ver}-{get_abbr_impl()}{get_impl_ver()}-{get_abi_tag()}-{PLATFORM}.whl'
+    pkg_whl = f'{pkg_name} @ https://data.pyg.org/whl/torch-2.0.0%2Bcpu/{file_name}-{pkg_ver}-{get_abbr_impl()}{get_impl_ver()}-{get_abi_tag()}-{PLATFORM}.whl'
 
     return pkg_whl
 
