@@ -27,6 +27,9 @@ class _TorchGeometricOpsSubstitutionManager:
         },
         torch_geometric.nn.ClusterGCNConv: {
             "forward": ops.ClusterGCNConv.forward
+        },
+        torch_geometric.nn.dense.HeteroLinear: {
+            "forward": ops.HeteroLinear.forward
         }
     }
 

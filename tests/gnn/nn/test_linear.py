@@ -20,10 +20,9 @@ def test_linear(weight, bias):
     dense_harness(lin, x)
 
 
-@pytest.mark.skip(reason="TODO(AFS-223)")
 def test_hetero_linear():
-    x = torch.randn(3, 16)
-    type_vec = torch.tensor([0, 1, 2])
+    x = torch.randn(10, 16)
+    type_vec = torch.tensor([0, 0, 2, 1, 0, 2, 2, 2, 1, 2])
 
     lin = HeteroLinear(16, 32, num_types=3)
 
