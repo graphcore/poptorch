@@ -13,7 +13,10 @@ from torch_geometric.data.data import BaseData
 
 from poptorch import ICustomArgParser, registerCustomArgParser
 
-from .utils import DataBatch, HeteroDataBatch
+from .utils import DataBatch, HeteroDataBatch, call_once
+
+DataBatch = type(Batch(_base_cls=Data))
+HeteroDataBatch = type(Batch(_base_cls=HeteroData))
 
 
 class PyGArgsParser(ICustomArgParser):
@@ -132,6 +135,11 @@ class PyGArgsParser(ICustomArgParser):
 
 
 # PyG uses the BaseData object as the root for data and batch objects.
-registerCustomArgParser(BaseData, PyGArgsParser())
-registerCustomArgParser(DataBatch, PyGArgsParser())
-registerCustomArgParser(HeteroDataBatch, PyGArgsParser())
+@call_once
+def registerCustomArgParsers():
+    registerCustomArgParser(BaseData, PyGArgsParser())
+    registerCustomArgParser(DataBatch, PyGArgsParser())
+    registerCustomArgParser(HeteroDataBatch, PyGArgsParser())
+
+
+registerCustomArgParsers()

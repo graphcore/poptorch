@@ -6,6 +6,8 @@ import torch_geometric
 import torch_cluster
 from poptorch_geometric import ops
 
+from .utils import call_once
+
 
 class _TorchGeometricOpsSubstitutionManager:
 
@@ -63,6 +65,7 @@ class _TorchGeometricOpsSubstitutionManager:
                 setattr(mod, op_name, func)
 
 
+@call_once
 def registerOptionalOverrides():
     torch_cluster_spec = importlib.util.find_spec("torch_cluster")
     if torch_cluster_spec is not None:

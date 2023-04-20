@@ -181,3 +181,14 @@ class TrainingStepper:
             results['gpu_time'] = None
             raise NotImplementedError('GPU benchmarking currently unsupported')
         return results
+
+
+def call_once(f):
+    def wrapper(*args, **kwargs):
+        if not wrapper.has_run:
+            wrapper.has_run = True
+            return f(*args, **kwargs)
+        return None
+
+    wrapper.has_run = False
+    return wrapper

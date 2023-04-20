@@ -4,6 +4,7 @@ import atexit
 import copy
 import copyreg
 import functools
+import importlib
 import os
 from typing import Any, Callable, Dict, Iterator, Optional, Union, Type, Sequence, Iterable
 import pickle
@@ -849,3 +850,16 @@ def registerCustomArgParser(arg_data_type: Type,
             raise createPoptorchError(
                 "arg_parser must inherit from ICustomArgParser")
         _utils.custom_arg_parsers[arg_data_type] = arg_parser
+
+
+def registerGeometricCustomArgParsers():
+    types_spec = importlib.util.find_spec("poptorch_geometric.types")
+
+    if types_spec is not None and types_spec.loader is not None:
+        types = types_spec.loader.load_module()
+        types.registerCustomArgParsers()
+
+
+registerGeometricCustomArgParsers()
+
+from ._poplar_executor import PoplarExecutor  # pylint: disable=reimported, wrong-import-position

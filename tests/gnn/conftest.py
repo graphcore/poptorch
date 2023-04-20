@@ -13,6 +13,17 @@ def pyg_qm9(pytestconfig):
 
 
 @pytest.fixture(scope="module")
+def planetoid_cora(pytestconfig):
+    planetoid_root = osp.join(pytestconfig.getoption("external_datasets_dir"),
+                              "planetoid")
+    if not osp.exists(planetoid_root):
+        raise RuntimeError(f'Path {planetoid_root} not exists.')
+    return pyg.datasets.Planetoid(planetoid_root,
+                                  "Cora",
+                                  transform=pyg.transforms.NormalizeFeatures())
+
+
+@pytest.fixture(scope="module")
 def molecule(pyg_qm9):
     # The index of the largest molecule in the QM9 dataset, which looks like:
     # Data(edge_attr=[56, 4], edge_index=[2, 56], idx=[1], name="gdb_57518",

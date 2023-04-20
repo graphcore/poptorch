@@ -12,5 +12,6 @@ parser.add_argument(
 
 args = parser.parse_args()
 
-qm9root = osp.join(args.external_datasets_dir, "qm9")
-pyg.datasets.QM9(root=qm9root)
+pyg.datasets.QM9(root=osp.join(args.external_datasets_dir, "qm9"))
+pyg.datasets.Planetoid(osp.join(args.external_datasets_dir, "planetoid"),
+                       "Cora")
