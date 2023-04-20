@@ -870,6 +870,15 @@ torch::jit::Node* createSpacetodepth(torch::jit::Graph *graph,  const std::vecto
 new_node->i_(c10::Symbol::attr("blocksize"),blocksize);
 return new_node;
 }
+torch::jit::Node* createSplinebasis(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,std::int32_t degree) {
+ torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::splinebasis, args, ImplicitCast::None, OutputType::FirstAsFirstInputSecondAlwaysInt, 2);
+new_node->i_(c10::Symbol::attr("degree"),degree);
+return new_node;
+}
+torch::jit::Node* createSplineweighting(torch::jit::Graph *graph, const std::vector<torch::jit::Value *>& args) {
+ torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::splineweighting, args, ImplicitCast::None, OutputType::AsFirstInput);
+return new_node;
+}
 torch::jit::Node* createSplit(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,unsigned int num_outputs,int64_t axis,const std::vector<int64_t> & split) {
  torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::split, args, ImplicitCast::None, OutputType::AsFirstInput, num_outputs);
 new_node->i_(c10::Symbol::attr("num_outputs"),num_outputs);
@@ -904,4 +913,3 @@ torch::jit::Node* createUnsqueeze(torch::jit::Graph *graph,  const std::vector<t
 new_node->is_(c10::Symbol::attr("axes"),axes);
 return new_node;
 }
-

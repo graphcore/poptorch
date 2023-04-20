@@ -409,6 +409,11 @@ PyTorch Scatter functions
 * ``torch_scatter.composite.scatter_std``
 * ``torch_scatter.composite.scatter_logsumexp``
 
+PyTorch Spline Convolution functions
+
+* ``torch_spline_conv.spline_basis``
+* ``torch_spline_conv.spline_weighting``
+
 .. _float_16_op_support:
 
 16-bit float operations

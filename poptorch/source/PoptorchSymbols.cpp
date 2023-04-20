@@ -55,6 +55,22 @@ static void initializeTorchScatterSymbols() {
 
 } // namespace torch_cluster
 
+namespace torch_spline_conv {
+
+c10::Symbol spline_basis;     // NOLINT
+c10::Symbol spline_weighting; // NOLINT
+
+// clang-format off
+  __attribute__((constructor(SYMBOL_INIT_PRIORITY)))
+  static void initializeTorchSplineConvSymbols() {
+  // clang-format on
+  poptorch::logging::trace("Initializing torch_spline_conv symbols");
+  SYMBOL_INIT(torch_spline_conv, spline_basis);
+  SYMBOL_INIT(torch_spline_conv, spline_weighting);
+}
+
+} // namespace torch_spline_conv
+
 namespace poptorch {
 namespace symbols {
 
