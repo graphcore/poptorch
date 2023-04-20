@@ -189,10 +189,10 @@ Comparison ops
 * ``torch.min``
 * ``torch.ne``
 * ``torch.isnan``
-
-    ``torch.topk`` only supports ``sorted=True`` and ``largest=True`` arguments.
-
 * ``torch.topk``
+
+  ``torch.topk`` only supports ``sorted=True`` argument.
+
 * ``torch.argsort``
 * ``torch.randperm``
 
