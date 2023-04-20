@@ -1348,7 +1348,7 @@ IPU Model
 ---------
 
 By default PopTorch will try to attach to a physical IPU.
-If instead you want to use the model, you can do so by setting ``POPTORCH_IPU_MODEL`` to ``1``:
+If instead you want to use the model, you can do so by setting ``POPTORCH_IPU_MODEL`` to 1:
 
 .. code-block:: bash
 
@@ -1361,7 +1361,7 @@ Wait for an IPU to become available
 
 By default, attempting to attach to an IPU when all IPUs are
 already in use will raise an exception.
-If you would rather wait for an IPU to become available, you can do so by setting ``POPTORCH_WAIT_FOR_IPU`` to ``1``.
+If you would rather wait for an IPU to become available, you can do so by setting ``POPTORCH_WAIT_FOR_IPU`` to 1.
 
 .. code-block:: bash
 

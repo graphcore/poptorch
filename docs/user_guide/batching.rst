@@ -105,7 +105,7 @@ For example:
 This means in this particular case 20% of the dataset will never be used. But, in general the larger the number of workers and the batch size, the more data will end up being unused.
 
 To work around this issue PopTorch has a :py:class:`mode=poptorch.DataLoaderMode.AsyncRebatched <poptorch.DataLoaderMode>`.
-PopTorch will set the ``batch_size`` in the PyTorch Dataset and DataLoader to ``1`` and will instead create the batched tensors in its worker process.
+PopTorch will set the ``batch_size`` in the PyTorch Dataset and DataLoader to 1 and will instead create the batched tensors in its worker process.
 
 The shape of the tensors returned by the DataLoader will be the same as before, but the number of used tensors from the dataset  will increase to
 ``floor(num_tensors / batch_size) * batch_size`` (which means all the tensors would be used in the example above).
