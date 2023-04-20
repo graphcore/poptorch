@@ -97,4 +97,9 @@ namespace torch_cluster {
 extern c10::Symbol grid;
 } // namespace torch_cluster
 
+namespace torch_spline_conv {
+extern c10::Symbol spline_basis;
+extern c10::Symbol spline_weighting;
+} // namespace torch_spline_conv
+
 #endif // SOURCE_POPTORCH_SYMBOLS_H

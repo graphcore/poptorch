@@ -298,6 +298,34 @@ at::Tensor fps(torch::Tensor src, const std::vector<std::int64_t> &ptr,
   return at::meta::empty({out_size}, c10::ScalarType::Int);
 }
 
+// torch_spline_conv
+std::tuple<at::Tensor, at::Tensor> splineBasis(at::Tensor pseudo,
+                                                 at::Tensor /*kernel_size*/,
+                                                 at::Tensor /*is_open_spline*/,
+                                                 int64_t degree) {
+  const std::vector<std::int64_t> in_shape = pseudo.sizes().vec();
+  const std::int64_t numEdges = in_shape[0];
+  const std::int64_t numDims = in_shape[1];
+  const std::int64_t numSplines = std::pow(degree + 1, numDims) + 0.5;
+  const std::vector<std::int64_t> out_shape({numEdges, numSplines});
+
+  const auto basis = at::meta::empty(out_shape, pseudo.scalar_type());
+  const auto weightIndex = at::meta::empty(out_shape, c10::ScalarType::Int);
+  return {basis, weightIndex};
+}
+
+at::Tensor splineWeighting(at::Tensor input,
+                           at::Tensor weight,
+                           at::Tensor /*basis*/,
+                           at::Tensor /*weight_index*/) {
+  const std::vector<std::int64_t> in_shape = input.sizes().vec();
+  const std::vector<std::int64_t> w_shape = weight.sizes().vec();
+  const std::vector<std::int64_t> out_shape({in_shape[0], w_shape[2]});
+
+  const auto output = at::meta::empty(out_shape, input.scalar_type());
+  return output;
+}
+
 // poptorch
 
 // dynamic_slice(Tensor self, int dim, Tensor start, int size, int step) -> Tensor
@@ -404,6 +432,11 @@ TORCH_LIBRARY_IMPL(torch_cluster, Meta, m) {
   m.impl("grid", PTC(poptorch::meta::grid));
 }
 
+TORCH_LIBRARY_IMPL(torch_spline_conv, Meta, m) {
+  m.impl("spline_basis", PTC(poptorch::meta::splineBasis));
+  m.impl("spline_weighting", PTC(poptorch::meta::splineWeighting));
+}
+
 TORCH_LIBRARY_IMPL(poptorch, Meta, m) {
   m.impl("push_name_scope", PTC_BOXED(poptorch::meta::opWithoutOutputs));
   m.impl("pop_name_scope", PTC_BOXED(poptorch::meta::opWithoutOutputs));
@@ -497,7 +530,11 @@ TORCH_LIBRARY_IMPL(torch_scatter, AutogradMeta, m) {
   m.impl("scatter_mul", torch::autograd::autogradNotImplementedFallback());
 }
 
-
 TORCH_LIBRARY_IMPL(torch_cluster, AutogradMeta, m) {
   m.impl("grid", torch::autograd::autogradNotImplementedFallback());
+}
+
+TORCH_LIBRARY_IMPL(torch_spline_conv, AutogradMeta, m) {
+  m.impl("spline_basis", torch::autograd::autogradNotImplementedFallback());
+  m.impl("spline_weighting", torch::autograd::autogradNotImplementedFallback());
 }

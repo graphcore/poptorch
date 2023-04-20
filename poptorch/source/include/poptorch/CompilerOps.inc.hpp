@@ -163,6 +163,8 @@ torch::jit::Node* createSoftmax(torch::jit::Graph *graph,  const std::vector<tor
 torch::jit::Node* createSoftplus(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args);
 torch::jit::Node* createSoftsign(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args);
 torch::jit::Node* createSpacetodepth(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,int64_t blocksize);
+torch::jit::Node* createSplinebasis(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,std::int32_t degree);
+torch::jit::Node* createSplineweighting(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args);
 torch::jit::Node* createSplit(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,unsigned int num_outputs,int64_t axis,const std::vector<int64_t> & split);
 torch::jit::Node* createSqrt(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args);
 torch::jit::Node* createSqueeze(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,const std::vector<int64_t> & axes);
@@ -170,4 +172,3 @@ torch::jit::Node* createTanh(torch::jit::Graph *graph,  const std::vector<torch:
 torch::jit::Node* createTile(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args);
 torch::jit::Node* createTranspose(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,const std::vector<int64_t> & perm);
 torch::jit::Node* createUnsqueeze(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,const std::vector<int64_t> & axes);
-

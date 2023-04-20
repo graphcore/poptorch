@@ -290,7 +290,8 @@ TypeInferenceHandler::indexArgToUpcast(const std::string &schema_key) {
       schema_key == "aten::scatter_reduce_.two" ||
       schema_key == "torch_scatter::scatter_max" ||
       schema_key == "torch_scatter::scatter_min" ||
-      schema_key == "torch_scatter::scatter_mul") {
+      schema_key == "torch_scatter::scatter_mul" ||
+      schema_key == "torch_spline_conv::spline_basis") {
     return 2;
   }
   if (schema_key == "aten::index.Tensor" ||

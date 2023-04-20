@@ -176,7 +176,11 @@ TORCH_LIBRARY_IMPL(torch_scatter, IPU, m) {
   m.impl("scatter_mul", PTC_BOXED(poptorch::fallback));
 }
 
-
 TORCH_LIBRARY_IMPL(torch_cluster, IPU, m) {
   m.impl("grid", PTC_BOXED(poptorch::fallback));
+}
+
+TORCH_LIBRARY_IMPL(torch_spline_conv, IPU, m) {
+  m.impl("spline_basis", PTC_BOXED(poptorch::fallback));
+  m.impl("spline_weighting", PTC_BOXED(poptorch::fallback));
 }
