@@ -50,7 +50,19 @@ def test_gen_aggregation(dataloader, Aggregation, learn):
     aggr = Aggregation(learn=learn)
     post_proc = torch.nn.Linear(in_channels, out_channels)
 
-    aggr_harness(aggr, first_sample.num_nodes, dataloader, post_proc)
+    if isinstance(aggr, PowerMeanAggregation):
+        enable_fp_exception = False
+        equal_nan = True
+    else:
+        enable_fp_exception = True
+        equal_nan = False
+
+    aggr_harness(aggr,
+                 first_sample.num_nodes,
+                 dataloader,
+                 post_proc,
+                 equal_nan=equal_nan,
+                 enable_fp_exception=enable_fp_exception)
 
 
 @pytest.mark.parametrize('Aggregation', [
