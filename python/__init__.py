@@ -853,6 +853,10 @@ def registerCustomArgParser(arg_data_type: Type,
 
 
 def registerGeometricCustomArgParsers():
+    poptorch_geometric_spec = importlib.util.find_spec("poptorch_geometric")
+    if poptorch_geometric_spec is None:
+        return
+
     types_spec = importlib.util.find_spec("poptorch_geometric.types")
 
     if types_spec is not None and types_spec.loader is not None:
