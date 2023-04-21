@@ -13,10 +13,7 @@ from torch_geometric.data.data import BaseData
 
 from poptorch import ICustomArgParser, registerCustomArgParser
 
-from .utils import DataBatch, HeteroDataBatch, call_once
-
-DataBatch = type(Batch(_base_cls=Data))
-HeteroDataBatch = type(Batch(_base_cls=HeteroData))
+from poptorch_geometric.common import DataBatch, HeteroDataBatch, call_once
 
 
 class PyGArgsParser(ICustomArgParser):

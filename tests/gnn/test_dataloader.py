@@ -22,7 +22,7 @@ from poptorch_geometric.pyg_collate import Collater
 from poptorch_geometric.pyg_dataloader import (CustomFixedSizeDataLoader,
                                                DataLoader, FixedSizeDataLoader)
 from poptorch_geometric.types import PyGArgsParser
-from poptorch_geometric.utils import DataBatch, HeteroDataBatch
+from poptorch_geometric.common import DataBatch, HeteroDataBatch
 
 import poptorch
 

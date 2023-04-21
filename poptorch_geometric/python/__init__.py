@@ -2,9 +2,10 @@
 import importlib
 
 from .collate import make_exclude_keys
+from .common import call_once
 from .dataloader import FixedSizeDataLoader
 from .types import PyGArgsParser, registerCustomArgParsers
-from .utils import TrainingStepper, set_aggregation_dim_size, call_once
+from .utils import TrainingStepper, set_aggregation_dim_size
 from .override import _TorchGeometricOpsSubstitutionManager
 
 __version__ = "@VERSION@-@SNAPSHOT@"

@@ -16,7 +16,7 @@ from torch_geometric.typing import EdgeType, NodeType
 from torch_geometric.transforms import Pad
 
 from poptorch_geometric.pyg_collate import Collater
-from poptorch_geometric.utils import DataBatch, HeteroDataBatch
+from poptorch_geometric.common import DataBatch, HeteroDataBatch
 
 from poptorch._utils import combine_batch_tensors_gen
 

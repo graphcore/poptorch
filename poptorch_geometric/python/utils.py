@@ -4,13 +4,9 @@ from copy import deepcopy
 
 import torch
 from torch.testing import assert_close
-from torch_geometric.data import Batch, Data, HeteroData
 from torch_geometric.nn import MessagePassing
 
 import poptorch
-
-DataBatch = type(Batch(_base_cls=Data))
-HeteroDataBatch = type(Batch(_base_cls=HeteroData))
 
 
 def set_aggregation_dim_size(model: torch.nn.Module, dim_size: int):
@@ -181,14 +177,3 @@ class TrainingStepper:
             results['gpu_time'] = None
             raise NotImplementedError('GPU benchmarking currently unsupported')
         return results
-
-
-def call_once(f):
-    def wrapper(*args, **kwargs):
-        if not wrapper.has_run:
-            wrapper.has_run = True
-            return f(*args, **kwargs)
-        return None
-
-    wrapper.has_run = False
-    return wrapper

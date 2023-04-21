@@ -5,7 +5,7 @@ import importlib
 import torch_geometric
 from poptorch_geometric import ops
 
-from .utils import call_once
+from poptorch_geometric.common import call_once
 
 
 class _TorchGeometricOpsSubstitutionManager:
