@@ -606,7 +606,8 @@ class FixedSizeCollater(Collater):
             out[key] = _reset_attr(attr)
         for key, attr in chain(data.node_items(), data.edge_items()):
             out[key] = {
-                k: torch.zeros(_reset_dim(v.shape, k))
+                k: torch.zeros(_reset_dim(v.shape, k),
+                               dtype=data[key][k].dtype)
                 for k, v in attr.to_dict().items()
                 if isinstance(v, torch.Tensor)
             }
