@@ -55,3 +55,41 @@ def test_cosine_similarity(dim):
 
     # Training test - check weights changed
     poptorch_model.assert_weights_changed()
+
+
+@pytest.mark.parametrize("input_shapes",
+                         (((3, 2), (2, 2)), ((3, 2, 3), (3, 10, 3)),
+                          ((3, 5, 2, 7), (5, 11, 7)), ((3, 5, 1, 2, 7),
+                                                       (3, 1, 10, 11, 7))))
+@pytest.mark.parametrize("p", (2, 3))
+def test_cdist(input_shapes, p):
+    a_shape, b_shape = input_shapes
+
+    torch.manual_seed(42)
+
+    class Cdist(torch.nn.Module):
+        def __init__(self, p, *args, **kwargs) -> None:
+            super().__init__(*args, **kwargs)
+            self.p = p
+
+        def forward(self, x, y):
+            return torch.cdist(x, y, self.p)
+
+    a = torch.rand(*a_shape)
+    b = torch.rand(*b_shape)
+
+    model = helpers.ModelWithWeights(Cdist(p), a.shape)
+
+    # Run on CPU
+    native_out, _ = model((a, b))
+
+    poptorch_model = poptorch.trainingModel(model)
+
+    # Run on IPU
+    poptorch_out, _ = poptorch_model((a, b))
+
+    # Inference test - check outputs
+    helpers.assert_allclose(expected=native_out, actual=poptorch_out)
+
+    # Training test - check weights changed
+    poptorch_model.assert_weights_changed()

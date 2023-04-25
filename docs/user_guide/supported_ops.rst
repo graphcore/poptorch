@@ -118,6 +118,7 @@ Pointwise ops
 * ``torch.bitwise_not``
 * ``torch.bitwise_or``
 * ``torch.bitwise_xor``
+* ``torch.cdist``
 * ``torch.ceil``
 * ``torch.clamp``
 * ``torch.clamp_max``
