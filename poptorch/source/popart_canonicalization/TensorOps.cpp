@@ -330,6 +330,13 @@ torch::jit::Node *scatterHandler(torch::jit::Graph *graph,
   // broadcast it up.
   if (isConstantScalar(src)) {
     auto *shape = intVectorToIrConstant(graph, shapeFromTensor(index));
+    const auto input_scalar_type = *input_type->scalarType();
+    if (input_scalar_type !=
+        *src->type()->expect<c10::TensorType>()->scalarType()) {
+      // poplibs scatter requires that `src` have the same data type as input so
+      // cast it if needed
+      src = castToPromoteType(graph, src, input_scalar_type);
+    }
     src = createExpand(graph, {src, shape})->output();
   }
 
@@ -337,7 +344,10 @@ torch::jit::Node *scatterHandler(torch::jit::Graph *graph,
     return createScatterElements(graph, {input, index, src}, dim);
   }
 
-  const auto reduce = getReductionMethod(node->input(4)->node());
+  // reduction type is optional argument
+  const auto reduce = node->inputs().size() < 5
+                          ? static_cast<std::int32_t>(ScatterReduction::None)
+                          : getReductionMethod(node->input(4)->node());
   const auto input_shape = shapeFromTensor(input);
   const auto axis_size = input_shape.at(dim);
   static constexpr bool enable_index_broadcast = false;

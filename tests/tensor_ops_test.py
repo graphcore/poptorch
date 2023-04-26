@@ -535,6 +535,46 @@ def test_scatter(dim, reduce):
     op_harness(op, input, indices, source)
 
 
+@pytest.mark.parametrize("reduce", [None, 'add'])
+@pytest.mark.parametrize("value", [1, 1.1])
+def test_scatter_value_inplace(reduce, value):
+    torch.manual_seed(42)
+    shape = (6, 6)
+
+    input = torch.randn(shape).to(torch.float32)
+    indices = torch.randint(6, (1, 6)).squeeze()
+
+    def op(inp, idx, reduce, value):
+        out = torch.zeros((idx.size(0), 6), dtype=inp.dtype)
+        if reduce is None:
+            out.scatter_(1, idx.unsqueeze(1), value)
+        else:
+            out.scatter_(1, idx.unsqueeze(1), value, reduce=reduce)
+        return out.mul_(inp)
+
+    op_harness(op, input, indices, reduce, value)
+
+
+@pytest.mark.parametrize("reduce", [None, 'add'])
+@pytest.mark.parametrize("value", [1, 1.1])
+def test_scatter_value(reduce, value):
+    torch.manual_seed(42)
+    shape = (6, 6)
+
+    input = torch.randn(shape).to(torch.float32)
+    indices = torch.randint(6, (1, 6)).squeeze()
+
+    def op(inp, idx, reduce, value):
+        out = torch.zeros((idx.size(0), 6), dtype=inp.dtype)
+        if reduce is None:
+            out = torch.scatter(out, 1, idx.unsqueeze(1), value)
+        else:
+            out = torch.scatter(out, 1, idx.unsqueeze(1), value, reduce=reduce)
+        return out.mul_(inp)
+
+    op_harness(op, input, indices, reduce, value)
+
+
 @pytest.mark.parametrize("dim", range(-3, 3))
 @pytest.mark.parametrize("reduce", [None, "add", "multiply"])
 def test_scatter_(dim, reduce):

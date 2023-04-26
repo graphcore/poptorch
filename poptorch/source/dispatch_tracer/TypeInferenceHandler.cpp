@@ -183,6 +183,9 @@ TypeInferenceHandler::indexArgToUpcast(const std::string &schema_key) {
   if (schema_key == "aten::gather" || schema_key == "aten::scatter.src" ||
       schema_key == "aten::scatter_.src" ||
       schema_key == "aten::scatter.value" ||
+      schema_key == "aten::scatter.value_reduce" ||
+      schema_key == "aten::scatter_.value" ||
+      schema_key == "aten::scatter_.value_reduce" ||
       schema_key == "aten::scatter_add" || schema_key == "aten::scatter_add_" ||
       schema_key == "aten::scatter_reduce.two" ||
       schema_key == "aten::scatter_reduce_.two" ||

@@ -9,13 +9,13 @@ from torch_geometric.nn import avg_pool, avg_pool_neighbor_x, avg_pool_x
 from pool_utils import pool_harness
 
 
-@pytest.mark.skip(reason="TODO(AFS-243)")
 def test_avg_pool_x():
     cluster = torch.tensor([0, 1, 0, 1, 2, 2])
     x = torch.Tensor([[1, 2], [3, 4], [5, 6], [7, 8], [9, 10], [11, 12]])
     batch = torch.tensor([0, 0, 0, 0, 1, 1])
+    batch_size = int(batch.max().item()) + 1
 
-    out, _ = pool_harness(avg_pool_x, [cluster, x, batch, 2])
+    out, _ = pool_harness(avg_pool_x, [cluster, x, batch, batch_size, 2])
     assert out.tolist() == [[3, 4], [5, 6], [10, 11], [0, 0]]
 
 
