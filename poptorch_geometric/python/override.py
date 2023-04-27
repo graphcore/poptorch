@@ -31,6 +31,9 @@ class _TorchGeometricOpsSubstitutionManager:
         },
         torch_geometric.nn.dense.HeteroLinear: {
             "forward": ops.HeteroLinear.forward
+        },
+        torch_geometric.utils: {
+            "to_dense_batch": ops.to_dense_batch
         }
     }
 

@@ -55,7 +55,7 @@ class FixedSizeClusterLoader(torch.utils.data.DataLoader):
                          collate_fn=collater,
                          **kwargs)
 
-    def __collate__(self, batch):
+    def _collate(self, batch):
         batch = self.cluster_collater(batch)
         batch = self.fixed_size_collater([batch])
         return batch
@@ -63,7 +63,7 @@ class FixedSizeClusterLoader(torch.utils.data.DataLoader):
     def _create_collater(self, **collater_args):
         cluster_loader = ClusterLoader(self.cluster_data,
                                        batch_size=self.batch_size)
-        self.cluster_collater = cluster_loader.__collate__
+        self.cluster_collater = cluster_loader._collate  # pylint: disable=protected-access
         self.fixed_size_collater = FixedSizeCollater(**collater_args)
 
-        return self.__collate__
+        return self._collate

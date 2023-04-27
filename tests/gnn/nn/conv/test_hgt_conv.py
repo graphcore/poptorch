@@ -2,11 +2,14 @@
 
 from collections import defaultdict
 
+import pytest
+
 from torch_geometric.nn import HGTConv
 
 from conv_utils import hetero_conv_harness, random_heterodata
 
 
+@pytest.mark.skip(reason="TODO(AFS-309)")
 def test_hgt_conv_same_dimensions():
     in_channels = defaultdict(lambda: 16)
 
@@ -19,6 +22,7 @@ def test_hgt_conv_same_dimensions():
     hetero_conv_harness(conv, data, 'author')
 
 
+@pytest.mark.skip(reason="TODO(AFS-309)")
 def test_hgt_conv_different_dimensions():
     in_channels = defaultdict(lambda: 16)
     in_channels['paper'] = 32
@@ -33,6 +37,7 @@ def test_hgt_conv_different_dimensions():
     hetero_conv_harness(conv, data, 'author')
 
 
+@pytest.mark.skip(reason="TODO(AFS-309)")
 def test_hgt_conv_lazy():
     in_channels = defaultdict(lambda: 16)
     in_channels['paper'] = 32

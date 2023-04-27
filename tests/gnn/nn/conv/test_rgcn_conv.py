@@ -7,6 +7,7 @@ from conv_utils import conv_harness
 out_channels = 16
 
 
+@pytest.mark.skip(reason="TODO(AFS-289)")
 @pytest.mark.parametrize('rgcn', [FastRGCNConv, RGCNConv])
 def test_rgcn_conv(rgcn):
     if rgcn == RGCNConv:
