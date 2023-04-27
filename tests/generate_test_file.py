@@ -83,7 +83,7 @@ short_tests = [
     "replicated_graph_test.py",
     "requires_grad_test.py",
     "sharding_test.py",
-    "gnn/test_batch_sampler.py",
+    "gnn/test_stream_packing_sampler.py",
     "gnn/test_cluster_loader.py",
     "gnn/test_collate.py",
     "gnn/test_dataloader.py",

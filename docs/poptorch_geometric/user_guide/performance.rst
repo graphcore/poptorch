@@ -71,7 +71,7 @@ The alternative method is to use the
 :py:class:`poptorch_geometric.dataloader.FixedSizeDataLoader` class with the
 dataset without the `Pad` transformation. The data loader uses
 :py:class:`poptorch_geometric.collate.FixedSizeCollater` and
-:py:class:`poptorch_geometric.batch_sampler.FixedBatchSampler` underneath to
+:py:class:`poptorch_geometric.stream_packing_sampler.StreamPackingSampler` underneath to
 create batches of graphs with a fixed number of nodes and edges from the
 initial graphs that do not necessarily have the same number of nodes and edges.
 The data loader combines graphs from the dataset and creates dummy graphs such

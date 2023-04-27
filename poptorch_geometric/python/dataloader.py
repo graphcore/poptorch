@@ -144,11 +144,12 @@ class CustomFixedSizeDataLoader(PyGCustomFixedSizeDataLoader,
 
 
 class FixedSizeDataLoader(PyGFixedSizeDataLoader, CustomFixedSizeDataLoader):
-    r"""A data loader which merges data objects from a
-    :py:class:`poptorch.Dataset` to a mini-batch and pads node and edge features
-    so tensors across all batches have constant shapes.
+    r"""A data loader which merges data objects from
+    :py:class:`poptorch.Dataset` to a mini-batch and pads node and
+    edge features so tensors across all batches have the same shapes.
     The data loader uses
-    :py:class:`poptorch_geometric.batch_sampler.FixedBatchSampler` underneath.
+    :py:class:`poptorch_geometric.stream_packing_sampler.StreamPackingSampler`
+    to select the samples that will be batched together.
 
     If not specified, :obj:`num_nodes` and :obj:`num_edges` are set to the
     batch size times the maximum number of nodes and edges, respectively.

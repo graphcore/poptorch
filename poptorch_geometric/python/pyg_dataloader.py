@@ -7,7 +7,7 @@ from torch.utils.data.sampler import Sampler
 from torch_geometric.data import Dataset
 from torch_geometric.data.data import BaseData
 
-from poptorch_geometric.batch_sampler import FixedBatchSampler
+from poptorch_geometric.stream_packing_sampler import StreamPackingSampler
 from poptorch_geometric.collate import FixedSizeCollater
 from poptorch_geometric.pyg_collate import Collater
 
@@ -132,23 +132,23 @@ class CustomFixedSizeDataLoader(torch.utils.data.DataLoader):
             'initializer. They should not be included in `collater_args`.'
 
         if batch_sampler is not None:
-            self.padded_batch_size = batch_sampler.num_graphs + 1
+            self.padded_batch_size = batch_sampler.max_num_graphs + 1
 
             if num_nodes is not None:
-                assert num_nodes >= batch_sampler.num_nodes + 1, \
+                assert num_nodes >= batch_sampler.max_num_nodes + 1, \
                     f'Argument `num_nodes` (= {num_nodes}) should be ' \
-                    f'greater than `num_nodes` (= ' \
-                    f'{batch_sampler.num_nodes}) attribute of ' \
+                    f'greater than `max_num_nodes` (= ' \
+                    f'{batch_sampler.max_num_nodes}) attribute of ' \
                     f'`batch_sampler` in order to leave some space for ' \
                     f'padding.'
             else:
-                num_nodes = batch_sampler.num_nodes + 1
+                num_nodes = batch_sampler.max_num_nodes + 1
 
             # The `torch.DataLoader` class expects batch size to be `1` when
             # `batch_sampler` is provided.
             torch_dataloader_batch_size = 1
             if 'num_edges' not in collater_args:
-                collater_args['num_edges'] = batch_sampler.num_edges + 1
+                collater_args['num_edges'] = batch_sampler.max_num_edges + 1
         else:
             self.padded_batch_size = batch_size or 2
             num_real_graphs = self.padded_batch_size - 1
@@ -177,13 +177,16 @@ class CustomFixedSizeDataLoader(torch.utils.data.DataLoader):
 
 
 class FixedSizeDataLoader(CustomFixedSizeDataLoader):
-    r"""A data loader which merges data objects from a
+    r"""A data loader which merges data objects from
     :class:`torch_geometric.data.Dataset` to a mini-batch and pads node and
-    edge features so tensors across all batches have constant shapes.
-    The data loader uses :class:`FixedBatchSampler` underneath.
+    edge features so tensors across all batches have the same shapes.
+    The data loader uses
+    :py:class:`poptorch_geometric.stream_packing_sampler.StreamPackingSampler`
+    to select the samples that will be batched together.
 
     If not specified, :obj:`num_nodes` and :obj:`num_edges` are set to the
-    batch size times the maximum number of nodes and edges, respectively.
+    batch size times the maximum number of nodes and maximum number of
+    edges, respectively.
 
     Args:
         dataset (Dataset): The :class:`~torch_geometric.data.Dataset` instance
@@ -232,12 +235,12 @@ class FixedSizeDataLoader(CustomFixedSizeDataLoader):
         sampler_graphs = batch_size - 1
         sampler_nodes = num_nodes - 1 if num_nodes is not None else num_nodes
         sampler_edges = num_edges - 1 if num_edges is not None else num_edges
-        batch_sampler = FixedBatchSampler(dataset,
-                                          sampler_graphs,
-                                          num_nodes=sampler_nodes,
-                                          num_edges=sampler_edges,
-                                          sampler=sampler,
-                                          allow_skip_data=allow_skip_data)
+        batch_sampler = StreamPackingSampler(dataset,
+                                             sampler_graphs,
+                                             max_num_nodes=sampler_nodes,
+                                             max_num_edges=sampler_edges,
+                                             base_sampler=sampler,
+                                             allow_skip_data=allow_skip_data)
 
         super().__init__(dataset=dataset,
                          num_nodes=num_nodes,

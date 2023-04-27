@@ -26,4 +26,4 @@ Collaters
 Batch samplers
 ==============
 
-.. autoclass:: poptorch_geometric.batch_sampler.FixedBatchSampler
+.. autoclass:: poptorch_geometric.stream_packing_sampler.StreamPackingSampler
