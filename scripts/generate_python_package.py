@@ -44,7 +44,7 @@ def get_version_from_requirements(package):
         for line in f:
             if package in line and not 'cpu' in line:
                 name_and_version = line.split(';')[0].split('=')
-                return name_and_version[-1]
+                return name_and_version[-1].strip()
 
     return None
 

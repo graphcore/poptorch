@@ -111,7 +111,8 @@ class PipRequirements(Installer):
         self._requirements_file = filename
 
     def install(self, env):
-        env.run_commands(f"pip3 install -r {self._requirements_file}")
+        env.run_commands(
+            f"pip3 install -r {self._requirements_file} --retries 30")
 
     def hashString(self):
         with open(self._requirements_file, "r") as f:
