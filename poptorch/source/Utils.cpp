@@ -150,6 +150,26 @@ at::ScalarType coerceToSupportedType(at::ScalarType type) {
   return type;
 }
 
+torch::jit::Node *createAndInsertCastOp(torch::jit::Graph *graph,
+                                        torch::jit::Value *val,
+                                        at::ScalarType type) {
+  // create args for cast torch value to type
+  auto *const long_dtype = insertConstant(graph, type);
+  auto *const false_val = insertConstant(graph, false);
+  auto *const none = graph->createNone();
+  insertNodeInGraph(graph, none);
+
+  // create and add upcast index to long
+  auto *cast = createAndInsertNode(graph, c10::aten::to,
+                                   {val, long_dtype, false_val /*non_blocking*/,
+                                    false_val /*copy*/,
+                                    none->output() /*memory_format*/});
+  cast->output()->setType(
+      val->type()->expect<c10::TensorType>()->withScalarType(type));
+
+  return cast;
+}
+
 namespace {
 // Adds a null pointers for every unused tensor in an unused tuple
 void addNullPtrsForUnusedTuple(const c10::TupleType *tuple_type,

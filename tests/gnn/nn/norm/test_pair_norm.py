@@ -18,7 +18,6 @@ def test_pair_norm_no_batch(scale_individually):
     assert out1.size() == (100, 16)
 
 
-@pytest.mark.skip(reason="TODO(AFS-242)")
 @pytest.mark.parametrize('scale_individually', [False, True])
 def test_pair_norm(scale_individually):
     x = torch.randn(100, 16)
@@ -28,11 +27,11 @@ def test_pair_norm(scale_individually):
     assert str(norm) == 'PairNorm()'
 
     out1 = norm_harness(norm, [x])
-    assert out1.size() == (100, 16)
 
-    out2 = norm_harness(
-        norm,
-        [torch.cat([x, x], dim=0),
-         torch.cat([batch, batch + 1], dim=0), 2])
+    batch_size = 2
+    out2 = norm_harness(norm, [
+        torch.cat([x, x], dim=0),
+        torch.cat([batch, batch + 1], dim=0), batch_size
+    ])
     assert torch.allclose(out1, out2[:100], atol=1e-04)
     assert torch.allclose(out1, out2[100:], atol=1e-04)

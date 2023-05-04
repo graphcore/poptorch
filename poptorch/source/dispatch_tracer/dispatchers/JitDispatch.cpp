@@ -323,26 +323,19 @@ void JITDispatch::fallback(const c10::OperatorHandle &op, c10::Stack *stack) {
           !canCast(input_type, output_type)) {
         continue;
       }
-      torch::jit::Value *jv = node->input(i);
-      auto *g = graph.get();
-      auto *dtype = insertConstant(g, output_type);
-      auto *non_blocking = insertConstant(g, false);
-      auto *copy = insertConstant(g, false);
-      auto *none = g->createNone();
-      insertNodeInGraph(g, none);
-      auto *cast =
-          createAndInsertNode(graph.get(), c10::aten::to,
-                              {jv, dtype, non_blocking, copy, none->output()});
-      cast->output()->setType(
-          jv->type()->expect<c10::TensorType>()->withScalarType(output_type));
-      // The cast needs to be before the node.
-      cast->moveBefore(node);
-      dtype->node()->moveBefore(cast);
-      non_blocking->node()->moveBefore(cast);
-      copy->node()->moveBefore(cast);
-      none->moveBefore(cast);
 
+      // Save where nodes will be inserted in the graph.
+      auto *curr_insert_point = graph->insertPoint();
+      // Set insertion point before `node`.
+      graph->setInsertPoint(node);
+
+      torch::jit::Value *jv = node->input(i);
+      torch::jit::Node *cast =
+          createAndInsertCastOp(graph.get(), jv, output_type);
       node->replaceInputWith(jv, cast->output());
+
+      // Restore old insertion point.
+      graph->setInsertPoint(curr_insert_point);
     }
   }
 

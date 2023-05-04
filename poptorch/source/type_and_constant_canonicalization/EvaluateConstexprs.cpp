@@ -80,6 +80,8 @@ private:
 
   void removeExclusionAttributes();
 
+  void addUpcastForScatterNode(torch::jit::Node *new_node);
+
   void removeLoneConstants();
 
   void evaluateConstExprGraph(torch::jit::Stack *stack);
@@ -205,6 +207,24 @@ void ConstExprEvaluator::removeExclusionAttributes() {
   }
 }
 
+void ConstExprEvaluator::addUpcastForScatterNode(torch::jit::Node *new_node) {
+  auto kind = new_node->kind();
+
+  if (kind == c10::aten::scatter || kind == c10::aten::scatter_ ||
+      kind == c10::aten::scatter_add || kind == c10::aten::scatter_add_ ||
+      kind == c10::aten::scatter_reduce || kind == c10::aten::scatter_reduce_ ||
+      kind == torch_scatter::scatter_max ||
+      kind == torch_scatter::scatter_min ||
+      kind == torch_scatter::scatter_mul) {
+    static constexpr size_t index_arg = 2;
+
+    torch::jit::Value *index = new_node->input(index_arg);
+    torch::jit::Node *cast = createAndInsertCastOp(_constexpr_graph.get(),
+                                                   index, at::ScalarType::Long);
+    new_node->replaceInputWith(index, cast->output());
+  }
+}
+
 void ConstExprEvaluator::removeLoneConstants() {
   for (auto *node : _graph->nodes()) {
     if (!node->inputs().empty()) {
@@ -326,6 +346,8 @@ void ConstExprEvaluator::copyNodeToConstexprGraph(torch::jit::Node *node) {
   }
 
   const WithNodeMetadata meta(new_node);
+
+  addUpcastForScatterNode(new_node);
 
   insertNodeInGraph(_constexpr_graph.get(), new_node);
 

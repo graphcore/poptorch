@@ -1,5 +1,6 @@
 # Copyright (c) 2023 Graphcore Ltd. All rights reserved.
 
+import copy
 import inspect
 import math
 import torch
@@ -13,43 +14,43 @@ import poptorch
 import poptorch_geometric  # pylint: disable=unused-import
 
 
-def op_harness(op, inputs, assert_func=None):
-    class ModelWW(helpers.ModelWithWeights):
-        def __init__(self, op, first_input_shape):
-            super().__init__(op, first_input_shape)
-            self.op = op
-            self.loss_fn = torch.nn.MSELoss()
-            self.first_input_shape = first_input_shape
-            self.first_input_numel = first_input_shape.numel()
-            self.out_fn = torch.nn.Linear(self.first_input_numel,
-                                          self.first_input_numel)
-            self._weights_before = self.out_fn.weight.detach().clone()
+class ModelWW(helpers.ModelWithWeights):
+    def __init__(self, op, first_input_shape):
+        super().__init__(op, first_input_shape)
+        self.op = copy.deepcopy(op)
+        self.loss_fn = torch.nn.MSELoss()
+        self.first_input_shape = first_input_shape
+        self.first_input_numel = first_input_shape.numel()
+        self.out_fn = torch.nn.Linear(self.first_input_numel,
+                                      self.first_input_numel)
+        self._weights_before = self.out_fn.weight.detach().clone()
 
-        def forward(self, xs):
-            if callable(getattr(op, "forward", None)) and isinstance(
-                    inspect.signature(op.forward).return_annotation, tuple):
-                x = op.forward(*xs)
-                l = 0
+    def forward(self, xs):
+        if callable(getattr(self.op, "forward", None)) and isinstance(
+                inspect.signature(self.op.forward).return_annotation, tuple):
+            x = self.op.forward(*xs)
+            l = 0
+        else:
+            x = self.op(*xs)
+            if isinstance(x, (Batch, Data)):
+                x1 = torch.flatten(x.x)
+            elif isinstance(x, tuple):
+                x1 = torch.flatten(x[0])
             else:
-                x = self.op(*xs)
-                if isinstance(x, (Batch, Data)):
-                    x1 = torch.flatten(x.x)
-                elif isinstance(x, tuple):
-                    x1 = torch.flatten(x[0])
-                else:
-                    x1 = torch.flatten(x)
-                if x1.shape.numel() != self.first_input_numel:
-                    ratio = math.ceil(self.first_input_numel /
-                                      x1.shape.numel())
-                    x1 = x1.repeat(ratio)[:self.first_input_numel]
-                if x1.dtype != torch.float:
-                    x1 = x1.float()
-                x1 = x1 if self.out_fn is None else self.out_fn(x1)
-                x1 = x1.reshape(self.first_input_shape)
-                target = torch.ones_like(x1)
-                l = self.loss_fn(x1, target)
-            return x, l
+                x1 = torch.flatten(x)
+            if x1.shape.numel() != self.first_input_numel:
+                ratio = math.ceil(self.first_input_numel / x1.shape.numel())
+                x1 = x1.repeat(ratio)[:self.first_input_numel]
+            if x1.dtype != torch.float:
+                x1 = x1.float()
+            x1 = x1 if self.out_fn is None else self.out_fn(x1)
+            x1 = x1.reshape(self.first_input_shape)
+            target = torch.ones_like(x1)
+            l = self.loss_fn(x1, target)
+        return x, l
 
+
+def op_harness(op, inputs, assert_func=None):
     if isinstance(inputs[0], (Batch, Data)):
         first_input_shape = inputs[0].x.shape
     else:

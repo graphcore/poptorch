@@ -24,6 +24,10 @@ at::ScalarType onnxStrToScalarType(const char *type_str);
 
 at::ScalarType coerceToSupportedType(at::ScalarType type);
 
+torch::jit::Node *createAndInsertCastOp(torch::jit::Graph *graph,
+                                        torch::jit::Value *val,
+                                        at::ScalarType type);
+
 // Returns a collapsed version of the graph input hierachy into a list of
 // tensor values by following any tuples/lists and their unpacking
 // N.B. if a tuple is not used (unpacked), the resulting values will be null
