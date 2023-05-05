@@ -196,6 +196,7 @@ Comparison ops
 
 * ``torch.argsort``
 * ``torch.randperm``
+* ``torch.sort``
 
 
 torch.linalg ops

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 
+import unittest
 import torch
 import pytest
 import helpers
@@ -681,7 +682,6 @@ comparison_ops = [
     torch.max,
     torch.min,
     torch.ne,
-    # torch.sort,         # Not in Onnx (could be added via TopK if onnx supported TODO(T23319))
 ]
 
 
@@ -756,6 +756,26 @@ def test_topk(largest):
 
     def operation(x):
         return torch.topk(x, k=10, dim=-1, largest=largest)
+
+    def assert_(native_out, poptorch_out):
+        helpers.assert_allclose(actual=poptorch_out[0],
+                                expected=native_out.values)
+        helpers.assert_allequal(actual=poptorch_out[1],
+                                expected=native_out.indices)
+
+    out_fn = lambda x: x.values
+    op_harness(operation, [input], assert_, test_training=True, out_fn=out_fn)
+
+
+@pytest.mark.parametrize("shape", [(17, 4), (18, 23, 5)])
+@pytest.mark.parametrize("descending", [True, False])
+@unittest.mock.patch.dict("os.environ", helpers.disableSmallModel())
+def test_sort(shape, descending):
+    torch.manual_seed(42)
+    input = torch.randn(*shape)
+
+    def operation(x):
+        return torch.sort(x, descending=descending)
 
     def assert_(native_out, poptorch_out):
         helpers.assert_allclose(actual=poptorch_out[0],

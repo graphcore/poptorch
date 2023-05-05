@@ -169,7 +169,7 @@ void JITDispatch::registerEmptyTensor(const at::Tensor &tensor, bool is_param) {
 
   // The tensor shouldn't need converting anyway: it should be created with a
   // valid type.
-  auto coerced_scalar_type = coerceToSupportedType(tensor.scalar_type());
+  const auto coerced_scalar_type = coerceToSupportedType(tensor.scalar_type());
   ERROR_ON_MSG(
       coerced_scalar_type != tensor.scalar_type(),
       "[Internal error] The empty tensor should have a valid compiler type");
@@ -178,8 +178,8 @@ void JITDispatch::registerEmptyTensor(const at::Tensor &tensor, bool is_param) {
   //                           bool? pin_memory=None,
   //                           MemoryFormat? memory_format=None) -> Tensor
   auto *g = graph.get();
-  auto *pin_memory = g->createNone();
-  auto *memory_format = g->createNone();
+  auto *const pin_memory = g->createNone();
+  auto *const memory_format = g->createNone();
   insertNodeInGraph(g, pin_memory);
   insertNodeInGraph(g, memory_format);
   torch::jit::Node *n = createAndInsertNode(
@@ -209,9 +209,9 @@ void JITDispatch::detach(const c10::OperatorHandle &op, c10::Stack *stack,
   const auto arguments = torch::jit::last(stack, num_arguments);
 
   ERROR_ON(arguments.size() != 1);
-  at::Tensor const in = arguments.front().toTensor();
+  const at::Tensor in = arguments.front().toTensor();
 
-  at::Tensor const out(in.unsafeGetTensorImpl()->shallow_copy_and_detach(
+  const at::Tensor out(in.unsafeGetTensorImpl()->shallow_copy_and_detach(
       /*version_counter=*/in.unsafeGetTensorImpl()->version_counter(),
       /*allow_tensor_metadata_change=*/true));
 
@@ -236,7 +236,7 @@ void JITDispatch::setCurrentCodeLocation(
 void JITDispatch::fixOutput(c10::Stack &stack, torch::jit::Node *node) {
   // Fix up the outputs.
   std::uint32_t output_index = 0;
-  for (c10::IValue value : stack) {
+  for (const c10::IValue &value : stack) {
     // Add any missing outputs. They frequently return scalars which we just
     // ignore here as our canonicalisation only returns tensors.
     while (output_index >= node->outputs().size()) {
@@ -247,7 +247,7 @@ void JITDispatch::fixOutput(c10::Stack &stack, torch::jit::Node *node) {
     torch::jit::Value *val = node->output(output_index);
 
     if (value.isTensor()) {
-      at::Tensor const tensor = value.toTensor();
+      const at::Tensor tensor = value.toTensor();
 
       val->inferTypeFrom(tensor);
 
@@ -264,13 +264,13 @@ void JITDispatch::fixOutput(c10::Stack &stack, torch::jit::Node *node) {
       logging::trace("[DISPATCHER][JIT] Output tensor list: jit ir %{}",
                      val->debugName());
       val->setType(value.type()->expect<c10::ListType>());
-      auto tensor_list = value.toTensorVector();
+      const auto tensor_list = value.toTensorVector();
       // Always insert list unpack if output value is a list.
-      auto *unpack = graph->createListUnpack(val, tensor_list.size());
+      auto *const unpack = graph->createListUnpack(val, tensor_list.size());
       insertNodeInGraph(graph.get(), unpack);
 
       for (size_t i = 0; i < tensor_list.size(); ++i) {
-        at::Tensor const tensor = tensor_list.at(i);
+        const at::Tensor &tensor = tensor_list.at(i);
         val = unpack->output(i);
         val->inferTypeFrom(copyAndCoerceType(tensor));
         _mapper.addTensor(tensor, val, false);
@@ -289,11 +289,19 @@ void JITDispatch::fallback(const c10::OperatorHandle &op, c10::Stack *stack) {
   const c10::FunctionSchema &schema = op.schema();
   // Run through the schema to find out if one of the operators is supposed to
   // be inplace, this could be the 'out' argument of a non-inplace op.
-  std::vector<at::Tensor> inplace_tensors = getInplaceArguments(*stack, schema);
-  torch::jit::Value *aliased_input = nullptr;
+  const std::vector<at::Tensor> inplace_tensors =
+      getInplaceArguments(*stack, schema);
+  const std::size_t num_inplace_tensors = inplace_tensors.size();
+  std::vector<torch::jit::Value *> aliased_inputs;
+  aliased_inputs.reserve(num_inplace_tensors);
+
   if (!inplace_tensors.empty()) {
-    aliased_input = _inplace_tracker.eraseCurrentAlias(
-        _mapper.getValueForTensor(inplace_tensors[0]));
+    std::transform(inplace_tensors.cbegin(), inplace_tensors.cend(),
+                   std::back_inserter(aliased_inputs),
+                   [&](const auto &inplace_tensor) {
+                     return _inplace_tracker.eraseCurrentAlias(
+                         _mapper.getValueForTensor(inplace_tensor));
+                   });
   }
 
   // Tag all the nodes created by the handler with the initial schema string
@@ -308,41 +316,46 @@ void JITDispatch::fallback(const c10::OperatorHandle &op, c10::Stack *stack) {
   if (!inplace_tensors.empty()) {
     // For inplace ops, cast all input tensors to the same type as the output
     // tensor.
-    auto output_type = inplace_tensors[0].scalar_type();
-    const bool output_float = c10::isFloatingType(output_type);
-    for (size_t i = 0; i < stack->size(); i++) {
-      const c10::IValue &sv = (*stack)[i];
-      if (!sv.isTensor()) {
-        continue;
+
+    for (std::size_t ouput_tensor_id = 0; ouput_tensor_id < num_inplace_tensors;
+         ++ouput_tensor_id) {
+      const auto output_type =
+          inplace_tensors.at(ouput_tensor_id).scalar_type();
+      const bool output_float = c10::isFloatingType(output_type);
+      for (size_t i = 0; i < stack->size(); i++) {
+        const c10::IValue &sv = (*stack)[i];
+        if (!sv.isTensor()) {
+          continue;
+        }
+        const at::Tensor &tensor = sv.toTensor();
+        const auto input_type = tensor.scalar_type();
+        const bool input_float = c10::isFloatingType(input_type);
+        if (input_type == at::ScalarType::Undefined ||
+            input_type == output_type || input_float != output_float ||
+            !canCast(input_type, output_type)) {
+          continue;
+        }
+
+        // Save where nodes will be inserted in the graph.
+        auto *const curr_insert_point = graph->insertPoint();
+        // Set insertion point before `node`.
+        graph->setInsertPoint(node);
+
+        torch::jit::Value *jv = node->input(i);
+        torch::jit::Node *cast =
+            createAndInsertCastOp(graph.get(), jv, output_type);
+        node->replaceInputWith(jv, cast->output());
+
+        // Restore old insertion point.
+        graph->setInsertPoint(curr_insert_point);
       }
-      const at::Tensor &tensor = sv.toTensor();
-      auto input_type = tensor.scalar_type();
-      const bool input_float = c10::isFloatingType(input_type);
-      if (input_type == at::ScalarType::Undefined ||
-          input_type == output_type || input_float != output_float ||
-          !canCast(input_type, output_type)) {
-        continue;
-      }
-
-      // Save where nodes will be inserted in the graph.
-      auto *curr_insert_point = graph->insertPoint();
-      // Set insertion point before `node`.
-      graph->setInsertPoint(node);
-
-      torch::jit::Value *jv = node->input(i);
-      torch::jit::Node *cast =
-          createAndInsertCastOp(graph.get(), jv, output_type);
-      node->replaceInputWith(jv, cast->output());
-
-      // Restore old insertion point.
-      graph->setInsertPoint(curr_insert_point);
     }
   }
 
   // The MLIR dispatcher is going to use the shape and type of the inputs to
   // infer the shape and type of the outputs so we need to create dummy MLIR
   // tensors for each input.
-  std::function<void(const c10::IValue &value)> process_value =
+  const std::function<void(const c10::IValue &value)> process_value =
       [&](const c10::IValue &value) {
         if (value.isList()) {
           for (const auto &v : value.toList()) {
@@ -381,7 +394,7 @@ void JITDispatch::fallback(const c10::OperatorHandle &op, c10::Stack *stack) {
   std::size_t i = 0;
   for (c10::IValue value : *stack) {
     if (value.isTensor()) {
-      at::Tensor const tensor = value.toTensor();
+      const at::Tensor tensor = value.toTensor();
       logging::trace(
           "[DISPATCHER][JIT] Node tensor output at index {} size: ={}", i++,
           tensor.sizes());
@@ -393,32 +406,40 @@ void JITDispatch::fallback(const c10::OperatorHandle &op, c10::Stack *stack) {
   // Switcheroo the output so the inplace tensor reference is now pointing to
   // the output.
   if (!inplace_tensors.empty()) {
-    at::Tensor const output = stack->at(0).toTensor();
+    for (std::size_t ouput_tensor_id = 0; ouput_tensor_id < num_inplace_tensors;
+         ++ouput_tensor_id) {
+      const at::Tensor output = stack->at(ouput_tensor_id).toTensor();
 
-    // Get the jit value we are tracking for the output.
-    torch::jit::Value *value = _mapper.getValueForTensor(output);
-    // If the modified inplace tensor was an alias for an input then
-    // register the new alias.
-    if (aliased_input != nullptr) {
-      _inplace_tracker.registerAlias(aliased_input, value);
+      // Get the jit value we are tracking for the output.
+      torch::jit::Value *const value = _mapper.getValueForTensor(output);
+      // If the modified inplace tensor was an alias for an input then
+      // register the new alias.
+      if (!aliased_inputs.empty()) {
+        const auto &aliased_input = aliased_inputs.at(ouput_tensor_id);
+        if (aliased_input != nullptr) {
+          _inplace_tracker.registerAlias(aliased_input, value);
+        }
+      }
+
+      // Overwrite the inplace tensor with that jit. Now a reference to the
+      // inplace tensor correctly points to this outplace value.
+      const auto &inplace_tensor = inplace_tensors.at(ouput_tensor_id);
+      ValueMapper::TrackedTensor *const record =
+          _mapper.rawTensorRecord(inplace_tensor);
+
+      ERROR_ON_MSG(
+          !record,
+          "[DISPATCHER][JIT] Inplace op is not tracking inplace argument");
+
+      // Ensure the value and torch tensor shapes match
+      const JitTensorInfo value_info(value);
+      inplace_tensor.unsafeGetTensorImpl()->set_sizes_contiguous(
+          value_info.dims);
+
+      // Validate to make sure the data type also matches.
+      validateTensorShapeAndType(value, inplace_tensor);
+      record->jit = value;
     }
-
-    // Overwrite the inplace tensor with that jit. Now a reference to the
-    // inplace tensor correctly points to this outplace value.
-    ValueMapper::TrackedTensor *record =
-        _mapper.rawTensorRecord(inplace_tensors[0]);
-    ERROR_ON_MSG(
-        !record,
-        "[DISPATCHER][JIT] Inplace op is not tracking inplace argument");
-
-    // Ensure the value and torch tensor shapes match
-    const JitTensorInfo value_info(value);
-    inplace_tensors[0].unsafeGetTensorImpl()->set_sizes_contiguous(
-        value_info.dims);
-
-    // Validate to make sure the data type also matches.
-    validateTensorShapeAndType(value, inplace_tensors[0]);
-    record->jit = value;
   }
 }
 

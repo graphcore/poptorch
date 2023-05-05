@@ -60,6 +60,12 @@ TORCH_API bool equal(const at::Tensor &, const at::Tensor &) {
   return {};
 }
 
+TORCH_API std::tuple<at::Tensor &, at::Tensor &> sortValuesStable(const at::Tensor &, c10::optional<bool> stable_sort, int64_t, bool, at::Tensor & values, at::Tensor & indices) {
+  ERROR_ON_MSG(stable_sort == true, "Stable sort algorithm is not supported");
+
+  return {values, indices};
+}
+
 at::Tensor ctcLossTensor(const at::Tensor &log_probs, const at::Tensor &/*targets*/,
                             const at::Tensor &/*input_lengths*/, const at::Tensor &/*target_lengths*/,
                             int64_t /*blank*/, int64_t reduction, bool /*zero_infinity*/) {
@@ -312,6 +318,7 @@ TORCH_LIBRARY_IMPL(aten, Meta, m) {
   m.impl("one_hot", PTC(poptorch::meta::oneHot));
   m.impl("silu.out", PTC(poptorch::meta::siluOut));
   m.impl("upsample_nearest3d.vec", PTC(poptorch::meta::upsampleNearest3d));
+  m.impl("sort.values_stable", PTC(poptorch::meta::sortValuesStable));
 }
 
 TORCH_LIBRARY_IMPL(torch_scatter, Meta, m) {

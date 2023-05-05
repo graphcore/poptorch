@@ -734,6 +734,21 @@ torch::jit::Node *topkHandler(torch::jit::Graph *graph,
   return createTopk(graph, {x, t1}, t3, largest, sorted);
 }
 
+torch::jit::Node *sortHandler(torch::jit::Graph *graph,
+                              torch::jit::Node *node) {
+  auto *const input = node->input(0);
+  auto *const dim = node->input(2);
+  const int64_t axis =
+      handleDimensionParam(dim, input->type()->expect<c10::TensorType>());
+  auto *const k =
+      createConstantLong(graph, {shapeFromTensor(input).at(axis)}, {1})
+          ->output();
+
+  const bool descending = constantToBool(node->input(3)->node());
+
+  return createTopk(graph, {input, k}, axis, descending, true);
+}
+
 torch::jit::Node *uniformInPlaceHandler(torch::jit::Graph *graph,
                                         torch::jit::Node *node) {
   auto *x = node->input(0);
@@ -833,6 +848,7 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::smooth_l1_loss, smoothL1LossHandler);
   registerHandler(c10::aten::soft_margin_loss, softMarginLossHandler);
   registerHandler(c10::aten::softshrink, softshrinkHandler);
+  registerHandler(c10::aten::sort, sortHandler);
   registerHandler(c10::aten::sqrt, sqrtHandler);
   registerHandler(c10::aten::square, squareHandler);
   registerHandler(c10::aten::sub, subHandler);
