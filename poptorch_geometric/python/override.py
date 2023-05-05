@@ -37,6 +37,9 @@ class _TorchGeometricOpsSubstitutionManager:
         },
         torch_geometric.utils: {
             "to_dense_batch": ops.to_dense_batch
+        },
+        torch_geometric.nn.pool.mem_pool: {
+            "to_dense_batch": ops.to_dense_batch
         }
     }
 
