@@ -905,7 +905,7 @@ def test_cross_axis(axis):
         # dims?, unbiased
         (
             False, ),
-        ([0, 1], True)
+        ([0, 1, -1], True)
     ])
 @pytest.mark.parametrize(
     "op", [torch.var, torch.var_mean, torch.std, torch.std_mean])

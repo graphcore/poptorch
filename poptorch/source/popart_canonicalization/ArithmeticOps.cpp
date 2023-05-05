@@ -259,6 +259,9 @@ calculateVarMean(torch::jit::Graph *graph,
     // n / (n - 1), where n is the sample size
     std::int64_t numel_reduced = 1;
     for (auto dim : dims) {
+      if (dim < 0) {
+        dim += shape.size();
+      }
       numel_reduced *= shape[dim];
     }
     const double n = static_cast<double>(numel_reduced);
