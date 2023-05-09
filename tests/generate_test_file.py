@@ -99,6 +99,8 @@ docs_only_test_files = [
 long_tests = [
     "bert_small_and_medium_test.py::test_bert_medium_result",
     "half_test.py::test_resnet",
+    "math_ops_test.py::test_sort[descending:True-shape1]"
+    "math_ops_test.py::test_sort[descending:False-shape1]"
     "io_performance_test.py::test_compare_io_performance",
     "torch_nn_test.py::test_pytorch_nn[trace_model:False-use_half:False-test_name:test_nn_Conv2d_circular_stride2_pad2]",
     "torch_nn_test.py::test_pytorch_nn[trace_model:True-use_half:False-test_name:test_nn_Conv2d_circular_stride2_pad2]",
