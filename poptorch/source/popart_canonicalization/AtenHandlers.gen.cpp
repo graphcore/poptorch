@@ -740,13 +740,11 @@ torch::jit::Node *sortHandler(torch::jit::Graph *graph,
   auto *const dim = node->input(2);
   const int64_t axis =
       handleDimensionParam(dim, input->type()->expect<c10::TensorType>());
-  auto *const k =
-      createConstantLong(graph, {shapeFromTensor(input).at(axis)}, {1})
-          ->output();
 
   const bool descending = constantToBool(node->input(3)->node());
+  const bool stable = constantToBool(node->input(1)->node());
 
-  return createTopk(graph, {input, k}, axis, descending, true);
+  return createSort(graph, {input}, axis, descending, stable);
 }
 
 torch::jit::Node *uniformInPlaceHandler(torch::jit::Graph *graph,

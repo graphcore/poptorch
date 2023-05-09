@@ -348,6 +348,15 @@ new_node->i_(c10::Symbol::attr("sorted"),static_cast<int32_t>(sorted));
 
 return new_node;
 }
+
+torch::jit::Node* createSort(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,int64_t axis, bool descending, bool stable) {
+ torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::sort, args, ImplicitCast::None, OutputType::FirstAsFirstInputSecondAlwaysInt, 2);
+new_node->i_(c10::Symbol::attr("axis"),axis);
+new_node->i_(c10::Symbol::attr("descending"),static_cast<int32_t>(descending));
+new_node->i_(c10::Symbol::attr("stable"),static_cast<int32_t>(stable));
+
+return new_node;
+}
 torch::jit::Node* createUpsample(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,const std::string & mode) {
  torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::upsample, args, ImplicitCast::None, OutputType::AsFirstInput);
 new_node->s_(c10::Symbol::attr("mode"),mode);

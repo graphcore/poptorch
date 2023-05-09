@@ -292,13 +292,11 @@ void JITDispatch::fallback(const c10::OperatorHandle &op, c10::Stack *stack) {
   const std::vector<at::Tensor> inplace_tensors =
       getInplaceArguments(*stack, schema);
   const std::size_t num_inplace_tensors = inplace_tensors.size();
-  std::vector<torch::jit::Value *> aliased_inputs;
-  aliased_inputs.reserve(num_inplace_tensors);
+  std::vector<torch::jit::Value *> aliased_inputs(num_inplace_tensors, nullptr);
 
   if (!inplace_tensors.empty()) {
     std::transform(inplace_tensors.cbegin(), inplace_tensors.cend(),
-                   std::back_inserter(aliased_inputs),
-                   [&](const auto &inplace_tensor) {
+                   aliased_inputs.begin(), [&](const auto &inplace_tensor) {
                      return _inplace_tracker.eraseCurrentAlias(
                          _mapper.getValueForTensor(inplace_tensor));
                    });
@@ -323,7 +321,7 @@ void JITDispatch::fallback(const c10::OperatorHandle &op, c10::Stack *stack) {
           inplace_tensors.at(ouput_tensor_id).scalar_type();
       const bool output_float = c10::isFloatingType(output_type);
       for (size_t i = 0; i < stack->size(); i++) {
-        const c10::IValue &sv = (*stack)[i];
+        const c10::IValue &sv = (*stack).at(i);
         if (!sv.isTensor()) {
           continue;
         }

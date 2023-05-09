@@ -786,6 +786,26 @@ def test_sort(shape, descending):
     op_harness(operation, [input], assert_, test_training=True, out_fn=out_fn)
 
 
+@pytest.mark.parametrize("descending", [True, False])
+@pytest.mark.ipuHardwareRequired
+def test_sort_stable(descending):
+    torch.manual_seed(42)
+    input = torch.tensor([[2.0, 2.0, 1.0, 10.0, 11.0],
+                          [2.0, 15.0, 15.0, 10.0, 11.0]])
+
+    def operation(x):
+        return torch.sort(x, descending=descending, stable=True)
+
+    def assert_(native_out, poptorch_out):
+        helpers.assert_allclose(actual=poptorch_out[0],
+                                expected=native_out.values)
+        helpers.assert_allequal(actual=poptorch_out[1],
+                                expected=native_out.indices)
+
+    out_fn = lambda x: x.values
+    op_harness(operation, [input], assert_, test_training=True, out_fn=out_fn)
+
+
 types = [torch.float32, torch.int32]
 
 

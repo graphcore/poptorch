@@ -14,7 +14,7 @@ constexpr c10::DispatchKeySet meta_keys{c10::DispatchKey::Meta,
 
 void TypeInferenceHandler::inferOutputTypes(const c10::OperatorHandle &op,
                                             c10::Stack *ipu_stack) {
-  auto schema_key = getSchemaKey(op.schema());
+  const auto schema_key = getSchemaKey(op.schema());
   // Unfortunately, aten::prelu with 1D inputs is broken with the Meta backend:
   // https://github.com/pytorch/pytorch/issues/89560
   // As a workaround, we add a dummy channel dim to the input, and then remove
@@ -62,7 +62,7 @@ c10::Stack TypeInferenceHandler::createMetaStack(const c10::Stack &ipu_stack,
                                                  const std::string &schema_key,
                                                  bool is_prelu) {
   c10::Stack meta_stack;
-
+  meta_stack.reserve(ipu_stack.size());
   const auto maybe_workaround = workaroundLookup(schema_key);
 
   // Create meta tensors and add them to the meta stack
@@ -83,6 +83,7 @@ c10::Stack TypeInferenceHandler::createMetaStack(const c10::Stack &ipu_stack,
     if (auto opt_upcast_arg = indexArgToUpcast(schema_key)) {
       should_upcast_to_long = opt_upcast_arg.value() == i;
     }
+
     // Convert any IPU tensors to meta tensors
     if (v.isTensor()) {
       meta_stack.push_back(
@@ -162,7 +163,7 @@ at::Tensor TypeInferenceHandler::toMeta(const at::Tensor &tensor,
   if (dtype == c10::ScalarType::Int && should_upcast_to_long) {
     dtype = c10::ScalarType::Long;
   }
-  auto sizes = tensor.sizes().vec();
+  std::vector<int64_t> sizes = tensor.sizes().vec();
   if (is_prelu && sizes.size() == 1) {
     sizes.push_back(1);
   }
@@ -193,6 +194,9 @@ TypeInferenceHandler::indexArgToUpcast(const std::string &schema_key) {
   if (schema_key == "aten::index.Tensor" ||
       schema_key == "aten::nll_loss_forward") {
     return 1;
+  }
+  if (schema_key == "aten::sort.values_stable") {
+    return 5;
   }
   return c10::nullopt;
 }
