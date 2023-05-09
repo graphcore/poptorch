@@ -853,15 +853,22 @@ def registerCustomArgParser(arg_data_type: Type,
 
 
 def registerGeometricCustomArgParsers():
-    poptorch_geometric_spec = importlib.util.find_spec("poptorch_geometric")
-    if poptorch_geometric_spec is None:
-        return
+    # Try registering pyg's custom arg parsers.
+    # If anything goes wrong with import of pyg, then silently ignore it,
+    # so that poptorch importers that don't need pyg do not needlessly fail.
+    try:
+        poptorch_geometric_spec = importlib.util.find_spec(
+            "poptorch_geometric")
+        if poptorch_geometric_spec is None:
+            return
 
-    types_spec = importlib.util.find_spec("poptorch_geometric.types")
+        types_spec = importlib.util.find_spec("poptorch_geometric.types")
 
-    if types_spec is not None and types_spec.loader is not None:
-        types = types_spec.loader.load_module()
-        types.registerCustomArgParsers()
+        if types_spec is not None and types_spec.loader is not None:
+            types = types_spec.loader.load_module()
+            types.registerCustomArgParsers()
+    except ImportError:
+        pass
 
 
 registerGeometricCustomArgParsers()
