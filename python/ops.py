@@ -203,6 +203,35 @@ def cond(condition: 'torch.Tensor',
          then_inps: List['torch.Tensor'],
          else_body: Callable[[List['torch.Tensor']], List['torch.Tensor']],
          else_inps: List['torch.Tensor']) -> List['torch.Tensor']:
+    """An on-device if/else operation. This creates two branches of instructions
+    executed conditionally on device.
+
+    The `then_body` and `else_body` should be Python functions containing the
+    PyTorch code you wish to execute conditionally on device. Condition is
+    passed in form of a boolean Tensor and the branch to be executed is decided
+    in runtime directly on device.
+    There are a few expectations according the branches functions:
+    - `then_body` and `else_body` can accept arbitrary number of inputs
+    (including zero),
+    - Tensors defined in the cond caller (the outer graph) can be used inside
+    `then_body` and `else_body` implicitly just as they were passed through the
+    inputs list,
+    - `then_body` and `else_body` have to return the same number of
+    corresponding outputs as the result of the cond op is assigned to a common
+    list of Tensors,
+    - all the Tensors utilized by `then_body` and `else_body` are passed in by
+    copy, so updating any of the Tensors inside bodies does not affect the
+    original Tensors; to update a Tensor passed in, its new value has to be
+    returned from the body and assigned to the original Tensor (please note that
+    number of outputs from `then_body` and `else_body` has to match).
+
+    :param condition: Condition controlling execution of `then_body` and
+    `else_body`.
+    :param then_body: The function to be executed if `condition` is True.
+    :param then_inps: `then_body` input Tensors.
+    :param else_body: The function to be executed if `condition` is False.
+    :param else_inps: `else_body` input Tensors.
+    """
 
     if not isinstance(then_inps, list) or not isinstance(else_inps, list):
         raise ValueError(
