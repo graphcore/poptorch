@@ -107,6 +107,99 @@ void markOutputs(torch::jit::Graph *graph, torch::jit::Node *outputs,
   }
 }
 
+struct InsertionPointAndShape {
+  torch::jit::Node *insertion_point;
+  std::vector<std::int64_t> shape;
+};
+using ReshapePutterHelper = std::vector<InsertionPointAndShape>;
+
+void markCondOutputs(torch::jit::Graph *graph, torch::jit::Node *outputs,
+                     torch::jit::Node *insertion_point, Subgraph *subgraph,
+                     ReshapePutterHelper &reshape_putter_helper,
+                     bool processingElseOutputs = false) {
+  torch::jit::WithInsertPoint insert_point(outputs);
+
+  // Sometimes the return might not be processed in this node.
+  const bool used_in_subgraph =
+      markInputsAsComingFromParent(graph, outputs, subgraph);
+
+  at::ArrayRef<torch::jit::Value *> inputs = outputs->inputs();
+  for (size_t idx = 0; idx < inputs.size(); idx++) {
+    torch::jit::Value *output = inputs[idx];
+
+    WithNodeMetadata meta{output->node()};
+
+    // Output tensor shape has to be read before adding IdentityOp as the shape
+    // info does not propagate to the op output.
+    const auto output_shape = shapeFromTensor(output);
+
+    // Add an identity op in lieu if the op isn't used in the subgraph to make
+    // sure popart handles the alias correctly.
+    if (!used_in_subgraph) {
+      torch::jit::Node *node = createIdentity(graph, {output});
+      output = node->output();
+    }
+
+    // PopART doesn't allow inputs to be outputs directly.
+    if (subgraph->reverse_input_map.find(output) !=
+        subgraph->reverse_input_map.end()) {
+      output = subgraph->reverse_input_map[output];
+    }
+
+    if (processingElseOutputs) {
+      // Processing the else branch of the cond op. Here we make sure the
+      // outputs of the branches have the same shapes. If not, we add a reshape
+      // in the `then` branch.
+      const auto &then_out_shape = reshape_putter_helper[idx].shape;
+      const auto &else_out_shape = output_shape;
+      if (else_out_shape.empty()) {
+        ERROR("`else` branch output has an empty shape, so adding a reshape "
+              "op to the `then` branch to achieve shapes identity is not "
+              "possible!");
+      }
+
+      if (then_out_shape != else_out_shape) {
+        // In case if branches output shapes differ, there is a reshape added:
+        // 1. Create a reshape op
+        torch::jit::Node *reshape_node = nullptr;
+        {
+          torch::jit::WithInsertPoint reshape_insert_point(
+              reshape_putter_helper[idx].insertion_point);
+          auto *tensor_to_reshape =
+              reshape_putter_helper[idx].insertion_point->input();
+          reshape_node =
+              createReshape(graph, tensor_to_reshape, else_out_shape);
+        }
+
+        // 2. Create a new output tensor of the `then` branch (being the reshape
+        // output) and insert it before the original output tensor op.
+        torch::jit::Node *new_then_output_node =
+            createAddOutputTensor(graph, reshape_node->output());
+        insertNodeBeforeNode(new_then_output_node,
+                             reshape_putter_helper[idx].insertion_point);
+
+        // 3. Remove the original output tensor op returning the wrongly shaped
+        // tensor.
+        reshape_putter_helper[idx].insertion_point->destroy();
+      }
+      // Create the output tensor of the `else` branch.
+      torch::jit::Node *else_output_node = createAddOutputTensor(graph, output);
+      insertNodeBeforeNode(else_output_node, insertion_point);
+
+    } else {
+      // Create the output tensor of the `then` branch.
+      // In case the output tensor turns out to be of a different shape then
+      // `else` branch'es one, it will be replaced with the reshaped output
+      // tensor.
+      torch::jit::Node *then_output_node = createAddOutputTensor(graph, output);
+      insertNodeBeforeNode(then_output_node, insertion_point);
+
+      reshape_putter_helper.push_back(
+          {then_output_node, shapeFromTensor(output)});
+    }
+  }
+}
+
 // State during the dispatcher intercept calls.
 std::stack<torch::jit::Node *> start_for_loop_nodes;
 
@@ -124,6 +217,9 @@ void annotateSubgraphs(torch::jit::Graph *graph, torch::jit::Node *start_node) {
 
   // Nodes to delete (if they are truely unused).
   std::unordered_set<torch::jit::Node *> to_delete;
+
+  // Helper struct for processing if_else.
+  std::stack<ReshapePutterHelper> reshape_putter_helpers_stack;
 
   // Look for any subgraphs. Subgraphs are currently:
   // * for loops.
@@ -160,8 +256,11 @@ void annotateSubgraphs(torch::jit::Graph *graph, torch::jit::Node *start_node) {
       to_delete.insert(node->input(0)->node());
       node->removeInput(0);
     } else if (kind == symbols::poptorch::start_else_block) {
-      // Add the outputs of the if just before starting the else block.
-      markOutputs(graph, node->input(0)->node(), node, &subgraph_nodes.top());
+      // Add the outputs of `then` branch just before starting the else block.
+      reshape_putter_helpers_stack.emplace();
+      markCondOutputs(graph, node->input(0)->node(), node,
+                      &subgraph_nodes.top(), reshape_putter_helpers_stack.top(),
+                      false /*processingElseOuputs*/);
 
       // Remove the if subgraph.
       subgraph_nodes.pop();
@@ -174,8 +273,11 @@ void annotateSubgraphs(torch::jit::Graph *graph, torch::jit::Node *start_node) {
       to_delete.insert(node->input(0)->node());
       node->removeInput(0);
     } else if (kind == symbols::poptorch::end_if_block) {
-      // Mark the outputs of the else block.
-      markOutputs(graph, node->input(0)->node(), node, &subgraph_nodes.top());
+      // Mark the outputs of the `else` block.
+      markCondOutputs(graph, node->input(0)->node(), node,
+                      &subgraph_nodes.top(), reshape_putter_helpers_stack.top(),
+                      true /*processingElseOutputs*/);
+      reshape_putter_helpers_stack.pop();
 
       // Remove the else subgraph.
       subgraph_nodes.pop();
