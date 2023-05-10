@@ -22,14 +22,14 @@ Version compatibility
 PopTorch Geometric and PopTorch wheels should always come from the same Poplar
 SDK version to guarantee version compatibility.
 
-The following is the corresponding ``poptorch``, ``torch`` and ``torchvision``
+The following are the corresponding ``poptorch``, ``torch``, ``torchvision`` and ``torchaudio``
 versions and supported Python versions.
 
-+------------------------+-----------------------+-------------+-----------------+------------+
-| ``poptorch_geometric`` | ``pytorch_geometric`` |  ``torch``  | ``torchvision`` | ``python`` |
-+========================+=======================+=============+=================+============+
-|          3.2           |   2.3.0.dev20230222   |    1.13.1   |      0.14.1     |   >= 3.7   |
-+------------------------+-----------------------+-------------+-----------------+------------+
++------------------------+-----------------------+-------------+-----------------+----------------+------------+
+| ``poptorch_geometric`` | ``pytorch_geometric`` |  ``torch``  | ``torchvision`` | ``torchaudio`` | ``python`` |
++========================+=======================+=============+=================+================+============+
+|          3.2           |   2.3.0.dev20230222   |    1.13.1   |      0.14.1     |      0.13.1    |   >= 3.7   |
++------------------------+-----------------------+-------------+-----------------+----------------+------------+
 
 
 Installation using Python virtual environment
@@ -49,6 +49,15 @@ After creating the virtual environment, you need to install the PopTorch wheel.
 .. code-block:: bash
 
     $ pip install <sdk_path>/poptorch-x.x.x.whl
+
+.. warning:: If, after installing PopTorch, you install a third-party library that requires ``torchvision`` or ``torchaudio`` then that may cause an incompatible version of ``torch`` to be installed.
+
+    To prevent this, after installing PopTorch, use the following commands to install compatible versions of ``torchvision`` or ``torchaudio``:
+
+    .. code-block:: bash
+
+        $ pip install torchvision==0.14.1+cpu --extra-index-url https://download.pytorch.org/whl/cpu
+        $ pip install torchaudio==0.13.1+cpu --extra-index-url https://download.pytorch.org/whl/cpu
 
 See the
 `PopTorch installation guide <https://docs.graphcore.ai/projects/poptorch-user-guide/en/latest/installation.html>`_
