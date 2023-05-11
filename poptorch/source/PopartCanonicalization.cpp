@@ -26,6 +26,7 @@ namespace poptorch {
 namespace {
 
 struct ReplaceInfo {
+  bool allow_original_input_modifications;
   torch::jit::Value *original_input;
   torch::jit::Value *modified_input;
 };
@@ -60,8 +61,26 @@ handleSliceModification(torch::jit::Graph *graph, torch::jit::Node *node,
                         std::vector<ReplaceInfo> *replace_infos) {
   torch::jit::Value *input = node->input(0);
   torch::jit::Node *new_node = modified_slice->node();
+
+  bool replace_infos_allow_input_modification = false;
+
   // Follow the chain of slices that are being operated on by the inplace op
-  while (input->node()->kind() == symbols::popart::slice) {
+  while (input->node()->kind() == symbols::popart::slice ||
+         input->node()->kind() == symbols::popart::reshape_static_shape) {
+
+    // skip reshape_static_shape and continue scanning for slice op, example IR
+    // handled in this way:
+    // %1 = slice(%x)
+    // %2 = popart::reshape_static_shape(%1)
+    // %3 = slice(%2)
+    // %4 = popart::reshape_static_shape(%3)
+    // in addition, in such case original_input in replace_infos is allowed to
+    // be modified during replace_infos processing
+    if (input->node()->kind() == symbols::popart::reshape_static_shape) {
+      input = input->node()->input(0);
+      replace_infos_allow_input_modification = true;
+      continue;
+    }
     auto *slice = input->node();
     auto *slice_input = slice->input(0);
 
@@ -89,7 +108,8 @@ handleSliceModification(torch::jit::Graph *graph, torch::jit::Node *node,
     // (i.e. the modified tensor) so that we can replace the original
     // inputs after PopART canonicalisation has taken place
     auto *modified_input = dynamic_update->output();
-    replace_infos->push_back({slice_input, modified_input});
+    replace_infos->push_back(
+        {replace_infos_allow_input_modification, slice_input, modified_input});
     new_node = dynamic_update;
 
     // Repeat this process for the entire chain of slices - the
@@ -221,9 +241,41 @@ void CanonicalizeImpl::run(torch::jit::Graph *graph) {
   }
 
   // Replace slice inputs with their modified counterparts
-  for (auto info : replace_infos) {
-    info.original_input->replaceAllUsesAfterNodeWith(
-        info.modified_input->node(), info.modified_input);
+  for (auto curr_info_iter = replace_infos.begin();
+       curr_info_iter != replace_infos.end(); ++curr_info_iter) {
+
+    curr_info_iter->original_input->replaceAllUsesAfterNodeWith(
+        curr_info_iter->modified_input->node(), curr_info_iter->modified_input);
+
+    for (auto next_info_iter = curr_info_iter + 1;
+         next_info_iter != replace_infos.end(); ++next_info_iter) {
+      // if original input modification is allowed this code will modify
+      // subsequent replace infos if original inputs are the same.
+      //
+      // example:
+      //     replace_infos[0] = {x, // don't care
+      //                         original_input = %1,
+      //                         modified_input = %2}
+      //     replace_infos[1] = {false,
+      //                         original_input = %1,
+      //                         modified_input = %3}
+      //     replace_infos[2] = {true,
+      //                         original_input = %1,
+      //                         modified_input = %4}
+      //
+      // >>>> will modify replace info struct at index 2:
+      //
+      //     replace_infos[1] = {false,
+      //                         original_input = %1,
+      //                         modified_input = %3}
+      //     replace_infos[2] = {true,
+      //                         original_input = %2, <-- was %1
+      //                         modified_input = %4}
+      if (next_info_iter->allow_original_input_modifications &&
+          curr_info_iter->original_input == next_info_iter->original_input) {
+        next_info_iter->original_input = curr_info_iter->modified_input;
+      }
+    }
   }
 
   // Build a list of nodes marked for deletion.

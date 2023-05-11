@@ -476,6 +476,34 @@ def test_inplace_modify_slice(op, step_size):
                 r"size other than 1 is not supported\.", e.message)
 
 
+def test_inplace_modify_select():
+    shape = (3, 4, 2)
+
+    inpA = torch.randint(55, shape)
+    inpB = torch.randint(66, shape)
+    inpC = torch.randint(77, shape)
+
+    class ModelWrapper(torch.nn.Module):
+        def forward(self, tensorA, tensorB, tensorC):
+            tensorA = tensorA - tensorB
+
+            tensorA[0:1] += tensorC[1]
+            tensorA[0] += tensorC[0]
+            tensorA[1][2] += tensorC[2][1]
+            tensorA[1][3][1] += tensorC[2][3][0]
+
+            return tensorA
+
+    model = ModelWrapper()
+
+    cpu_out = model(inpA, inpB, inpC)
+
+    poptorch_model = poptorch.inferenceModel(model)
+    ipu_out = poptorch_model(inpA, inpB, inpC)
+
+    helpers.assert_allclose(actual=ipu_out, expected=cpu_out)
+
+
 def test_index_put_on_buffer():
     class Model(torch.nn.Module):
         def __init__(self):
