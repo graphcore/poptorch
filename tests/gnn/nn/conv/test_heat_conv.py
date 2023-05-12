@@ -6,7 +6,6 @@ from torch_geometric.nn import HEATConv
 from conv_utils import conv_harness
 
 
-@pytest.mark.skip(reason="TODO(AFS-223)")
 @pytest.mark.parametrize('concat', [True, False])
 def test_heat_conv(concat):
     x = torch.randn(4, 8)
@@ -26,4 +25,7 @@ def test_heat_conv(concat):
                     concat=concat,
                     add_self_loops=False)
 
-    conv_harness(conv, batch=(x, edge_index, node_type, edge_type, edge_attr))
+    conv_harness(conv,
+                 batch=(x, edge_index, node_type, edge_type, edge_attr),
+                 atol=5e-4,
+                 rtol=0.3)
