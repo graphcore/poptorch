@@ -381,3 +381,48 @@ def test_batchnorm_statistics():
     # Running var is not so close.
     helpers.assert_allclose(actual=model2.bn.running_var,
                             expected=model1.bn.running_var)
+
+
+@pytest.mark.parametrize('p',
+                         (1, 2, 1.0, 2.0, float('inf'), float('-inf'), 'fro'))
+def test_norm_in_loop(p):
+    embedding = torch.nn.Parameter(torch.randn((200, 100)))
+    num_loops = 3
+
+    class Model(torch.nn.Module):
+        def __init__(self, ):
+            super().__init__()
+            self.embedding = embedding
+
+        def forward(self):
+            def loop_body(norm):
+                norm += torch.norm(self.embedding[:100], p=p, dim=-1)
+                return norm
+
+            cumulative_norm = torch.zeros(100, device=self.embedding.device)
+            (cumulative_norm, ) = poptorch.for_loop(
+                num_loops,
+                loop_body,
+                [cumulative_norm],
+            )
+            return cumulative_norm
+
+    class RefModel(torch.nn.Module):
+        def __init__(self, ):
+            super().__init__()
+            self.embedding = embedding
+
+        def forward(self):
+            cumulative_norm = torch.zeros(100, device=self.embedding.device)
+            for _ in range(num_loops):
+                cumulative_norm += torch.norm(self.embedding[:100],
+                                              p=p,
+                                              dim=-1)
+            return cumulative_norm
+
+    native = Model()
+    ipu = poptorch.inferenceModel(native)
+    ipu_out = ipu()
+    native_out = RefModel()()
+
+    helpers.assert_allclose(actual=ipu_out, expected=native_out)

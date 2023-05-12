@@ -347,14 +347,19 @@ torch::jit::Node *tensorNormHandler(torch::jit::Graph *graph,
     }
     // handle optional dtype
     if (node->inputs().size() >= 5) {
-      auto *opt_dtype = node->input(4);
-      if (opt_dtype->mustNotBeNone()) {
-        const auto &opt_dtype_tensors = opt_dtype->node()->ts(c10::attr::value);
-        ERROR_ON(opt_dtype_tensors.empty());
-        if (!opt_dtype_tensors.front().is_floating_point()) {
-          input =
-              createCast(graph, input, constantToScalarType(opt_dtype->node()))
-                  ->output();
+      auto *input_4 = node->input(4);
+      const bool is_scalar_type =
+          input_4->type()->kind() == c10::TypeKind::ScalarTypeType;
+      if (is_scalar_type) {
+        if (auto *opt_dtype = input_4; opt_dtype->mustNotBeNone()) {
+          const auto &opt_dtype_tensors =
+              opt_dtype->node()->ts(c10::attr::value);
+          ERROR_ON(opt_dtype_tensors.empty());
+          if (!opt_dtype_tensors.front().is_floating_point()) {
+            input = createCast(graph, input,
+                               constantToScalarType(opt_dtype->node()))
+                        ->output();
+          }
         }
       }
     }
