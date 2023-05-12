@@ -333,7 +333,8 @@ class FixedSizeCollater(Collater):
         if not isinstance(data_list, list):
             raise TypeError(f'Expected list, got {type(data_list).__name__}.')
 
-        if isinstance(data_list[0], Data) and hasattr(data_list[0], 'y'):
+        if (isinstance(data_list[0], Data) and hasattr(data_list[0], 'y')
+                and data_list[0].y is not None):
             y0_equal_num_nodes = all(data.y.shape[0] == data.num_nodes
                                      for data in data_list)
             y0_equal_ones = all(data.y.shape[0] == 1 for data in data_list)
@@ -343,8 +344,9 @@ class FixedSizeCollater(Collater):
             elif y0_equal_ones and not y0_equal_num_nodes:
                 self.labels_type = self.LabelsType.GRAPH_LVL
             else:
-                assert False, "Incorrect input data. Labels `y` have" \
-                              "uncompatible shapes!"
+                assert False, "Incorrect input data. The size of the shape" \
+                              "of labels `y` must be either the number" \
+                              "of nodes or the number of graphs"
 
         num_real_graphs = len(data_list)
         num_pad_graphs = 1 if self.num_graphs is None \
@@ -362,15 +364,35 @@ class FixedSizeCollater(Collater):
             num_real_nodes, num_pad_nodes, num_real_edges, num_pad_edges = \
                 self._calc_pad_limits(data_list)
 
-        if num_pad_graphs < 0 or _any_negative(num_pad_edges) or _any_negative(
-                num_pad_nodes):
-            raise RuntimeError('Graphs in the batch are too large. Requested '
-                               f'{num_all_graphs} graphs, but batch has '
-                               f'{num_real_graphs} graphs. Requested '
-                               f'{self.num_nodes} nodes, but batch has '
-                               f'{num_real_nodes} nodes. Requested '
-                               f'{self.num_edges} edges, but batch has '
-                               f'{num_real_edges} edges.')
+        if num_pad_graphs < 0:
+            raise RuntimeError(
+                "The maximum number of graphs requested doesn't allocate"
+                " enough room for all the graphs in the batch plus at least"
+                " one extra graph required for padding the batch to a fixed"
+                " size. The number of graphs received for batching is"
+                f" {num_real_graphs + 1}, including at least one padding"
+                " graph, but space for only"
+                f" {num_pad_graphs + num_real_graphs} graphs has been"
+                " requested.")
+
+        oversize_error = (
+            "The fixed sizes given don't allocate enough space for the"
+            " number of {type_str} required to fit"
+            f" {num_real_graphs} sample(s) into a batch"
+            f" ({num_pad_graphs + num_real_graphs} including an extra padded"
+            " graph). Increase the maximum number of {type_str}, currently"
+            " set to {type_value}, or set `trim_{type_str}` to remove any"
+            " excess {type_str} to achieve the given maximum number of"
+            " {type_str}.")
+
+        if _any_negative(num_pad_nodes):
+            raise RuntimeError(
+                oversize_error.format(type_str="nodes",
+                                      type_value=self.num_nodes))
+        if _any_negative(num_pad_edges):
+            raise RuntimeError(
+                oversize_error.format(type_str="edges",
+                                      type_value=self.num_edges))
 
         num_nodes_or_edges_positive = _all_positive(
             num_pad_nodes) or _all_positive(num_pad_edges)
