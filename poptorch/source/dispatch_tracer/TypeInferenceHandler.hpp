@@ -27,11 +27,13 @@ public:
         transform_fn;
   };
 
-private:
   // Create a meta tensor with the same type as the input
   static at::Tensor toMeta(const at::Tensor &tensor, bool upcast_to_long,
                            bool is_prelu = false);
+  static c10::optional<std::size_t>
+  indexArgToUpcast(const std::string &schema_key);
 
+private:
   // Create a stack of meta tensors that matches the inputs in
   // ipu_stack
   static c10::Stack createMetaStack(const c10::Stack &ipu_stack,
@@ -40,11 +42,12 @@ private:
 
   // Using the computed meta output stack, repopulate the ipu stack
   // with tensors of the correct inferred output types
-  void repopulateIpuStack(c10::Stack *ipu_stack, const c10::Stack &meta_stack,
+  void repopulateIpuStack(c10::Stack &ipu_stack, const c10::Stack &meta_stack,
                           bool is_prelu);
 
-  static c10::optional<std::size_t>
-  indexArgToUpcast(const std::string &schema_key);
+  at::Tensor allocateTensor(const at::Tensor &meta_tensor, bool is_prelu);
+  c10::List<at::Tensor>
+  allocateTensorList(const c10::List<at::Tensor> &meta_tensor_list);
 
   static std::optional<Workaround>
   workaroundLookup(const std::string &schema_key);

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
+import unittest
 
 import torch
 import pytest
@@ -768,7 +769,7 @@ def test_topk(largest):
 
 @pytest.mark.parametrize("shape", [(17, 4), (18, 23, 5)])
 @pytest.mark.parametrize("descending", [True, False])
-@pytest.mark.ipuHardwareRequired
+@unittest.mock.patch.dict("os.environ", helpers.disableSmallModel())
 def test_sort(shape, descending):
     torch.manual_seed(42)
     input = torch.randn(*shape)
@@ -787,7 +788,7 @@ def test_sort(shape, descending):
 
 
 @pytest.mark.parametrize("descending", [True, False])
-@pytest.mark.ipuHardwareRequired
+@unittest.mock.patch.dict("os.environ", helpers.disableSmallModel())
 def test_sort_stable(descending):
     torch.manual_seed(42)
     input = torch.tensor([[2.0, 2.0, 1.0, 10.0, 11.0],

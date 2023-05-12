@@ -32,9 +32,7 @@ namespace {
 using BufferPtr = std::shared_ptr<Buffer>;
 using TensorViewPtr = std::shared_ptr<ITensorView>;
 
-template <class... Ts> struct Overloaded : Ts... {
-  using Ts::operator()...;
-};
+template <class... Ts> struct Overloaded : Ts... { using Ts::operator()...; };
 template <class... Ts> Overloaded(Ts...) -> Overloaded<Ts...>;
 
 std::shared_ptr<IpuTensorDetails>
@@ -246,10 +244,7 @@ C10_REGISTER_GUARD_IMPL(IPU, GuardImpl)
 
 poptorch_ir::TensorType getTensorType(const at::ScalarType &scalar_type,
                                       std::vector<std::int64_t> sizes) {
-  poptorch_ir::TensorType type;
-  type.element_type = toCompilerType(scalar_type);
-  type.shape = std::move(sizes);
-  return type;
+  return {std::move(sizes), toCompilerType(scalar_type)};
 }
 } // namespace
 
