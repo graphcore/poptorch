@@ -326,6 +326,7 @@ OutputTypeSameAsFirstInput = [
     "gatherelements",
     "gathernd",
     "gelu",
+    "geluerf",
     "globalaveragepool",
     "globallppool",
     "globalmaxpool",

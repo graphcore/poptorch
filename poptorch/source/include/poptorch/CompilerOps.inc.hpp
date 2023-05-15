@@ -14,6 +14,7 @@ torch::jit::Node* createScale(torch::jit::Graph *graph,  const std::vector<torch
 torch::jit::Node* createScaledadd(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,float scale0,float scale1);
 torch::jit::Node* createLstm(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,int64_t outputFullSequence);
 torch::jit::Node* createGelu(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args);
+torch::jit::Node* createGeluErf(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args);
 torch::jit::Node* createDetach(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args);
 torch::jit::Node* createDepthtospace(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,int64_t blocksize,const std::string & mode);
 torch::jit::Node* createRound(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args);

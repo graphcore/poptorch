@@ -14,6 +14,7 @@ OP_DECL(popart, scale, scale, AiGraphcoreOpset1.scale, ARG(FLOAT,scale) , BODY_A
 OP_DECL(popart, scaledadd, scaledadd, AiGraphcoreOpset1.scaledadd, ARG(FLOAT,scale0) ARG(FLOAT,scale1) , BODY_ARG(scale0) BODY_ARG(scale1) BODY_ARG(DEBUG_CONTEXT("Scaledadd")))
 OP_DECL(popart, lstm, lstm, AiGraphcoreOpset1.lstm, ARG(INT,outputFullSequence) , BODY_ARG(outputFullSequence) BODY_ARG(DEBUG_CONTEXT("Lstm")))
 OP_DECL(popart, gelu, gelu, AiGraphcoreOpset1.gelu, NONE, BODY_ARG(DEBUG_CONTEXT("Gelu")))
+OP_DECL(popart, geluerf, geluerf, AiGraphcoreOpset1.geluerf, NONE, BODY_ARG(DEBUG_CONTEXT("GeluErf")))
 OP_DECL(popart, detach, detach, AiGraphcoreOpset1.detach, NONE, BODY_ARG(DEBUG_CONTEXT("Detach")))
 OP_DECL(popart, depthtospace, depthtospace, AiGraphcoreOpset1.depthtospace, ARG(INT,blocksize) ARG(STRING,mode) , BODY_ARG(blocksize) BODY_ARG(mode) BODY_ARG(DEBUG_CONTEXT("Depthtospace")))
 OP_DECL(popart, round, round, AiGraphcoreOpset1.round, NONE, BODY_ARG(DEBUG_CONTEXT("Round")))

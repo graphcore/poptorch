@@ -70,6 +70,10 @@ torch::jit::Node* createGelu(torch::jit::Graph *graph,  const std::vector<torch:
  torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::gelu, args, ImplicitCast::None, OutputType::AsFirstInput);
 return new_node;
 }
+torch::jit::Node* createGeluErf(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args) {
+ torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::geluerf, args, ImplicitCast::None, OutputType::AsFirstInput);
+return new_node;
+}
 torch::jit::Node* createDetach(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args) {
  torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::detach, args, ImplicitCast::None, OutputType::AsFirstInput);
 return new_node;
