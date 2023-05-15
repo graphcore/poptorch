@@ -417,6 +417,8 @@ def test_fixed_size_heterodataloader(
 
         assert batch.num_nodes == padded_num_nodes
         assert batch.num_edges == padded_num_edges
+        assert 'num_nodes' not in batch.node_types
+        assert 'num_edges' not in batch.edge_types
 
         if 'y' in batch._node_store_dict.keys():
             assert batch.y.shape[0] == batch_size * device_iterations

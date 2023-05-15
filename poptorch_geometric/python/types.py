@@ -55,11 +55,29 @@ class PyGArgsParser(ICustomArgParser):
             original_structure: Union[DataBatch, HeteroDataBatch]):
         if hasattr(original_structure, '_num_graphs'):
             batch._num_graphs = original_structure._num_graphs  # pylint: disable=protected-access
-        batch['num_nodes'] = original_structure.num_nodes
-        batch['num_edges'] = original_structure.num_edges
+
+        num_nodes = original_structure.num_nodes
+        num_edges = original_structure.num_edges
+        batch['num_nodes'] = num_nodes
+        batch['num_edges'] = num_edges
         if isinstance(batch, HeteroDataBatch):
-            batch._node_store_dict['num_nodes'] = original_structure.num_nodes  # pylint: disable=protected-access
-            batch._edge_store_dict['num_edges'] = original_structure.num_edges  # pylint: disable=protected-access
+            # We need to override properties getters, to make them return the
+            # proper (device iterations independent) `num_nodes` and `num_edges`
+            # The general idea is to return values from `num_nodes` or
+            # `num_edges` fields (if defined) in the first place.
+            def nodes_fget(sub_self):
+                if 'num_nodes' in sub_self._global_store:  # pylint: disable=protected-access
+                    return sub_self['num_nodes']
+                return super(type(sub_self), sub_self).num_nodes
+
+            setattr(HeteroDataBatch, 'num_nodes', property(fget=nodes_fget))
+
+            def edges_fget(sub_self):
+                if 'num_edges' in sub_self._global_store:  # pylint: disable=protected-access
+                    return sub_self['num_edges']
+                return super(type(sub_self), sub_self).num_edges
+
+            setattr(HeteroDataBatch, 'num_edges', property(fget=edges_fget))
 
     @staticmethod
     def _add_next(tensor_iterator: Iterable[List[Any]],
