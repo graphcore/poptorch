@@ -6,6 +6,7 @@ from torch_geometric.loader import ClusterData
 
 from poptorch_geometric.cluster_loader import \
     FixedSizeClusterLoader as IPUFixedSizeClusterLoader
+from poptorch_geometric.fixed_size_options import FixedSizeOptions
 from poptorch_geometric.pyg_cluster_loader import FixedSizeClusterLoader
 import poptorch
 
@@ -55,12 +56,14 @@ def test_fixed_size_dataloader_with_cluster_data(loader_cls, batch_size,
 
     # Create a fixed size dataloader.
     kwargs = {
-        'cluster_data': cluster_data,
-        'num_nodes': padded_num_nodes,
-        'batch_size': batch_size,
-        'collater_args': {
-            'num_edges': padded_num_edges,
-        }
+        'cluster_data':
+        cluster_data,
+        'fixed_size_options':
+        FixedSizeOptions(num_nodes=padded_num_nodes,
+                         num_edges=padded_num_edges,
+                         num_graphs=2),
+        'batch_size':
+        batch_size
     }
     if ipu_dataloader:
         kwargs['options'] = poptorch.Options()

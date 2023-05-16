@@ -8,6 +8,7 @@ from torch_geometric.data import Dataset
 
 import poptorch
 from poptorch_geometric.collate import CombinedBatchingCollater
+from poptorch_geometric.fixed_size_options import FixedSizeOptions
 from poptorch_geometric.pyg_dataloader import CustomFixedSizeDataLoader as PyGCustomFixedSizeDataLoader
 from poptorch_geometric.pyg_dataloader import DataLoader as PyGDataLoader
 from poptorch_geometric.pyg_dataloader import FixedSizeDataLoader as PyGFixedSizeDataLoader
@@ -75,14 +76,15 @@ class CustomFixedSizeDataLoader(PyGCustomFixedSizeDataLoader,
 
     Args:
         dataset (Dataset): The dataset from which to load the data.
-        num_nodes (int, optional): The total number of nodes in the padded
-            batch. If the value is not provided, it will be set to the
-            maximum number of nodes times the batch size. For maximum
-            performance it is recommended to tune that value per specific
-            use case. (default: `None`)
         batch_size (int, optional): The number of samples per batch to load.
             This should be at least :obj:`2` to allow for creating at least
             one padding graph. (default: :obj:`None`)
+        fixed_size_options (FixedSizeOptions, optional): A
+            :py:class:`poptorch_geometric.fixed_size_options.FixedSizeOptions`
+            object which holds the maximum number of nodes, edges and other
+            options required to pad the batches, produced by the data loader,
+            to a fixed size. If not specified, this will be determined from
+            the provided dataset. (default: :obj:`None`)
         batch_sampler (Sampler, optional): Batch sampler to yield a mini-batch
             of indices. If :obj:`batch_sampler` is specified, the
             :obj:`batch_size` and :obj:`shuffle` arguments do not have any
@@ -108,8 +110,8 @@ class CustomFixedSizeDataLoader(PyGCustomFixedSizeDataLoader,
     def __init__(
             self,
             dataset: Dataset,
-            num_nodes: Optional[int] = None,
             batch_size: Optional[int] = None,
+            fixed_size_options: Optional[FixedSizeOptions] = None,
             batch_sampler: Optional[Sampler[List[int]]] = None,
             shuffle: bool = False,
             follow_batch: Optional[Union[List[str], Tuple[str, ...]]] = None,
@@ -123,8 +125,8 @@ class CustomFixedSizeDataLoader(PyGCustomFixedSizeDataLoader,
             # Create IPU default options
             options = poptorch.Options()
         super().__init__(dataset=dataset,
-                         num_nodes=num_nodes,
                          batch_size=batch_size,
+                         fixed_size_options=fixed_size_options,
                          batch_sampler=batch_sampler,
                          shuffle=shuffle,
                          follow_batch=follow_batch,
@@ -151,19 +153,18 @@ class FixedSizeDataLoader(PyGFixedSizeDataLoader, CustomFixedSizeDataLoader):
     :py:class:`poptorch_geometric.stream_packing_sampler.StreamPackingSampler`
     to select the samples that will be batched together.
 
-    If not specified, :obj:`num_nodes` and :obj:`num_edges` are set to the
-    batch size times the maximum number of nodes and edges, respectively.
-
     Args:
         dataset (Dataset): The :py:class:`~torch_geometric.data.Dataset`
             instance from which to load the graph examples for the IPU.
-        num_nodes (int, optional): Number of nodes in a batch.
-            (default: :obj:`None`)
-        num_edges (int, optional): Number of edges in a batch.
-            (default: :obj:`None`)
         batch_size (int, optional): How many graph examples to load in each
             batch. This should be at least :obj:`2` to allow for creating at
             least one padding graph. (default: :obj:`2`)
+        fixed_size_options (FixedSizeOptions, optional): A
+            :py:class:`poptorch_geometric.fixed_size_options.FixedSizeOptions`
+            object which holds the maximum number of nodes, edges and other
+            options required to pad the batches, produced by the data loader,
+            to a fixed size. If not specified, this will be determined from
+            the provided dataset. (default: :obj:`None`)
         options (poptorch.Options, optional): The :py:class:`poptorch.Options`
             used by the :py:class:`poptorch.DataLoader`. Will use the default
             options if not provided. (default: :obj:`None`)
@@ -190,9 +191,8 @@ class FixedSizeDataLoader(PyGFixedSizeDataLoader, CustomFixedSizeDataLoader):
     def __init__(
             self,
             dataset: Dataset,
-            num_nodes: Optional[int] = None,
-            num_edges: Optional[int] = None,
             batch_size: int = 2,
+            fixed_size_options: Optional[FixedSizeOptions] = None,
             options: Optional[poptorch.Options] = None,
             follow_batch: Optional[Union[List[str], Tuple[str, ...]]] = None,
             exclude_keys: Optional[Union[List[str], Tuple[str, ...]]] = None,
@@ -203,9 +203,8 @@ class FixedSizeDataLoader(PyGFixedSizeDataLoader, CustomFixedSizeDataLoader):
     ) -> None:
 
         super().__init__(dataset=dataset,
-                         num_nodes=num_nodes,
-                         num_edges=num_edges,
                          batch_size=batch_size,
+                         fixed_size_options=fixed_size_options,
                          follow_batch=follow_batch,
                          exclude_keys=exclude_keys,
                          collater_args=collater_args,

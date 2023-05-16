@@ -10,6 +10,7 @@ from torch.utils.data import BatchSampler, RandomSampler, SequentialSampler
 
 from utils import is_data
 from poptorch_geometric.collate import FixedSizeCollater
+from poptorch_geometric.fixed_size_options import FixedSizeOptions
 
 # pylint: disable=protected-access
 
@@ -28,11 +29,10 @@ def _get_test_data(request, molecule, fake_hetero_data):
     return request.param, dataset
 
 
-@pytest.mark.parametrize('num_graphs', [10, None])
+@pytest.mark.parametrize('num_graphs,num_real_graphs', [(10, 8), (2, 1)])
 @pytest.mark.parametrize('num_edges', [300, None])
 @pytest.mark.parametrize('set_pad_values', [True, False])
-def test_batch_masks(num_graphs, num_edges, set_pad_values):
-    num_real_graphs = 8
+def test_batch_masks(num_graphs, num_real_graphs, num_edges, set_pad_values):
     avg_num_nodes = 10
     num_channels = 8
 
@@ -50,24 +50,27 @@ def test_batch_masks(num_graphs, num_edges, set_pad_values):
     num_batch_nodes = 100
     num_batch_edges = num_batch_nodes * (num_batch_nodes - 1) \
          if num_edges is None else num_edges
-    num_batch_graphs = num_real_graphs + 1 \
-         if num_graphs is None else num_graphs
+    num_batch_graphs = num_graphs
 
+    fixed_size_options = None
     fixed_size_collater = None
     if set_pad_values:
+        fixed_size_options = FixedSizeOptions(num_nodes=num_batch_nodes,
+                                              num_edges=num_edges,
+                                              num_graphs=num_graphs,
+                                              node_pad_value=node_pad_value,
+                                              edge_pad_value=edge_pad_value,
+                                              graph_pad_value=graph_pad_value)
         fixed_size_collater = FixedSizeCollater(
+            fixed_size_options=fixed_size_options, add_masks_to_batch=True)
+    else:
+        fixed_size_options = FixedSizeOptions(
             num_nodes=num_batch_nodes,
             num_edges=num_edges,
             num_graphs=num_graphs,
-            add_masks_to_batch=True,
-            node_pad_value=node_pad_value,
-            edge_pad_value=edge_pad_value,
-            graph_pad_value=graph_pad_value)
-    else:
-        fixed_size_collater = FixedSizeCollater(num_nodes=num_batch_nodes,
-                                                num_edges=num_edges,
-                                                num_graphs=num_graphs,
-                                                add_masks_to_batch=True)
+        )
+        fixed_size_collater = FixedSizeCollater(
+            fixed_size_options=fixed_size_options, add_masks_to_batch=True)
 
     batch_sampler = BatchSampler(SequentialSampler(dataset),
                                  num_real_graphs,
@@ -124,12 +127,12 @@ def test_batch_masks(num_graphs, num_edges, set_pad_values):
                 assert feature == edge_pad_value
 
 
-@pytest.mark.parametrize('num_graphs', [4, None])
+@pytest.mark.parametrize('num_graphs,num_real_graphs', [(6, 2), (4, 2),
+                                                        (2, 1)])
 @pytest.mark.parametrize('num_edges', [1200, None])
 @pytest.mark.parametrize('set_pad_values', [True, False])
-def test_batch_masks_heterodata(num_graphs, num_edges, set_pad_values,
-                                fake_hetero_dataset):
-    num_real_graphs = 2
+def test_batch_masks_heterodata(num_graphs, num_real_graphs, num_edges,
+                                set_pad_values, fake_hetero_dataset):
 
     dataset = fake_hetero_dataset
     num_node_types = 2
@@ -141,26 +144,29 @@ def test_batch_masks_heterodata(num_graphs, num_edges, set_pad_values,
 
     num_batch_nodes = 150
 
+    fixed_size_options = None
     fixed_size_collater = None
     if set_pad_values:
+        fixed_size_options = FixedSizeOptions(num_nodes=num_batch_nodes,
+                                              num_edges=num_edges,
+                                              num_graphs=num_graphs,
+                                              node_pad_value=node_pad_value,
+                                              edge_pad_value=edge_pad_value,
+                                              graph_pad_value=graph_pad_value)
         fixed_size_collater = FixedSizeCollater(
+            fixed_size_options=fixed_size_options, add_masks_to_batch=True)
+    else:
+        fixed_size_options = FixedSizeOptions(
             num_nodes=num_batch_nodes,
             num_edges=num_edges,
             num_graphs=num_graphs,
-            add_masks_to_batch=True,
-            node_pad_value=node_pad_value,
-            edge_pad_value=edge_pad_value,
-            graph_pad_value=graph_pad_value)
-    else:
-        fixed_size_collater = FixedSizeCollater(num_nodes=num_batch_nodes,
-                                                num_edges=num_edges,
-                                                num_graphs=num_graphs,
-                                                add_masks_to_batch=True)
+        )
+        fixed_size_collater = FixedSizeCollater(
+            fixed_size_options=fixed_size_options, add_masks_to_batch=True)
 
     num_batch_edges = (num_batch_nodes * (num_batch_nodes - 1) \
          if num_edges is None else num_edges) * num_edge_types
-    num_batch_graphs = num_real_graphs + 1 \
-         if num_graphs is None else num_graphs
+    num_batch_graphs = num_graphs
     num_batch_nodes *= num_node_types
 
     batch_sampler = BatchSampler(SequentialSampler(dataset),
@@ -213,7 +219,9 @@ def test_prune_nodes_single_input(_get_test_data):
     type_, dataset = _get_test_data
 
     expected_num_nodes = 10
-    fixed_size_collater = FixedSizeCollater(num_nodes=expected_num_nodes)
+    fixed_size_options = FixedSizeOptions(num_nodes=expected_num_nodes,
+                                          num_graphs=2)
+    fixed_size_collater = FixedSizeCollater(fixed_size_options)
     result = fixed_size_collater._prune_nodes([dataset])
     assert len(result) == 1
 
@@ -233,7 +241,9 @@ def test_prune_nodes_multiple_inputs(_get_test_data):
     num_inputs = 4
     input = [dataset] * num_inputs
     expected_num_nodes = 80
-    fixed_size_collater = FixedSizeCollater(num_nodes=expected_num_nodes)
+    fixed_size_options = FixedSizeOptions(num_nodes=expected_num_nodes,
+                                          num_graphs=num_inputs + 1)
+    fixed_size_collater = FixedSizeCollater(fixed_size_options)
     result = fixed_size_collater._prune_nodes(input)
     assert len(result) == num_inputs
 
@@ -251,7 +261,9 @@ def test_prune_nodes_multiple_inputs_minimal_num_node(_get_test_data):
     num_inputs = 3
     input = [dataset] * num_inputs
     expected_num_nodes = num_inputs * (1 if is_data(type_) else 2)
-    fixed_size_collater = FixedSizeCollater(num_nodes=expected_num_nodes)
+    fixed_size_options = FixedSizeOptions(num_nodes=expected_num_nodes,
+                                          num_graphs=num_inputs + 1)
+    fixed_size_collater = FixedSizeCollater(fixed_size_options)
     result = fixed_size_collater._prune_nodes(input)
     assert len(result) == num_inputs
 
@@ -269,8 +281,9 @@ def test_prune_edges_single_input(_get_test_data):
     expected_num_nodes = dataset.num_nodes
     expected_num_edges = 40
 
-    fixed_size_collator = FixedSizeCollater(num_nodes=expected_num_nodes,
-                                            num_edges=expected_num_edges)
+    fixed_size_options = FixedSizeOptions(num_nodes=expected_num_nodes,
+                                          num_edges=expected_num_edges)
+    fixed_size_collator = FixedSizeCollater(fixed_size_options)
 
     result = fixed_size_collator._prune_edges([dataset])
 
@@ -293,8 +306,10 @@ def test_prune_edges_multiple_inputs(_get_test_data):
     expected_num_nodes = dataset.num_nodes * num_inputs
     expected_num_edges = 80
 
-    fixed_size_collator = FixedSizeCollater(num_nodes=expected_num_nodes,
-                                            num_edges=expected_num_edges)
+    fixed_size_options = FixedSizeOptions(num_nodes=expected_num_nodes,
+                                          num_edges=expected_num_edges,
+                                          num_graphs=num_inputs + 1)
+    fixed_size_collator = FixedSizeCollater(fixed_size_options)
 
     result = fixed_size_collator._prune_edges(input)
     assert len(result) == num_inputs
@@ -319,8 +334,10 @@ def test_prune_nodes_multiple_inputs_minimal_num_edges(_get_test_data):
     expected_num_nodes = dataset.num_nodes * num_inputs
     expected_num_edges = num_inputs
 
-    fixed_size_collator = FixedSizeCollater(num_nodes=expected_num_nodes,
-                                            num_edges=expected_num_edges)
+    fixed_size_options = FixedSizeOptions(num_nodes=expected_num_nodes,
+                                          num_edges=expected_num_edges,
+                                          num_graphs=num_inputs + 1)
+    fixed_size_collator = FixedSizeCollater(fixed_size_options)
 
     result = fixed_size_collator._prune_edges(input)
     assert len(result) == num_inputs
@@ -342,7 +359,10 @@ def test_prune_nodes_multiple_inputs_should_throw_exception(_get_test_data):
     input = [dataset] * num_inputs
     num_of_nodes = sum(data.num_nodes for data in input)
     expected_num_nodes = (num_inputs - 1)
-    fixed_size_collater = FixedSizeCollater(num_nodes=expected_num_nodes)
+
+    fixed_size_options = FixedSizeOptions(num_nodes=expected_num_nodes,
+                                          num_graphs=num_inputs + 1)
+    fixed_size_collater = FixedSizeCollater(fixed_size_options)
 
     with pytest.raises(
             RuntimeError,
@@ -371,7 +391,9 @@ def test_prune_nodes_fixed_size_collater(data_type, fake_hetero_dataset):
         dataset = fake_hetero_dataset
 
     batch_size = 10
-    fixed_size_collater = FixedSizeCollater(num_nodes=expected_num_nodes,
+    fixed_size_options = FixedSizeOptions(num_nodes=expected_num_nodes,
+                                          num_graphs=batch_size + 1)
+    fixed_size_collater = FixedSizeCollater(fixed_size_options,
                                             trim_nodes=True)
     expected_num_nodes *= num_node_types
 
@@ -416,8 +438,10 @@ def test_prune_edges_fixed_size_collator(data_type, fake_hetero_dataset):
     batch_size = 10
     expected_num_nodes = avg_num_nodes * (batch_size * 2)
 
-    fixed_size_collator = FixedSizeCollater(num_nodes=expected_num_nodes,
-                                            num_edges=expected_num_edges,
+    fixed_size_options = FixedSizeOptions(num_nodes=expected_num_nodes,
+                                          num_edges=expected_num_edges,
+                                          num_graphs=batch_size + 1)
+    fixed_size_collator = FixedSizeCollater(fixed_size_options,
                                             trim_edges=True)
     expected_num_nodes *= num_node_types
     expected_num_edges *= num_edge_types
@@ -478,8 +502,10 @@ def test_prune_data_fixed_size_collator(data_type, fake_hetero_dataset):
             for edge_store in data.edge_stores:
                 assert edge_store['edge_index'].shape[1] > 0
 
-    fixed_size_collator = FixedSizeCollater(num_nodes=expected_num_nodes,
-                                            num_edges=expected_num_edges,
+    fixed_size_options = FixedSizeOptions(num_nodes=expected_num_nodes,
+                                          num_edges=expected_num_edges,
+                                          num_graphs=batch_size + 1)
+    fixed_size_collator = FixedSizeCollater(fixed_size_options,
                                             trim_nodes=True,
                                             trim_edges=True)
     expected_num_nodes *= num_node_types
@@ -517,7 +543,9 @@ def test_valid_args_fixed_size_collater(_get_test_data):
     num_inputs = 3
     expected_num_nodes = dataset.num_nodes * num_inputs
 
-    fixed_size_collater = FixedSizeCollater(num_nodes=expected_num_nodes)
+    fixed_size_options = FixedSizeOptions(num_nodes=expected_num_nodes,
+                                          num_graphs=num_inputs + 1)
+    fixed_size_collater = FixedSizeCollater(fixed_size_options)
     input_list = [dataset] * num_inputs
     fixed_size_collater(input_list)
 
@@ -532,7 +560,8 @@ def test_fixed_size_collater_should_include_non_tensor_keys_in_pad_graph(
     dataset['scalar_key'] = 2
     expected_num_nodes = dataset.num_nodes * 3
 
-    fixed_size_collater = FixedSizeCollater(num_nodes=expected_num_nodes)
+    fixed_size_options = FixedSizeOptions(num_nodes=expected_num_nodes)
+    fixed_size_collater = FixedSizeCollater(fixed_size_options)
     input_list = [dataset]
     result = fixed_size_collater(input_list)
 
@@ -548,8 +577,9 @@ def test_fixed_size_collater_should_assign_default_pad_values(_get_test_data):
     pad_graph_defaults = {'name': 'pad_graph', 'scalar_key': 3}
     input_list = [dataset]
 
-    fixed_size_collater = FixedSizeCollater(
+    fixed_size_options = FixedSizeOptions(
         num_nodes=expected_num_nodes, pad_graph_defaults=pad_graph_defaults)
+    fixed_size_collater = FixedSizeCollater(fixed_size_options)
     result = fixed_size_collater(input_list)
     assert result.name == ['gdb_57518', 'pad_graph']
     assert torch.equal(result.scalar_key, torch.Tensor([2, 3]))

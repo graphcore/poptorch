@@ -15,6 +15,7 @@ from torch_geometric.data.data import BaseData
 from torch_geometric.typing import EdgeType, NodeType
 from torch_geometric.transforms import Pad
 
+from poptorch_geometric.fixed_size_options import FixedSizeOptions
 from poptorch_geometric.pyg_collate import Collater
 from poptorch_geometric.common import DataBatch, HeteroDataBatch
 
@@ -246,21 +247,11 @@ class FixedSizeCollater(Collater):
     the requested limits.
 
     Args:
-        num_nodes (int): The total number of nodes in the padded batch.
-        num_edges (int, optional): The total number of edges in the padded
-            batch. (default: :obj:`num_nodes * (num_nodes - 1)`)
-        num_graphs (int, optional): The total number of graphs in the padded
-            batch. Note that if it is not explicitly set then this class always
-            increases the batch size by 1, i.e. given a batch size of 128
-            graphs, it will return a batch with 129 graphs. Otherwise it will
-            pad given batch to the :obj:`num_graphs` limit. (default:
-            :obj:`None`)
-        node_pad_value (float, optional): The fill value to use for node
-            features. (default: :obj:`0.0`)
-        edge_pad_value (float, optional): The fill value to use for edge
-            features. (default: :obj:`0.0`)
-        graph_pad_value (float, optional): The fill value to use for graph
-            features. (default: :obj:`0.0`)
+        fixed_size_options (FixedSizeOptions, optional): A
+            :py:class:`poptorch_geometric.fixed_size_options.FixedSizeOptions`
+            object which holds the maximum number of nodes, edges and other
+            options required to pad the batches, produced by collater,
+            to a fixed size.
         add_masks_to_batch (bool, optional): If set to :obj:`True`, masks object
             are attached to batch result. They represents three levels of
             padding:
@@ -278,10 +269,6 @@ class FixedSizeCollater(Collater):
         trim_edges (bool, optional): If set to :obj:`True`, randomly prune
             edges from batch to fulfill the condition of :obj:`num_edges`.
             (default: :obj:`False`)
-        pad_graph_defaults (dict, optional): The default values that
-            will be assigned to the keys of type different than
-            :class:`torch.Tensor` in the newly created padding graphs.
-            (default: :obj:`None`)
         follow_batch (list or tuple, optional): Creates assignment batch
             vectors for each key in the list. (default: :obj:`None`)
         exclude_keys (list or tuple, optional): The keys to exclude
@@ -290,39 +277,18 @@ class FixedSizeCollater(Collater):
 
     def __init__(
             self,
-            num_nodes: int,
-            num_edges: Optional[int] = None,
-            num_graphs: Optional[int] = None,
-            node_pad_value: Optional[float] = None,
-            edge_pad_value: Optional[float] = None,
-            graph_pad_value: Optional[float] = None,
+            fixed_size_options: FixedSizeOptions,
             add_masks_to_batch: Optional[bool] = False,
             trim_nodes: Optional[bool] = False,
             trim_edges: Optional[bool] = False,
-            pad_graph_defaults: Optional[Dict[str, Any]] = None,
             follow_batch: Optional[Union[List[str], Tuple[str, ...]]] = None,
             exclude_keys: Optional[Union[List[str], Tuple[str, ...]]] = None,
     ) -> None:
         super().__init__(follow_batch, exclude_keys)
-
-        self.num_graphs = num_graphs
-        self.num_nodes = num_nodes
-        if num_edges:
-            self.num_edges = num_edges
-        else:
-            # Assume fully connected graph.
-            self.num_edges = num_nodes * (num_nodes - 1)
-
-        self.node_pad_value = 0.0 if node_pad_value is None else node_pad_value
-        self.edge_pad_value = 0.0 if edge_pad_value is None else edge_pad_value
-        self.graph_pad_value = (0.0 if graph_pad_value is None else
-                                graph_pad_value)
-
+        self.opts = fixed_size_options
         self.add_masks_to_batch = add_masks_to_batch
         self.trim_nodes = trim_nodes
         self.trim_edges = trim_edges
-        self.pad_graph_defaults = ({} if pad_graph_defaults is None else
-                                   pad_graph_defaults)
         self.labels_type = None
 
     class LabelsType(Enum):
@@ -349,8 +315,7 @@ class FixedSizeCollater(Collater):
                               "of nodes or the number of graphs"
 
         num_real_graphs = len(data_list)
-        num_pad_graphs = 1 if self.num_graphs is None \
-            else self.num_graphs - num_real_graphs
+        num_pad_graphs = self.opts.num_graphs - num_real_graphs
         num_all_graphs = num_real_graphs + num_pad_graphs
         num_real_nodes, num_pad_nodes, num_real_edges, num_pad_edges = \
             self._calc_pad_limits(data_list)
@@ -388,11 +353,11 @@ class FixedSizeCollater(Collater):
         if _any_negative(num_pad_nodes):
             raise RuntimeError(
                 oversize_error.format(type_str="nodes",
-                                      type_value=self.num_nodes))
+                                      type_value=self.opts.num_nodes))
         if _any_negative(num_pad_edges):
             raise RuntimeError(
                 oversize_error.format(type_str="edges",
-                                      type_value=self.num_edges))
+                                      type_value=self.opts.num_edges))
 
         num_nodes_or_edges_positive = _all_positive(
             num_pad_nodes) or _all_positive(num_pad_edges)
@@ -437,8 +402,8 @@ class FixedSizeCollater(Collater):
         num_real_nodes = kwargs['num_real_nodes']
         num_real_edges = kwargs['num_real_edges']
         graphs_mask = torch.arange(num_all_graphs) < num_real_graphs
-        nodes_mask = torch.arange(self.num_nodes) < num_real_nodes
-        edges_mask = torch.arange(self.num_edges) < num_real_edges
+        nodes_mask = torch.arange(self.opts.num_nodes) < num_real_nodes
+        edges_mask = torch.arange(self.opts.num_edges) < num_real_edges
         setattr(batch, 'graphs_mask', graphs_mask)
         setattr(batch, 'nodes_mask', nodes_mask)
         setattr(batch, 'edges_mask', edges_mask)
@@ -488,15 +453,15 @@ class FixedSizeCollater(Collater):
 
     @_calc_pad_limits_body.register(Data)
     def _(self, _, data_list: List[Data]) -> Tuple[int, int, int, int]:
-        def calc_pad_limits_attr(data_list, attr):
+        def calc_pad_limits_attr(data_list, attr, fixed_size):
             data_num_attr = sum(getattr(d, attr) for d in data_list)
-            num_pad_attr = getattr(self, attr) - data_num_attr
+            num_pad_attr = fixed_size - data_num_attr
             return data_num_attr, num_pad_attr
 
         num_real_nodes, num_pad_nodes = calc_pad_limits_attr(
-            data_list, 'num_nodes')
+            data_list, 'num_nodes', self.opts.num_nodes)
         num_real_edges, num_pad_edges = calc_pad_limits_attr(
-            data_list, 'num_edges')
+            data_list, 'num_edges', self.opts.num_edges)
 
         return num_real_nodes, num_pad_nodes, num_real_edges, num_pad_edges
 
@@ -516,11 +481,11 @@ class FixedSizeCollater(Collater):
                     edge_type, 0) + data_[edge_type].edge_index.shape[1]
 
         pad_nodes_nums = {
-            k: (self.num_nodes - v)
+            k: (self.opts.num_nodes - v)
             for k, v in real_nodes_nums.items()
         }
         pad_edges_nums = {
-            k: (self.num_edges - v)
+            k: (self.opts.num_edges - v)
             for k, v in real_edges_nums.items()
         }
 
@@ -539,8 +504,8 @@ class FixedSizeCollater(Collater):
             data_to_pad_dict)
         pad_op = Pad(max_num_nodes=num_nodes,
                      max_num_edges=num_edges,
-                     node_pad_value=self.node_pad_value,
-                     edge_pad_value=self.edge_pad_value,
+                     node_pad_value=self.opts.node_pad_value,
+                     edge_pad_value=self.opts.edge_pad_value,
                      exclude_keys=self.exclude_keys)
         padded_data = pad_op(data_to_pad)
 
@@ -554,10 +519,10 @@ class FixedSizeCollater(Collater):
         num_real_edges = sum(d.num_edges for d in data_list)
 
         # There is nothing to prune.
-        if num_real_edges < self.num_edges:
+        if num_real_edges < self.opts.num_edges:
             return data_list
 
-        num_edges_to_trim = num_real_edges - self.num_edges
+        num_edges_to_trim = num_real_edges - self.opts.num_edges
         edge_slices = _make_data_edge_slice_gen(data_list)
 
         # Prepare the mask of edges randomly chosen to remove.
@@ -575,12 +540,12 @@ class FixedSizeCollater(Collater):
         num_real_nodes = sum(d.num_nodes for d in data_list)
 
         # There is nothing to prune.
-        if num_real_nodes < self.num_nodes:
+        if num_real_nodes < self.opts.num_nodes:
             return data_list
 
         num_graphs_to_trim = len(data_list)
-        num_nodes_to_trim = num_real_nodes - self.num_nodes
-        if self.num_nodes < num_graphs_to_trim:
+        num_nodes_to_trim = num_real_nodes - self.opts.num_nodes
+        if self.opts.num_nodes < num_graphs_to_trim:
             raise RuntimeError('Too many nodes to trim. Batch has '
                                f'{num_graphs_to_trim} graphs with '
                                f'{num_real_nodes} total nodes. Requested '
@@ -670,11 +635,11 @@ class FixedSizeCollater(Collater):
                                original_data: BaseData, key: Any,
                                value: Any) -> None:
         if not torch.is_tensor(value):
-            padded_data[key] = self.pad_graph_defaults.get(
+            padded_data[key] = self.opts.pad_graph_defaults.get(
                 key, original_data[key])
         else:
             pad_shape = list(value.shape)
-            pad_value = self.graph_pad_value
+            pad_value = self.opts.graph_pad_value
             padded_data[key] = value.new_full(pad_shape, pad_value)
 
 

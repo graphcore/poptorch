@@ -83,12 +83,13 @@ short_tests = [
     "replicated_graph_test.py",
     "requires_grad_test.py",
     "sharding_test.py",
-    "gnn/test_stream_packing_sampler.py",
     "gnn/test_cluster_loader.py",
     "gnn/test_collate.py",
     "gnn/test_dataloader.py",
+    "gnn/test_fixed_size_options.py",
     "gnn/test_masker.py",
     "gnn/test_model_args.py",
+    "gnn/test_stream_packing_sampler.py",
 ]
 
 # The only tests that should be run in doc-only builds.

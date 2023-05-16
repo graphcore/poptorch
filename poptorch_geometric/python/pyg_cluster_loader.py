@@ -5,6 +5,7 @@ import torch
 from torch_geometric.loader import ClusterData, ClusterLoader
 
 from poptorch_geometric.collate import FixedSizeCollater
+from poptorch_geometric.fixed_size_options import FixedSizeOptions
 
 
 class FixedSizeClusterLoader(torch.utils.data.DataLoader):
@@ -15,7 +16,11 @@ class FixedSizeClusterLoader(torch.utils.data.DataLoader):
 
     Args:
         cluster_data (ClusterData): The cluster from which to load the data.
-        num_nodes (int): The total number of nodes in the padded batch.
+        fixed_size_options (FixedSizeOptions, optional): A
+            :py:class:`poptorch_geometric.fixed_size_options.FixedSizeOptions`
+            object which holds the maximum number of nodes, edges and other
+            options required to pad the batches, produced by the data loader,
+            to a fixed size.
         batch_size (int, optional): The number of samples per batch to load.
             (default: :obj:`1`)
         collater_args (dict, optional): The additional arguments passed to
@@ -29,11 +34,17 @@ class FixedSizeClusterLoader(torch.utils.data.DataLoader):
     def __init__(
             self,
             cluster_data: ClusterData,
-            num_nodes: int,
+            fixed_size_options: FixedSizeOptions,
             batch_size: int = 1,
             collater_args: Optional[Dict[str, Union[int, float]]] = None,
             **kwargs,
     ):
+        assert fixed_size_options.num_graphs == 2, (
+            "The number of graphs in a batch specified by the fixed sized"
+            f" options must be 2 when using the {self.__class__.__name__},"
+            " currently it is set to"
+            f" {fixed_size_options.num_graphs}")
+
         unsupported = set(kwargs).intersection(
             {'collate_fn', 'batch_sampler', 'shuffle', 'exclude_keys'})
         assert not unsupported, \
@@ -41,15 +52,16 @@ class FixedSizeClusterLoader(torch.utils.data.DataLoader):
             f'arguments: {unsupported}.'
 
         collater_args = collater_args if collater_args else {}
-        assert 'num_nodes' not in collater_args, \
-            '`FixedSizeClusterLoader` uses argument `num_nodes` passed ' \
+        assert 'fixed_size_options' not in collater_args, \
+            '`FixedSizeClusterLoader` uses argument `fixed_size_options`' \
             ' directly to the initializer. They should not be included' \
-            'in `collater_args`.'
+            ' in `collater_args`.'
 
         self.cluster_data = cluster_data
         self.batch_size = batch_size
 
-        collater = self._create_collater(num_nodes=num_nodes, **collater_args)
+        collater = self._create_collater(fixed_size_options=fixed_size_options,
+                                         **collater_args)
         super().__init__(dataset=range(len(cluster_data)),
                          batch_size=batch_size,
                          collate_fn=collater,

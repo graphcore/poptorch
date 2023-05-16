@@ -13,6 +13,7 @@ from torch_geometric.datasets import FakeDataset
 from poptorch_geometric.stream_packing_sampler import StreamPackingSampler
 from poptorch_geometric.collate import CombinedBatchingCollater, FixedSizeCollater
 from poptorch_geometric.dataloader import FixedSizeDataLoader
+from poptorch_geometric.fixed_size_options import FixedSizeOptions
 
 
 def test_stream_packing_sampler_default_params():
@@ -157,6 +158,13 @@ def test_stream_packing_sampler_should_be_usable_with_torch_data_loader(
         batch_num_edges = max(batch_num_edges,
                               max_num_edges + batch_num_graphs)
 
+    fixed_size_options = FixedSizeOptions(num_nodes=batch_num_nodes,
+                                          num_edges=batch_num_edges,
+                                          num_graphs=num_graphs,
+                                          node_pad_value=0.0,
+                                          edge_pad_value=0.0,
+                                          graph_pad_value=0.0)
+
     # Leave space for padding.
     if torch_data_loader:
         batch_sampler = StreamPackingSampler(dataset,
@@ -167,12 +175,7 @@ def test_stream_packing_sampler_should_be_usable_with_torch_data_loader(
                                              allow_skip_data=allow_skip_data)
 
         collater = CombinedBatchingCollater(
-            FixedSizeCollater(batch_num_nodes,
-                              batch_num_edges,
-                              batch_num_graphs,
-                              node_pad_value=0.0,
-                              edge_pad_value=0.0,
-                              graph_pad_value=0.0,
+            FixedSizeCollater(fixed_size_options=fixed_size_options,
                               add_masks_to_batch=True))
 
         dataloader = torch.utils.data.DataLoader(dataset,
@@ -181,15 +184,9 @@ def test_stream_packing_sampler_should_be_usable_with_torch_data_loader(
     else:
         collater_args = {
             'add_masks_to_batch': True,
-            'num_edges': batch_num_edges,
-            'num_graphs': num_graphs,
-            'node_pad_value': 0.0,
-            'edge_pad_value': 0.0,
-            'graph_pad_value': 0.0
         }
         dataloader = FixedSizeDataLoader(dataset,
-                                         num_nodes=batch_num_nodes,
-                                         num_edges=batch_num_edges,
+                                         fixed_size_options=fixed_size_options,
                                          batch_size=num_graphs,
                                          collater_args=collater_args,
                                          sampler=base_sampler,
@@ -254,13 +251,15 @@ def test_stream_packing_sampler_padding_not_needed(shuffle, allow_skip_data):
                                          base_sampler=base_sampler,
                                          allow_skip_data=allow_skip_data)
 
+    fixed_size_options = FixedSizeOptions(num_nodes=batch_num_nodes,
+                                          num_edges=batch_num_edges,
+                                          num_graphs=batch_num_graphs,
+                                          node_pad_value=0.0,
+                                          edge_pad_value=0.0,
+                                          graph_pad_value=0.0)
+
     collator = CombinedBatchingCollater(
-        FixedSizeCollater(batch_num_nodes,
-                          batch_num_edges,
-                          batch_num_graphs,
-                          node_pad_value=0.0,
-                          edge_pad_value=0.0,
-                          graph_pad_value=0.0,
+        FixedSizeCollater(fixed_size_options=fixed_size_options,
                           add_masks_to_batch=True))
 
     dataloader = torch.utils.data.DataLoader(dataset,

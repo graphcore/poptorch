@@ -6,6 +6,7 @@ from torch_geometric.datasets import FakeDataset
 from torch_geometric.transforms import NormalizeFeatures
 
 from poptorch_geometric.dataloader import FixedSizeDataLoader
+from poptorch_geometric.fixed_size_options import FixedSizeOptions
 
 
 @pytest.fixture
@@ -19,6 +20,8 @@ def dataloader():
                           num_channels=8)
 
     dataloader = FixedSizeDataLoader(
-        dataset, num_nodes=12, collater_args={'add_masks_to_batch': True})
+        dataset,
+        fixed_size_options=FixedSizeOptions(num_nodes=12, num_edges=32),
+        collater_args={'add_masks_to_batch': True})
 
     return dataloader

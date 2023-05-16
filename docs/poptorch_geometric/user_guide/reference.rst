@@ -27,3 +27,8 @@ Batch samplers
 ==============
 
 .. autoclass:: poptorch_geometric.stream_packing_sampler.StreamPackingSampler
+
+Fixed size options
+==================
+
+.. autoclass:: poptorch_geometric.fixed_size_options.FixedSizeOptions

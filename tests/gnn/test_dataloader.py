@@ -18,6 +18,7 @@ from poptorch_geometric.dataloader import DataLoader as IPUDataLoader
 from poptorch_geometric.dataloader import CustomFixedSizeDataLoader as IPUCustomFixedSizeDataLoader
 from poptorch_geometric.dataloader import \
     FixedSizeDataLoader as IPUFixedSizeDataLoader
+from poptorch_geometric.fixed_size_options import FixedSizeOptions
 from poptorch_geometric.pyg_collate import Collater
 from poptorch_geometric.pyg_dataloader import (CustomFixedSizeDataLoader,
                                                DataLoader, FixedSizeDataLoader)
@@ -223,8 +224,11 @@ def test_simple_fixed_size_data_loader_mro(num_graphs=2, num_nodes=40):
     # affected if the MRO changes here.
     dataset = FakeDataset(num_graphs=num_graphs, avg_num_nodes=30)
 
+    fixed_size_options = FixedSizeOptions(num_nodes=num_nodes,
+                                          num_graphs=num_graphs)
+
     pyg_dataloader = FixedSizeDataLoader(dataset,
-                                         num_nodes=num_nodes,
+                                         fixed_size_options=fixed_size_options,
                                          batch_size=num_graphs)
 
     mro = inspect.getmro(type(pyg_dataloader))
@@ -234,9 +238,10 @@ def test_simple_fixed_size_data_loader_mro(num_graphs=2, num_nodes=40):
     num_classes = len(expected_mro)
     assert mro[:num_classes] == expected_mro
 
-    ipu_dataloader = IPUFixedSizeDataLoader(dataset=dataset,
-                                            num_nodes=num_nodes,
-                                            batch_size=num_graphs)
+    ipu_dataloader = IPUFixedSizeDataLoader(
+        dataset=dataset,
+        fixed_size_options=fixed_size_options,
+        batch_size=num_graphs)
     mro = inspect.getmro(type(ipu_dataloader))
     # MRO is longer but it's enough to check these classes.
     expected_mro = (IPUFixedSizeDataLoader, FixedSizeDataLoader,
@@ -291,11 +296,12 @@ def test_fixed_size_dataloader(loader,
 
     # Create a fixed size dataloader.
     kwargs = {
-        'dataset': dataset,
-        'num_nodes': padded_num_nodes,
-        'collater_args': {
-            'num_edges': padded_num_edges,
-        }
+        'dataset':
+        dataset,
+        'fixed_size_options':
+        FixedSizeOptions(num_nodes=padded_num_nodes,
+                         num_edges=padded_num_edges,
+                         num_graphs=batch_size)
     }
 
     if use_stream_pack_sampler:
@@ -305,6 +311,7 @@ def test_fixed_size_dataloader(loader,
             max_num_nodes=padded_num_nodes - 1,
             max_num_edges=padded_num_edges - 1)
         kwargs['batch_sampler'] = batch_sampler
+        kwargs['batch_size'] = batch_size
     else:
         kwargs['batch_size'] = batch_size
 
@@ -383,11 +390,12 @@ def test_fixed_size_heterodataloader(
 
     # Create a fixed size dataloader.
     kwargs = {
-        'dataset': dataset,
-        'num_nodes': padded_num_nodes,
-        'collater_args': {
-            'num_edges': padded_num_edges,
-        }
+        'dataset':
+        dataset,
+        'fixed_size_options':
+        FixedSizeOptions(num_nodes=padded_num_nodes,
+                         num_edges=padded_num_edges,
+                         num_graphs=batch_size)
     }
 
     if use_stream_pack_sampler:
@@ -397,6 +405,7 @@ def test_fixed_size_heterodataloader(
             max_num_nodes=padded_num_nodes - 1,
             max_num_edges=padded_num_edges - 1)
         kwargs['batch_sampler'] = batch_sampler
+        kwargs['batch_size'] = batch_size
     else:
         kwargs['batch_size'] = batch_size
 
@@ -448,24 +457,25 @@ def test_dataloader_produces_fixed_sizes(custom_loader, num_edges, num_graphs,
     dataset_size = 123
     dataset = fake_molecular_dataset[:dataset_size]
 
+    fixed_size_options = FixedSizeOptions(num_nodes=num_nodes,
+                                          num_edges=num_edges,
+                                          num_graphs=num_graphs)
+
     if custom_loader:
-        train_dataloader = CustomFixedSizeDataLoader(dataset,
-                                                     num_nodes=num_nodes,
-                                                     batch_size=num_graphs,
-                                                     collater_args={
-                                                         'add_masks_to_batch':
-                                                         True,
-                                                         'num_edges':
-                                                         num_edges,
-                                                         'trim_nodes': True,
-                                                         'trim_edges': True,
-                                                     })
+        train_dataloader = CustomFixedSizeDataLoader(
+            dataset,
+            fixed_size_options=fixed_size_options,
+            batch_size=num_graphs,
+            collater_args={
+                'add_masks_to_batch': True,
+                'trim_nodes': True,
+                'trim_edges': True,
+            })
     else:
         train_dataloader = FixedSizeDataLoader(
             dataset,
-            num_nodes=num_nodes,
+            fixed_size_options=fixed_size_options,
             batch_size=num_graphs,
-            num_edges=num_edges,
             collater_args={'add_masks_to_batch': True})
 
     batch = next(iter(train_dataloader))
@@ -626,17 +636,12 @@ def test_dataloader_with_sampler_num_nodes(allow_skip_data, dataset, request):
                                    max_num_nodes=num_nodes,
                                    allow_skip_data=allow_skip_data)
 
-    with pytest.raises(AssertionError,
-                       match=rf'Argument `num_nodes` \(= {num_nodes}\) should '\
-                             r'be greater'):
-        dataloader = CustomFixedSizeDataLoader(dataset,
-                                               batch_sampler=sampler,
-                                               num_nodes=num_nodes)
-
     num_nodes = num_nodes + 1
-    dataloader = CustomFixedSizeDataLoader(dataset,
-                                           batch_sampler=sampler,
-                                           num_nodes=num_nodes)
+
+    fixed_size_options = FixedSizeOptions(num_nodes=num_nodes)
+
+    dataloader = CustomFixedSizeDataLoader(
+        dataset, fixed_size_options=fixed_size_options, batch_sampler=sampler)
 
     for batch in dataloader:
         assert batch.num_nodes == num_nodes * num_node_types
@@ -654,9 +659,11 @@ def test_fixed_size_dataloader_num_created_batches(create_loader):
     # graph).
     expected_num_batches = 10
     padded_batch_size = 11
+    fixed_size_options = FixedSizeOptions(num_nodes=total_num_nodes,
+                                          num_graphs=padded_batch_size)
     loader = create_loader(ds,
                            batch_size=padded_batch_size,
-                           num_nodes=total_num_nodes)
+                           fixed_size_options=fixed_size_options)
     batches_created = sum(1 for _ in loader)
 
     assert batches_created == expected_num_batches
@@ -664,10 +671,12 @@ def test_fixed_size_dataloader_num_created_batches(create_loader):
     # Loader should create only 1 batch since there is space for all graphs
     # and one padding graph.
     expected_num_batches = 1
+    fixed_size_options = FixedSizeOptions(num_nodes=total_num_nodes + 1,
+                                          num_edges=total_num_edges + 1,
+                                          num_graphs=101)
     loader = create_loader(ds,
                            batch_size=101,
-                           num_nodes=total_num_nodes + 1,
-                           num_edges=total_num_edges + 1)
+                           fixed_size_options=fixed_size_options)
     batches_created = sum(1 for _ in loader)
 
     assert batches_created == expected_num_batches
@@ -675,10 +684,12 @@ def test_fixed_size_dataloader_num_created_batches(create_loader):
     # There is no space for padding graph in the first batch (not enough
     # graphs) so loader should create two batches.
     expected_num_batches = 2
+    fixed_size_options = FixedSizeOptions(num_nodes=total_num_nodes + 1,
+                                          num_edges=total_num_edges + 1,
+                                          num_graphs=100)
     loader = create_loader(ds,
                            batch_size=100,
-                           num_nodes=total_num_nodes + 1,
-                           num_edges=total_num_edges + 1)
+                           fixed_size_options=fixed_size_options)
     batches_created = sum(1 for _ in loader)
 
     assert batches_created == expected_num_batches
@@ -686,10 +697,12 @@ def test_fixed_size_dataloader_num_created_batches(create_loader):
     # There is no space for padding graph in the first batch (not enough
     # nodes) so loader should create two batches.
     expected_num_batches = 2
+    fixed_size_options = FixedSizeOptions(num_nodes=total_num_nodes,
+                                          num_edges=total_num_edges + 1,
+                                          num_graphs=101)
     loader = create_loader(ds,
                            batch_size=101,
-                           num_nodes=total_num_nodes,
-                           num_edges=total_num_edges + 1)
+                           fixed_size_options=fixed_size_options)
     batches_created = sum(1 for _ in loader)
 
     assert batches_created == expected_num_batches
@@ -697,10 +710,12 @@ def test_fixed_size_dataloader_num_created_batches(create_loader):
     # There is no space for padding graph in the first batch (not enough
     # edges) so loader should create two batches.
     expected_num_batches = 2
+    fixed_size_options = FixedSizeOptions(num_nodes=total_num_nodes + 1,
+                                          num_edges=total_num_edges,
+                                          num_graphs=101)
     loader = create_loader(ds,
                            batch_size=101,
-                           num_nodes=total_num_nodes + 1,
-                           num_edges=total_num_edges)
+                           fixed_size_options=fixed_size_options)
     batches_created = sum(1 for _ in loader)
 
     assert batches_created == expected_num_batches
@@ -726,7 +741,9 @@ def test_num_nodes_default_value(fake_large_dataset):
 
     # DataLoader should correctly capture the number of nodes from sampler.
     sampler = StreamPackingSampler(ds, max_num_graphs=batch_size)
-    loader = CustomFixedSizeDataLoader(ds, batch_sampler=sampler)
+    loader = CustomFixedSizeDataLoader(ds,
+                                       batch_size=padded_batch_size,
+                                       batch_sampler=sampler)
 
     num_batches = 0
     for batch in loader:

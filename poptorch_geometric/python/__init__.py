@@ -4,6 +4,7 @@ import importlib
 from .collate import make_exclude_keys
 from .common import call_once
 from .dataloader import FixedSizeDataLoader
+from .fixed_size_options import FixedSizeOptions
 from .types import PyGArgsParser, registerCustomArgParsers
 from .utils import TrainingStepper, set_aggregation_dim_size
 from .override import _TorchGeometricOpsSubstitutionManager
@@ -11,8 +12,9 @@ from .override import _TorchGeometricOpsSubstitutionManager
 __version__ = "@VERSION@-@SNAPSHOT@"
 
 __all__ = [
-    '__version__', 'FixedSizeDataLoader', 'set_aggregation_dim_size',
-    'TrainingStepper', 'make_exclude_keys', 'PyGArgsParser'
+    '__version__', 'FixedSizeDataLoader', 'FixedSizeOptions',
+    'set_aggregation_dim_size', 'TrainingStepper', 'make_exclude_keys',
+    'PyGArgsParser'
 ]
 
 

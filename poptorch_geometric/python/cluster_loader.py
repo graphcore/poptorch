@@ -6,6 +6,7 @@ from typing import Dict, Optional, Union
 from torch_geometric.loader import ClusterData
 
 from poptorch_geometric.collate import CombinedBatchingCollater
+from poptorch_geometric.fixed_size_options import FixedSizeOptions
 from poptorch_geometric.pyg_cluster_loader import \
     FixedSizeClusterLoader as PyGFixedSizeClusterLoader
 import poptorch
@@ -19,7 +20,11 @@ class FixedSizeClusterLoader(PyGFixedSizeClusterLoader, poptorch.DataLoader):
 
     Args:
         cluster_data (ClusterData): The cluster from which to load the data.
-        num_nodes (int): The total number of nodes in the padded batch.
+        fixed_size_options (FixedSizeOptions, optional): A
+            :py:class:`poptorch_geometric.fixed_size_options.FixedSizeOptions`
+            object which holds the maximum number of nodes, edges and other
+            options required to pad the batches, produced by the data loader,
+            to a fixed size.
         batch_size (int, optional): The number of samples per batch to load.
             (default: :obj:`1`)
         collater_args (dict, optional): The additional arguments passed to
@@ -36,7 +41,7 @@ class FixedSizeClusterLoader(PyGFixedSizeClusterLoader, poptorch.DataLoader):
     def __init__(
             self,
             cluster_data: ClusterData,
-            num_nodes: int,
+            fixed_size_options: FixedSizeOptions,
             batch_size: int = 1,
             collater_args: Optional[Dict[str, Union[int, float]]] = None,
             options: Optional[poptorch.Options] = None,
@@ -49,7 +54,7 @@ class FixedSizeClusterLoader(PyGFixedSizeClusterLoader, poptorch.DataLoader):
             options = poptorch.Options()
 
         super().__init__(cluster_data=cluster_data,
-                         num_nodes=num_nodes,
+                         fixed_size_options=fixed_size_options,
                          batch_size=batch_size,
                          collater_args=collater_args,
                          options=options,

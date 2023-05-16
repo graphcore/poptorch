@@ -7,9 +7,10 @@ from torch.utils.data.sampler import Sampler
 from torch_geometric.data import Dataset
 from torch_geometric.data.data import BaseData
 
-from poptorch_geometric.stream_packing_sampler import StreamPackingSampler
 from poptorch_geometric.collate import FixedSizeCollater
+from poptorch_geometric.fixed_size_options import FixedSizeOptions
 from poptorch_geometric.pyg_collate import Collater
+from poptorch_geometric.stream_packing_sampler import StreamPackingSampler
 
 
 # ==== Copied from PyG and changed to have `_create_collater` method and
@@ -77,11 +78,12 @@ class CustomFixedSizeDataLoader(torch.utils.data.DataLoader):
 
     Args:
         dataset (Dataset): The dataset from which to load the data.
-        num_nodes (int, optional): The total number of nodes in the padded
-            batch. If the value is not provided, it will be set to the
-            maximum number of nodes times the batch size. For maximum
-            performance it is recommended to tune that value per specific
-            use case. (default: `None`)
+        fixed_size_options (FixedSizeOptions, optional): A
+            :py:class:`poptorch_geometric.fixed_size_options.FixedSizeOptions`
+            object which holds the maximum number of nodes, edges and other
+            options required to pad the batches, produced by the data loader,
+            to a fixed size. If not specified, this will be determined from
+            the provided dataset. (default: :obj:`None`)
         batch_size (int, optional): The number of samples per batch to load.
             This should be at least :obj:`2` to allow for creating at least
             one padding graph. (default: :obj:`None`)
@@ -107,8 +109,8 @@ class CustomFixedSizeDataLoader(torch.utils.data.DataLoader):
     def __init__(
             self,
             dataset: Dataset,
-            num_nodes: Optional[int] = None,
-            batch_size: Optional[int] = None,
+            batch_size: int = 2,
+            fixed_size_options: Optional[int] = None,
             batch_sampler: Optional[Sampler[List[int]]] = None,
             shuffle: bool = False,
             follow_batch: Optional[Union[List[str], Tuple[str, ...]]] = None,
@@ -116,6 +118,17 @@ class CustomFixedSizeDataLoader(torch.utils.data.DataLoader):
             collater_args: Optional[Dict[str, Union[int, float]]] = None,
             **kwargs,
     ):
+        if fixed_size_options is None:
+            self.fixed_size_options = FixedSizeOptions.from_dataset(
+                dataset, batch_size)
+        else:
+            self.fixed_size_options = fixed_size_options
+
+        assert batch_size == self.fixed_size_options.num_graphs, (
+            "`num_graphs` in fixed size options must match"
+            " provided batch size in dataloader. `num_graphs`"
+            f" is {self.fixed_size_options.num_graphs} but batch"
+            f" size is {batch_size}.")
 
         assert 'collate_fn' not in kwargs, \
             'Cannot set `collate_fn` with `CustomFixedSizeDataLoader`. '\
@@ -123,7 +136,9 @@ class CustomFixedSizeDataLoader(torch.utils.data.DataLoader):
             'to specify collater manually.'
 
         collater_args = collater_args if collater_args else {}
-        not_in_collater_args = {'num_nodes', 'follow_batch', 'exclude_keys'}
+        not_in_collater_args = {
+            'fixed_size_options', 'follow_batch', 'exclude_keys'
+        }
         invalid_collater_args = not_in_collater_args.intersection(
             set(collater_args))
         assert not invalid_collater_args, \
@@ -131,40 +146,20 @@ class CustomFixedSizeDataLoader(torch.utils.data.DataLoader):
             f'{", ".join(invalid_collater_args)} passed directly to the ' \
             'initializer. They should not be included in `collater_args`.'
 
+        self.padded_batch_size = batch_size
         if batch_sampler is not None:
-            self.padded_batch_size = batch_sampler.max_num_graphs + 1
-
-            if num_nodes is not None:
-                assert num_nodes >= batch_sampler.max_num_nodes + 1, \
-                    f'Argument `num_nodes` (= {num_nodes}) should be ' \
-                    f'greater than `max_num_nodes` (= ' \
-                    f'{batch_sampler.max_num_nodes}) attribute of ' \
-                    f'`batch_sampler` in order to leave some space for ' \
-                    f'padding.'
-            else:
-                num_nodes = batch_sampler.max_num_nodes + 1
-
             # The `torch.DataLoader` class expects batch size to be `1` when
             # `batch_sampler` is provided.
             torch_dataloader_batch_size = 1
-            if 'num_edges' not in collater_args:
-                collater_args['num_edges'] = batch_sampler.max_num_edges + 1
         else:
-            self.padded_batch_size = batch_size or 2
-            num_real_graphs = self.padded_batch_size - 1
-            torch_dataloader_batch_size = num_real_graphs
+            torch_dataloader_batch_size = batch_size - 1
 
-            if num_nodes is None:
-                num_nodes = max(d.num_nodes
-                                for d in dataset) * num_real_graphs + 1
+        collater = self._create_collater(
+            fixed_size_options=self.fixed_size_options,
+            follow_batch=follow_batch,
+            exclude_keys=exclude_keys,
+            **collater_args)
 
-        if 'num_graphs' not in collater_args:
-            collater_args['num_graphs'] = self.padded_batch_size
-
-        collater = self._create_collater(num_nodes=num_nodes,
-                                         follow_batch=follow_batch,
-                                         exclude_keys=exclude_keys,
-                                         **collater_args)
         super().__init__(dataset=dataset,
                          batch_size=torch_dataloader_batch_size,
                          batch_sampler=batch_sampler,
@@ -184,17 +179,18 @@ class FixedSizeDataLoader(CustomFixedSizeDataLoader):
     :py:class:`poptorch_geometric.stream_packing_sampler.StreamPackingSampler`
     to select the samples that will be batched together.
 
-    If not specified, :obj:`num_nodes` and :obj:`num_edges` are set to the
-    batch size times the maximum number of nodes and maximum number of
-    edges, respectively.
+    If not specified, :obj:`fixed_size_options` will be retrieved from the
+    dataset.
 
     Args:
         dataset (Dataset): The :class:`~torch_geometric.data.Dataset` instance
             from which to load the graph examples.
-        num_nodes (int, optional): Number of nodes in a batch.
-            (default: :obj:`None`)
-        num_edges (int, optional): Number of edges in a batch.
-            (default: :obj:`None`)
+        fixed_size_options (FixedSizeOptions, optional): A
+            :py:class:`poptorch_geometric.fixed_size_options.FixedSizeOptions`
+            object which holds the maximum number of nodes, edges and other
+            options required to pad the batches, produced by the data loader,
+            to a fixed size. If not specified, this will be determined from
+            the provided dataset. (default: :obj:`None`)
         batch_size (int, optional): How many graph examples to load in each
             batch. This should be at least :obj:`2` to allow for creating at
             least one padding graph. (default: :obj:`2`)
@@ -221,9 +217,8 @@ class FixedSizeDataLoader(CustomFixedSizeDataLoader):
     def __init__(
             self,
             dataset: Dataset,
-            num_nodes: Optional[int] = None,
-            num_edges: Optional[int] = None,
             batch_size: int = 2,
+            fixed_size_options: Optional[FixedSizeOptions] = None,
             follow_batch: Optional[Union[List[str], Tuple[str, ...]]] = None,
             exclude_keys: Optional[Union[List[str], Tuple[str, ...]]] = None,
             collater_args: Optional[Dict[str, Union[int, float]]] = None,
@@ -231,10 +226,23 @@ class FixedSizeDataLoader(CustomFixedSizeDataLoader):
             allow_skip_data: bool = False,
             **kwargs,
     ) -> None:
+
+        if fixed_size_options is None:
+            self.fixed_size_options = FixedSizeOptions.from_dataset(
+                dataset, batch_size)
+        else:
+            self.fixed_size_options = fixed_size_options
+
+        assert batch_size == self.fixed_size_options.num_graphs, (
+            "`num_graphs` in fixed size options must match"
+            " provided batch size in dataloader. `num_graphs`"
+            f" is {self.fixed_size_options.num_graphs} but batch"
+            f" size is {batch_size}.")
+
         # Leave space for padding.
         sampler_graphs = batch_size - 1
-        sampler_nodes = num_nodes - 1 if num_nodes is not None else num_nodes
-        sampler_edges = num_edges - 1 if num_edges is not None else num_edges
+        sampler_nodes = self.fixed_size_options.num_nodes - 1
+        sampler_edges = self.fixed_size_options.num_edges - 1
         batch_sampler = StreamPackingSampler(dataset,
                                              sampler_graphs,
                                              max_num_nodes=sampler_nodes,
@@ -243,7 +251,8 @@ class FixedSizeDataLoader(CustomFixedSizeDataLoader):
                                              allow_skip_data=allow_skip_data)
 
         super().__init__(dataset=dataset,
-                         num_nodes=num_nodes,
+                         batch_size=batch_size,
+                         fixed_size_options=self.fixed_size_options,
                          batch_sampler=batch_sampler,
                          follow_batch=follow_batch,
                          exclude_keys=exclude_keys,
