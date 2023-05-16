@@ -1,13 +1,11 @@
 # Copyright (c) 2023 Graphcore Ltd. All rights reserved.
 
-import pytest
 import torch
 from torch_geometric.nn.aggr import SortAggregation
 
 from aggr_utils import aggr_harness
 
 
-@pytest.mark.skip(reason="TODO(AFS-279, AFS-277)")
 def test_sort_aggregation(dataloader):
     first_sample = next(iter(dataloader))
     in_channels = first_sample.num_node_features

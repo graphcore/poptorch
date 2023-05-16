@@ -20,10 +20,11 @@ def test_linear(weight, bias):
     dense_harness(lin, x)
 
 
-def test_hetero_linear():
+@pytest.mark.parametrize('with_bias', [True, False])
+def test_hetero_linear(with_bias):
     x = torch.randn(10, 16)
     type_vec = torch.tensor([0, 0, 2, 1, 0, 2, 2, 2, 1, 2])
 
-    lin = HeteroLinear(16, 32, num_types=3)
+    lin = HeteroLinear(16, 32, num_types=3, bias=with_bias)
 
     dense_harness(lin, (x, type_vec))

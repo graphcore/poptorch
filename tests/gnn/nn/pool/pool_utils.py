@@ -1,17 +1,16 @@
 # Copyright (c) 2023 Graphcore Ltd. All rights reserved.
-
+import dataclasses
 import torch
 
 import helpers
 from torch_geometric.data import Batch, Data
-from torch_geometric.nn.pool.select import SelectOutput
-from torch_geometric.nn.pool.connect import ConnectOutput
 
 from gnn.nn.nn_utils import op_harness
 
 
 def assert_(native_out, poptorch_out):
     def check_inner_field(x, y):
+        print(type(x))
         assert isinstance(x, type(y)), \
             f"x type={type(x)} is different than y type={type(y)}"
         if isinstance(x, torch.Tensor):
@@ -27,7 +26,7 @@ def assert_(native_out, poptorch_out):
             assert x.keys == y.keys, "Objects have different keys."
             for k in x.keys:
                 check_inner_field(x[k], y[k])
-        elif isinstance(x, (ConnectOutput, SelectOutput)):
+        elif dataclasses.is_dataclass(x):
             for att in dir(x):
                 x_field = getattr(x, att, None)
                 if not callable(x_field) and isinstance(x_field, torch.Tensor):

@@ -11,6 +11,18 @@ from poptorch_geometric.common import call_once
 class _TorchGeometricOpsSubstitutionManager:
 
     subsitutions = {
+        torch_geometric.nn: {
+            "knn_interpolate": ops.knn_interpolate
+        },
+        torch_geometric.nn.aggr.base: {
+            "to_dense_batch": ops.to_dense_batch
+        },
+        torch_geometric.nn.aggr.base.Aggregation: {
+            "assert_sorted_index": ops.Aggregation.assert_sorted_index
+        },
+        torch_geometric.nn.ClusterGCNConv: {
+            "forward": ops.ClusterGCNConv.forward
+        },
         torch_geometric.nn.conv.edge_conv: {  # pylint: disable=no-member
             "knn": ops.knn
         },
@@ -20,25 +32,19 @@ class _TorchGeometricOpsSubstitutionManager:
         torch_geometric.nn.conv.x_conv: {  # pylint: disable=no-member
             "knn_graph": ops.knn_graph
         },
-        torch_geometric.nn: {
-            "knn_interpolate": ops.knn_interpolate
-        },
-        torch_geometric.nn.unpool: {
-            "knn_interpolate": ops.knn_interpolate
-        },
-        torch_geometric.nn.ClusterGCNConv: {
-            "forward": ops.ClusterGCNConv.forward
-        },
         torch_geometric.nn.dense.HeteroLinear: {
             "forward": ops.HeteroLinear.forward
         },
         torch_geometric.nn.InstanceNorm: {
             "forward": ops.InstanceNorm.forward
         },
-        torch_geometric.utils: {
-            "to_dense_batch": ops.to_dense_batch
+        torch_geometric.nn.unpool: {
+            "knn_interpolate": ops.knn_interpolate
         },
         torch_geometric.nn.pool.mem_pool: {
+            "to_dense_batch": ops.to_dense_batch
+        },
+        torch_geometric.utils: {
             "to_dense_batch": ops.to_dense_batch
         }
     }

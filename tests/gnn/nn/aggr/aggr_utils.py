@@ -2,6 +2,7 @@
 
 from typing import List
 import torch
+import torch_geometric
 
 from poptorch_geometric import TrainingStepper
 
@@ -39,7 +40,14 @@ def aggr_harness(aggr,
             aggr_index = edge_index[0] if sorted_index else edge_index[1]
 
             x_broadcasted = torch.index_select(x, 0, broadcast_index)
-            result = self.aggr(x_broadcasted, aggr_index, dim_size=size)
+            kwargs = {}
+            if isinstance(self.aggr, torch_geometric.nn.aggr.SortAggregation):
+                kwargs["max_num_elements"] = size
+
+            result = self.aggr(x_broadcasted,
+                               aggr_index,
+                               dim_size=size,
+                               **kwargs)
 
             if self.post_proc is not None:
                 if isinstance(result, List):
@@ -79,5 +87,6 @@ def aggr_harness(aggr,
         for step, batch in enumerate(dataloader):
             if step == num_steps:
                 break
+
             stepper.run(
                 1, (batch.x, batch.edge_index, batch.nodes_mask, dim_size))

@@ -24,11 +24,11 @@
 # THE SOFTWARE.
 
 import torch
+import torch_geometric
 from torch import Tensor
-from torch_geometric.nn.dense.linear import Linear
 
 
-class HeteroLinear(torch.nn.Module):
+class HeteroLinear(torch_geometric.nn.dense.linear.HeteroLinear):
     r"""Applies separate linear tranformations to the incoming data according
     to types
 
@@ -59,33 +59,8 @@ class HeteroLinear(torch.nn.Module):
         - **output:** features :math:`(*, F_{out})`
     """
 
-    def __init__(self,
-                 in_channels: int,
-                 out_channels: int,
-                 num_types: int,
-                 is_sorted: bool = False,
-                 **kwargs):
-        super().__init__()
-
-        self.in_channels = in_channels
-        self.out_channels = out_channels
-        self.num_types = num_types
-        self.is_sorted = is_sorted
-        self.kwargs = kwargs
-
-        self.lins = torch.nn.ModuleList([
-            Linear(in_channels, out_channels, **kwargs)
-            for _ in range(num_types)
-        ])
-        self.register_parameter('weight', None)
-        self.register_parameter('bias', None)
-
-        self.reset_parameters()
-
-    def reset_parameters(self):
-        r"""Resets all learnable parameters of the module."""
-        for lin in self.lins:
-            lin.reset_parameters()
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
     def forward(self, x: Tensor, type_vec: Tensor) -> Tensor:
         r"""
@@ -93,16 +68,13 @@ class HeteroLinear(torch.nn.Module):
             x (torch.Tensor): The input features.
             type_vec (torch.Tensor): A vector that maps each entry to a type.
         """
-        assert self.lins is not None
         out = x.new_empty(x.size(0), self.out_channels)
-        for i, lin in enumerate(self.lins):
+        for i in range(self.num_types):
             mask = torch.eq(type_vec, i).view(-1, 1)
             x_type_i = torch.where(mask, x, 0.0)
-            out_type_i = lin(x_type_i)
+            out_type_i = torch.nn.functional.linear(x_type_i, self.weight[i].T)
             out = torch.where(mask, out_type_i, out)
-        return out
 
-    def __repr__(self) -> str:
-        return (f'{self.__class__.__name__}({self.in_channels}, '
-                f'{self.out_channels}, num_types={self.num_types}, '
-                f'bias={self.kwargs.get("bias", True)})')
+        if self.bias is not None:
+            out += self.bias[type_vec]
+        return out

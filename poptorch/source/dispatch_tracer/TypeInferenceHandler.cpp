@@ -30,6 +30,12 @@ c10::Stack copyTensorsFrom(const c10::Stack &meta_stack) {
 void TypeInferenceHandler::inferOutputTypes(const c10::OperatorHandle &op,
                                             c10::Stack *ipu_stack) {
   const auto schema_key = getSchemaKey(op.schema());
+  ERROR_ON_MSG(!op.hasComputedKernelForDispatchKey(c10::DispatchKey::Meta),
+               "Type inference failed for "
+                   << schema_key
+                   << " because the operator "
+                      "doesn't have an implementation for the Meta backend.");
+
   // Unfortunately, aten::prelu with 1D inputs is broken with the Meta backend:
   // https://github.com/pytorch/pytorch/issues/89560
   // As a workaround, we add a dummy channel dim to the input, and then remove
@@ -46,11 +52,6 @@ void TypeInferenceHandler::inferOutputTypes(const c10::OperatorHandle &op,
   const c10::Stack input_tensor_liftetime_extender =
       copyTensorsFrom(meta_stack);
 
-  ERROR_ON_MSG(!op.hasComputedKernelForDispatchKey(c10::DispatchKey::Meta),
-               "Type inference failed for "
-                   << schema_key
-                   << " because the operator "
-                      "doesn't have an implementation for the Meta backend.");
   logging::trace("[DISPATCHER] Using meta type inference for {}", schema_key);
 
   op.redispatchBoxed(meta_keys, &meta_stack);

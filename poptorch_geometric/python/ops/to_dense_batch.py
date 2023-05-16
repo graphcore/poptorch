@@ -1,6 +1,29 @@
 # Copyright (c) 2023 Graphcore Ltd. All rights reserved.
+#
+# This file includes content from PyTorch Geometric which
+# has been modified by Graphcore Ltd.
+#
+# Copyright (c) 2023 PyG Team <team@pyg.org>
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+# THE SOFTWARE.
 
-from typing import Optional, Tuple
+from typing import Union, Optional, Tuple
 
 import torch
 from torch import Tensor
@@ -10,7 +33,7 @@ from torch_geometric.utils import scatter
 
 def to_dense_batch(x: Tensor,
                    batch: Optional[Tensor] = None,
-                   fill_value: float = 0.,
+                   fill_value: Union[Tensor, float] = 0.,
                    max_num_nodes: Optional[int] = None,
                    batch_size: Optional[int] = None) -> Tuple[Tensor, Tensor]:
     r"""Given a sparse batch of node features
@@ -67,7 +90,10 @@ def to_dense_batch(x: Tensor,
     x_size_slice = list(x.size())[1:]
 
     size = [batch_size * max_num_nodes] + x_size_slice
-    out = x.new_full(size, fill_value)
+    if isinstance(fill_value, torch.Tensor):
+        out = fill_value.repeat(*size)
+    else:
+        out = x.new_full(size, fill_value)
     out[idx] = x
     out = out.view([batch_size, max_num_nodes] + x_size_slice)
 
