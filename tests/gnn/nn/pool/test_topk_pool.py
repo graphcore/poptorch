@@ -2,33 +2,10 @@
 
 import pytest
 import torch
-
-from torch_geometric.nn.pool.topk_pool import TopKPooling, filter_adj, topk
+from torch_geometric.nn.pool import TopKPooling
+from torch_geometric.nn.pool.topk_pool import filter_adj
 
 from pool_utils import pool_harness
-
-
-@pytest.mark.skip(reason="The class is using filter_adj which produces "
-                  "tensors with dynamic shapes. It is not supported "
-                  "on Mk2.")
-def test_topk():
-    x = torch.Tensor([2, 4, 5, 6, 2, 9])
-    batch = torch.tensor([0, 0, 1, 1, 1, 1])
-
-    perm1 = pool_harness(topk, [x, 0.5, batch])
-    assert perm1.tolist() == [1, 5, 3]
-    assert x[perm1].tolist() == [4, 9, 6]
-    assert batch[perm1].tolist() == [0, 1, 1]
-
-    perm2 = pool_harness(topk, [x, 2, batch])
-    assert perm2.tolist() == [1, 0, 5, 3]
-    assert x[perm2].tolist() == [4, 2, 9, 6]
-    assert batch[perm2].tolist() == [0, 0, 1, 1]
-
-    perm3 = pool_harness(topk, [x, 3, batch])
-    assert perm3.tolist() == [1, 0, 5, 3, 2]
-    assert x[perm3].tolist() == [4, 2, 9, 6, 5]
-    assert batch[perm3].tolist() == [0, 0, 1, 1, 1]
 
 
 @pytest.mark.skip(reason="The class is using filter_adj which produces "
