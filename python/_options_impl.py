@@ -2,6 +2,7 @@
 import abc
 import copy
 import logging
+import datetime
 import torch
 import tqdm
 
@@ -18,11 +19,14 @@ tqdm.tqdm.get_lock().locks = []
 
 class ProgressBar:
     def __init__(self):
+        self.compilation_time = None
+        self._start_time = None
         self._bar = None
         self._last = 0
 
     def __call__(self, progress: int, total: int):
         if self._bar is None:
+            self._start_time = datetime.datetime.now()
             # Remove {rate_fmt}{postfix} from the default format
             # as it doesn't really make sense for a compilation process
             #
@@ -34,9 +38,11 @@ class ProgressBar:
                                   bar_format=bar_format)
         self._bar.update(progress - self._last)
         self._last = progress
+        self.compilation_time = datetime.datetime.now() - self._start_time
         if progress == total:
             self._bar.close()
             self._bar = None
+            self.compilation_time = datetime.datetime.now() - self._start_time
 
 
 class OptionsDict:

@@ -1171,6 +1171,7 @@ class Options(_options_impl.OptionsDict):
         # options. (It is passed to createGraph() instead).
         self._source_location_excludes = copy.copy(
             _options_impl.default_source_location_excludes)
+        self._progress_bar = _options_impl.ProgressBar()
 
         self.relaxOptimizerAttributesChecks(False)
         self.showCompilationProgressBar(True)
@@ -1887,7 +1888,7 @@ class Options(_options_impl.OptionsDict):
         out = self._tensor_locations.update(out)
 
         if self._show_compilation_progress_bar:
-            out["compilation_progress_bar_fn"] = _options_impl.ProgressBar()
+            out["compilation_progress_bar_fn"] = self._progress_bar
 
         return out
 

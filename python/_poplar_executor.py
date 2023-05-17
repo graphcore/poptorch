@@ -1,6 +1,7 @@
 # Copyright (c) 2021 Graphcore Ltd. All rights reserved.
 import collections
 import copy
+from datetime import timedelta
 import functools
 import itertools
 import os
@@ -1192,6 +1193,29 @@ class PoplarExecutor:
             raise _impl.createPoptorchError(err_msg)
 
         return poptorch_core.cycleCount(self._executable)
+
+    def compilationTime(self) -> timedelta:
+        """ Returns the total model compilation time.
+
+            :returns: An object of type datetime.timedelta representing
+                the compilation time.
+
+            .. note:: You must compile the model before calling this method
+                also showCompilationProgressBar option must be set to True.
+            """
+        # pylint: disable=protected-access
+
+        if not self.isCompiled():
+            err_msg = ("Please compile the model before obtaining "
+                       "compilation time.")
+            raise _impl.createPoptorchError(err_msg)
+
+        if not self._options._show_compilation_progress_bar:
+            err_msg = ("Please set showCompilationProgressBar option "
+                       "to obtain compilation time.")
+            raise _impl.createPoptorchError(err_msg)
+
+        return self._options._progress_bar.compilation_time
 
     def __call__(self, *args: List['torch.Tensor'],
                  **kwargs: Dict[str, 'torch.Tensor']):

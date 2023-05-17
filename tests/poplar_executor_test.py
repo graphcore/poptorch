@@ -396,6 +396,44 @@ def test_get_cycles_no_hw():
         inference_model(torch.Tensor([3.0]), torch.Tensor([4.0]))
 
 
+def test_get_compilation_time():
+    class Model(torch.nn.Module):
+        def forward(self, x, y):
+            return x + y
+
+    no_compilation_time_opts = poptorch.Options()
+    no_compilation_time_opts.showCompilationProgressBar(False)
+    no_compilation_time_model = poptorch.inferenceModel(
+        Model(), options=no_compilation_time_opts)
+
+    compilation_time_opts = poptorch.Options()
+    compilation_time_opts.showCompilationProgressBar(True)
+    compilation_time_model = poptorch.inferenceModel(
+        Model(), options=compilation_time_opts)
+
+    error_msg = (
+        r"Please compile the model before obtaining compilation time.")
+
+    with pytest.raises(poptorch.Error, match=error_msg):
+        no_compilation_time_model.compilationTime()
+
+    with pytest.raises(poptorch.Error, match=error_msg):
+        compilation_time_model.compilationTime()
+
+    error_msg = (
+        r"Please set showCompilationProgressBar option to obtain compilation "
+        r"time.")
+
+    with pytest.raises(poptorch.Error, match=error_msg):
+        no_compilation_time_model(torch.Tensor([3.0]), torch.Tensor([4.0]))
+        no_compilation_time_model.compilationTime()
+
+    compilation_time_model(torch.Tensor([3.0]), torch.Tensor([4.0]))
+    compilation_time = compilation_time_model.compilationTime()
+
+    assert compilation_time > datetime.timedelta(seconds=1)
+
+
 @pytest.mark.parametrize("rewrap_executor", [True, False])
 def test_rewrap_model(rewrap_executor):
     class Model(torch.nn.Module):

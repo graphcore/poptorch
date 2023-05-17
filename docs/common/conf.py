@@ -67,6 +67,7 @@ nitpick_ignore = [
     ('py:class', 'optional'),
     ('py:class', 'str'),
     ('py:class', 'T_co'),
+    ('py:class', 'datetime.timedelta'),
     ('py:class', 'torch.Tensor'),
     ('py:class', 'torch.dtype'),
     ('py:class', 'torch.nn.Module'),
