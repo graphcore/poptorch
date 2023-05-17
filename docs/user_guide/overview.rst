@@ -169,7 +169,8 @@ The exception contains the action required to recover from this error in its `re
 
 This attribute can contain:
  - `IPU_RESET`: Reset the IPU and reload the IPU memory.
- - `PARTITION_RESET`: Reset the IPU partition. This resets the IPU-links between IPUs.
+ - `LINK_RESET`: Reset the IPU-Links in a non-Pod system. This retrains the IPU-Links between IPUs.
+ - `PARTITION_RESET`: Reset the IPU partition in a Pod system. This retrains the IPU-Links between IPUs.
  - `FULL_RESET`: Power cycle the system.
 
 Unrecoverable runtime errors
