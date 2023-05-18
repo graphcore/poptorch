@@ -152,7 +152,9 @@ torch::jit::Node *geluHandler(torch::jit::Graph *graph,
     return createGelu(graph, {input});
   }
   if (approximate == "none") {
-    return createGeluErf(graph, {input});
+    // TODO: use createGeluErf when it will reach sufficient
+    // performance
+    return createGelu(graph, {input});
   }
 
   ERROR("Unknown GELU approximate '" << approximate << "'");
