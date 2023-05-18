@@ -300,20 +300,23 @@ def test_nested_cond():
                 return poptorch.cond(cond_nested, nested_then, [y],
                                      nested_else, [])[0]
 
-            return poptorch.cond(condition, body_then, [], body_else,
+            res1 = poptorch.cond(condition, body_then, [], body_else,
                                  [cond_nested])[0]
+            re2 = poptorch.cond(condition, body_then, [], body_else,
+                                [cond_nested])[0]
+            return res1 + re2
 
     model = Model()
     cond_nested = torch.tensor([True])
     args = [cond_nested] + [torch.rand(1) for v in range(2)]
-    exp_then = args[1] + args[2]
-    exp_else = args[1] * 2
+    exp_then = 2 * (args[1] + args[2])
+    exp_else = 2 * args[1] * 2
     if_else_harness(model, exp_then, exp_else, *args)
 
     cond_nested = torch.tensor([False])
     args = [cond_nested] + [torch.rand(1) for v in range(2)]
-    exp_then = args[1] - args[2]
-    exp_else = args[1] * args[2]
+    exp_then = 2 * (args[1] - args[2])
+    exp_else = 2 * (args[1] * args[2])
     if_else_harness(model, exp_then, exp_else, *args)
 
 

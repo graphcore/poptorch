@@ -29,7 +29,7 @@ installers.add(
         # appear here with the correct version.
         "wheel=0.34.2",
         "zip=3.0",
-    ))
+        "libuuid=2.38.1"))
 
 if config.build_documentation:
     installers.add(

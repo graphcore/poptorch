@@ -113,11 +113,12 @@ WithNodeMetadata::~WithNodeMetadata() {
   }
 }
 
-torch::jit::Node *
-createAndInsertNode(torch::jit::Graph *graph, torch::jit::NodeKind kind,
-                    torch::jit::ArrayRef<torch::jit::Value *> inputs,
-                    const ImplicitCast implicit_cast, OutputType output_type,
-                    size_t num_outputs, c10::optional<at::ScalarType> dtype) {
+torch::jit::Node *createNode(torch::jit::Graph *graph,
+                             torch::jit::NodeKind kind,
+                             torch::jit::ArrayRef<torch::jit::Value *> inputs,
+                             const ImplicitCast implicit_cast,
+                             OutputType output_type, size_t num_outputs,
+                             c10::optional<at::ScalarType> dtype) {
   torch::jit::Node *new_node;
 
   if (implicit_cast != ImplicitCast::None && !inputs.empty()) {
@@ -141,6 +142,17 @@ createAndInsertNode(torch::jit::Graph *graph, torch::jit::NodeKind kind,
   }
 
   setNodeOutputsTypes(new_node, implicit_cast, output_type);
+  return new_node;
+}
+
+torch::jit::Node *
+createAndInsertNode(torch::jit::Graph *graph, torch::jit::NodeKind kind,
+                    torch::jit::ArrayRef<torch::jit::Value *> inputs,
+                    const ImplicitCast implicit_cast, OutputType output_type,
+                    size_t num_outputs, c10::optional<at::ScalarType> dtype) {
+
+  torch::jit::Node *new_node = createNode(graph, kind, inputs, implicit_cast,
+                                          output_type, num_outputs, dtype);
   insertNodeInGraph(graph, new_node);
 
   return new_node;
@@ -630,7 +642,6 @@ torch::jit::Node *createCallCpuOp(torch::jit::Graph *graph,
 
   return new_node;
 }
-
 torch::jit::Node *createSetAvailableMemory(torch::jit::Graph *graph,
                                            torch::jit::Value *value,
                                            float proportion) {
@@ -639,6 +650,49 @@ torch::jit::Node *createSetAvailableMemory(torch::jit::Graph *graph,
   new_node->f_(c10::Symbol::attr("availableMemoryProportion"), proportion);
 
   new_node->output()->setType(value->type());
+
+  return new_node;
+}
+
+torch::jit::Node *createSetAttribute(torch::jit::Graph *graph,
+                                     const std::string &attribute,
+                                     const std::string &key,
+                                     const std::string &value,
+                                     bool insert_after_insertion_pnt) {
+  torch::jit::Node *new_node = nullptr;
+  if (insert_after_insertion_pnt) {
+    new_node = createNode(graph, symbols::poptorch::set_attribute, {},
+                          ImplicitCast::None, OutputType::Unknown, 0);
+    insertNodeAfterNode(new_node, graph->insertPoint());
+  } else {
+    new_node = createAndInsertNode(graph, symbols::poptorch::set_attribute, {},
+                                   ImplicitCast::None, OutputType::Unknown, 0);
+  }
+
+  new_node->s_(c10::Symbol::attr("attribute"), attribute);
+  new_node->s_(c10::Symbol::attr("key"), key);
+  new_node->s_(c10::Symbol::attr("value"), value);
+
+  return new_node;
+}
+
+torch::jit::Node *createClearAttribute(torch::jit::Graph *graph,
+                                       const std::string &attribute,
+                                       const std::string &key,
+                                       bool insert_after_insertion_pnt) {
+  torch::jit::Node *new_node = nullptr;
+  if (insert_after_insertion_pnt) {
+    new_node = createNode(graph, symbols::poptorch::clear_attribute, {},
+                          ImplicitCast::None, OutputType::Unknown, 0);
+    insertNodeAfterNode(new_node, graph->insertPoint());
+  } else {
+    new_node =
+        createAndInsertNode(graph, symbols::poptorch::clear_attribute, {},
+                            ImplicitCast::None, OutputType::Unknown, 0);
+  }
+
+  new_node->s_(c10::Symbol::attr("attribute"), attribute);
+  new_node->s_(c10::Symbol::attr("key"), key);
 
   return new_node;
 }

@@ -12,6 +12,8 @@
 #include "poptorch_logging/Error.hpp"
 #include "poptorch_logging/Logging.hpp"
 
+#include <uuid/uuid.h>
+
 namespace poptorch {
 
 namespace {
@@ -200,6 +202,29 @@ void markCondOutputs(torch::jit::Graph *graph, torch::jit::Node *outputs,
   }
 }
 
+void insertSetAttribute(torch::jit::Graph *graph, size_t cond_nest_lvl,
+                        torch::jit::Node *insertion_point,
+                        bool after_insert_pnt = false) {
+  torch::jit::WithInsertPoint set_attr_insert_point(insertion_point);
+  WithNodeMetadata meta{insertion_point};
+  uuid_t uuid_obj;
+  uuid_generate(uuid_obj);
+  const std::string id{std::cbegin(uuid_obj), std::cend(uuid_obj)};
+  const std::string cond_context =
+      "cond_context_" + std::to_string(cond_nest_lvl);
+  createSetAttribute(graph, "__outline", cond_context, id, after_insert_pnt);
+}
+
+void insertClearAttribute(torch::jit::Graph *graph, size_t cond_nest_lvl,
+                          torch::jit::Node *insertion_point,
+                          bool after_insert_pnt = false) {
+  torch::jit::WithInsertPoint clr_attr_insert_point(insertion_point);
+  WithNodeMetadata meta{insertion_point};
+  const std::string cond_context =
+      "cond_context_" + std::to_string(cond_nest_lvl);
+  createClearAttribute(graph, "__outline", cond_context, after_insert_pnt);
+}
+
 // State during the dispatcher intercept calls.
 std::stack<torch::jit::Node *> start_for_loop_nodes;
 
@@ -252,6 +277,9 @@ void annotateSubgraphs(torch::jit::Graph *graph, torch::jit::Node *start_node) {
       // Start tracking the new subgraph.
       subgraph_nodes.push(Subgraph());
 
+      // if/else block branches code have to get their own context, so that
+      // popart outlining does not tear them appart and break their logic.
+      insertSetAttribute(graph, subgraph_nodes.size(), node);
       // Delete the input node (condition) as it is not needed anymore.
       to_delete.insert(node->input(0)->node());
       node->removeInput(0);
@@ -262,11 +290,16 @@ void annotateSubgraphs(torch::jit::Graph *graph, torch::jit::Node *start_node) {
                       &subgraph_nodes.top(), reshape_putter_helpers_stack.top(),
                       false /*processingElseOuputs*/);
 
+      insertClearAttribute(graph, subgraph_nodes.size(), node);
+
       // Remove the if subgraph.
       subgraph_nodes.pop();
 
       // Start tracking the new subgraph.
       subgraph_nodes.push(Subgraph());
+
+      insertSetAttribute(graph, subgraph_nodes.size(), node,
+                         true /* after_insert_pnt */);
 
       // Delete the input node (then_branch output), as it is not needed
       // anymore.
@@ -278,6 +311,9 @@ void annotateSubgraphs(torch::jit::Graph *graph, torch::jit::Node *start_node) {
                       &subgraph_nodes.top(), reshape_putter_helpers_stack.top(),
                       true /*processingElseOutputs*/);
       reshape_putter_helpers_stack.pop();
+
+      insertClearAttribute(graph, subgraph_nodes.size(), node,
+                           true /* after_insert_pnt */);
 
       // Remove the else subgraph.
       subgraph_nodes.pop();

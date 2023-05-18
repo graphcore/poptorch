@@ -57,6 +57,13 @@ void setCurrentMetadata(const std::string &metadata);
 
 void resetCurrentSourceLocation();
 
+torch::jit::Node *createNode(
+    torch::jit::Graph *graph, torch::jit::NodeKind kind,
+    torch::jit::ArrayRef<torch::jit::Value *> inputs = {},
+    ImplicitCast implicit_cast = ImplicitCast::None,
+    OutputType output_type = OutputType::Unknown, size_t num_outputs = 1,
+    c10::optional<at::ScalarType> dtype = c10::optional<at::ScalarType>());
+
 torch::jit::Node *createAndInsertNode(
     torch::jit::Graph *graph, torch::jit::NodeKind kind,
     torch::jit::ArrayRef<torch::jit::Value *> inputs = {},
@@ -265,6 +272,17 @@ torch::jit::Node *createCallCpuOp(torch::jit::Graph *graph,
 torch::jit::Node *createSetAvailableMemory(torch::jit::Graph *graph,
                                            torch::jit::Value *value,
                                            float proportion);
+
+torch::jit::Node *createSetAttribute(torch::jit::Graph *graph,
+                                     const std::string &attribute,
+                                     const std::string &key,
+                                     const std::string &value,
+                                     bool insert_after_insertion_pnt = false);
+
+torch::jit::Node *createClearAttribute(torch::jit::Graph *graph,
+                                       const std::string &attribute,
+                                       const std::string &key,
+                                       bool insert_after_insertion_pnt = false);
 
 torch::jit::Node *createSetMatMulSerialization(torch::jit::Graph *graph,
                                                torch::jit::Value *matmul,
