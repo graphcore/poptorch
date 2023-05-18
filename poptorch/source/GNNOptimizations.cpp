@@ -145,7 +145,8 @@ void groupScatterReduceNodes(torch::jit::Graph *graph) {
   using ScatterKind =
       std::tuple<std::int64_t /*reduction*/, at::ScalarType /*input_type*/,
                  bool /*index_broadcast_enabled*/, bool /*with_update*/,
-                 std::size_t /*stage*/>;
+                 std::size_t /*stage*/, std::int64_t /*axis*/,
+                 std::int64_t /*axis_size*/>;
   std::map<ScatterKind, torch::jit::node_list> scatters;
 
   std::size_t optimization_candidates = 0;
@@ -175,8 +176,13 @@ void groupScatterReduceNodes(torch::jit::Graph *graph) {
             const bool index_broadcast_enabled =
                 user->i(c10::Symbol::attr("enable_index_broadcast")) != 0;
             const std::size_t stage = deduceOpStage(user, barriers);
-            const ScatterKind key{reduction, input_type,
-                                  index_broadcast_enabled, with_update, stage};
+            const std::int64_t axis = user->i(c10::Symbol::attr("axis"));
+            const std::int64_t axis_size =
+                user->i(c10::Symbol::attr("axis_size"));
+            const ScatterKind key{
+                reduction,   input_type, index_broadcast_enabled,
+                with_update, stage,      axis,
+                axis_size};
             scatters[key].push_back(user);
           }
         }
@@ -236,8 +242,8 @@ void groupGatherNodes(torch::jit::Graph *graph) {
   std::unordered_map<torch::jit::Node *, std::size_t> node_num_visited_inputs;
   // The unordered_set elements mean that children have been added to the queue.
 
-  using GatherKind =
-      std::tuple<at::ScalarType /*input_type*/, std::size_t /*stage*/>;
+  using GatherKind = std::tuple<at::ScalarType /*input_type*/,
+                                std::int64_t /*axis*/, std::size_t /*stage*/>;
   std::map<GatherKind, torch::jit::node_list> gathers;
 
   std::size_t optimization_candidates = 0;
@@ -261,8 +267,9 @@ void groupGatherNodes(torch::jit::Graph *graph) {
                                                    ->expect<c10::TensorType>()
                                                    ->scalarType();
 
+            const std::int64_t axis = user->i(c10::Symbol::attr("axis"));
             const std::size_t stage = deduceOpStage(user, barriers);
-            const GatherKind key{input_type, stage};
+            const GatherKind key{input_type, axis, stage};
             gathers[key].push_back(user);
           }
         }
