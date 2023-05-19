@@ -807,6 +807,55 @@ def test_sort_stable(descending):
     op_harness(operation, [input], assert_, test_training=True, out_fn=out_fn)
 
 
+def test_bincount():
+    torch.manual_seed(42)
+    input_size = 7
+    input = torch.randint(0, 8, (input_size, ), dtype=torch.int64)
+
+    def operation(x):
+        return torch.bincount(x, minlength=input_size + 1)
+
+    def assert_(native_out, poptorch_out):
+        helpers.assert_allequal(actual=poptorch_out, expected=native_out)
+
+    op_harness(operation, [input], assert_, test_training=False)
+
+
+def test_bincount_error():
+    torch.manual_seed(42)
+    input_size = 7
+    input = torch.randint(0, 8, (input_size, ), dtype=torch.int64)
+
+    def operation(x):
+        return torch.bincount(x)
+
+    def assert_(native_out, poptorch_out):
+        helpers.assert_allequal(actual=poptorch_out, expected=native_out)
+
+    with pytest.raises(
+            poptorch.poptorch_core.Error,
+            match=
+            "Bincount `minlength` must be specified and must be a constant. "
+            "On the IPU MK2 platform the minimum length is also the "
+            "maximum length"):
+        op_harness(operation, [input], assert_, test_training=False)
+
+
+def test_bincount_weights():
+    torch.manual_seed(42)
+    input_size = 7
+    input = torch.randint(0, 8, (input_size, ), dtype=torch.int64)
+
+    def operation(x):
+        weights = torch.linspace(0, 1, steps=input_size)
+        return torch.bincount(x, weights, minlength=input_size + 1)
+
+    def assert_(native_out, poptorch_out):
+        helpers.assert_allequal(actual=poptorch_out, expected=native_out)
+
+    op_harness(operation, [input], assert_, test_training=False)
+
+
 types = [torch.float32, torch.int32]
 
 

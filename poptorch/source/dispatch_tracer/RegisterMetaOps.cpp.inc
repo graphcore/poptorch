@@ -36,6 +36,23 @@ at::Tensor ctcLoss(const at::Tensor &log_probs, const at::Tensor &/*targets*/,
   return at::meta::empty(shape, log_probs.scalar_type());
 }
 
+at::Tensor bincount(const at::Tensor &, const c10::optional<at::Tensor> & weights, int64_t minlength) {
+
+  ERROR_ON_MSG(minlength <= 0, "Bincount `minlength` must be specified and must be a constant. "
+                                "On the IPU MK2 platform the minimum length is also the "
+                                "maximum length");
+
+  return at::meta::empty({minlength}, weights ? weights->scalar_type() : c10::ScalarType::Int);
+}
+
+at::Tensor & bincountOut(const at::Tensor &, const c10::optional<at::Tensor> &, int64_t minlength, at::Tensor & out) {
+  ERROR_ON_MSG(minlength <= 0, "Bincount `minlength` must be specified and must be a constant. "
+                              "On the IPU MK2 platform the minimum length is also the "
+                              "maximum length");
+
+  return out;
+}
+
 TORCH_API at::Tensor bucketize(const at::Tensor & self, const at::Tensor &, bool out_int32=false, bool right=false) {
   UNUSED(right);
   UNUSED(out_int32);
@@ -296,6 +313,8 @@ void opReturningFirstArgument(const c10::OperatorHandle &/*op*/, c10::Stack *sta
 } // namespace poptorch::meta
 
 TORCH_LIBRARY_IMPL(aten, Meta, m) {
+  m.impl("bincount", PTC(poptorch::meta::bincount));
+  m.impl("bincount.out", PTC(poptorch::meta::bincountOut));
   m.impl("bucketize.Tensor", PTC(poptorch::meta::bucketize));
   m.impl("bucketize.Tensor_out", PTC(poptorch::meta::bucketizeOut));
   m.impl("equal", PTC(poptorch::meta::equal));

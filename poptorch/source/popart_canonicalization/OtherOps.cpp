@@ -32,6 +32,42 @@ torch::jit::Node *bucketizeHandler(torch::jit::Graph *graph,
   return createBucketize(graph, args, right);
 }
 
+torch::jit::Node *bincountHandler(torch::jit::Graph *graph,
+                                  torch::jit::Node *node) {
+
+  // aten::bincount(Tensor self, Tensor? weights=None, int minlength=0)
+  // -> Tensor
+  auto *input = node->input(0);
+  auto *const weights_param = node->input(1);
+  auto *const minlength = node->input(2);
+  const int64_t axis_size = constantToLong(minlength->node());
+
+  const auto weights_length = shapeFromTensor(input).front();
+  auto *const weights =
+      isNone(weights_param)
+          ? createConstantInt(graph, std::vector<int64_t>(weights_length, 1),
+                              {weights_length})
+                ->output()
+          : weights_param;
+
+  if (getNodeScalarType(input) != c10::kInt) {
+    input = createCast(graph, createFloor(graph, {input})->output(), c10::kInt)
+                ->output();
+  }
+
+  auto *const condition = createLess(graph, {input, minlength})->output();
+  auto *const max_index =
+      createConstantInt(graph, {weights_length - 1}, {1})->output();
+  input = createWhere(graph, {condition, input, max_index})->output();
+
+  static constexpr bool enable_index_broadcast = false;
+  static constexpr int64_t reduction_type =
+      static_cast<std::int32_t>(ScatterReduction::Sum);
+  static constexpr int64_t axis = 0;
+  return createScatterreduce(graph, {weights, input}, axis_size, axis,
+                             enable_index_broadcast, reduction_type);
+}
+
 torch::jit::Node *einsumHandler(torch::jit::Graph *graph,
                                 torch::jit::Node *node) {
   // aten::einsum(string equation, Tensor[] tensors) -> Tensor
@@ -435,6 +471,7 @@ torch::jit::Node *randomHandler(torch::jit::Graph *graph,
 } // namespace
 
 __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
+  registerHandler(c10::aten::bincount, bincountHandler);
   registerHandler(c10::aten::bucketize, bucketizeHandler);
   registerHandler(c10::aten::einsum, einsumHandler);
   registerHandler(c10::aten::meshgrid, meshgridHandler);
