@@ -73,40 +73,6 @@ def random_heterodata(in_channels=None):
     return data, in_channels
 
 
-class HeteroDataTupleConverter:
-    def __init__(self, data):
-        self.type_list = []
-        if not isinstance(data, dict):
-            data = data.to_dict()
-
-        for k1 in data.keys():
-            data_k1 = data[k1]
-            if not isinstance(data[k1], dict):
-                data_k1 = data[k1].to_dict()
-            for k2 in data_k1.keys():
-                self.type_list.append((k1, k2))
-
-    def to_tuple(self, data):
-        items = []
-        for k1, k2 in self.type_list:
-            item = data[k1][k2]
-            if not isinstance(item, torch.Tensor):
-                item = torch.tensor(item)
-                if item.dim() == 0:
-                    item = item.unsqueeze(0)
-
-            items.append(item)
-
-        return tuple(items)
-
-    def from_tuple(self, tensors):
-        data = HeteroData()
-        for (k1, k2), tensor in zip(self.type_list, tensors):
-            data[k1][k2] = tensor
-
-        return data
-
-
 def hetero_conv_harness(
         conv,
         data,
@@ -122,17 +88,13 @@ def hetero_conv_harness(
         forward_args = ['x_dict', 'edge_index_dict']
 
     class ConvWrapper(torch.nn.Module):
-        def __init__(self, conv, converter, loss_fn):
+        def __init__(self, conv, loss_fn):
             super().__init__()
             self.conv = conv
-            self.converter = converter
             self.loss_fn = loss_fn
 
         def forward(self, *args):
-            data = self.converter.from_tuple(args)
-            inputs = (getattr(data, x) for x in forward_args)
-            out = self.conv(*inputs)
-
+            out = self.conv(*args)
             out = out[output_key]
             if self.training:
                 target = torch.ones_like(out)
@@ -140,8 +102,8 @@ def hetero_conv_harness(
                 return out, loss
             return out
 
-    converter = HeteroDataTupleConverter(data)
-    model = ConvWrapper(conv, converter, loss_fn)
+    model = ConvWrapper(conv, loss_fn)
 
     stepper = TrainingStepper(model, atol=atol, rtol=rtol)
-    stepper.run(num_steps, converter.to_tuple(data))
+    inputs = [getattr(data, f_arg) for f_arg in forward_args]
+    stepper.run(num_steps, inputs)
