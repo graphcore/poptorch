@@ -14,6 +14,7 @@ from poptorch_geometric.stream_packing_sampler import StreamPackingSampler
 from poptorch_geometric.collate import CombinedBatchingCollater, FixedSizeCollater
 from poptorch_geometric.dataloader import FixedSizeDataLoader
 from poptorch_geometric.fixed_size_options import FixedSizeOptions
+from poptorch_geometric.pyg_dataloader import FixedSizeStrategy, OverSizeStrategy
 
 
 def test_stream_packing_sampler_default_params():
@@ -182,15 +183,14 @@ def test_stream_packing_sampler_should_be_usable_with_torch_data_loader(
                                                  batch_sampler=batch_sampler,
                                                  collate_fn=collater)
     else:
-        collater_args = {
-            'add_masks_to_batch': True,
-        }
-        dataloader = FixedSizeDataLoader(dataset,
-                                         fixed_size_options=fixed_size_options,
-                                         batch_size=num_graphs,
-                                         collater_args=collater_args,
-                                         sampler=base_sampler,
-                                         allow_skip_data=allow_skip_data)
+        dataloader = FixedSizeDataLoader(
+            dataset,
+            batch_size=num_graphs,
+            fixed_size_options=fixed_size_options,
+            fixed_size_strategy=FixedSizeStrategy.StreamPack,
+            add_pad_masks=True,
+            over_size_strategy=OverSizeStrategy.Skip
+            if allow_skip_data else OverSizeStrategy.Error)
 
     expected_x_shape = torch.Size([batch_num_nodes, num_channels])
     expected_batch_shape = torch.Size([batch_num_nodes])

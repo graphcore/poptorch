@@ -3,7 +3,8 @@ import importlib
 
 from .collate import make_exclude_keys
 from .common import call_once
-from .dataloader import FixedSizeDataLoader
+from .dataloader import (FixedSizeDataLoader, FixedSizeStrategy,
+                         OverSizeStrategy)
 from .fixed_size_options import FixedSizeOptions
 from .types import PyGArgsParser, registerCustomArgParsers
 from .utils import TrainingStepper, set_aggregation_dim_size
@@ -13,8 +14,8 @@ __version__ = "@VERSION@-@SNAPSHOT@"
 
 __all__ = [
     '__version__', 'FixedSizeDataLoader', 'FixedSizeOptions',
-    'set_aggregation_dim_size', 'TrainingStepper', 'make_exclude_keys',
-    'PyGArgsParser'
+    'FixedSizeStrategy', 'set_aggregation_dim_size', 'TrainingStepper',
+    'make_exclude_keys', 'OverSizeStrategy', 'PyGArgsParser'
 ]
 
 

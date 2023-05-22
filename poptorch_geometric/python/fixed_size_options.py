@@ -150,4 +150,4 @@ class FixedSizeOptions:
                 f"node_pad_value={self.node_pad_value}, "
                 f"edge_pad_value={self.edge_pad_value}, "
                 f"graph_pad_value={self.graph_pad_value}, "
-                f"pad_graph_defaults={self.pad_graph_defaults}")
+                f"pad_graph_defaults={self.pad_graph_defaults})")

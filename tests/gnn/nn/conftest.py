@@ -2,14 +2,13 @@
 
 import pytest
 
-from torch.utils.data.sampler import SequentialSampler
-
 from torch_geometric import seed_everything
 from torch_geometric.datasets import FakeDataset
 from torch_geometric.transforms import Compose, GCNNorm, NormalizeFeatures
 
 from poptorch_geometric.dataloader import FixedSizeDataLoader, DataLoader
 from poptorch_geometric.fixed_size_options import FixedSizeOptions
+from poptorch_geometric.pyg_dataloader import FixedSizeStrategy
 
 
 def get_dataset(num_channels=16):
@@ -48,8 +47,8 @@ def fixed_size_dataloader(fake_dataset):
     dataloader = FixedSizeDataLoader(
         fake_dataset,
         fixed_size_options=FixedSizeOptions(num_nodes=12),
-        collater_args={'add_masks_to_batch': True},
-        sampler=SequentialSampler(fake_dataset))
+        fixed_size_strategy=FixedSizeStrategy.StreamPack,
+        add_pad_masks=True)
     return dataloader
 
 

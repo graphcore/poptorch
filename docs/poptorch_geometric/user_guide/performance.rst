@@ -70,23 +70,24 @@ Fixed-size data loaders
 The alternative method is to use the
 :py:class:`poptorch_geometric.dataloader.FixedSizeDataLoader` class with the
 dataset without the `Pad` transformation. The data loader uses
-:py:class:`poptorch_geometric.collate.FixedSizeCollater` and
-:py:class:`poptorch_geometric.stream_packing_sampler.StreamPackingSampler` underneath to
-create batches of graphs with a fixed number of nodes and edges from the
+:py:class:`poptorch_geometric.collate.FixedSizeCollater` underneath to
+create mini-batches of graphs with a fixed number of nodes and edges from the
 initial graphs that do not necessarily have the same number of nodes and edges.
 The data loader combines graphs from the dataset and creates dummy graphs such
-that the whole batch has a fixed number of nodes, edges and graphs.
+that the whole mini-batch has a fixed number of nodes, edges and graphs.
 
-The data loader can produce batches with a fixed number of graphs from a
-dataset, but it can also produce packed batches with a variable number of
-graphs from a dataset. In the latter case, each batch contains a certain number
-of dummy graphs, so that the total number of graphs in the batch is constant.
+By default the `FixedSizeStrategy.PadToMax` strategy is used, which pads the
+mini-batches to a fixed-size where the resulting mini-batches have a fixed
+number of samples in each mini-batch and one padding graph at the end of the
+mini-batch.
 
-Using :py:class:`poptorch_geometric.dataloader.FixedSizeDataLoader` may work
-better than `Pad` transformation with a regular data loader in cases when the
-differences in the number of nodes and edges between the graphs in
-the dataset are large. The data loader can combine graphs of different sizes
-and create less padding nodes and edges.
+The data loader can also produce packed batches with a variable number of
+graphs in each mini-batch. This can help reduce the amount of space in each
+mini-batch assigned to padding. This is enabled by using
+`FixedSizeStrategy.StreamPack` which changes the underlying sampler to
+:py:class:`poptorch_geometric.stream_packing_sampler.StreamPackingSampler`.
+In this case, each mini-batch contains a certain number of dummy graphs, so
+that the total number of graphs in the mini-batch is constant.
 
 Compared to `Pad` transformation, instead of padding each sample in the batch,
 the data loader pads the entire batch, which is often more efficient and the

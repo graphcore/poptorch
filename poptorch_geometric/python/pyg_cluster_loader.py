@@ -1,11 +1,12 @@
 # Copyright (c) 2022 Graphcore Ltd. All rights reserved.
-from typing import Dict, Optional, Union
+from typing import Optional
 
 import torch
 from torch_geometric.loader import ClusterData, ClusterLoader
 
 from poptorch_geometric.collate import FixedSizeCollater
 from poptorch_geometric.fixed_size_options import FixedSizeOptions
+from poptorch_geometric.pyg_dataloader import OverSizeStrategy
 
 
 class FixedSizeClusterLoader(torch.utils.data.DataLoader):
@@ -19,14 +20,29 @@ class FixedSizeClusterLoader(torch.utils.data.DataLoader):
         fixed_size_options (FixedSizeOptions, optional): A
             :py:class:`poptorch_geometric.fixed_size_options.FixedSizeOptions`
             object which holds the maximum number of nodes, edges and other
-            options required to pad the batches, produced by the data loader,
-            to a fixed size.
-        batch_size (int, optional): The number of samples per batch to load.
+            options required to pad the mini-batches, produced by the data
+            loader, to a fixed size.
+        batch_size (int, optional): The number of nodes per mini-batch to
+            load.
             (default: :obj:`1`)
-        collater_args (dict, optional): The additional arguments passed to
-            :class:`FixedSizeCollater`. They should not contain
-            :obj:`num_nodes` or :obj:`exclude_keys` as those should be passed
-            directly to the initializer method. (default: :obj:`None`)
+        over_size_strategy (OverSizeStrategy, optional): The
+            behaviour if a sample cannot fit in the fixed-size mini-batch.
+            By default, if the required number of samples cannot fit into the
+            fixed-sized mini-batch, nodes and edges will be removed from the
+            mini-batch to achieve the specified fixed size.
+            (default: `poptorch_geometric.OverSizeStrategy.TrimNodesAndEdges`)
+        add_pad_masks  (bool, optional): If :obj:`True`, mask objects
+            are attached to mini-batch result. They represents three levels of
+            padding:
+
+            - :obj:`graphs_mask` - graph level mask
+            - :obj:`nodes_mask`  - node level mask
+            - :obj:`edges_mask`  - edge level mask
+
+            Mask objects indicate which elements in the mini-batch are real
+            (represented by :obj:`True`) and which were added as
+            padding (represented by :obj:`False`).
+            (default: :obj:`True`)
         **kwargs (optional): The additional arguments of
             :class:`torch.utils.data.DataLoader`.
     """
@@ -36,7 +52,9 @@ class FixedSizeClusterLoader(torch.utils.data.DataLoader):
             cluster_data: ClusterData,
             fixed_size_options: FixedSizeOptions,
             batch_size: int = 1,
-            collater_args: Optional[Dict[str, Union[int, float]]] = None,
+            over_size_strategy: OverSizeStrategy = OverSizeStrategy.
+            TrimNodesAndEdges,
+            add_pad_masks: Optional[bool] = True,
             **kwargs,
     ):
         assert fixed_size_options.num_graphs == 2, (
@@ -51,17 +69,19 @@ class FixedSizeClusterLoader(torch.utils.data.DataLoader):
             '`FixedSizeClusterLoader` does not support the following ' \
             f'arguments: {unsupported}.'
 
-        collater_args = collater_args if collater_args else {}
-        assert 'fixed_size_options' not in collater_args, \
-            '`FixedSizeClusterLoader` uses argument `fixed_size_options`' \
-            ' directly to the initializer. They should not be included' \
-            ' in `collater_args`.'
-
         self.cluster_data = cluster_data
         self.batch_size = batch_size
 
-        collater = self._create_collater(fixed_size_options=fixed_size_options,
-                                         **collater_args)
+        collater = self._create_collater(
+            fixed_size_options=fixed_size_options,
+            add_masks_to_batch=add_pad_masks,
+            trim_nodes=(
+                over_size_strategy in (OverSizeStrategy.TrimNodes,
+                                       OverSizeStrategy.TrimNodesAndEdges)),
+            trim_edges=(
+                over_size_strategy in (OverSizeStrategy.TrimEdges,
+                                       OverSizeStrategy.TrimNodesAndEdges)))
+
         super().__init__(dataset=range(len(cluster_data)),
                          batch_size=batch_size,
                          collate_fn=collater,

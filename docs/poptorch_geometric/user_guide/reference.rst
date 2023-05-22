@@ -13,6 +13,10 @@ Data loaders
 
 .. autoclass:: poptorch_geometric.dataloader.FixedSizeDataLoader
 
+.. autoclass:: poptorch_geometric.pyg_dataloader.FixedSizeStrategy
+
+.. autoclass:: poptorch_geometric.pyg_dataloader.OverSizeStrategy
+
 Cluster data loaders
 ====================
 
