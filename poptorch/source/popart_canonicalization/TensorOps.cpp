@@ -318,6 +318,82 @@ torch::jit::Node *gatherHandler(torch::jit::Graph *graph,
   return output->node();
 }
 
+torch::jit::Node *takeAlongDimHandler(torch::jit::Graph *graph,
+                                      torch::jit::Node *node) {
+  // aten::take_along_dim(Tensor self, Tensor indices, int? dim=None) -> Tensor
+
+  torch::jit::Value *input = node->input(0);
+  torch::jit::Value *indices = node->input(1);
+  torch::jit::Value *dim = node->input(2);
+
+  const std::vector<std::int64_t> input_shape = shapeFromTensor(input);
+  std::vector<std::int64_t> indices_shape = shapeFromTensor(indices);
+
+  if (!isNone(dim)) {
+    const auto dim_value = constantToLong(dim->node());
+
+    const auto broadcast_to = [&](torch::jit::Value *value,
+                                  const std::vector<std::int64_t> &shape) {
+      std::vector<torch::jit::Value *> shape_values(shape.size(), nullptr);
+      std::transform(shape.cbegin(), shape.cend(), shape_values.begin(),
+                     [&](const auto elem) -> torch::jit::Value * {
+                       return wrapInConstant1D(graph, elem);
+                     });
+
+      torch::jit::Value *shape_list =
+          createAndInsertNode(graph, c10::prim::ListConstruct, shape_values)
+              ->output();
+
+      auto *broadcasted_value =
+          createHandlerOperation(graph, getHandler(c10::aten::broadcast_to),
+                                 {value, shape_list})
+              ->output();
+
+      broadcasted_value->setType(
+          value->type()->expect<c10::TensorType>()->withSizes(shape));
+      return broadcasted_value;
+    };
+
+    auto self_sizes = input_shape;
+    // update number of elements at dim as per indices
+    self_sizes.at(dim_value) = indices_shape.at(dim_value);
+    if (auto bcast_shape = at::infer_size(self_sizes, indices_shape);
+        bcast_shape != indices_shape) {
+      indices = broadcast_to(indices, bcast_shape);
+    }
+
+    // update number of elements at dim as per self
+    indices_shape.at(dim_value) = input_shape.at(dim_value);
+    if (auto bcast_shape = at::infer_size(indices_shape, input_shape);
+        bcast_shape != input_shape) {
+      input = broadcast_to(input, bcast_shape);
+    }
+  } else {
+    const auto flatten =
+        [&](torch::jit::Value *value,
+            const std::vector<std::int64_t> &shape) -> torch::jit::Value * {
+      const auto rank = shape.size();
+      if (rank == 1) {
+        return value;
+      }
+
+      const int64_t num_elems =
+          rank > 1 ? std::accumulate(shape.cbegin(), shape.cend(), 1,
+                                     std::multiplies<int64_t>())
+                   : 1;
+
+      return createReshape(graph, value, {num_elems})->output();
+    };
+
+    input = flatten(input, input_shape);
+    indices = flatten(indices, indices_shape);
+    dim = wrapInConstant1D(graph, 0);
+  }
+
+  return createHandlerOperation(graph, getHandler(c10::aten::gather),
+                                {input, dim, indices});
+}
+
 torch::jit::Node *scatterHandler(torch::jit::Graph *graph,
                                  torch::jit::Node *node) {
   auto *input = node->input(0);
@@ -455,6 +531,7 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::full_like, fullLikeHandler);
   registerHandler(c10::aten::triu, triuHandler);
   registerHandler(symbols::poptorch::ipu_print_tensor, ipuPrintTensorHandler);
+  registerHandler(c10::aten::take_along_dim, takeAlongDimHandler);
 }
 
 } // namespace poptorch

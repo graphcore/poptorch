@@ -71,6 +71,7 @@ PyTorch functions
 * ``torch.split``
 * ``torch.squeeze``
 * ``torch.t``
+* ``torch.take_along_dim``
 * ``torch.transpose``
 * ``torch.unbind``
 * ``torch.unsqueeze``

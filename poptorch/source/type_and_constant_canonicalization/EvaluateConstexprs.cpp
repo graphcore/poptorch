@@ -80,7 +80,7 @@ private:
 
   void removeExclusionAttributes();
 
-  void addUpcastForScatterNode(torch::jit::Node *new_node);
+  void addNodeInputArgUpcast(torch::jit::Node *new_node);
 
   void removeLoneConstants();
 
@@ -207,8 +207,10 @@ void ConstExprEvaluator::removeExclusionAttributes() {
   }
 }
 
-void ConstExprEvaluator::addUpcastForScatterNode(torch::jit::Node *new_node) {
-  auto kind = new_node->kind();
+namespace {
+
+std::optional<size_t> getUpcastIndexArg(torch::jit::Node *new_node) {
+  const auto kind = new_node->kind();
 
   if (kind == c10::aten::scatter || kind == c10::aten::scatter_ ||
       kind == c10::aten::scatter_add || kind == c10::aten::scatter_add_ ||
@@ -216,12 +218,29 @@ void ConstExprEvaluator::addUpcastForScatterNode(torch::jit::Node *new_node) {
       kind == torch_scatter::scatter_max ||
       kind == torch_scatter::scatter_min ||
       kind == torch_scatter::scatter_mul) {
-    static constexpr size_t index_arg = 2;
+    return 2;
+  }
 
-    torch::jit::Value *index = new_node->input(index_arg);
-    torch::jit::Node *cast = createAndInsertCastOp(_constexpr_graph.get(),
-                                                   index, at::ScalarType::Long);
-    new_node->replaceInputWith(index, cast->output());
+  if (kind == c10::aten::take_along_dim) {
+    return 1;
+  }
+
+  return std::nullopt;
+}
+
+void addInputUpcast(torch::jit::Graph *graph, torch::jit::Node *new_node,
+                    std::size_t arg_index) {
+  torch::jit::Value *input = new_node->input(arg_index);
+  torch::jit::Node *cast =
+      createAndInsertCastOp(graph, input, at::ScalarType::Long);
+  new_node->replaceInputWith(input, cast->output());
+}
+
+} // namespace
+
+void ConstExprEvaluator::addNodeInputArgUpcast(torch::jit::Node *new_node) {
+  if (const auto index = getUpcastIndexArg(new_node); index) {
+    addInputUpcast(_constexpr_graph.get(), new_node, index.value());
   }
 }
 
@@ -347,7 +366,7 @@ void ConstExprEvaluator::copyNodeToConstexprGraph(torch::jit::Node *node) {
 
   const WithNodeMetadata meta(new_node);
 
-  addUpcastForScatterNode(new_node);
+  addNodeInputArgUpcast(new_node);
 
   insertNodeInGraph(_constexpr_graph.get(), new_node);
 

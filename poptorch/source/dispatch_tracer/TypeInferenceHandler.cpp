@@ -294,7 +294,9 @@ TypeInferenceHandler::indexArgToUpcast(const std::string &schema_key) {
     return 2;
   }
   if (schema_key == "aten::index.Tensor" ||
-      schema_key == "aten::nll_loss_forward") {
+      schema_key == "aten::nll_loss_forward" ||
+      schema_key == "aten::take_along_dim" ||
+      schema_key == "aten::take_along_dim.out") {
     return 1;
   }
   if (schema_key == "aten::sort.values_stable") {

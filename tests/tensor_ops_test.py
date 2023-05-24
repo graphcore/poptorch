@@ -1193,3 +1193,19 @@ def test_unfold(input_shape, dim, size, step):
     op = lambda x: x.unfold(dim, size, step)
     x = torch.randn(input_shape)
     op_harness(op, x)
+
+
+@pytest.mark.parametrize("op", [
+    lambda input: torch.take_along_dim(input, torch.argmax(input)),
+    lambda input: torch.take_along_dim(
+        input, torch.argsort(input, dim=1), dim=1),
+    lambda input: torch.take_along_dim(
+        input, torch.tensor([[2, 0, 1]], dtype=torch.int64), dim=1),
+    lambda input: torch.take_along_dim(
+        input, torch.tensor([[2, 0, 1, 0]], dtype=torch.int64), dim=1),
+])
+def test_take_along_dim(op):
+    torch.manual_seed(42)
+
+    input = torch.tensor([[10, 30, 20], [60, 40, 50]]).float()
+    op_harness(op, input)

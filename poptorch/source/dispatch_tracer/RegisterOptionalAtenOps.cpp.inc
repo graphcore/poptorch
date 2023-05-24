@@ -161,6 +161,9 @@ TORCH_LIBRARY_IMPL(aten, IPU, m) {
   m.impl("select_scatter.out", PTC_BOXED(poptorch::fallback));
 
   m.impl("_prelu_kernel", PTC_BOXED(poptorch::fallback));
+
+  m.impl("take_along_dim", PTC_BOXED(poptorch::fallback));
+  m.impl("take_along_dim.out", PTC_BOXED(poptorch::fallback));
 }
 
 TORCH_LIBRARY_IMPL(torch_scatter, IPU, m) {
