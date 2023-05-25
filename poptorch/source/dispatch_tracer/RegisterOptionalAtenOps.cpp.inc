@@ -166,6 +166,10 @@ TORCH_LIBRARY_IMPL(aten, IPU, m) {
   m.impl("take_along_dim.out", PTC_BOXED(poptorch::fallback));
 }
 
+TORCH_LIBRARY_IMPL(poptorch, IPU, m) {
+  m.impl("fps", PTC_BOXED(poptorch::fallback));
+}
+
 TORCH_LIBRARY_IMPL(torch_scatter, IPU, m) {
   m.impl("scatter_max", PTC_BOXED(poptorch::fallback));
   m.impl("scatter_min", PTC_BOXED(poptorch::fallback));

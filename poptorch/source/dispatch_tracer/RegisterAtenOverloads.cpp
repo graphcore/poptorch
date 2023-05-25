@@ -18,6 +18,7 @@
 #include <string>
 #include <unordered_map>
 
+#include "../PoptorchSymbols.hpp"
 #include "../popart_canonicalization/PopartCanonicalizationUtils.hpp"
 #include "CommonHelperFunctions.hpp"
 #include "Tensor.hpp"
@@ -946,6 +947,8 @@ TORCH_LIBRARY(poptorch, m) {
   m.def(torch::schema("call_cpu_op(Tensor[] inputs, str name) -> ()",
                       c10::AliasAnalysisKind::CONSERVATIVE),
         PTC_BOXED(callCpuOp));
+  m.def("fps(Tensor src, "
+        "int[] ptr, float ratio, bool random_start) -> Tensor");
 }
 
 TORCH_LIBRARY_IMPL(poptorch, CPU, m) {
@@ -998,6 +1001,7 @@ TORCH_LIBRARY_IMPL(poptorch, AutogradIPU, m) {
   m.impl("start_if_block", torch::autograd::autogradNotImplementedFallback());
   m.impl("start_else_block", torch::autograd::autogradNotImplementedFallback());
   m.impl("end_if_block", torch::autograd::autogradNotImplementedFallback());
+  m.impl("fps", torch::autograd::autogradNotImplementedFallback());
 
   m.impl("optimizer_group", torch::autograd::autogradNotImplementedFallback());
   m.impl("set_matmul_serialization",

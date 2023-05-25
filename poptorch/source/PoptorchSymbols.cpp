@@ -30,8 +30,8 @@ c10::Symbol scatter_min; // NOLINT
 c10::Symbol scatter_mul; // NOLINT
 
 // clang-format off
-  __attribute__((constructor(SYMBOL_INIT_PRIORITY)))
-  static void initializeTorchScatterSymbols() {
+__attribute__((constructor(SYMBOL_INIT_PRIORITY)))
+static void initializeTorchScatterSymbols() {
   // clang-format on
   poptorch::logging::trace("Initializing torch_scatter symbols");
   SYMBOL_INIT(torch_scatter, scatter_max);
@@ -120,6 +120,8 @@ c10::Symbol ctc_beam_search_decoder;
 c10::Symbol set_attribute;
 c10::Symbol clear_attribute;
 
+c10::Symbol fps;
+
 // clang-format off
 __attribute__((constructor(SYMBOL_INIT_PRIORITY)))
 static void initializePoptorchSymbols() {
@@ -165,6 +167,8 @@ static void initializePoptorchSymbols() {
 
   SYMBOL_INIT(poptorch, set_attribute);
   SYMBOL_INIT(poptorch, clear_attribute);
+
+  SYMBOL_INIT(poptorch, fps);
 }
 
 } // namespace poptorch

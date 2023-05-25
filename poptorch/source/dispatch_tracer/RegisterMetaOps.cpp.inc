@@ -1,4 +1,5 @@
 // Copyright (c) 2022 Graphcore Ltd. All rights reserved.
+#include <cmath>
 #include <ATen/MetaFunctions.h>
 
 namespace poptorch::meta {
@@ -237,6 +238,30 @@ at::Tensor scatterMul(at::Tensor src,at::Tensor index, int64_t dim, c10::optiona
   return std::get<0>(scatterMinMax(src, index, dim, out, dim_size));
 }
 
+// torch_cluster
+at::Tensor fps(torch::Tensor src, const std::vector<std::int64_t> &ptr,
+               double ratio, bool /*random_start*/) {
+  const auto dim = src.dim();
+  const auto ptr_size = ptr.size();
+  const auto src_size = src.size(0);
+  ERROR_ON_MSG(ratio <= 0.0 || ratio > 1.0,
+               "`ratio` (" << ratio << ") has to be in range (0.0, 1.0>");
+
+  ERROR_ON_MSG(dim != 2,
+               "`src` is supposed to be 2d Tensor, while it has " << dim
+                                                                  << " dims");
+  ERROR_ON_MSG(
+      ptr_size < 2 || ptr_size > static_cast<size_t>(src_size) + 1,
+      "`ptr` length (" << ptr_size << ") is supposed to be < src.size(0) ("
+                       << src_size << ")");
+
+  std::int64_t out_size = 0;
+  for (size_t i = 1; i < ptr_size; i++)
+    out_size += std::ceil(static_cast<float>(ptr[i] - ptr[i - 1]) * ratio);
+
+  return at::meta::empty({out_size}, c10::ScalarType::Int);
+}
+
 // poptorch
 
 // dynamic_slice(Tensor self, int dim, Tensor start, int size, int step) -> Tensor
@@ -371,6 +396,7 @@ TORCH_LIBRARY_IMPL(poptorch, Meta, m) {
   m.impl("dynamic_slice", PTC(poptorch::meta::dynamicSlice));
   m.impl("dynamic_update", PTC(poptorch::meta::dynamicUpdate));
   m.impl("identity_loss", PTC(poptorch::meta::identityLoss));
+  m.impl("fps", PTC(poptorch::meta::fps));
 }
 
 TORCH_LIBRARY_IMPL(poptorch, AutogradMeta, m) {
@@ -410,6 +436,7 @@ TORCH_LIBRARY_IMPL(poptorch, AutogradMeta, m) {
   m.impl("call_cpu_op", torch::autograd::autogradNotImplementedFallback());
   m.impl("set_attribute", torch::autograd::autogradNotImplementedFallback());
   m.impl("clear_attribute", torch::autograd::autogradNotImplementedFallback());
+  m.impl("fps", torch::autograd::autogradNotImplementedFallback());
 }
 
 // For some reason these operations are first dispatched to AutogradMeta,

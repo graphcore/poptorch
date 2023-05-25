@@ -59,6 +59,7 @@ add_library(poptorch SHARED
   "source/popart_canonicalization/SoftmaxOps.cpp"
   "source/popart_canonicalization/ScatterReduction.cpp"
   "source/popart_canonicalization/TensorOps.cpp"
+  "source/popart_canonicalization/SamplingOps.cpp"
   "source/type_and_constant_canonicalization/AddListNumElements.cpp"
   "source/type_and_constant_canonicalization/CanonicaliseConstants.cpp"
   "source/type_and_constant_canonicalization/CastUnsupportedInputs.cpp"

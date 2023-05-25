@@ -1046,6 +1046,43 @@ def identity_loss(x: "torch.Tensor", reduction: "str") -> "torch.Tensor":
     return torch.ops.poptorch.identity_loss(x, 2)
 
 
+def fps(src: "torch.Tensor",
+        ptr: List[int],
+        ratio: float = 0.5,
+        random_start: bool = False) -> "torch.Tensor":
+    """Poptorch implementation of torch_cluster fps operation which is
+    a sampling algorithm from the `"PointNet++: Deep Hierarchical Feature
+    Learning on Point Sets in a Metric Space"
+    <https://arxiv.org/abs/1706.02413>`_ paper, which iteratively samples the
+    most distant point with regard to the rest points.
+
+    :param src: Point feature matrix.
+    :param ptr: Ptr vector which defines ranges of node assigned to specific
+        example.
+    :param ratio: Sampling ratio.
+    :param random_start: If set to :obj:`False`, use the first node in src as
+        starting node.
+    :returns: A tensor of src points indexes.
+    """
+    if not isinstance(src, torch.Tensor):
+        raise _impl.createPoptorchError(
+            f"fps must take a torch.tensor input. {type(src)} is "
+            "not supported.")
+    if not isinstance(ptr, list):
+        raise _impl.createPoptorchError("`ptr` must be a list of integers.")
+    if not len(ptr) >= 2:
+        raise _impl.createPoptorchError(
+            "`ptr` must containt at least 2 elements.")
+    if not isinstance(ratio, float):
+        raise _impl.createPoptorchError(
+            f"`ratio` must be of float type. {type(ratio)} is not supported.")
+    if not isinstance(random_start, bool):
+        raise _impl.createPoptorchError(
+            f"`random_start` must be of bool type. {type(random_start)} is "
+            "not supported.")
+    return torch.ops.poptorch.fps(src, ptr, ratio, random_start)
+
+
 class MultiConv():
     """
     Combines all convolution layers evaluated inside this scope into a single
