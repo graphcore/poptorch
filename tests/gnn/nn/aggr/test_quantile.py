@@ -9,8 +9,11 @@ from aggr_utils import aggr_harness
 
 @pytest.mark.parametrize('q', [0., .1, .2, .3, .4, .5, .6, .7, .8, .9, 1.])
 @pytest.mark.parametrize('interpolation', QuantileAggregation.interpolations)
-@pytest.mark.skip(reason="TODO(AFS-275, AFS-277, AFS-278)")
 def test_quantile_aggregation(dataloader, q, interpolation):
+    if interpolation == "nearest" and q == 0.5:
+        pytest.skip("TODD AFS-340")
+
+    torch.manual_seed(42)
     first_sample = next(iter(dataloader))
     in_channels = first_sample.num_node_features
     out_channels = in_channels * 2
@@ -25,7 +28,6 @@ def test_quantile_aggregation(dataloader, q, interpolation):
                  sorted_index=True)
 
 
-@pytest.mark.skip(reason="TODO(AFS-275, AFS-277, AFS-278)")
 def test_median_aggregation(dataloader):
     first_sample = next(iter(dataloader))
     in_channels = first_sample.num_node_features
