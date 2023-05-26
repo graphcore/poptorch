@@ -73,16 +73,15 @@ def random_heterodata(in_channels=None):
     return data, in_channels
 
 
-def hetero_conv_harness(
-        conv,
-        data,
-        output_key,
-        forward_args=None,
-        loss_fn=torch.nn.MSELoss(),
-        num_steps=4,
-        atol=1e-3,
-        rtol=1e-2,
-):
+def hetero_conv_harness(conv,
+                        data,
+                        output_key,
+                        forward_args=None,
+                        loss_fn=torch.nn.MSELoss(),
+                        num_steps=4,
+                        atol=1e-3,
+                        rtol=1e-2,
+                        enable_fp_exception=True):
 
     if forward_args is None:
         forward_args = ['x_dict', 'edge_index_dict']
@@ -104,6 +103,9 @@ def hetero_conv_harness(
 
     model = ConvWrapper(conv, loss_fn)
 
-    stepper = TrainingStepper(model, atol=atol, rtol=rtol)
+    stepper = TrainingStepper(model,
+                              atol=atol,
+                              rtol=rtol,
+                              enable_fp_exception=enable_fp_exception)
     inputs = [getattr(data, f_arg) for f_arg in forward_args]
     stepper.run(num_steps, inputs)

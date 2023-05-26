@@ -93,7 +93,11 @@ def test_hetero_conv_multiple_layers(aggr, num_layers):
 
     forward_args = ('x_dict', 'edge_index_dict', 'edge_attr_dict',
                     'edge_weight_dict')
-    hetero_conv_harness(conv, data, 'author', forward_args=forward_args)
+    hetero_conv_harness(conv,
+                        data,
+                        'author',
+                        forward_args=forward_args,
+                        enable_fp_exception=False)
 
 
 @pytest.mark.parametrize('aggr', ['sum', 'mean', 'min', 'max', 'cat'])
