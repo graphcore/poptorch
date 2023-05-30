@@ -38,6 +38,9 @@ class _TorchGeometricOpsSubstitutionManager:
         torch_geometric.nn.InstanceNorm: {
             "forward": ops.InstanceNorm.forward
         },
+        torch_geometric.nn.conv.MFConv: {
+            "forward": ops.MFConv.forward
+        },
         torch_geometric.nn.unpool: {
             "knn_interpolate": ops.knn_interpolate
         },

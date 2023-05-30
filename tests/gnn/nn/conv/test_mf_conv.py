@@ -1,12 +1,10 @@
 # Copyright (c) 2023 Graphcore Ltd. All rights reserved.
-import pytest
 import torch
 from torch_geometric.nn import MFConv
 
 from conv_utils import conv_harness
 
 
-@pytest.mark.skip(reason="TODO(AFS-219)")
 def test_mf_conv(dataset):
     in_channels = dataset.num_node_features
     out_channels = 32
