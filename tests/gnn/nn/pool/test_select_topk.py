@@ -8,7 +8,10 @@ from torch_geometric.nn.pool.select.topk import topk
 from pool_utils import pool_harness
 
 
-@pytest.mark.skip(reason="TODO(AFS-332)")
+@pytest.mark.skip(
+    reason=
+    "Inside the topk function, an index tensor is created that causes the "
+    "output tensor to dynamically shape. It is not supported on MK2.")
 def test_topk_ratio():
     x = torch.Tensor([2, 4, 5, 6, 2, 9])
     batch = torch.tensor([0, 0, 1, 1, 1, 1])
@@ -29,7 +32,10 @@ def test_topk_ratio():
     assert batch[perm3].tolist() == [0, 0, 1, 1, 1]
 
 
-@pytest.mark.skip(reason="TODO(AFS-332)")
+@pytest.mark.skip(
+    reason=
+    "Inside the topk function, an index tensor is created that causes the "
+    "output tensor to dynamically shape. It is not supported on MK2.")
 @pytest.mark.parametrize('min_score', [None, 2.0])
 def test_select_topk(min_score):
     if min_score is not None:
