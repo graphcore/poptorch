@@ -48,6 +48,7 @@ OP_DECL(popart, groupedgather, groupedgather, AiGraphcoreOpset1.groupedgather, A
 OP_DECL(popart, swish, swish, AiGraphcoreOpset1.swish, NONE, BODY_ARG(DEBUG_CONTEXT("Swish")))
 OP_DECL(popart, bucketize, bucketize, AiGraphcoreOpset1.bucketize, ARG(INT,right) , BODY_ARG(right) BODY_ARG(DEBUG_CONTEXT("Bucketize")))
 OP_DECL(popart, sort, sort, AiGraphcoreOpset1.sort,  ARG(INT,axis) ARG(INT,descending) ARG(INT,stable) , BODY_ARG(axis)  BODY_ARG(descending)  BODY_ARG(stable) BODY_ARG(DEBUG_CONTEXT("Sort")))
+OP_DECL(popart, nearbyint, nearbyint, AiGraphcoreOpset1.nearbyint, NONE, BODY_ARG(DEBUG_CONTEXT("NearbyInt")))
 
 // Ops from AiOnnxOpset11
 OP_DECL(popart, topk, topk, AiOnnxOpset11.topk, ARG(INT,axis) ARG(INT,largest) ARG(INT,sorted), BODY_ARG(axis) BODY_ARG(largest) BODY_ARG(sorted) BODY_ARG(DEBUG_CONTEXT("Topk")))

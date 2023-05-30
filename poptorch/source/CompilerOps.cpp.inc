@@ -88,6 +88,10 @@ torch::jit::Node* createRound(torch::jit::Graph *graph,  const std::vector<torch
  torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::round, args, ImplicitCast::None, OutputType::AsFirstInput);
 return new_node;
 }
+torch::jit::Node* createNearbyInt(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args) {
+ torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::nearbyint, args, ImplicitCast::None, OutputType::AsFirstInput);
+return new_node;
+}
 torch::jit::Node* createDynamicslice(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,std::vector<int64_t> axes,std::vector<int64_t> sizes,std::int32_t noOverlap) {
  torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::dynamicslice, args, ImplicitCast::None, OutputType::AsFirstInput);
 new_node->is_(c10::Symbol::attr("axes"),axes);

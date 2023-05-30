@@ -545,7 +545,7 @@ torch::jit::Node *roundHandler(torch::jit::Graph *graph,
                                torch::jit::Node *node) {
   auto *i0 = node->input(0);
   // round(i0)
-  return createRound(graph, {i0});
+  return createNearbyInt(graph, {i0});
 }
 
 torch::jit::Node *rsqrtHandler(torch::jit::Graph *graph,
