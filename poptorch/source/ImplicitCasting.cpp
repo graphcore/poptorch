@@ -138,8 +138,9 @@ void removeDeadImplicitCasts(torch::jit::Graph *graph) {
       // 'node' is the only use so it's safe to delete. This must be a
       // tensor_constant representing a wrapped number.
       auto *constant = node->input()->node();
-      ERROR_ON(constant->kind() != symbols::poptorch::tensor_constant);
-      to_delete.push_back(constant);
+      if (constant->kind() == symbols::poptorch::tensor_constant) {
+        to_delete.push_back(constant);
+      }
     }
   }
 

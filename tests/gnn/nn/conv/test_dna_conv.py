@@ -18,7 +18,6 @@ conv_kwargs_list = [{
 }]
 
 
-@pytest.mark.skip(reason="TODO(AFS-193)")
 @pytest.mark.parametrize('conv_kwargs', conv_kwargs_list)
 def test_dna_conv(conv_kwargs):
     channels = 32
