@@ -208,6 +208,7 @@ def test_dropout_eval_during_training(dropout_op):
 
 @pytest.mark.ipuHardwareRequired
 def test_dropout_training():
+    torch.manual_seed(42)
     drop_ratio = 0.8
     dropout_op = torch.nn.Dropout(drop_ratio)
 
@@ -228,6 +229,7 @@ def test_dropout_training():
 
 @pytest.mark.ipuHardwareRequired
 def test_dropout2d_training():
+    torch.manual_seed(42)
     drop_ratio = 0.8
     dropout_op = torch.nn.Dropout2d(drop_ratio)
 
@@ -251,6 +253,7 @@ def test_dropout2d_training():
 
 @pytest.mark.ipuHardwareRequired
 def test_dropout3d_training():
+    torch.manual_seed(42)
     drop_ratio = 0.6
     dropout_op = torch.nn.Dropout3d(drop_ratio)
 
@@ -273,6 +276,7 @@ def test_dropout3d_training():
 
 
 def test_embedding():
+    torch.manual_seed(42)
     model = torch.nn.Embedding(10, 3)
     x = torch.LongTensor([[1, 2, 4, 5], [4, 3, 2, 9]])
 
@@ -289,6 +293,8 @@ def test_embedding():
 
 # pylint: disable=unsubscriptable-object
 def test_embedding_padding_idx():
+    torch.manual_seed(0)
+
     class TestEmbedding(torch.nn.Module):
         def __init__(self):
             super().__init__()
@@ -394,6 +400,7 @@ def test_unfold(params):
     padding = 2
     y_in = 19
     x_in = 23
+    torch.manual_seed(42)
 
     unfold_layer = torch.nn.Unfold(kernel_size=(kernel_size_y, kernel_size_x),
                                    dilation=(dilation_y, dilation_x),
