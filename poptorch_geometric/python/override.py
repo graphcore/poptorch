@@ -94,6 +94,7 @@ def registerOptionalOverrides():
                     torch_cluster, {})
             torch_cluster_overrides["knn"] = ops.knn
             torch_cluster_overrides["knn_graph"] = ops.knn_graph
+            torch_cluster_overrides["nearest"] = ops.nearest
 
 
 registerOptionalOverrides()
