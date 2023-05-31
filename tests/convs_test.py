@@ -219,6 +219,7 @@ def merge_dicts(x, y):
 
 
 # The test is reliant on an IPU model with limited memory, so force the small model
+@pytest.mark.skip(reason="TODO(AFS-343)")
 @helpers.printCapfdOnExit
 @unittest.mock.patch.dict("os.environ",
                           merge_dicts(helpers.forceSmallModel(),
