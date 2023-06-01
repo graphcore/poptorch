@@ -32,10 +32,10 @@ def assert_(native_out, poptorch_out):
     check_inner_field(native_out, poptorch_out)
 
 
-def norm_harness(op, inputs, assert_func=None):
+def norm_harness(op, inputs, assert_func=None, inference=False):
 
     if assert_func is None:
         assert_func = assert_
-    poptorch_out = op_harness(op, inputs, assert_func)
+    poptorch_out = op_harness(op, inputs, assert_func, inference)
 
     return poptorch_out

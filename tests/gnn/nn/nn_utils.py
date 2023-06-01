@@ -50,7 +50,7 @@ class ModelWW(helpers.ModelWithWeights):
         return x, l
 
 
-def op_harness(op, inputs, assert_func=None):
+def op_harness(op, inputs, assert_func=None, inference=False):
     if isinstance(inputs[0], (Batch, Data)):
         first_input_shape = inputs[0].x.shape
     else:
@@ -61,12 +61,15 @@ def op_harness(op, inputs, assert_func=None):
     # Run on CPU.
     native_out, _ = model(tuple(inputs))
 
-    # The LR should be large enough that a single training step will
-    # definitely cause weights to change
-    optim = torch.optim.AdamW(model.parameters(), lr=0.1)
-
     # Run on IPU.
-    poptorch_model = poptorch.trainingModel(model, optimizer=optim)
+    if inference:
+        poptorch_model = poptorch.inferenceModel(model)
+    else:
+        # The LR should be large enough that a single training step will
+        # definitely cause weights to change
+        optim = torch.optim.AdamW(model.parameters(), lr=0.1)
+        poptorch_model = poptorch.trainingModel(model, optimizer=optim)
+
     poptorch_out, _ = poptorch_model(tuple(inputs))
 
     # Training test - check weights have changed
