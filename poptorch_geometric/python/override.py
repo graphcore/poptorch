@@ -44,6 +44,12 @@ class _TorchGeometricOpsSubstitutionManager:
         torch_geometric.nn.unpool: {
             "knn_interpolate": ops.knn_interpolate
         },
+        torch_geometric.nn.pool: {
+            "knn": ops.knn,
+            "knn_graph": ops.knn_graph,
+            "radius": ops.radius,
+            "radius_graph": ops.radius_graph,
+        },
         torch_geometric.nn.pool.mem_pool: {
             "to_dense_batch": ops.to_dense_batch
         },
@@ -95,6 +101,8 @@ def registerOptionalOverrides():
             torch_cluster_overrides["knn"] = ops.knn
             torch_cluster_overrides["knn_graph"] = ops.knn_graph
             torch_cluster_overrides["nearest"] = ops.nearest
+            torch_cluster_overrides["radius"] = ops.radius
+            torch_cluster_overrides["radius_graph"] = ops.radius_graph
 
 
 registerOptionalOverrides()
