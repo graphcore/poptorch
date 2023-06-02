@@ -212,6 +212,44 @@ torch::jit::Node *cumsumHandler(torch::jit::Graph *graph,
   return y->node();
 }
 
+torch::jit::Node *cumprodHandler(torch::jit::Graph *graph,
+                                 torch::jit::Node *node) {
+  torch::jit::Value *data = node->input(0);
+  const std::vector<int64_t> data_shape = shapeFromTensor(data);
+  const int64_t dim = handleDimensionParam(
+      node->input(1), data->type()->expect<c10::TensorType>());
+  const std::int64_t num_iters = data_shape.at(dim);
+
+  auto *result = createIdentity(graph, {data});
+  result->output()->setType(
+      result->output()->type()->expect<c10::TensorType>()->withSizes(
+          data_shape));
+  auto select_handler = getHandler(c10::aten::select);
+
+  for (std::int64_t i = 1; i < num_iters; ++i) {
+    auto src_slice_idx = i - 1;
+    auto dst_slice_idx = i;
+
+    auto *const src = createSlice(graph, {result->output()},
+                                  {src_slice_idx + 1}, {src_slice_idx}, {dim})
+                          ->output();
+    auto *const dst = createSlice(graph, {result->output()},
+                                  {dst_slice_idx + 1}, {dst_slice_idx}, {dim})
+                          ->output();
+    auto *const new_val = createMul(graph, {src, dst})->output();
+
+    const std::vector<torch::jit::Value *> args{
+        result->output(), wrapInConstantVec(graph, {dst_slice_idx}), new_val};
+
+    result = createDynamicupdate(graph, args, {dim}, {1}, 0);
+    result->output()->setType(
+        result->output()->type()->expect<c10::TensorType>()->withSizes(
+            data_shape));
+  }
+
+  return result;
+}
+
 } // namespace
 
 __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
@@ -221,6 +259,7 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::mkldnn_convolution, conv2dHandler);
   registerHandler(c10::aten::conv2d, conv2dHandler);
   registerHandler(c10::aten::cumsum, cumsumHandler);
+  registerHandler(c10::aten::cumprod, cumprodHandler);
 }
 
 } // namespace poptorch

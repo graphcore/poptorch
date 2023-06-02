@@ -354,10 +354,18 @@ def test_available_memory_automatic():
 @pytest.mark.parametrize("training", [True, False])
 def test_cumsum(dim, training):
     torch.manual_seed(42)
-
     op = lambda x: torch.cumsum(x, dim=dim)
     input = torch.randn(1, 5, 6, dtype=torch.float32)
 
+    execute_and_check_wrapper(op, input, training, rtol=0.02, atol=0.02)
+
+
+@pytest.mark.parametrize("dim", range(-3, 3))
+@pytest.mark.parametrize("training", [True, False])
+def test_cumprod(dim, training):
+    torch.manual_seed(42)
+    input = torch.randn(1, 5, 6, dtype=torch.float32)
+    op = lambda x: torch.cumprod(x, dim=dim)
     execute_and_check_wrapper(op, input, training, rtol=0.02, atol=0.02)
 
 
