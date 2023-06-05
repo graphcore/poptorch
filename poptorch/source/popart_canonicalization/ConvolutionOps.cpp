@@ -218,7 +218,7 @@ torch::jit::Node *cumprodHandler(torch::jit::Graph *graph,
   const std::vector<int64_t> data_shape = shapeFromTensor(data);
   const int64_t dim = handleDimensionParam(
       node->input(1), data->type()->expect<c10::TensorType>());
-  const std::int64_t num_iters = data_shape.at(dim);
+  const int64_t num_iters = data_shape.at(dim);
 
   auto *result = createIdentity(graph, {data});
   result->output()->setType(
@@ -226,9 +226,9 @@ torch::jit::Node *cumprodHandler(torch::jit::Graph *graph,
           data_shape));
   auto select_handler = getHandler(c10::aten::select);
 
-  for (std::int64_t i = 1; i < num_iters; ++i) {
-    auto src_slice_idx = i - 1;
-    auto dst_slice_idx = i;
+  for (int64_t i = 1; i < num_iters; ++i) {
+    const auto src_slice_idx = i - 1;
+    const auto dst_slice_idx = i;
 
     auto *const src = createSlice(graph, {result->output()},
                                   {src_slice_idx + 1}, {src_slice_idx}, {dim})

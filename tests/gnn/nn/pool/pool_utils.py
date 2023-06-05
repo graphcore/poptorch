@@ -10,7 +10,6 @@ from gnn.nn.nn_utils import op_harness
 
 def assert_(native_out, poptorch_out):
     def check_inner_field(x, y):
-        print(type(x))
         assert isinstance(x, type(y)), \
             f"x type={type(x)} is different than y type={type(y)}"
         if isinstance(x, torch.Tensor):

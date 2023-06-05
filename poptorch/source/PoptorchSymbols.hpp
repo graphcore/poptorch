@@ -93,4 +93,8 @@ extern c10::Symbol scatter_min;
 extern c10::Symbol scatter_mul;
 } // namespace torch_scatter
 
+namespace torch_cluster {
+extern c10::Symbol grid;
+} // namespace torch_cluster
+
 #endif // SOURCE_POPTORCH_SYMBOLS_H

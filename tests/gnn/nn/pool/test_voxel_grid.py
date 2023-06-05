@@ -10,7 +10,6 @@ from torch_geometric.testing import withPackage
 from pool_utils import pool_harness
 
 
-@pytest.mark.skip(reason="TODO(AFS-264, AFS-265)")
 @withPackage('torch_cluster')
 def test_voxel_grid():
     pos = torch.Tensor([[0, 0], [11, 9], [2, 8], [2, 2], [8, 3]])
@@ -35,7 +34,6 @@ def test_voxel_grid_with_optional_args():
     assert cluster_no_batch.tolist() == [0, 10, 4, 0, 1]
 
 
-@pytest.mark.skip(reason="TODO(AFS-264, AFS-265)")
 @withPackage('torch_cluster')
 def test_single_voxel_grid():
     pos = torch.Tensor([[0, 0], [1, 1], [2, 2], [3, 3], [4, 4]])

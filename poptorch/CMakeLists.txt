@@ -51,6 +51,7 @@ add_library(poptorch SHARED
   "source/popart_canonicalization/PopartCanonicalizationUtils.cpp"
   "source/popart_canonicalization/PoptorchHandlers.gen.cpp"
   "source/popart_canonicalization/PyGTorchScatterOps.cpp"
+  "source/popart_canonicalization/PyGTorchClusterOps.cpp"
   "source/popart_canonicalization/RNNOps.cpp"
   "source/popart_canonicalization/RandomSamplingOps.cpp"
   "source/popart_canonicalization/ReduceOps.cpp"

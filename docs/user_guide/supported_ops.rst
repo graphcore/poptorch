@@ -219,7 +219,7 @@ Other ops
 '''''''''
 
 * ``torch.cumsum``
-* ``torch.cumpros``
+* ``torch.cumprod``
 * ``torch.cross``
 * ``torch.meshgrid``
 * ``torch.cartesian_prod``

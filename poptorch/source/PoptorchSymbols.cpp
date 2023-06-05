@@ -41,6 +41,20 @@ static void initializeTorchScatterSymbols() {
 
 } // namespace torch_scatter
 
+namespace torch_cluster {
+
+c10::Symbol grid; // NOLINT
+
+// clang-format off
+__attribute__((constructor(SYMBOL_INIT_PRIORITY)))
+static void initializeTorchScatterSymbols() {
+  // clang-format on
+  poptorch::logging::trace("Initializing torch_scatter symbols");
+  SYMBOL_INIT(torch_cluster, grid);
+}
+
+} // namespace torch_cluster
+
 namespace poptorch {
 namespace symbols {
 
