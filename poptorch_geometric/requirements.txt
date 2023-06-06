@@ -1,6 +1,6 @@
 # Install pre-built wheels for PyTorch Geometric that are compatible with
-# poptorch which is currently pinned to torch 2.0.0
---find-links https://data.pyg.org/whl/torch-2.0.0+cpu.html
+# poptorch which is currently pinned to torch 2.0.1
+--find-links https://data.pyg.org/whl/torch-2.0.1+cpu.html
 
 pyg-nightly==2.4.0.dev20230606
 
