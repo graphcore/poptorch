@@ -160,6 +160,25 @@ torch::jit::Node *geluHandler(torch::jit::Graph *graph,
   ERROR("Unknown GELU approximate '" << approximate << "'");
 }
 
+torch::jit::Node *mishHandler(torch::jit::Graph *graph,
+                              torch::jit::Node *node) {
+  auto *src = node->input(0);
+  auto *const neg_src = createNeg(graph, {src});
+  auto *const sigm = createSigmoid(graph, {neg_src->output()});
+  auto *const mul = createMul(graph, {sigm->output(), sigm->output()});
+
+  const auto shape = shapeFromTensor(mul->output());
+  const size_t size = std::accumulate(shape.cbegin(), shape.cend(), 1,
+                                      std::multiplies<size_t>());
+  const std::vector<double> ones_vec(size, 1.0);
+  auto *const one = createConstantFloat32(graph, ones_vec, shape);
+  auto *const one_minus_mul = createSub(graph, {one->output(), mul->output()});
+  auto *const one_plus_mul = createAdd(graph, {one->output(), mul->output()});
+  auto *const div =
+      createDiv(graph, {one_minus_mul->output(), one_plus_mul->output()});
+  return createMul(graph, {src, div->output()});
+}
+
 } // namespace
 
 __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
@@ -172,6 +191,7 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::prelu, preluHandler);
   registerHandler(c10::aten::_prelu_kernel, preluHandler);
   registerHandler(c10::aten::gelu, geluHandler);
+  registerHandler(c10::aten::mish, mishHandler);
 }
 
 } // namespace poptorch
