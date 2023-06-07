@@ -41,7 +41,12 @@ def aggr_harness(aggr,
 
             x_broadcasted = torch.index_select(x, 0, broadcast_index)
             kwargs = {}
-            if isinstance(self.aggr, torch_geometric.nn.aggr.SortAggregation):
+            if isinstance(self.aggr,
+                          (torch_geometric.nn.aggr.SortAggregation,
+                           torch_geometric.nn.aggr.GRUAggregation,
+                           torch_geometric.nn.aggr.GraphMultisetTransformer,
+                           torch_geometric.nn.aggr.SetTransformerAggregation,
+                           torch_geometric.nn.aggr.LSTMAggregation)):
                 kwargs["max_num_elements"] = size
 
             result = self.aggr(x_broadcasted,
