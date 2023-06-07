@@ -8,7 +8,6 @@ from .knn import knn
 from .knn_graph import knn_graph
 from .knn_interpolate import knn_interpolate
 from .mf_conv import MFConv
-from .nearest import nearest
 from .radius import radius, radius_graph
 
 __all__ = [
@@ -19,7 +18,6 @@ __all__ = [
     'knn',
     'knn_graph',
     'knn_interpolate',
-    'nearest',
     'MFConv',
     'radius',
     'radius_graph',
