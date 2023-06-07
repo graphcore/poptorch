@@ -79,6 +79,8 @@ extern c10::Symbol clear_attribute;
 extern c10::Symbol unfold;
 extern c10::Symbol prelu;
 extern c10::Symbol fps;
+extern c10::Symbol nearest;
+extern c10::Symbol nearest_batch_list;
 } // namespace symbols::poptorch
 
 // Return the attribute symbol refering to having overlap for a given input
