@@ -10,10 +10,17 @@ from .knn_interpolate import knn_interpolate
 from .mf_conv import MFConv
 from .nearest import nearest
 from .radius import radius, radius_graph
-from .to_dense_batch import to_dense_batch
 
 __all__ = [
-    'Aggregation', 'ClusterGCNConv', 'HeteroLinear', 'InstanceNorm', 'knn',
-    'knn_graph', 'knn_interpolate', 'nearest', 'MFConv', 'radius',
-    'radius_graph', 'to_dense_batch'
+    'Aggregation',
+    'ClusterGCNConv',
+    'HeteroLinear',
+    'InstanceNorm',
+    'knn',
+    'knn_graph',
+    'knn_interpolate',
+    'nearest',
+    'MFConv',
+    'radius',
+    'radius_graph',
 ]

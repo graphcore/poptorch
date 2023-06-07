@@ -14,11 +14,11 @@ class _TorchGeometricOpsSubstitutionManager:
         torch_geometric.nn: {
             "knn_interpolate": ops.knn_interpolate
         },
-        torch_geometric.nn.aggr.base: {
-            "to_dense_batch": ops.to_dense_batch
-        },
         torch_geometric.nn.aggr.base.Aggregation: {
             "assert_sorted_index": ops.Aggregation.assert_sorted_index
+        },
+        torch_geometric.nn.aggr.sort.SortAggregation: {
+            "to_dense_batch": ops.Aggregation.to_dense_batch
         },
         torch_geometric.nn.ClusterGCNConv: {
             "forward": ops.ClusterGCNConv.forward
@@ -49,12 +49,6 @@ class _TorchGeometricOpsSubstitutionManager:
             "knn_graph": ops.knn_graph,
             "radius": ops.radius,
             "radius_graph": ops.radius_graph,
-        },
-        torch_geometric.nn.pool.mem_pool: {
-            "to_dense_batch": ops.to_dense_batch
-        },
-        torch_geometric.utils: {
-            "to_dense_batch": ops.to_dense_batch
         }
     }
 
@@ -69,6 +63,9 @@ class _TorchGeometricOpsSubstitutionManager:
         self.restore()
 
     def replace(self):
+        torch_geometric.experimental.set_experimental_mode(
+            True, 'disable_dynamic_shapes')
+
         def create_wrapper(f, replacement_f):
             @functools.wraps(f)
             def _wrapper(*args, **kwargs):
@@ -86,6 +83,9 @@ class _TorchGeometricOpsSubstitutionManager:
         for mod, replacement_map in self.overrides.items():
             for op_name, func in replacement_map.items():
                 setattr(mod, op_name, func)
+
+        torch_geometric.experimental.set_experimental_mode(
+            False, 'disable_dynamic_shapes')
 
 
 @call_once
