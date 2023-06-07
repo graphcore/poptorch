@@ -359,41 +359,78 @@ def test_fixed_size_dataloader(loader,
     [FixedSizeStrategy.PadToMax, FixedSizeStrategy.StreamPack])
 @pytest.mark.parametrize(
     'dataset', ['fake_hetero_dataset', 'fake_node_task_hetero_dataset'])
+@pytest.mark.parametrize('fixed_size_options,requires_trimming',
+                         [(FixedSizeOptions(
+                             num_nodes={
+                                 "v0": 500,
+                                 "v1": 1000,
+                             },
+                             num_edges={
+                                 ("v0", "e0", "v1"): 5000,
+                                 ("v0", "e0", "v0"): 6000,
+                                 ("v1", "e0", "v0"): 7000,
+                                 ("v0", "e1", "v1"): 8000,
+                                 ("v1", "e0", "v1"): 9000,
+                             },
+                             num_graphs=10,
+                         ), False),
+                          (FixedSizeOptions(
+                              num_nodes=1000,
+                              num_edges={
+                                  ("v0", "e0", "v1"): 5000,
+                                  ("v0", "e0", "v0"): 6000,
+                                  ("v1", "e0", "v0"): 7000,
+                                  ("v0", "e1", "v1"): 8000,
+                                  ("v1", "e0", "v1"): 9000,
+                              },
+                              num_graphs=10,
+                          ), False),
+                          (FixedSizeOptions(
+                              num_nodes={
+                                  "v0": 500,
+                                  "v1": 1000,
+                              },
+                              num_edges=8000,
+                              num_graphs=10,
+                          ), False),
+                          (FixedSizeOptions(
+                              num_nodes={
+                                  "v0": 100,
+                                  "v1": 200,
+                              },
+                              num_edges={
+                                  ("v0", "e0", "v1"): 2000,
+                                  ("v0", "e0", "v0"): 300,
+                                  ("v1", "e0", "v0"): 1000,
+                                  ("v0", "e1", "v1"): 100,
+                                  ("v1", "e0", "v1"): 3000,
+                              },
+                              num_graphs=10,
+                          ), True)])
 def test_fixed_size_heterodataloader(
         loader,
         fixed_size_strategy,
         benchmark,
         dataset,
+        fixed_size_options,
+        requires_trimming,
         request,
-        batch_size=10,
 ):
     dataset = request.getfixturevalue(dataset)
-    num_node_types = 2
-    num_edge_types = 5
     ipu_dataloader = loader is not FixedSizeDataLoader
+
+    batch_size = fixed_size_options.num_graphs
 
     device_iterations = loader.get(
         'device_iterations',
         poptorch.Options().device_iterations) if ipu_dataloader else 1
 
-    # Get a sensible value for the the maximum number of nodes.
-    padded_num_nodes = dataset.avg_num_nodes * (batch_size + 1)
-    padded_num_edges = len(
-        dataset.edge_types) * dataset.avg_degree * padded_num_nodes
-    padded_num_nodes = len(dataset.node_types) * padded_num_nodes
-
     # Create a fixed size dataloader.
     kwargs = {
-        'dataset':
-        dataset,
-        'batch_size':
-        batch_size,
-        'fixed_size_options':
-        FixedSizeOptions(num_nodes=padded_num_nodes,
-                         num_edges=padded_num_edges,
-                         num_graphs=batch_size),
-        'fixed_size_strategy':
-        fixed_size_strategy
+        'dataset': dataset,
+        'batch_size': batch_size,
+        'fixed_size_options': fixed_size_options,
+        'fixed_size_strategy': fixed_size_strategy,
     }
 
     if ipu_dataloader:
@@ -402,34 +439,57 @@ def test_fixed_size_heterodataloader(
         kwargs['options'] = options
         loader = loader['loader_cls']
 
-    loader = loader(**kwargs)
+    fixed_size_loader = loader(**kwargs)
 
-    # Check that each batch matches the expected size.
-    padded_num_nodes *= num_node_types
-    padded_num_edges *= num_edge_types
-    for batch in loader:
+    if requires_trimming:
+        with pytest.raises(RuntimeError):
+            next(iter(fixed_size_loader))
+        fixed_size_loader = loader(
+            over_size_strategy=OverSizeStrategy.TrimNodesAndEdges, **kwargs)
+
+    for batch in fixed_size_loader:
         for node_attr in filter(is_iterable, batch.node_stores):
             check_batch_and_ptr(node_attr)
 
-        assert batch.num_nodes == padded_num_nodes
-        assert batch.num_edges == padded_num_edges
+        assert batch.num_nodes == fixed_size_options.total_num_nodes
+        assert batch.num_edges == fixed_size_options.total_num_edges
         assert 'num_nodes' not in batch.node_types
         assert 'num_edges' not in batch.edge_types
 
         if 'y' in batch._node_store_dict.keys():
             assert batch.y.shape[0] == batch_size * device_iterations
+        assert batch.graphs_mask.shape[0] == batch_size * device_iterations
 
         assert sum(node_attr.batch.shape[0]
                    for node_attr in filter(is_iterable, batch.node_stores)
-                   ) == padded_num_nodes * device_iterations
+                   ) == fixed_size_options.total_num_nodes * device_iterations
         if not fixed_size_strategy == FixedSizeStrategy.StreamPack:
             assert {
                 node_attr.ptr.shape[0]
                 for node_attr in filter(is_iterable, batch.node_stores)
             } == {device_iterations * (batch_size + 1)}
 
+        # Check sizes for some of the items in the batch
+        for node_type in fixed_size_options.num_nodes:
+            assert batch[node_type].x.shape[0] == fixed_size_options.num_nodes[
+                node_type] * device_iterations
+            assert batch[node_type].batch.shape[
+                0] == fixed_size_options.num_nodes[
+                    node_type] * device_iterations
+            assert batch[node_type].nodes_mask.shape[
+                0] == fixed_size_options.num_nodes[
+                    node_type] * device_iterations
+        for edge_type in fixed_size_options.num_edges:
+            # Checking num of edges with second dimension so it is not a multiple
+            # of device iterations.
+            assert batch[edge_type].edge_index.shape[
+                1] == fixed_size_options.num_edges[edge_type]
+            assert batch[edge_type].edges_mask.shape[
+                0] == fixed_size_options.num_edges[
+                    edge_type] * device_iterations
+
     def loop():
-        for _ in loader:
+        for _ in fixed_size_loader:
             pass
 
     benchmark(loop)
@@ -523,12 +583,14 @@ def test_dataloader(dataset, request, batch_size=10):
 @pytest.mark.parametrize('dataset',
                          ['fake_molecular_dataset', 'fake_hetero_dataset'])
 @pytest.mark.parametrize('device_iterations', [None, 3])
-def test_padded_dataloader(
+def test_pad_transform_with_dataloader(
         device_iterations,
         dataset,
         request,
         batch_size=3,
 ):
+    """Tests the pattern of using a Pad transform and a non-fixed-size
+       data loader as an approach to achieve fixed size batches"""
     dataset = request.getfixturevalue(dataset)
     is_HeteroData = isinstance(dataset[0], HeteroData)
     if is_HeteroData:

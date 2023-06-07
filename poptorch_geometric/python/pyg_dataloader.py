@@ -5,7 +5,7 @@ from typing import List, Optional, Sequence, Tuple, Union
 
 import torch.utils.data
 from torch.utils.data.sampler import RandomSampler, SequentialSampler
-from torch_geometric.data import Dataset
+from torch_geometric.data import Dataset, HeteroData
 from torch_geometric.data.data import BaseData
 
 from poptorch_geometric.collate import FixedSizeCollater
@@ -186,9 +186,14 @@ class FixedSizeDataLoader(torch.utils.data.DataLoader):
         else:
             self.fixed_size_options = fixed_size_options
 
+        if (isinstance(dataset[0], HeteroData)
+                and not self.fixed_size_options.is_hetero()):
+            self.fixed_size_options.to_hetero(dataset[0].node_types,
+                                              dataset[0].edge_types)
+
         assert batch_size == self.fixed_size_options.num_graphs, (
-            "`max_num_graphs_per_batch` in fixed size options must match"
-            " provided batch size in dataloader. `max_num_graphs_per_batch`"
+            "`num_graphs` in fixed size options must match"
+            " provided batch size in dataloader. `num_graphs`"
             f" is {self.fixed_size_options.num_graphs} but batch"
             f" size is {batch_size}.")
         self.padded_batch_size = batch_size
@@ -207,8 +212,8 @@ class FixedSizeDataLoader(torch.utils.data.DataLoader):
 
             # Leave space for padding.
             sampler_graphs = batch_size - 1
-            sampler_nodes = fixed_size_options.num_nodes - 1
-            sampler_edges = fixed_size_options.num_edges - 1
+            sampler_nodes = fixed_size_options.total_num_nodes - 1
+            sampler_edges = fixed_size_options.total_num_edges - 1
             batch_sampler = StreamPackingSampler(
                 dataset,
                 sampler_graphs,

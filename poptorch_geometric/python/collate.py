@@ -104,44 +104,6 @@ def _reset_attr(value: Any, key: str = None) -> Any:
     return type(value)()
 
 
-def _make_node_slices_gen(data_list: List[BaseData]) -> List[slice]:
-    data_type = type(data_list[0])
-    return list(_data_slice_gen.dispatch(data_type)(data_list, 'num_nodes'))
-
-
-def _make_data_edge_slice_gen(data_list: List[BaseData]) -> List[slice]:
-    data_type = type(data_list[0])
-    return list(_data_slice_gen.dispatch(data_type)(data_list, 'num_edges'))
-
-
-@singledispatch
-def _data_slice_gen(data_list, attr) -> Generator[slice, None, None]:
-    raise ValueError(f'Unsupported data type: {type(data_list[0])}')
-
-
-@_data_slice_gen.register(Data)
-def _(data_list: List[Data], attr: str) -> Generator[slice, None, None]:
-    start = 0
-    end = 0
-    for data in data_list:
-        end += getattr(data, attr)
-        yield slice(start, end)
-        start = end
-
-
-@_data_slice_gen.register(HeteroData)
-def _(data_list: List[HeteroData], attr: str) -> Generator[slice, None, None]:
-    start = 0
-    end = 0
-    is_nodes_gen = (attr == 'num_nodes')
-    for data in data_list:
-        for node_type in (data.node_stores
-                          if is_nodes_gen else data.edge_stores):
-            end += getattr(node_type, attr)
-            yield slice(start, end)
-            start = end
-
-
 def _create_preserve_mask(num_elems: int, num_elems_to_trim: int,
                           slices: List[slice]) -> List[bool]:
     # Prevent deletion of all elements from a single graph.
@@ -161,56 +123,32 @@ def _create_preserve_mask(num_elems: int, num_elems_to_trim: int,
     return preserve_mask
 
 
-@singledispatch
-def _prune_data_nodes(data_list, preserve_nodes_mask, node_slices):  # pylint: disable=unused-argument
-    raise ValueError(f'Unsupported data types: {type(data_list[0])}')
+def data_slice_gen(num_list: List[int]) -> Generator[slice, None, None]:
+    start = 0
+    end = 0
+    for num in num_list:
+        end += num
+        yield slice(start, end)
+        start = end
 
 
-@_prune_data_nodes.register(Data)
-def _(data_list: List[Data], preserve_nodes_mask: torch.Tensor,
-      node_slices: List[slice]) -> List[Data]:
-    return [
-        data.subgraph(preserve_nodes_mask[slice])
-        for data, slice in zip(data_list, node_slices)
-    ]
+def create_slices_and_preserve_mask(
+        max_num: int, num_list: List[int]
+) -> Tuple[Generator[slice, None, None], List[bool]]:
+    num_real = sum(num_list)
 
+    # There is nothing to prune.
+    if num_real < max_num:
+        return None, None
 
-@_prune_data_nodes.register(HeteroData)
-def _(data_list: List[HeteroData], preserve_nodes_mask: torch.Tensor,
-      node_slices: List[slice]) -> List[HeteroData]:
-    node_slices_iter = iter(node_slices)
-    return [
-        data.subgraph({
-            node_type: preserve_nodes_mask[next(node_slices_iter)]
-            for node_type in data.node_types
-        }) for data in data_list
-    ]
+    num_to_trim = num_real - max_num
 
+    slices = list(data_slice_gen(num_list))
 
-@singledispatch
-def _prune_data_edges(data_list, preserve_edges_mask, edge_slices):  # pylint: disable=unused-argument
-    raise ValueError(f'Unsupported data types: {type(data_list[0])}')
+    # Prepare the mask of randomly chosen to remove.
+    preserve_mask = _create_preserve_mask(num_real, num_to_trim, slices)
 
-
-@_prune_data_edges.register(Data)
-def _(data_list: List[Data], preserve_edges_mask: torch.Tensor,
-      edge_slices: List[slice]) -> Data:
-    return [
-        data.edge_subgraph(preserve_edges_mask[slc])
-        for data, slc in zip(data_list, edge_slices)
-    ]
-
-
-@_prune_data_edges.register(HeteroData)
-def _(data_list: List[HeteroData], preserve_edges_mask: torch.Tensor,
-      edge_slices: List[slice]) -> HeteroData:
-    edge_slices_iter = iter(edge_slices)
-    return [
-        data.edge_subgraph({
-            edge_type: preserve_edges_mask[next(edge_slices_iter)]
-            for edge_type in data.edge_types
-        }) for data in data_list
-    ]
+    return slices, preserve_mask
 
 
 @singledispatch
@@ -224,13 +162,33 @@ def _(value: dict) -> bool:
 
 
 @singledispatch
-def _all_positive(value: int) -> bool:
+def _any_positive(value: int) -> bool:
     return value > 0
 
 
-@_all_positive.register(dict)
+@_any_positive.register(dict)
 def _(value: dict) -> bool:
-    return all(v > 0 for v in value.values())
+    return any(v > 0 for v in value.values())
+
+
+@singledispatch
+def _check_if_over_size(num_pad: int, num_total: int, type_str: str,
+                        oversize_error: str):
+    if _any_negative(num_pad):
+        raise RuntimeError(
+            oversize_error.format(type_str=type_str,
+                                  trim_fn=f"trim_{type_str}",
+                                  type_value=num_total))
+
+
+@_check_if_over_size.register(dict)
+def _(num_pad: dict, num_total: dict, type_str: str, oversize_error: str):
+    for k, v in num_pad.items():
+        if v < 0:
+            raise RuntimeError(
+                oversize_error.format(type_str=f"{k} {type_str}",
+                                      trim_fn=f"trim_{type_str}",
+                                      type_value=num_total[k]))
 
 
 class FixedSizeCollater(Collater):
@@ -296,6 +254,10 @@ class FixedSizeCollater(Collater):
         NODE_LVL = 1
 
     def __call__(self, data_list: List[BaseData]) -> Batch:
+        if not self.opts.is_hetero() and isinstance(data_list[0], HeteroData):
+            self.opts.to_hetero(data_list[0].node_types,
+                                data_list[0].edge_types)
+
         if not isinstance(data_list, list):
             raise TypeError(f'Expected list, got {type(data_list).__name__}.')
 
@@ -316,7 +278,19 @@ class FixedSizeCollater(Collater):
 
         num_real_graphs = len(data_list)
         num_pad_graphs = self.opts.num_graphs - num_real_graphs
+
+        if num_pad_graphs < 0:
+            raise RuntimeError(
+                "The maximum number of graphs requested doesn't allocate"
+                " enough room for all the graphs in the batch plus at least"
+                " one extra graph required for padding the batch to a fixed"
+                " size. The number of graphs received for batching is"
+                f" {num_real_graphs + 1}, including at least one padding"
+                " graph, but space for only"
+                f" {num_pad_graphs + num_real_graphs} graphs has been"
+                " requested.")
         num_all_graphs = num_real_graphs + num_pad_graphs
+
         num_real_nodes, num_pad_nodes, num_real_edges, num_pad_edges = \
             self._calc_pad_limits(data_list)
         if self.trim_nodes and _any_negative(num_pad_nodes):
@@ -329,38 +303,23 @@ class FixedSizeCollater(Collater):
             num_real_nodes, num_pad_nodes, num_real_edges, num_pad_edges = \
                 self._calc_pad_limits(data_list)
 
-        if num_pad_graphs < 0:
-            raise RuntimeError(
-                "The maximum number of graphs requested doesn't allocate"
-                " enough room for all the graphs in the batch plus at least"
-                " one extra graph required for padding the batch to a fixed"
-                " size. The number of graphs received for batching is"
-                f" {num_real_graphs + 1}, including at least one padding"
-                " graph, but space for only"
-                f" {num_pad_graphs + num_real_graphs} graphs has been"
-                " requested.")
-
         oversize_error = (
             "The fixed sizes given don't allocate enough space for the"
             " number of {type_str} required to fit"
             f" {num_real_graphs} sample(s) into a batch"
-            f" ({num_pad_graphs + num_real_graphs} including an extra padded"
-            " graph). Increase the maximum number of {type_str}, currently"
-            " set to {type_value}, or set `trim_{type_str}` to remove any"
+            f" ({num_pad_graphs + num_real_graphs} including extra padded"
+            " graph(s)). Increase the maximum number of {type_str}, currently"
+            " set to {type_value}, or set `{trim_fn}` to remove any"
             " excess {type_str} to achieve the given maximum number of"
             " {type_str}.")
 
-        if _any_negative(num_pad_nodes):
-            raise RuntimeError(
-                oversize_error.format(type_str="nodes",
-                                      type_value=self.opts.num_nodes))
-        if _any_negative(num_pad_edges):
-            raise RuntimeError(
-                oversize_error.format(type_str="edges",
-                                      type_value=self.opts.num_edges))
+        _check_if_over_size(num_pad_nodes, self.opts.num_nodes, "nodes",
+                            oversize_error)
+        _check_if_over_size(num_pad_edges, self.opts.num_edges, "edges",
+                            oversize_error)
 
-        num_nodes_or_edges_positive = _all_positive(
-            num_pad_nodes) or _all_positive(num_pad_edges)
+        num_nodes_or_edges_positive = _any_positive(
+            num_pad_nodes) or _any_positive(num_pad_edges)
         if num_pad_graphs == 0 and num_nodes_or_edges_positive:
             raise RuntimeError(
                 f'Requested to pad a batch to {num_all_graphs} graphs but ' \
@@ -470,24 +429,43 @@ class FixedSizeCollater(Collater):
           ) -> Tuple[Dict[NodeType, int], Dict[NodeType, int],
                      Dict[EdgeType, int], Dict[EdgeType, int]]:
         real_nodes_nums = dict()
+        pad_nodes_nums = dict()
         real_edges_nums = dict()
+        pad_edges_nums = dict()
         for data_ in data_list:
             for node_type in data_.node_types:
-                real_nodes_nums[node_type] = real_nodes_nums.get(
+                num_real_nodes = real_nodes_nums.get(
                     node_type, 0) + data_[node_type].x.shape[0]
+                real_nodes_nums[node_type] = num_real_nodes
+
+                if isinstance(self.opts.num_nodes, dict):
+                    assert node_type in self.opts.num_nodes, (
+                        f"Node type {node_type} exists in the data"
+                        " but not in the fixed size options. Ensure"
+                        " your fixed size options specify a `num_nodes`"
+                        f" for node type {node_type}.")
+                    num_pad_nodes = self.opts.num_nodes[
+                        node_type] - num_real_nodes
+                else:
+                    num_pad_nodes = self.opts.num_nodes - num_real_nodes
+                pad_nodes_nums[node_type] = num_pad_nodes
 
             for edge_type in data_.edge_types:
-                real_edges_nums[edge_type] = real_edges_nums.get(
+                num_real_edges = real_edges_nums.get(
                     edge_type, 0) + data_[edge_type].edge_index.shape[1]
+                real_edges_nums[edge_type] = num_real_edges
 
-        pad_nodes_nums = {
-            k: (self.opts.num_nodes - v)
-            for k, v in real_nodes_nums.items()
-        }
-        pad_edges_nums = {
-            k: (self.opts.num_edges - v)
-            for k, v in real_edges_nums.items()
-        }
+                if isinstance(self.opts.num_edges, dict):
+                    assert edge_type in self.opts.num_edges, (
+                        f"Edge type {edge_type} exists in the data"
+                        " but not in the fixed size options. Ensure"
+                        " your fixed size options specify a `num_edges`"
+                        f" for edge type {edge_type}.")
+                    num_pad_edges = self.opts.num_edges[
+                        edge_type] - num_real_edges
+                else:
+                    num_pad_edges = self.opts.num_edges - num_real_edges
+                pad_edges_nums[edge_type] = num_pad_edges
 
         return real_nodes_nums, pad_nodes_nums, real_edges_nums, pad_edges_nums
 
@@ -515,53 +493,110 @@ class FixedSizeCollater(Collater):
 
         return padded_data
 
-    def _prune_edges(self, data_list: List[BaseData]) -> List[BaseData]:
-        num_real_edges = sum(d.num_edges for d in data_list)
+    def _prune_edges(self, data_list):
+        return self._prune_edges_body(data_list[0], data_list)
+
+    @singledispatchmethod
+    def _prune_edges_body(self, data, data_list):  # pylint: disable=unused-argument
+        raise ValueError(f'Unsupported data type: {type(data)}')
+
+    @_prune_edges_body.register(Data)
+    def _(self, _, data_list: List[Data]) -> List[Data]:
+        edge_slices, preserve_edges_mask = create_slices_and_preserve_mask(
+            self.opts.num_edges, [d.num_edges for d in data_list])
 
         # There is nothing to prune.
-        if num_real_edges < self.opts.num_edges:
+        if edge_slices is None:
             return data_list
-
-        num_edges_to_trim = num_real_edges - self.opts.num_edges
-        edge_slices = _make_data_edge_slice_gen(data_list)
-
-        # Prepare the mask of edges randomly chosen to remove.
-        preserve_edges_mask = _create_preserve_mask(num_real_edges,
-                                                    num_edges_to_trim,
-                                                    edge_slices)
 
         # Apply the preservation masks to the data_list to finally trim edges.
-        data_type = type(data_list[0])
-        return _prune_data_edges.dispatch(data_type)(data_list,
-                                                     preserve_edges_mask,
-                                                     edge_slices)
+        return [
+            data.edge_subgraph(preserve_edges_mask[slc])
+            for data, slc in zip(data_list, edge_slices)
+        ]
 
-    def _prune_nodes(self, data_list: List[BaseData]) -> List[BaseData]:
-        num_real_nodes = sum(d.num_nodes for d in data_list)
+    @_prune_edges_body.register(HeteroData)
+    def _(self, data: HeteroData,
+          data_list: List[HeteroData]) -> List[HeteroData]:
+        edge_types = data.edge_types
+        preserve_edges_masks_dict = dict()
+        edge_slices_dict = dict()
+
+        for edge_type in edge_types:
+            edge_slices, preserve_edges_mask = create_slices_and_preserve_mask(
+                self.opts.num_edges[edge_type],
+                [d[edge_type].edge_index.shape[1] for d in data_list])
+            preserve_edges_masks_dict[edge_type] = preserve_edges_mask
+            edge_slices_dict[edge_type] = edge_slices
+
+        return [
+            data.edge_subgraph({
+                edge_type: preserve_edges_masks_dict[edge_type][
+                    edge_slices_dict[edge_type][idx]]
+                for edge_type in edge_types
+                if edge_slices_dict[edge_type] is not None
+            }) for idx, data in enumerate(data_list)
+        ]
+
+    def _prune_nodes(self, data_list):
+        return self._prune_nodes_body(data_list[0], data_list)
+
+    @singledispatchmethod
+    def _prune_nodes_body(self, data, data_list):  # pylint: disable=unused-argument
+        raise ValueError(f'Unsupported data type: {type(data)}')
+
+    @_prune_nodes_body.register(Data)
+    def _(self, _, data_list: List[BaseData]) -> List[BaseData]:
+        num_graphs_to_trim = len(data_list)
+        if self.opts.num_nodes < num_graphs_to_trim:
+            raise RuntimeError(
+                f'The number of nodes to trim to ({self.opts.num_nodes})'
+                ' is less than the number of graphs in the batch'
+                f' ({num_graphs_to_trim}), which would result in empty'
+                ' graphs.')
+
+        nodes_slices, preserve_nodes_mask = create_slices_and_preserve_mask(
+            self.opts.num_nodes, [d.num_nodes for d in data_list])
 
         # There is nothing to prune.
-        if num_real_nodes < self.opts.num_nodes:
+        if nodes_slices is None:
             return data_list
 
-        num_graphs_to_trim = len(data_list)
-        num_nodes_to_trim = num_real_nodes - self.opts.num_nodes
-        if self.opts.num_nodes < num_graphs_to_trim:
-            raise RuntimeError('Too many nodes to trim. Batch has '
-                               f'{num_graphs_to_trim} graphs with '
-                               f'{num_real_nodes} total nodes. Requested '
-                               f'to trim it to {num_nodes_to_trim} nodes, '
-                               'which would result in empty graphs.')
-        node_slices = _make_node_slices_gen(data_list)
-
-        # Prepare the mask of nodes randomly chosen to remove.
-        preserve_nodes_mask = _create_preserve_mask(num_real_nodes,
-                                                    num_nodes_to_trim,
-                                                    node_slices)
         # Apply the preservation masks to the data_list  to finally trim nodes.
-        data_type = type(data_list[0])
-        return _prune_data_nodes.dispatch(data_type)(data_list,
-                                                     preserve_nodes_mask,
-                                                     node_slices)
+        return [
+            data.subgraph(preserve_nodes_mask[slice])
+            for data, slice in zip(data_list, nodes_slices)
+        ]
+
+    @_prune_nodes_body.register(HeteroData)
+    def _(self, data: HeteroData,
+          data_list: List[HeteroData]) -> List[HeteroData]:
+        node_types = data.node_types
+        num_graphs_to_trim = len(data_list)
+        preserve_nodes_masks_dict = dict()
+        node_slices_dict = dict()
+
+        for node_type in node_types:
+            if self.opts.num_nodes[node_type] < num_graphs_to_trim:
+                raise RuntimeError(
+                    f'The number of nodes to trim to ({self.opts.num_nodes})'
+                    f' for node type {node_type} is less than the number'
+                    f' of graphs in the batch ({num_graphs_to_trim}), which'
+                    ' would result in empty graphs.')
+            node_slices, preserve_nodes_mask = create_slices_and_preserve_mask(
+                self.opts.num_nodes[node_type],
+                [d[node_type].num_nodes for d in data_list])
+            preserve_nodes_masks_dict[node_type] = preserve_nodes_mask
+            node_slices_dict[node_type] = node_slices
+
+        return [
+            data.subgraph({
+                node_type: preserve_nodes_masks_dict[node_type][
+                    node_slices_dict[node_type][idx]]
+                for node_type in data.node_types
+                if node_slices_dict[node_type] is not None
+            }) for idx, data in enumerate(data_list)
+        ]
 
     @singledispatchmethod
     def _create_structure_dict(self, data):
