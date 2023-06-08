@@ -38,7 +38,7 @@ class Channel:
         """Instrument the methods of an object.
 
         :param obj: Object to instrument
-        :param methods: One or more methods to wrap in profiling tracepoints.
+        :param methods: One or more methods to wrap in profiling trace points.
         """
         if _pvti_available:
             pvti.instrument(obj, methods, self._channel)

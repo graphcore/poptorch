@@ -215,7 +215,7 @@ class SGD(Optimizer, torch.optim.SGD):
         :param momentum: momentum factor.
         :param dampening: dampening term for momentum.
         :param weight_decay: Weight decay (L2 penalty) factor.
-        :param nesterov: Whether to enable nesterov momentum. Default is
+        :param nesterov: Whether to enable Nesterov momentum. Default is
             `False`.
         :param loss_scaling: Factor by which to scale the loss and hence
             gradients to assist numerical stability when using float16.

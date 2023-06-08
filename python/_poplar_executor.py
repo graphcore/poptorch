@@ -203,7 +203,7 @@ class PoplarExecutor:
         self._executable = None
         self._outputs_structure = None
         self._options = options
-        # The args parser needs to be initilialised before the model gets wrapped
+        # The args parser needs to be initialised before the model gets wrapped
         # otherwise we will not be able to retrieve the real arguments list
         self._args_parser = _args_parser.ArgsParser(model)
         # Inputs used to compile the executable
@@ -320,7 +320,7 @@ class PoplarExecutor:
             # The mere existence of the "__torch_function__" results in a
             # "__getattribute__" call and hence weight copying if required.
             # "check_has_torch_function" and "handle_torch_function_getter"
-            # in the Pytorch source code may explain this.
+            # in the PyTorch source code may explain this.
             # Without this, the weights will not be copied in certain
             # situations such as torch.equal(a, b).
             class PoptorchParameter(torch.nn.Parameter):

@@ -34,7 +34,7 @@ try:
 except ImportError as e:
     raise ImportError("Unable to import PopTorch, this can be caused by "
                       "attempting to import PopTorch without an active Poplar "
-                      "SDK\n  The SDK can be enabled by running: "
+                      "SDK.\n  The SDK can be enabled by running: "
                       "`source /path/to/poplar-sdk/enable`") from e
 
 # pylint: disable=wrong-import-position
@@ -665,9 +665,10 @@ def trainingModel(model: Union['torch.nn.Module', 'poptorch.PoplarExecutor'],
     hardware in training mode.
 
     .. note:: PopTorch makes a shallow copy of the model and wraps the original
-            model to fasciliate weight syncronisation. Changes to the parameters
+            model to facilitate weight synchronisation. Changes to the
+            parameters
             in the returned training model affect the original model and vice
-            versa. However, primitive variable types are not synced: for
+            versa. However, primitive variable types are not synced. For
             example calling ``model.train()`` on the original model, which
             changes the ``training`` bool of the model instance, will not alter
             the model returned by this function. You may need to call
@@ -750,7 +751,7 @@ def ipuHardwareIsAvailable(num_ipus: int = 1) -> bool:
 
     Note: This function doesn't check if the IPU is free or already being used.
 
-    :param num_ipus:
+    :param num_ipus: The number of IPUs required.
     :returns: True if physical IPUs are available, False otherwise.
     """
     return poptorch_core.ipuHardwareVersion(num_ipus) != 0
