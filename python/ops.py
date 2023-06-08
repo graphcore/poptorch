@@ -360,7 +360,7 @@ def recomputationCheckpoint(*tensors: List["torch.Tensor"]
     When recomputation is enabled, these values will not be recomputed and they
     will be stored in memory between forward and backwards passes instead.
 
-    :param tensors: One or more tensors which should be checkpointed.
+    :param tensors: One or more tensors which should be check-pointed.
     :return: Tensors (same number and shape as the input tensors).
     """
 
@@ -1011,7 +1011,7 @@ class CPU:
 
 def identity_loss(x: "torch.Tensor", reduction: "str") -> "torch.Tensor":
     """Marks a tensor as being part of the loss calculation and, as such,
-    will backpropagate through it in the PopTorch autograd.
+    will back-propagate through it in the PopTorch autograd.
 
     This function should be called on the (final) loss of a model so that
     it is used as the start of backpropagation. This is equivalent to calling

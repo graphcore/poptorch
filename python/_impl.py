@@ -76,7 +76,7 @@ def createPoptorchError(msg):
 def isRunningOnIpu() -> bool:
     """ This function returns `True` when executing on IPU and `False` when
     executing the model outside IPU scope. This allows for separate
-    codepaths to be marked in the model simply by using:
+    code-paths to be marked in the model simply by using:
 
     >>> if poptorch.isRunningOnIpu():
     >>>      # IPU path
@@ -376,7 +376,7 @@ def forEachParameterAndBuffer(model, fn):
 
 
 def unwrapModelIfNecessary(model: torch.nn.Module):
-    """Unwrap the model, including parameter and buffer annoations and the
+    """Unwrap the model, including parameter and buffer annotations and the
        model as a whole."""
 
     for buff in itertools.chain(model.buffers(), model.parameters()):

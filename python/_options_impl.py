@@ -52,7 +52,7 @@ class OptionsDict:
 
     def __init__(self, **default_values):
         # Keep a dictionary of warnings messages based on the parameter options:
-        # these are printed when the dictionarys are consolidated. The use of a
+        # these are printed when the dictionaries are consolidated. The use of a
         # dictionary allows a warning to be removed by the key, e.g. if there is
         # a warning that the default parameter has changed but the parameter is
         # specified explicitly.

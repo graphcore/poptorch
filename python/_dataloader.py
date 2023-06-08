@@ -475,7 +475,7 @@ class _AsynchronousWorkerProcess:
                 continue
 
             if eof_reached:
-                # Note: it's important to have a writing slot before signaling
+                # Note: it's important to have a writing slot before signalling
                 # the end of the dataset or we might encounter the case where
                 # the whole ring buffer is ready to read:
                 # [ True, True, True]
@@ -509,7 +509,7 @@ class _AsynchronousWorkerProcess:
                 if not self.load_indefinitely:
                     logger.debug(
                         "AsynchronousDataAccessor worker: end of dataset"
-                        " reached signaled to host: waiting for command from"
+                        " reached signalled to host: waiting for command from"
                         " host")
                     state = _WorkerState.Stopped
                     continue  # Go back to the wait for reset

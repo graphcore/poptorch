@@ -396,9 +396,9 @@ class _ValueConstPairFormatter:
     "is_const" is a boolean
 
     If ``variable_attrs`` is provided it will be used to determine the
-    attribute's constness.
+    attribute's const-ness.
 
-    Otherwise the const_evaluator function will be called.
+    Otherwise the ``const_evaluator`` function will be called.
     """
 
     def __init__(self, variable_attrs, const_evaluator, value_validator=None):
@@ -452,7 +452,7 @@ class _AttrReader:
         - If no ``variable_attrs`` list and no const value are provided then
           only ``{name: value}`` will be returned.
         - if a ``variable_attrs`` object is provided then the parameter's
-          constness will depend on whether or not it's marked as const.
+          const-ness will depend on whether or not it's marked as const.
         - if no list is provided but the parameter's value is equal to
           ``is_const_val`` then the parameter will be considered constant
         """
