@@ -151,8 +151,6 @@ c10::Symbol set_attribute;
 c10::Symbol clear_attribute;
 
 c10::Symbol fps;
-c10::Symbol nearest;
-c10::Symbol nearest_batch_list;
 
 // clang-format off
 __attribute__((constructor(SYMBOL_INIT_PRIORITY)))
@@ -201,8 +199,6 @@ static void initializePoptorchSymbols() {
   SYMBOL_INIT(poptorch, clear_attribute);
 
   SYMBOL_INIT(poptorch, fps);
-  SYMBOL_INIT(poptorch, nearest);
-  SYMBOL_INIT(poptorch, nearest_batch_list);
 }
 
 } // namespace poptorch
