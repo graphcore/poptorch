@@ -18,9 +18,6 @@ class _TorchGeometricOpsSubstitutionManager:
         torch_geometric.nn.aggr.base.Aggregation: {
             "assert_sorted_index": ops.Aggregation.assert_sorted_index
         },
-        torch_geometric.nn.aggr.sort.SortAggregation: {
-            "to_dense_batch": ops.Aggregation.to_dense_batch
-        },
         torch_geometric.nn.ClusterGCNConv: {
             "forward": ops.ClusterGCNConv.forward
         },
