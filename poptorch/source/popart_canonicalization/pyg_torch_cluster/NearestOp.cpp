@@ -169,7 +169,8 @@ void concatFeatures(torch::jit::Graph *graph, torch::jit::Value *&input,
                          {static_cast<std::int64_t>(batch.size()), 1})
           ->output();
   input = createConcat(graph, {input, batch_tensor}, 1)->output();
-  const auto concat_shape = {input_shape[0], input_shape[1] + 1};
+  const std::vector<std::int64_t> concat_shape{input_shape[0],
+                                               input_shape[1] + 1};
   input->setType(
       input->type()->expect<c10::TensorType>()->withSizes(concat_shape));
 }
@@ -185,7 +186,8 @@ void concatFeatures(torch::jit::Graph *graph, torch::jit::Value *&input,
   batch = createReshape(graph, batch, batch_shape)->output();
   batch = createMul(graph, {multiplier, batch})->output();
   input = createConcat(graph, {input, batch}, 1)->output();
-  const auto concat_shape = {input_shape[0], input_shape[1] + 1};
+  const std::vector<std::int64_t> concat_shape{input_shape[0],
+                                               input_shape[1] + 1};
   input->setType(
       input->type()->expect<c10::TensorType>()->withSizes(concat_shape));
 }
