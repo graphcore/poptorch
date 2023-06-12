@@ -949,6 +949,10 @@ TORCH_LIBRARY(poptorch, m) {
         PTC_BOXED(callCpuOp));
   m.def("fps(Tensor src, "
         "int[] ptr, float ratio, bool random_start) -> Tensor");
+  m.def("nearest(Tensor x, Tensor y, "
+        "Tensor batch_x, Tensor batch_y) -> Tensor");
+  m.def("nearest_batch_list(Tensor x, Tensor y, "
+        "int[] batch_x, int[] batch_y) -> Tensor");
 }
 
 TORCH_LIBRARY_IMPL(poptorch, CPU, m) {
@@ -1002,6 +1006,9 @@ TORCH_LIBRARY_IMPL(poptorch, AutogradIPU, m) {
   m.impl("start_else_block", torch::autograd::autogradNotImplementedFallback());
   m.impl("end_if_block", torch::autograd::autogradNotImplementedFallback());
   m.impl("fps", torch::autograd::autogradNotImplementedFallback());
+  m.impl("nearest", torch::autograd::autogradNotImplementedFallback());
+  m.impl("nearest_batch_list",
+         torch::autograd::autogradNotImplementedFallback());
 
   m.impl("optimizer_group", torch::autograd::autogradNotImplementedFallback());
   m.impl("set_matmul_serialization",

@@ -275,7 +275,7 @@ at::Tensor scatterMul(at::Tensor src,at::Tensor index, int64_t dim, c10::optiona
 }
 
 // torch_cluster
-at::Tensor fps(torch::Tensor src, const std::vector<std::int64_t> &ptr,
+at::Tensor fps(const torch::Tensor &src, const std::vector<std::int64_t> &ptr,
                double ratio, bool /*random_start*/) {
   const auto dim = src.dim();
   const auto ptr_size = ptr.size();
@@ -324,6 +324,17 @@ at::Tensor splineWeighting(at::Tensor input,
 
   const auto output = at::meta::empty(out_shape, input.scalar_type());
   return output;
+}
+
+at::Tensor nearest(const torch::Tensor &x, const torch::Tensor &,
+                   const torch::Tensor &, const torch::Tensor &) {
+  return at::meta::empty({x.sizes().front()}, c10::ScalarType::Int);
+}
+
+at::Tensor nearest_batch_list(const torch::Tensor &x, const torch::Tensor &,
+                              const std::vector<std::int64_t> &,
+                              const std::vector<std::int64_t> &) {
+  return at::meta::empty({x.sizes().front()}, c10::ScalarType::Int);
 }
 
 // poptorch
@@ -470,6 +481,8 @@ TORCH_LIBRARY_IMPL(poptorch, Meta, m) {
   m.impl("dynamic_update", PTC(poptorch::meta::dynamicUpdate));
   m.impl("identity_loss", PTC(poptorch::meta::identityLoss));
   m.impl("fps", PTC(poptorch::meta::fps));
+  m.impl("nearest", PTC(poptorch::meta::nearest));
+  m.impl("nearest_batch_list", PTC(poptorch::meta::nearest_batch_list));
 }
 
 TORCH_LIBRARY_IMPL(poptorch, AutogradMeta, m) {
@@ -510,6 +523,8 @@ TORCH_LIBRARY_IMPL(poptorch, AutogradMeta, m) {
   m.impl("set_attribute", torch::autograd::autogradNotImplementedFallback());
   m.impl("clear_attribute", torch::autograd::autogradNotImplementedFallback());
   m.impl("fps", torch::autograd::autogradNotImplementedFallback());
+  m.impl("nearest", torch::autograd::autogradNotImplementedFallback());
+  m.impl("nearest_batch_list", torch::autograd::autogradNotImplementedFallback());
 }
 
 // For some reason these operations are first dispatched to AutogradMeta,
