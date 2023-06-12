@@ -253,7 +253,8 @@ This chapter contains a list of the PyTorch Geometric operations supported by th
     |                               +---------------------------+---------------+---------------------------------------------------+
     |                               | voxel_grid                | Supported     |                                                   |
     |                               +---------------------------+---------------+---------------------------------------------------+
-    |                               | fps                       | Not supported |                                                   |
+    |                               | fps                       | Supported     | * ``ptr`` is required.                            |
+    |                               |                           |               | * ``batch`` has to be ``None``.                   |
     |                               +---------------------------+---------------+---------------------------------------------------+
     |                               | knn                       | Supported     |                                                   |
     |                               +---------------------------+---------------+---------------------------------------------------+
@@ -264,7 +265,14 @@ This chapter contains a list of the PyTorch Geometric operations supported by th
     |                               +---------------------------+               |                                                   |
     |                               | radius_graph              |               |                                                   |
     |                               +---------------------------+---------------+---------------------------------------------------+
-    |                               | nearest                   | Not supported |                                                   |
+    |                               | nearest                   | Supported     | * ``torch_cluster.nearest`` has to be replaced    |
+    |                               |                           |               |   with ``poptorch.nearest``.                      |
+    |                               |                           |               | * ``poptorch.nearest`` supports  arguments        |
+    |                               |                           |               |   ``batch_x`` and ``batch_y`` in the original     |
+    |                               |                           |               |   form of ``torch.Tensor`` plus a regular list.   |
+    |                               |                           |               | * Validation of batch indices is NOT performed if |
+    |                               |                           |               |   ``batch_x`` and ``batch_y`` are passed as       |
+    |                               |                           |               |   ``torch.Tensor``.                               |
     |                               +---------------------------+---------------+---------------------------------------------------+
     |                               | decimation_indices        | Not supported |                                                   |
     +-------------------------------+---------------------------+---------------+---------------------------------------------------+

@@ -298,6 +298,7 @@ Activations
 * ``torch.nn.Hardshrink``
 * ``torch.nn.LeakyReLU``
 * ``torch.nn.LogSoftmax``
+* ``torch.nn.Mish``
 * ``torch.nn.ReLU``
 * ``torch.nn.SELU``
 * ``torch.nn.SiLU``
