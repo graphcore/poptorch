@@ -78,8 +78,6 @@ set_target_properties(poptorch PROPERTIES
   CXX_STANDARD 17
   PUBLIC_HEADER "${poptorch_public_headers}")
 
-find_library(LIBUUID_LIBRARY libuuid.a)
-
 target_link_libraries(poptorch PUBLIC
                                popart_compiler_types
                                PRIVATE
@@ -88,7 +86,6 @@ target_link_libraries(poptorch PUBLIC
                                poptorch_logging
                                torch
                                stdc++fs
-                               ${LIBUUID_LIBRARY}
                                )
 
 
