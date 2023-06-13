@@ -1,5 +1,6 @@
 // Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 
+#include <ATen/InferSize.h>
 #include <torch/csrc/jit/ir/ir.h>
 
 #include "../PoptorchStaticInit.hpp"
@@ -113,7 +114,12 @@ IndexInfo processIndex(torch::jit::Graph *graph, torch::jit::Value *x,
               std::back_inserter(flatten_shape));
   // Flatten the tensor being indexed into [-1, u1, u2, ..., uN] where
   // each u is a dimension not being indexed into
-  auto *flatten = createReshape(graph, x, flatten_shape);
+
+  const int64_t num_elems = std::accumulate(shape.cbegin(), shape.cend(), 1,
+                                            std::multiplies<int64_t>());
+
+  auto *flatten =
+      createReshape(graph, x, at::infer_size(flatten_shape, num_elems));
 
   return {flatten->output(), flat_indices};
 }
