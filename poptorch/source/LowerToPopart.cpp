@@ -86,8 +86,8 @@ private:
 
 popart_compiler::TensorId ValueMap::tensor(torch::jit::Value *value) const {
   const auto it = _map.find(value);
-  ERROR_ON_MSG(it == _map.end(), value->debugName()
-                                     << " not found in ValueMap");
+  ERROR_ON_MSG(it == _map.cend(), value->debugName()
+                                      << " not found in ValueMap");
   ERROR_ON_MSG(it->second.type != popart_compiler::OutputElemType::Tensor,
                value->debugName() << " is not a tensor");
   ERROR_ON(it->second.tensors.size() != 1);
@@ -138,39 +138,36 @@ void ValueMap::setTuple(torch::jit::Value *value,
 /*
  * Static helper functions.
  */
+const char *typeToPopartCStr(const at::ScalarType type) {
 
-std::string typeToPopartStr(at::ScalarType type) {
-  if (type == at::ScalarType::Float || type == at::ScalarType::Double) {
+  switch (type) {
+  case at::ScalarType::Float:
+  case at::ScalarType::Double:
     return "FLOAT";
-  }
-  if (type == at::ScalarType::Half) {
+  case at::ScalarType::Half:
     return "FLOAT16";
-  }
-  if (type == at::ScalarType::Short) {
+  case at::ScalarType::Short:
     return "INT16";
-  }
-  if (type == at::ScalarType::Int || type == at::ScalarType::Long) {
+  case at::ScalarType::Int:
+  case at::ScalarType::Long:
     return "INT32";
-  }
-  if (type == at::ScalarType::Bool) {
+  case at::ScalarType::Bool:
     return "BOOL";
-  }
-  if (type == at::ScalarType::Char) {
+  case at::ScalarType::Char:
     return "INT8";
-  }
-  if (type == at::ScalarType::Byte) {
+  case at::ScalarType::Byte:
     return "UINT8";
+  default:
+    logging::err("Unimplemented type '{}'", type);
+    return "UNIMPLEMENTED";
   }
 
-  logging::err("Unimplemented type '{}'", type);
   return "UNIMPLEMENTED";
 }
 
 std::vector<int64_t> getTensorDimensions(const at::Tensor &tensor) {
-  std::vector<int64_t> dims;
-  std::transform(tensor.sizes().begin(), tensor.sizes().end(),
-                 std::back_inserter(dims), [](std::int64_t i) { return i; });
-  return dims;
+  const auto &sizes = tensor.sizes();
+  return std::vector<int64_t>(sizes.cbegin(), sizes.cend());
 }
 
 at::ScalarType fromPopartType(const popart_compiler::PopartType type) {
@@ -271,7 +268,7 @@ void platformAgnosticTypeInfoFromIRType(
       value->type()->expect<c10::TensorType>();
   c10::ScalarType const as_scalar = *tensor_type->scalarType();
 
-  types->push_back(toPopartType(as_scalar));
+  types->emplace_back(toPopartType(as_scalar));
 
   c10::VaryingShape const shape = tensor_type->sizes();
 
@@ -384,7 +381,7 @@ std::shared_ptr<PoplarExecutable> LowerToPopartImpl::compile() {
 
   std::vector<at::ScalarType> data_types;
   data_types.reserve(_output_tensor_hooks.size());
-  for (auto id : _output_tensor_hooks) {
+  for (const auto id : _output_tensor_hooks) {
     data_types.emplace_back(fromPopartType(_compiler.getPopartType(id)));
   }
 
@@ -637,15 +634,16 @@ void LowerToPopartImpl::lowerBody() {
     // Switch/lookup based on the actual int value.
     const c10::Symbol kind = node->kind();
     // When using the dispatcher metadata should always be set.
-    std::string meta;
-    if (node->sourceRange().source()) {
-      meta = node->sourceRange().source()->text_str().str();
-    }
+    const std::string meta =
+        node->sourceRange().source()
+            ? node->sourceRange().source()->text_str().str()
+            : std::string{};
+
     ERROR_ON_MSG(meta.empty(),
                  "Source code location missing for node " + nodeToString(node));
     // Note: filename and line number might still not be available (For example
     // if the filter set by the user excludes the entire stack).
-    auto file_line_col = node->sourceRange().file_line_col();
+    const auto file_line_col = node->sourceRange().file_line_col();
     std::uint64_t line = 0;
     std::uint64_t col = 0;
     std::string filename;
@@ -655,8 +653,8 @@ void LowerToPopartImpl::lowerBody() {
     _compiler.setCurrentPythonCodeLocation(meta.c_str(), filename.c_str(), line,
                                            col);
 
-    auto itr = _functionToImplementation.find(kind);
-    if (itr != _functionToImplementation.end()) {
+    const auto itr = _functionToImplementation.find(kind);
+    if (itr != _functionToImplementation.cend()) {
       // Get the torch jit SSA for the input/output values.
       std::vector<popart_compiler::TensorId> inputs;
       std::transform(node->inputs().begin(), node->inputs().end(),
@@ -1030,7 +1028,7 @@ void LowerToPopartImpl::lowerParameters() {
   size_t param_index = 0;
   for (auto *value : graph_t_inputs) {
     JitTensorInfo info = JitTensorInfo(value);
-    std::string const popart_type = typeToPopartStr(info.scalar_type);
+    const char *popart_type = typeToPopartCStr(info.scalar_type);
     if (isParameter(value)) {
       void *data_ptr = getDataSourceForValue(value);
       ERROR_ON_MSG(value->uses().empty(),
@@ -1051,12 +1049,12 @@ void LowerToPopartImpl::lowerParameters() {
         memcpy(&dims[1], info.dims.data(),
                info.dims.size() * sizeof(std::int64_t));
         id = _compiler.addInitializedInputTensor(
-            name.c_str(), popart_type.c_str(), dims,
-            pr_settings.host_buffer->data(), pr_settings.comm_group_type,
-            pr_settings.shards, pr_settings.variable_retrieval_mode);
+            name.c_str(), popart_type, dims, pr_settings.host_buffer->data(),
+            pr_settings.comm_group_type, pr_settings.shards,
+            pr_settings.variable_retrieval_mode);
       } else {
-        id = _compiler.addInitializedInputTensor(
-            name.c_str(), popart_type.c_str(), info.dims, data_ptr);
+        id = _compiler.addInitializedInputTensor(name.c_str(), popart_type,
+                                                 info.dims, data_ptr);
       }
       // Compiler knows which buffers are updatable
       _compiler.registerUpdatableNamedBuffer(id);
@@ -1070,8 +1068,8 @@ void LowerToPopartImpl::lowerParameters() {
         overlap_str = _graph.param_node()->s(overlap_symbol);
       }
 
-      auto id = _compiler.addInputTensor(popart_type.c_str(), info.dims,
-                                         overlap_str.c_str());
+      const auto id =
+          _compiler.addInputTensor(popart_type, info.dims, overlap_str.c_str());
       _input_tensor_hooks.push_back(id);
       input_index++;
     }

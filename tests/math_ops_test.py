@@ -1023,3 +1023,24 @@ def test_argsort(axis, descending):
         helpers.assert_allclose(actual=poptorch_out, expected=native_out)
 
     op_harness(operation, [input], assert_)
+
+
+def test_reciprocal_intergral_input():
+
+    torch.manual_seed(42)
+    input = torch.randint(256, size=(640, 480))
+
+    def operation(original_sizes):
+        image_size = 896
+
+        ratio_image_size = (image_size /
+                            torch.amax(original_sizes).unsqueeze(axis=-1))
+
+        multiplication = (ratio_image_size * original_sizes)
+
+        return ratio_image_size, multiplication
+
+    def assert_(native_out, poptorch_out):
+        helpers.assert_allclose(actual=poptorch_out, expected=native_out)
+
+    op_harness(operation, [input], assert_)
