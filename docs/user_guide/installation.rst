@@ -29,6 +29,8 @@ The following are the corresponding ``torch``, ``torchvision``, ``torchaudio`` a
 +--------------+-----------+-----------------+----------------+------------------------------+------------+
 | ``poptorch`` | ``torch`` | ``torchvision`` | ``torchaudio`` |       ``torch_scatter``      | ``python`` |
 +==============+===========+=================+================+==============================+============+
+|     3.3      |   2.0.1   |      0.15.2     |      2.0.1     |   >=2.0.9 and <=2.1.1        |    >=3.8   |
++--------------+-----------+-----------------+----------------+------------------------------+------------+
 |     3.2      |   1.13.1  |      0.14.1     |      0.13.1    |   >=2.0.9 and <=2.1.0        |    >=3.7   |
 +--------------+-----------+-----------------+----------------+------------------------------+------------+
 |     3.1      |   1.13.0  |      0.14.0     |      0.13.0    |   >=2.0.9 and <=2.1.0        |    >=3.7   |
@@ -54,6 +56,9 @@ The following are the corresponding ``torch``, ``torchvision``, ``torchaudio`` a
 
 Based on https://github.com/pytorch/vision/blob/master/README.md
 
+.. note:: To ensure version compatibility, ``torchvision`` and ``torchaudio`` are automatically installed with PopTorch in Poplar SDK 3.3 and later.
+
+
 Using a Python virtual environment
 ==================================
 
@@ -68,14 +73,6 @@ for this. You can create a virtual environment and install PopTorch as shown bel
     $ pip install -U pip
     $ pip install <sdk_path>/poptorch_x.x.x.whl
 
-.. warning:: If, after installing PopTorch, you install a third-party library that requires ``torchvision`` or ``torchaudio`` then that may cause an incompatible version of ``torch`` to be installed.
-
-    To prevent this, after installing PopTorch, use the following commands to install compatible versions of ``torchvision`` or ``torchaudio``:
-
-    .. code-block:: bash
-
-        $ pip install torchvision==0.14.1+cpu --extra-index-url https://download.pytorch.org/whl/cpu
-        $ pip install torchaudio==0.13.1+cpu --extra-index-url https://download.pytorch.org/whl/cpu
 
 .. _setting_env:
 
