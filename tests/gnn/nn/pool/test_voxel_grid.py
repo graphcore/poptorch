@@ -1,6 +1,5 @@
 # Copyright (c) 2023 Graphcore Ltd. All rights reserved.
 
-import pytest
 import torch
 
 from torch_geometric.data import Batch
@@ -21,7 +20,6 @@ def test_voxel_grid():
     assert out.tolist() == [0, 5, 3, 0, 1]
 
 
-@pytest.mark.skip(reason="TODO(AFS-264, AFS-265)")
 @withPackage('torch_cluster')
 def test_voxel_grid_with_optional_args():
     pos = torch.Tensor([[0, 0], [11, 9], [2, 8], [2, 2], [8, 3]])

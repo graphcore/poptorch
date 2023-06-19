@@ -2,7 +2,7 @@
 # poptorch which is currently pinned to torch 2.0.1
 --find-links https://data.pyg.org/whl/torch-2.0.1+cpu.html
 
-pyg-nightly==2.4.0.dev20230607
+pyg-nightly==2.4.0.dev20230612
 
 torch-scatter==2.1.1+pt20cpu
 torch-sparse==0.6.17+pt20cpu
