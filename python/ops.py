@@ -1050,7 +1050,7 @@ def fps(src: "torch.Tensor",
         ptr: List[int],
         ratio: float = 0.5,
         random_start: bool = False) -> "torch.Tensor":
-    """Poptorch implementation of torch_cluster fps operation which is
+    """Poptorch implementation of torch_cluster `fps` operator which is
     a sampling algorithm from the `"PointNet++: Deep Hierarchical Feature
     Learning on Point Sets in a Metric Space"
     <https://arxiv.org/abs/1706.02413>`_ paper, which iteratively samples the
@@ -1066,7 +1066,7 @@ def fps(src: "torch.Tensor",
     """
     if not isinstance(src, torch.Tensor):
         raise _impl.createPoptorchError(
-            f"fps must take a torch.tensor input. {type(src)} is "
+            f"`fps` must take a torch.tensor input. {type(src)} is "
             "not supported.")
     if not isinstance(ptr, list):
         raise _impl.createPoptorchError("`ptr` must be a list of integers.")
@@ -1081,6 +1081,55 @@ def fps(src: "torch.Tensor",
             f"`random_start` must be of bool type. {type(random_start)} is "
             "not supported.")
     return torch.ops.poptorch.fps(src, ptr, ratio, random_start)
+
+
+def nearest(x: "torch.Tensor",
+            y: "torch.Tensor",
+            batch_x: Optional[Union[List[int], "torch.Tensor"]] = None,
+            batch_y: Optional[Union[List[int], "torch.Tensor"]] = None):
+    """Poptorch implementation of torch_cluster `nearest` operator which
+    clusters points in :obj:`x` together which are nearest to a given query
+    point in :obj:`y`
+
+    :param x: Node feature matrix.
+    :param y: Node feature matrix.
+    :param batch_x: Batch vector, which assigns each node to a specific
+            example. :obj:`batch_x` needs to be sorted.
+    :param batch_y: Batch vector, which assigns each node to a specific
+            example. :obj:`batch_y` needs to be sorted.
+    """
+
+    if not isinstance(x, torch.Tensor):
+        raise _impl.createPoptorchError(
+            f"`nearest` must take a torch.tensor `x` input. {type(x)} is "
+            "not supported.")
+    if not isinstance(y, torch.Tensor):
+        raise _impl.createPoptorchError(
+            f"`nearest` must take a torch.tensor `y` input. {type(y)} is "
+            "not supported.")
+
+    batch_x = list() if batch_x is None else batch_x
+    batch_y = list() if batch_y is None else batch_y
+
+    batch_x_is_list = isinstance(batch_x, list)
+    batch_y_is_list = isinstance(batch_y, list)
+    batch_x_is_tensor = isinstance(batch_x, torch.Tensor)
+    batch_y_is_tensor = isinstance(batch_y, torch.Tensor)
+
+    if batch_x_is_list and batch_y_is_list:
+        return torch.ops.poptorch.nearest_batch_list(x, y, batch_x, batch_y)
+    if batch_x_is_tensor and batch_y_is_tensor:
+        pass
+    elif batch_x_is_list and batch_y_is_tensor:
+        batch_x = torch.tensor(batch_x, dtype=batch_y.dtype)
+    elif batch_x_is_tensor and batch_y_is_list:
+        batch_y = torch.tensor(batch_y, dtype=batch_x.dtype)
+    else:
+        raise _impl.createPoptorchError(
+            f"`batch_x` and `batch_y` must be torch.Tensors or lists while "
+            f"`batch_x` is of type {type(batch_x)} and `batch_y` is of type "
+            f"{type(batch_y)}.")
+    return torch.ops.poptorch.nearest(x, y, batch_x, batch_y)
 
 
 class MultiConv():

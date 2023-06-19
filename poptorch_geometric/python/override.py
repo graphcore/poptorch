@@ -3,6 +3,7 @@ import functools
 import importlib
 
 import torch_geometric
+import poptorch
 from poptorch_geometric import ops
 
 from poptorch_geometric.common import call_once
@@ -100,9 +101,9 @@ def registerOptionalOverrides():
                     torch_cluster, {})
             torch_cluster_overrides["knn"] = ops.knn
             torch_cluster_overrides["knn_graph"] = ops.knn_graph
-            torch_cluster_overrides["nearest"] = ops.nearest
             torch_cluster_overrides["radius"] = ops.radius
             torch_cluster_overrides["radius_graph"] = ops.radius_graph
+            torch_cluster_overrides["nearest"] = poptorch.nearest
 
 
 registerOptionalOverrides()

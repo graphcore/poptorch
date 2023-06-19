@@ -168,6 +168,8 @@ TORCH_LIBRARY_IMPL(aten, IPU, m) {
 
 TORCH_LIBRARY_IMPL(poptorch, IPU, m) {
   m.impl("fps", PTC_BOXED(poptorch::fallback));
+  m.impl("nearest", PTC_BOXED(poptorch::fallback));
+  m.impl("nearest_batch_list", PTC_BOXED(poptorch::fallback));
 }
 
 TORCH_LIBRARY_IMPL(torch_scatter, IPU, m) {

@@ -4,9 +4,9 @@
 
 #include <ATen/ExpandUtils.h>
 
+#include "../PopartCanonicalizationUtils.hpp"
 #include "../PoptorchStaticInit.hpp"
 #include "../PoptorchSymbols.hpp"
-#include "PopartCanonicalizationUtils.hpp"
 
 #include "poptorch/OpBuilder.hpp"
 #include "poptorch/Utils.hpp"
@@ -122,8 +122,7 @@ std::vector<std::int64_t> calcDeg(const std::vector<std::int64_t> &ptr,
   return deg;
 }
 
-[[maybe_unused]] torch::jit::Node *
-fpsHandler(torch::jit::Graph *graph, [[maybe_unused]] torch::jit::Node *node) {
+torch::jit::Node *fpsHandler(torch::jit::Graph *graph, torch::jit::Node *node) {
   torch::jit::Value *const src = node->input(0);
 
   const std::vector<std::int64_t> ptr =

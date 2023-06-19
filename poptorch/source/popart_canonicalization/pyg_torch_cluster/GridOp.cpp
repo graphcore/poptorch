@@ -1,9 +1,9 @@
 // Copyright (c) 2022 Graphcore Ltd. All rights reserved.
+#include "../PopartCanonicalizationUtils.hpp"
 #include "../PoptorchStaticInit.hpp"
 #include "../PoptorchSymbols.hpp"
-#include "PopartCanonicalizationUtils.hpp"
 
-#include "ScatterReduction.hpp"
+#include "../ScatterReduction.hpp"
 
 #include "poptorch/OpBuilder.hpp"
 #include "poptorch/Utils.hpp"
