@@ -370,6 +370,24 @@ std::vector<at::Tensor> customOperation(const std::vector<at::Tensor> &/*inputs*
   return ret;
 }
 
+at::Tensor & tanh_backward_out(const at::Tensor& , const at::Tensor &, at::Tensor & grad_input) {
+  return grad_input;
+}
+
+std::tuple<at::Tensor, at::Tensor, at::Tensor> native_layer_norm_backward(
+    const at::Tensor&,
+    const at::Tensor& input,
+    at::IntArrayRef ,
+    const at::Tensor&,
+    const at::Tensor&,
+    const c10::optional<at::Tensor>& weight,
+    const c10::optional<at::Tensor>& bias,
+    ::std::array<bool, 3> output_mask) {
+
+  return { at::meta::empty(output_mask[0] ? input.sizes().vec() : std::vector<int64_t>{}, input.scalar_type()),  at::meta::empty(output_mask[1] && weight ? weight->sizes().vec()
+                               : std::vector<int64_t>{}, weight && weight->defined() ? weight->scalar_type() : input.scalar_type()),  at::meta::empty(output_mask[2] && bias ? bias->sizes().vec() : std::vector<int64_t>{}, bias && weight->defined() ? bias->scalar_type() : input.scalar_type()) };
+}
+
 // ctc_beam_search_decoder(Tensor probs, Tensor lengths, int blank, int beam_width, int top_paths) -> (Tensor, Tensor, Tensor)
 std::tuple<at::Tensor, at::Tensor, at::Tensor>
 ctcBeamSearchDecoder(const at::Tensor &probs, const at::Tensor &/*lengths*/,
@@ -431,7 +449,12 @@ TORCH_LIBRARY_IMPL(aten, Meta, m) {
   m.impl("one_hot", PTC(poptorch::meta::oneHot));
   m.impl("silu.out", PTC(poptorch::meta::siluOut));
   m.impl("upsample_nearest3d.vec", PTC(poptorch::meta::upsampleNearest3d));
+  m.impl("tanh_backward.grad_input", PTC(poptorch::meta::tanh_backward_out));
+  m.impl("native_layer_norm_backward", PTC(poptorch::meta::native_layer_norm_backward));
 }
+
+
+
 
 TORCH_LIBRARY_IMPL(torch_scatter, Meta, m) {
   m.impl("scatter_max", PTC(poptorch::meta::scatterMinMax));

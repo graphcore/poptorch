@@ -142,6 +142,9 @@ torch::jit::Node *
 createAtenTarget(torch::jit::Graph &graph, const c10::FunctionSchema &schema,
                  const std::vector<torch::jit::Value *> &inputs,
                  c10::Stack *stack, ValueMapper &mapper) {
+
+  logging::trace("[DISPATCHER] Create aten target {}", schema.name());
+
   torch::jit::Symbol const symbol =
       torch::jit::Symbol::fromQualString(schema.name());
 

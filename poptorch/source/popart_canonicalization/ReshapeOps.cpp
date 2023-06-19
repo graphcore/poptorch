@@ -230,6 +230,7 @@ torch::jit::Node *selectHandler(torch::jit::Graph *graph,
 
   // Reshape to remove the singleton dimenson left in by slice
   const auto original_shape = shapeFromTensor(node->output());
+
   return createReshape(graph, slice_node->output(), original_shape);
 }
 
