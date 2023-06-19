@@ -3,6 +3,7 @@
 #include <torch/csrc/jit/ir/ir.h>
 
 #include <functional>
+#include <random>
 #include <stack>
 
 #include "PoptorchSymbols.hpp"
@@ -11,8 +12,6 @@
 #include "poptorch/Utils.hpp"
 #include "poptorch_logging/Error.hpp"
 #include "poptorch_logging/Logging.hpp"
-
-#include <uuid/uuid.h>
 
 namespace poptorch {
 
@@ -204,14 +203,14 @@ void markCondOutputs(torch::jit::Graph *graph, torch::jit::Node *outputs,
 
 void insertSetAttribute(torch::jit::Graph *graph, size_t cond_nest_lvl,
                         torch::jit::Node *insertion_point,
+                        std::mt19937 &random_gen,
                         bool after_insert_pnt = false) {
   torch::jit::WithInsertPoint set_attr_insert_point(insertion_point);
   WithNodeMetadata meta{insertion_point};
-  uuid_t uuid_obj;
-  uuid_generate(uuid_obj);
-  const std::string id{std::cbegin(uuid_obj), std::cend(uuid_obj)};
-  const std::string cond_context =
-      "cond_context_" + std::to_string(cond_nest_lvl);
+  std::uniform_int_distribution<> distribution;
+  const std::string id{"cond_id_" + std::to_string(distribution(random_gen))};
+  const std::string cond_context{"cond_context_" +
+                                 std::to_string(cond_nest_lvl)};
   createSetAttribute(graph, "__outline", cond_context, id, after_insert_pnt);
 }
 
@@ -246,6 +245,9 @@ void annotateSubgraphs(torch::jit::Graph *graph, torch::jit::Node *start_node) {
   // Helper struct for processing if_else.
   std::stack<ReshapePutterHelper> reshape_putter_helpers_stack;
 
+  // Random generator - used to generate ids for cond operator entities
+  std::mt19937 random_gen(0);
+
   // Look for any subgraphs. Subgraphs are currently:
   // * for loops.
   for (auto iter = start_node->iterator(); iter != graph->nodes().end();
@@ -279,7 +281,7 @@ void annotateSubgraphs(torch::jit::Graph *graph, torch::jit::Node *start_node) {
 
       // if/else block branches code have to get their own context, so that
       // popart outlining does not tear them appart and break their logic.
-      insertSetAttribute(graph, subgraph_nodes.size(), node);
+      insertSetAttribute(graph, subgraph_nodes.size(), node, random_gen);
       // Delete the input node (condition) as it is not needed anymore.
       to_delete.insert(node->input(0)->node());
       node->removeInput(0);
@@ -298,7 +300,7 @@ void annotateSubgraphs(torch::jit::Graph *graph, torch::jit::Node *start_node) {
       // Start tracking the new subgraph.
       subgraph_nodes.push(Subgraph());
 
-      insertSetAttribute(graph, subgraph_nodes.size(), node,
+      insertSetAttribute(graph, subgraph_nodes.size(), node, random_gen,
                          true /* after_insert_pnt */);
 
       // Delete the input node (then_branch output), as it is not needed
