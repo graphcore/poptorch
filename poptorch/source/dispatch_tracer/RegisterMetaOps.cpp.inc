@@ -275,7 +275,7 @@ at::Tensor scatterMul(at::Tensor src,at::Tensor index, int64_t dim, c10::optiona
 }
 
 // torch_cluster
-at::Tensor fps(const torch::Tensor &src, const std::vector<std::int64_t> &ptr,
+at::Tensor fps(torch::Tensor src, const std::vector<std::int64_t> &ptr,
                double ratio, bool /*random_start*/) {
   const auto dim = src.dim();
   const auto ptr_size = ptr.size();
@@ -296,45 +296,6 @@ at::Tensor fps(const torch::Tensor &src, const std::vector<std::int64_t> &ptr,
     out_size += std::ceil(static_cast<float>(ptr[i] - ptr[i - 1]) * ratio);
 
   return at::meta::empty({out_size}, c10::ScalarType::Int);
-}
-
-// torch_spline_conv
-std::tuple<at::Tensor, at::Tensor> splineBasis(at::Tensor pseudo,
-                                                 at::Tensor /*kernel_size*/,
-                                                 at::Tensor /*is_open_spline*/,
-                                                 int64_t degree) {
-  const std::vector<std::int64_t> in_shape = pseudo.sizes().vec();
-  const std::int64_t numEdges = in_shape[0];
-  const std::int64_t numDims = in_shape[1];
-  const std::int64_t numSplines = std::pow(degree + 1, numDims) + 0.5;
-  const std::vector<std::int64_t> out_shape({numEdges, numSplines});
-
-  const auto basis = at::meta::empty(out_shape, pseudo.scalar_type());
-  const auto weightIndex = at::meta::empty(out_shape, c10::ScalarType::Int);
-  return {basis, weightIndex};
-}
-
-at::Tensor splineWeighting(at::Tensor input,
-                           at::Tensor weight,
-                           at::Tensor /*basis*/,
-                           at::Tensor /*weight_index*/) {
-  const std::vector<std::int64_t> in_shape = input.sizes().vec();
-  const std::vector<std::int64_t> w_shape = weight.sizes().vec();
-  const std::vector<std::int64_t> out_shape({in_shape[0], w_shape[2]});
-
-  const auto output = at::meta::empty(out_shape, input.scalar_type());
-  return output;
-}
-
-at::Tensor nearest(const torch::Tensor &x, const torch::Tensor &,
-                   const torch::Tensor &, const torch::Tensor &) {
-  return at::meta::empty({x.sizes().front()}, c10::ScalarType::Int);
-}
-
-at::Tensor nearest_batch_list(const torch::Tensor &x, const torch::Tensor &,
-                              const std::vector<std::int64_t> &,
-                              const std::vector<std::int64_t> &) {
-  return at::meta::empty({x.sizes().front()}, c10::ScalarType::Int);
 }
 
 // poptorch
@@ -499,8 +460,6 @@ TORCH_LIBRARY_IMPL(poptorch, Meta, m) {
   m.impl("dynamic_update", PTC(poptorch::meta::dynamicUpdate));
   m.impl("identity_loss", PTC(poptorch::meta::identityLoss));
   m.impl("fps", PTC(poptorch::meta::fps));
-  m.impl("nearest", PTC(poptorch::meta::nearest));
-  m.impl("nearest_batch_list", PTC(poptorch::meta::nearest_batch_list));
 }
 
 TORCH_LIBRARY_IMPL(poptorch, AutogradMeta, m) {
@@ -541,8 +500,6 @@ TORCH_LIBRARY_IMPL(poptorch, AutogradMeta, m) {
   m.impl("set_attribute", torch::autograd::autogradNotImplementedFallback());
   m.impl("clear_attribute", torch::autograd::autogradNotImplementedFallback());
   m.impl("fps", torch::autograd::autogradNotImplementedFallback());
-  m.impl("nearest", torch::autograd::autogradNotImplementedFallback());
-  m.impl("nearest_batch_list", torch::autograd::autogradNotImplementedFallback());
 }
 
 // For some reason these operations are first dispatched to AutogradMeta,
