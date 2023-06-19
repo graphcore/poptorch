@@ -505,6 +505,11 @@ torch::jit::Node *reciprocalHandler(torch::jit::Graph *graph,
                                     torch::jit::Node *node) {
   auto *i0 = node->input(0);
   // reciprocal(i0)
+
+  if (getNodeScalarType(i0) == c10::kInt) {
+    i0 = createCast(graph, i0, c10::kFloat)->output();
+  }
+
   return createReciprocal(graph, {i0});
 }
 
