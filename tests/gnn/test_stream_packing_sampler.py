@@ -129,18 +129,19 @@ def test_stream_packing_sampler_should_be_usable_with_torch_data_loader(
         data_type, shuffle, allow_skip_data, torch_data_loader,
         fake_hetero_dataset):
 
-    avg_num_nodes = 30
     batch_num_graphs = 10
     num_channels = 16
     edge_dim = 8
     num_graphs = 10
     if is_data(data_type):
+        avg_num_nodes = 30
         dataset = FakeDataset(num_graphs=100,
                               avg_num_nodes=avg_num_nodes,
                               avg_degree=5,
                               num_channels=num_channels,
                               edge_dim=8)
     else:
+        avg_num_nodes = 50
         dataset = fake_hetero_dataset
     avg_num_edges = math.ceil(mean(data.num_edges for data in dataset))
 

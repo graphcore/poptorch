@@ -131,13 +131,14 @@ class StreamPackingSampler(Sampler[List[int]]):
                     raise RuntimeError(
                         'The maximum number of graphs, nodes or edges'
                         ' specified is too small to fit in the single sample'
-                        f' {idx} ({data}). The maximum number of graphs'
+                        f' {idx} with {data.num_nodes} nodes and'
+                        f' {data.num_edges} edges. The maximum number of graphs'
                         f' specified is {self.max_num_graphs}, the maximum'
                         f' number of nodes is {self.max_num_nodes} and the'
                         f' maximum number of edges is {self.max_num_edges}.'
                         ' If this is intended, use `allow_skip_data` to'
                         ' enable this sample to be completely skipped'
-                        ' from batching.')
+                        f' from batching. The sample is {data}.')
                 break
 
         if not batch.empty():
