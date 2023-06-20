@@ -194,7 +194,7 @@ Comparison ops
 * ``torch.isnan``
 * ``torch.topk``
 
-  ``torch.topk`` only supports ``sorted=True`` argument.
+  * The option ``sorted=False`` is not supported for ``torch.topk``.
 
 * ``torch.argsort``
 * ``torch.randperm``

@@ -204,33 +204,35 @@ def cond(condition: 'torch.Tensor',
          else_body: Callable[[List['torch.Tensor']], List['torch.Tensor']],
          else_inps: List['torch.Tensor']) -> List['torch.Tensor']:
     """An on-device if/else operation. This creates two branches of instructions
-    executed conditionally on device.
+    executed conditionally on the device. Only for inference.
 
     The `then_body` and `else_body` should be Python functions containing the
-    PyTorch code you wish to execute conditionally on device. Condition is
-    passed in form of a boolean Tensor and the branch to be executed is decided
-    in runtime directly on device.
-    There are a few expectations according the branches functions:
-    - `then_body` and `else_body` can accept arbitrary number of inputs
-    (including zero),
-    - Tensors defined in the cond caller (the outer graph) can be used inside
-    `then_body` and `else_body` implicitly just as they were passed through the
-    inputs list,
-    - `then_body` and `else_body` have to return the same number of
-    corresponding outputs as the result of the cond op is assigned to a common
-    list of Tensors,
-    - all the Tensors utilized by `then_body` and `else_body` are passed in by
-    copy, so updating any of the Tensors inside bodies does not affect the
-    original Tensors; to update a Tensor passed in, its new value has to be
-    returned from the body and assigned to the original Tensor (please note that
-    number of outputs from `then_body` and `else_body` has to match).
+    PyTorch code you wish to execute conditionally on the device. The condition
+    is passed in the form of a boolean `Tensor` and the branch to be executed is
+    decided in runtime directly on the device. There are a few conditions on the
+    branch functions:
 
-    :param condition: Condition controlling execution of `then_body` and
-    `else_body`.
+    * `then_body` and `else_body` can accept an arbitrary number of inputs
+      (including zero).
+    * Tensors defined in the `cond` caller (the outer graph) can be used inside
+      `then_body` and `else_body` implicitly just as if they were passed
+      through the inputs list.
+    * `then_body` and `else_body` have to return the same number of
+      corresponding outputs. This is because the result of the `cond` op is
+      assigned to a common list of tensors.
+    * all the tensors utilized by `then_body` and `else_body` are passed in by
+      copy, so updating any of the tensors inside `then_body` and `else_body`
+      does not affect the original tensors. To update a tensor passed in, its
+      new value has to be returned from the body and assigned to the original
+      tensor (please note that the number of outputs from `then_body` and
+      `else_body` has to match).
+
+    :param condition: The condition controlling the execution of `then_body` and
+        `else_body`.
     :param then_body: The function to be executed if `condition` is True.
-    :param then_inps: `then_body` input Tensors.
+    :param then_inps: `then_body` input tensors.
     :param else_body: The function to be executed if `condition` is False.
-    :param else_inps: `else_body` input Tensors.
+    :param else_inps: `else_body` input tensors.
     """
 
     if not isinstance(then_inps, list) or not isinstance(else_inps, list):
@@ -1050,19 +1052,19 @@ def fps(src: "torch.Tensor",
         ptr: List[int],
         ratio: float = 0.5,
         random_start: bool = False) -> "torch.Tensor":
-    """Poptorch implementation of torch_cluster `fps` operator which is
-    a sampling algorithm from the `"PointNet++: Deep Hierarchical Feature
-    Learning on Point Sets in a Metric Space"
-    <https://arxiv.org/abs/1706.02413>`_ paper, which iteratively samples the
+    """PopTorch implementation of the `torch_cluster` `fps` operator.
+
+    This op is a sampling algorithm from the `"PointNet++: Deep Hierarchical Feature Learning on Point Sets in a Metric Space"
+    <https://arxiv.org/abs/1706.02413>`_ paper, and iteratively samples the
     most distant point with regard to the rest points.
 
     :param src: Point feature matrix.
-    :param ptr: Ptr vector which defines ranges of node assigned to specific
-        example.
-    :param ratio: Sampling ratio.
-    :param random_start: If set to :obj:`False`, use the first node in src as
-        starting node.
-    :returns: A tensor of src points indexes.
+    :param ptr: Pointer vector which defines ranges of nodes assigned to a
+        specific sample.
+    :param ratio: The sampling ratio.
+    :param random_start: If set to `False`, use the first node in `src` as
+        the starting node.
+    :returns: A tensor of `src` point indexes.
     """
     if not isinstance(src, torch.Tensor):
         raise _impl.createPoptorchError(
@@ -1087,16 +1089,17 @@ def nearest(x: "torch.Tensor",
             y: "torch.Tensor",
             batch_x: Optional[Union[List[int], "torch.Tensor"]] = None,
             batch_y: Optional[Union[List[int], "torch.Tensor"]] = None):
-    """Poptorch implementation of torch_cluster `nearest` operator which
-    clusters points in :obj:`x` together which are nearest to a given query
-    point in :obj:`y`
+    """PopTorch implementation of the `torch_cluster` `nearest` operator.
+
+    This op clusters points in `x` together which are nearest to a given query
+    point in `y`.
 
     :param x: Node feature matrix.
     :param y: Node feature matrix.
     :param batch_x: Batch vector, which assigns each node to a specific
-            example. :obj:`batch_x` needs to be sorted.
+        sample. `batch_x` needs to be sorted.
     :param batch_y: Batch vector, which assigns each node to a specific
-            example. :obj:`batch_y` needs to be sorted.
+        sample. `batch_y` needs to be sorted.
     """
 
     if not isinstance(x, torch.Tensor):

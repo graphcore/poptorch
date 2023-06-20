@@ -42,7 +42,7 @@ Helpers
 .. autoclass:: poptorch.profiling.Channel
    :members:
 
-PopTorch Ops
+PopTorch ops
 ============
 
 .. autofunction:: poptorch.ctc_beam_search_decoder
@@ -81,6 +81,12 @@ PopTorch Ops
 .. autofunction:: poptorch.set_overlap_for_input
 
 .. autofunction:: poptorch.set_overlap_for_output
+
+.. autofunction:: poptorch.nearest
+
+.. autofunction:: poptorch.fps
+
+.. autofunction:: poptorch.cond
 
 Model wrapping functions
 ========================
