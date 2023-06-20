@@ -4,7 +4,13 @@ From PyTorch to PopTorch
 
 This page will introduce the key features that enable training on the IPU, and how they differ from native PyTorch.
 
-.. warning:: Compiling using the PyTorch ``torch.compile`` interface is not supported. Please replace calls of ``torch.compile`` with :py:func:`~poptorch.trainingModel` or :py:func:`~poptorch.inferenceModel`. Both functions allow for whole graph static `compilation <https://docs.graphcore.ai/projects/ipu-programmers-guide/en/latest/programming_tools.html#compilation>`_ .
+.. note::
+   PopTorch compiles a ``torch.nn.Model`` model for the IPU when it is wrapped in either a :py:func:`~poptorch.trainingModel` or :py:func:`~poptorch.inferenceModel`, as appropriate.
+   This provides similar functionality to ``torch.compile`` but with more flexibility to generate optimal code for the IPU.
+   Also, ``torch.compile`` does not pass options to a custom compiler backend.
+
+   For these reasons, we do not currently support ``torch.compile``. Any calls to ``torch.compile`` should be replaced by wrapping the model with either :py:func:`~poptorch.trainingModel` or :py:func:`~poptorch.inferenceModel`. These functions perform static `compilation of the whole graph <https://docs.graphcore.ai/projects/ipu-programmers-guide/en/latest/programming_tools.html#compilation>`__ to produce optimized code to run on the IPU. The compilation of multiple partial graphs is not supported.
+
 
 Preparing your data
 ===================
