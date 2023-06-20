@@ -221,3 +221,51 @@ def test_baddbmm(params):
     ipu_result = poptorch.inferenceModel(model)(t1, t2, t3)
 
     helpers.assert_allclose(expected=cpu_result, actual=ipu_result)
+
+
+@pytest.mark.parametrize("input_shape", [(20, 10)])
+@pytest.mark.parametrize("beta", [0, .5])
+@pytest.mark.parametrize("alpha", [0, 1.5])
+@pytest.mark.parametrize("use_out", [True, False])
+def test_addmv(input_shape, beta, alpha, use_out):
+    torch.manual_seed(42)
+
+    mat = torch.randn(input_shape)
+    vec = torch.randn(input_shape[1])
+    inp = torch.randn(input_shape[0])
+
+    if beta == 0:
+        # NaNs in input should be ignored
+        inp[0] = float('nan')
+    if alpha == 0:
+        # NaNs in vec or mat should be ignored
+        mat[0, 0] = float('nan')
+        vec[0] = float('nan')
+
+    output = torch.empty(input_shape[0]) if use_out else None
+
+    class AddmvModel(torch.nn.Module):
+        def __init__(self, beta, alpha):
+            super().__init__()
+            self.beta = beta
+            self.alpha = alpha
+
+        def forward(self, inp, mat, vec, out=None):
+            result = torch.addmv(inp,
+                                 mat,
+                                 vec,
+                                 beta=self.beta,
+                                 alpha=self.alpha,
+                                 out=out)
+            if self.beta == 0 and self.alpha == 0:
+                # Avoid empty compute graph
+                result += torch.zeros_like(inp)
+            return result
+
+    model = AddmvModel(beta, alpha)
+    cpu_result = model(inp, mat, vec, out=output)
+    ipu_result = poptorch.inferenceModel(model)(inp, mat, vec, output)
+
+    helpers.assert_allclose(expected=cpu_result, actual=ipu_result)
+    if use_out is True:
+        helpers.assert_allclose(expected=cpu_result, actual=output)

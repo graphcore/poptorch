@@ -112,16 +112,38 @@ torch::jit::Node *baddbmmHandler(torch::jit::Graph *graph,
 
 torch::jit::Node *addmvHandler(torch::jit::Graph *graph,
                                torch::jit::Node *node) {
+  auto *input = node->input(0);
   auto *mat = node->input(1);
   auto *vec = node->input(2);
-  auto *t0 = createMatmul(graph, {mat, vec})->output();
-  auto *alpha = node->input(4);
-  auto *t1 = createMul(graph, {t0, alpha})->output();
-  auto *input = node->input(0);
   auto *beta = node->input(3);
-  auto *t2 = createMul(graph, {input, beta})->output();
-  // add(mul(matmul(mat, vec), alpha), mul(input, beta))
-  return createAdd(graph, {t1, t2});
+  auto *alpha = node->input(4);
+
+  const auto alpha_val = constantToFloat(alpha->node());
+  const auto beta_val = constantToFloat(beta->node());
+
+  if (alpha_val == 0 && beta_val == 0) {
+    return createConstantFloatLike(graph, input, {0}, {shapeFromTensor(input)});
+  }
+
+  torch::jit::Node *t1 = nullptr;
+  if (alpha_val != 0) {
+    auto *t0 = createMatmul(graph, {mat, vec})->output();
+    t1 = createMul(graph, {t0, alpha});
+  }
+
+  torch::jit::Node *output;
+  if (beta_val != 0) {
+    auto *t2 = createMul(graph, {input, beta});
+    if (t1 != nullptr) {
+      output = createAdd(graph, {t1->output(), t2->output()});
+    } else {
+      output = t2;
+    }
+  } else {
+    output = t1;
+  }
+
+  return output;
 }
 } // namespace
 
