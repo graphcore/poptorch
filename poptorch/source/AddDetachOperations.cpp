@@ -94,7 +94,6 @@ void addDetachOperations(torch::jit::Graph *graph) {
   // detached so we superficially mark them as detached before processing.
   for (torch::jit::Value *input : graph->inputs()) {
     visited_nodes.insert(input->node());
-    detached_values.insert({input, input});
   }
 
   // Process the graph recursively and replace the values at the end.
