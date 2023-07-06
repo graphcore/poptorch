@@ -292,8 +292,10 @@ meanScatterReduceHandler(torch::jit::Graph *graph, torch::jit::Value *self,
                          const bool enable_index_broadcast) {
   static constexpr int32_t sum_reduce =
       static_cast<std::int32_t>(ScatterReduction::Sum);
-  auto *ones_self = createConstantFloat32(graph, {1.0}, shapeFromTensor(self));
-  auto *ones_src = createConstantFloat32(graph, {1.0}, shapeFromTensor(src));
+  auto *ones_self =
+      createConstantFloatLike(graph, src, {1.0}, shapeFromTensor(self));
+  auto *ones_src =
+      createConstantFloatLike(graph, src, {1.0}, shapeFromTensor(src));
   torch::jit::Node *count;
   if (include_self) {
     // Count the number of elements reduced to each index.
@@ -303,7 +305,8 @@ meanScatterReduceHandler(torch::jit::Graph *graph, torch::jit::Value *self,
   } else {
     static constexpr int32_t none_reduce =
         static_cast<std::int32_t>(ScatterReduction::None);
-    auto *zeros_src = createConstantFloat32(graph, {0.0}, shapeFromTensor(src));
+    auto *zeros_src =
+        createConstantFloatLike(graph, src, {0.0}, shapeFromTensor(src));
 
     // Tensor with zeros where the indices are updated and ones otherwise.
     auto *count_mask = createScatterreduce(
@@ -354,8 +357,8 @@ torch::jit::Node *scatterReduce(torch::jit::Graph *graph,
 
   if (!include_self) {
     // Mask those indices in `self` that are specified by `index`
-    auto *init = createConstantFloat32(graph, {getReductionInitValue(reduce)},
-                                       shapeFromTensor(src));
+    auto *init = createConstantFloatLike(
+        graph, src, {getReductionInitValue(reduce)}, shapeFromTensor(src));
     static constexpr std::int32_t none_reduce =
         static_cast<std::int32_t>(ScatterReduction::None);
     auto *masked_self =
