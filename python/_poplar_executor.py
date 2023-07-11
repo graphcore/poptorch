@@ -729,8 +729,11 @@ class PoplarExecutor:
                                     "Scalars cannot be passed as per-replica "
                                     "weight tensor values")
                             param_tensor = param.narrow(0, 0, 1).squeeze(dim=0)
-                            setattr(*self._get_module_and_name(name),
-                                    torch.nn.Parameter(param_tensor))
+                            setattr(
+                                *self._get_module_and_name(name),
+                                torch.nn.Parameter(
+                                    param_tensor,
+                                    requires_grad=param.requires_grad))
                 d = torch.device("ipu:0")
                 poptorch_core.startParametersMove()
                 self._model.to(d)
