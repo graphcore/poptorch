@@ -47,6 +47,7 @@ if config.build_documentation:
 if config.install_linters:
     installers.add(
         CondaPackages(
+            "pre-commit=3.3.3",
             "clang-tools=" + _llvm_version,
             "pylint=2.7.2",
             "yapf=0.27.0",

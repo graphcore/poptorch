@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 # Copyright (c) 2021 Graphcore Ltd. All rights reserved.
+from typing import Tuple
+
 import argparse
 import collections
 import difflib
 import enum
+import hashlib
 import json
 import logging
 import os
@@ -27,12 +30,28 @@ cpp_lint_disabled = [
 ]
 
 
+class OutputProcessor:
+    def __call__(self, raw_output: str, returncode: int) -> Tuple[str, int]:
+        raise NotImplementedError()
+
+
+class SaveOutput(OutputProcessor):
+    def __init__(self):
+        self.output = ""
+
+    def __call__(self, raw_output: str, returncode: int) -> Tuple[str, int]:
+        self.output = raw_output
+        return raw_output, returncode
+
+
 class GitStrategy(enum.Enum):
-    ArcconfigBase = "arcconfig"  # against the git:<branch> in .arcconfig
     Master = "master"  # Files modified / added between HEAD and origin/master
     Head = "head"  # Files modified / added in the last commit
     Diff = "diff"  # Files modified / added but not commited
     All = "all"  # All files tracked by git
+    PreCommit = "pre-commit"  # pre-commit is like "master" except it takes
+    # precedence over the files provided on the
+    # command line.
 
 
 class ILinterFamily:
@@ -457,7 +476,7 @@ class ClangFormat(ILinter):
 
 
 class ClangTidy(ILinter):
-    class ResultsProcessor:
+    class ResultsProcessor(OutputProcessor):
         """Wait for all the jobs to complete then combine and process their
         outputs
         """
@@ -805,7 +824,7 @@ class Linters:
     def __init__(self):
         self._linters = [CppLinters(), PyLinters()]
 
-    def lint_git(self, strategy, autofix):
+    def _get_git_files(self, strategy):
         files = []
 
         class GetFiles:
@@ -821,26 +840,11 @@ class Linters:
                     self.files.append(line.split()[-1])
                 return output, returncode
 
-        def arcconfig_base():
-            try:
-                with open(".arcconfig", "r") as f:
-                    conf = json.load(f)
-                    # We expect something like:
-                    # "base": "git:origin/master"
-                    return conf["base"].split(":")[-1]
-            except:  #pylint: disable=bare-except
-                logger.warning(
-                    "Failed to parse 'base' option from .arconfig, defaulting "
-                    "to 'origin/master'")
-                return "origin/master"
-
         assert isinstance(strategy, GitStrategy)
         git_cmd = ""
         filter_cmd = "| grep \"^[AMRT]\" "
-        if strategy == GitStrategy.Master:
-            git_cmd = "git diff --name-status -r origin/master "
-        if strategy == GitStrategy.ArcconfigBase:
-            git_cmd = "git diff --name-status -r " + arcconfig_base()
+        if strategy in [GitStrategy.Master, GitStrategy.PreCommit]:
+            git_cmd = "git diff --name-status -r origin/mk2-main "
         elif strategy == GitStrategy.Head:
             git_cmd = "git diff --name-status -r HEAD^ "
         elif strategy == GitStrategy.Diff:
@@ -849,14 +853,80 @@ class Linters:
             git_cmd = "git ls-tree --name-only -r HEAD "
             filter_cmd = ""
         else:
-            raise RuntimeError("Unknown strategy requested")
+            raise RuntimeError(f"Unknown strategy requested {strategy}")
         Command(git_cmd,
                 filter_cmd,
                 print_output=False,
                 output_processor=GetFiles(files)).run()
-        self.lint_files(files, autofix)
+        return files
 
-    def lint_files(self, files, autofix):
+    def lint_git(self, strategy, autofix, add_trailer_on_success):
+        return self.lint_files(self._get_git_files(strategy), autofix,
+                               add_trailer_on_success)
+
+    def _read_head_trailer(self):
+        out = SaveOutput()
+
+        Command("git show -s --pretty='%(trailers:key=Lint-Ok,valueonly)'",
+                print_output=False,
+                output_processor=out).run()
+        return out.output.splitlines()[0].strip().rstrip()
+
+    def _unstaged_diff(self, files):
+        out = SaveOutput()
+
+        Command("git diff " + " ".join(files),
+                print_output=False,
+                output_processor=out).run()
+        return out.output.strip().rstrip()
+
+    def _compute_git_trailer(self, files):
+        diff_content = ""
+        for f in sorted(files):
+            with open(f, "r", encoding="utf-8") as src:
+                diff_content += src.read()
+
+        return str(hashlib.md5(diff_content.encode("utf-8")).hexdigest())
+
+    def check_git_trailer(self, strategy):
+        return self._check_trailer(self._get_git_files(strategy),
+                                   add_if_missing=False)
+
+    def _check_trailer(self, files, add_if_missing):
+        head_trailer = self._read_head_trailer()
+        files_trailer = self._compute_git_trailer(files)
+        if files_trailer == head_trailer:
+            logger.info("Git trailer present and up to date")
+            return 0
+
+        if add_if_missing:
+            logger.warning(
+                "Files are linted but trailer is either missing or out of "
+                "date, updating it:")
+            git_cmd = (
+                "echo \"$(git log -1 --pretty=format:%B | "
+                "git interpret-trailers --if-exists='replace' --trailer "
+                f"'Lint-Ok: {files_trailer}' --if-exists=replace)\" | "
+                "git commit --amend --no-edit -F -")
+            Command(git_cmd).run()
+            logger.warning(
+                "If you were trying to push your local branch to Github, "
+                "try again.")
+        else:
+            logger.error(
+                "Files haven't been linted: expected the git trailer to be "
+                "'%s' but found '%s'", files_trailer, head_trailer)
+        return -1
+
+    def lint_files(self, files, autofix, add_trailer_on_success):
+        # If there is no local change and the trailer is up to date: no need to re-run the linters.
+        if add_trailer_on_success and self._unstaged_diff(
+                files) == "" and self._read_head_trailer(
+                ) == self._compute_git_trailer(files):
+            logger.info(
+                "Git trailer already present and up to date: early return")
+            return 0
+
         jobs = {}
         for f in files:
             cmd = self._gen_lint_commands(f, autofix)
@@ -864,8 +934,9 @@ class Linters:
                 jobs[f] = cmd
         if not jobs:
             logger.info("No linter to run: early return")
-            return
+            return 0
         executors = []
+        returncode = 0
         for filename, cmd in jobs.items():
             print(f"Linting file {filename} [{len(cmd)}] commands to run")
             if autofix:
@@ -883,10 +954,20 @@ class Linters:
             ProcessManager.get().update()
             for e in executors:
                 if e.execution_complete():
+                    returncode += e.returncode
                     continue
                 e.update()
                 still_running = True
             time.sleep(1)
+        if add_trailer_on_success:
+            diff = self._unstaged_diff(files)
+            if diff != "":
+                logger.warning(
+                    "Your commit needs to be amended to include the following "
+                    "changes:\n%s", diff)
+            if returncode == 0:
+                return self._check_trailer(files, add_if_missing=True)
+        return returncode
 
     def _gen_lint_commands(self, filename, autofix):
         cmd = []
@@ -895,7 +976,7 @@ class Linters:
         return [[c] if isinstance(c, Command) else c for c in cmd]
 
 
-if __name__ == "__main__":
+def main():
     parser = argparse.ArgumentParser()
     # TODO Add option to exclude some linters (e.g -no-clang-tidy)
     # TODO Check / update Copyrights
@@ -907,12 +988,28 @@ if __name__ == "__main__":
                         "-a",
                         action="store_true",
                         help="Automatically apply fixes when possible")
+
+    parser.add_argument(
+        "--add-trailer-on-success",
+        "-t",
+        action="store_true",
+        help="Add a git trailer to the commit message on success.",
+    )
+
+    parser.add_argument(
+        "--check-trailer",
+        "-c",
+        action="store_true",
+        help=
+        "Check the git trailer in HEAD and raise an error if it's invalid.",
+    )
+
     parser.add_argument(
         "--git-strategy",
         "-s",
         type=str,
         choices=[v.value for _, v in GitStrategy.__members__.items()],
-        default=GitStrategy.ArcconfigBase.value,
+        default=GitStrategy.Master.value,
         help="Strategy to use when no files are passed")
     parser.add_argument("--jobs",
                         "-j",
@@ -930,14 +1027,27 @@ if __name__ == "__main__":
         assert args.jobs >= 0
         ProcessManager.create(args.jobs)
 
+    linters = Linters()
+    if args.check_trailer:
+        assert not args.files, ("You cannot pass a list of files and use "
+                                "--check-trailer at the same time")
+        return linters.check_git_trailer(GitStrategy(args.git_strategy))
+
     # Check we've got a Conda environment available
     CondaCommand()
+    strategy = GitStrategy(args.git_strategy)
+    # PRE_COMMIT is a special case because it will pass on the command line
+    # the files which have been modified in the last commit but also set some
+    # environment variables to indicate where to find the whole branch.
+    # As we want to lint all the files on the branch, we need to ignore the
+    # files provided on the command line.
+    if args.files and strategy != GitStrategy.PreCommit:
+        return linters.lint_files(args.files, args.autofix,
+                                  args.add_trailer_on_success)
+    print(f"Linting files selected by the git strategy '{args.git_strategy}'")
+    return linters.lint_git(strategy, args.autofix,
+                            args.add_trailer_on_success)
 
-    linters = Linters()
-    if args.files:
-        linters.lint_files(args.files, args.autofix)
-    else:
-        print(
-            f"Linting files selected by the git strategy '{args.git_strategy}'"
-        )
-        linters.lint_git(GitStrategy(args.git_strategy), args.autofix)
+
+if __name__ == "__main__":
+    sys.exit(main())

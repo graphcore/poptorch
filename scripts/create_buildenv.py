@@ -138,8 +138,9 @@ class Installers:
 class Config:
     """Contains the configuration for the environment."""
 
-    def __init__(self, **opts):
+    def __init__(self, install_linters, **opts):
         self.__dict__ = opts
+        self.install_linters = install_linters
 
     def setDefault(self, **opts):
         for k, v in opts.items():
@@ -352,6 +353,10 @@ class BuildenvManager:
                         f"conda activate {self.buildenv_dir}",
                         f"conda pack -p {self.buildenv_dir} -o \
                                 {full_template_name}")
+
+        if self.config.install_linters:
+            self.env.run_commands(f"cd {_utils.sources_dir()}",
+                                  "pre-commit install --hook-type pre-push")
 
         os.chdir(self.output_dir)
         # If ccache is available

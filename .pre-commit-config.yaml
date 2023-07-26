@@ -1,0 +1,17 @@
+repos:
+-   repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v2.3.0
+    hooks:
+    -   id: check-yaml
+    -   id: end-of-file-fixer
+    -   id: check-merge-conflict
+    -   id: trailing-whitespace
+-   repo: local
+    hooks:
+    -   id: apply_linters
+        name: apply_linters
+        entry: scripts/apply_linters.py
+        language: python
+        args: [-a, --add-trailer-on-success, --debug, --git-strategy=pre-commit]
+        additional_dependencies: [pyyaml==6.0.0, packaging==23.0.0, colorama==0.4.6]
+        # For the git trailer to be correct apply_linters.py must be applied to all the files.

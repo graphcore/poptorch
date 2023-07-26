@@ -1,0 +1,3 @@
+@Library('sw-jenkins-library@view-component-trigger') _
+
+viewComponentTrigger(jobsFilepath: '.ci/view_component_trigger/jobs.groovy')

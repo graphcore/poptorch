@@ -1,0 +1,25 @@
+name: apply_linters.py git trailer check
+
+on:
+  push:
+    branches: [mk2-main]
+  pull_request:
+    branches: [mk2-main]
+
+jobs:
+  apply_linters:
+    timeout-minutes: 10
+    name: apply_linters.py git trailer check
+    runs-on: [self-hosted, linux]
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        # 0 indicates fetch history for all branches and tags.
+        # By default the checkout action only checks out the PR
+        # ref. However apply_linters.py needs run git commands
+        # that reference origin/mk2-main.
+        fetch-depth: 0
+        # Checkout the head instead of the merge commit
+        ref: ${{ github.event.pull_request.head.sha }}
+    - name: Verify most recent commit's git trailer
+      run: python scripts/apply_linters.py --check-trailer

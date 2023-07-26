@@ -1,6 +1,0 @@
-{
-  "phabricator.uri" : "https://phabricator.sourcevertex.net",
-  "arc.land.onto.default": "mk2-main",
-  "arc.land.onto": ["mk2-main"],
-  "base": "git:origin/mk2-main"
-}

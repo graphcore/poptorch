@@ -7,3 +7,11 @@ requires = [
   "@TORCH_DEPENDENCY@",
 ]
 build-backend = "setuptools.build_meta"
+
+[tool.pytest.ini_options]
+# Required to supress a warning from the package `ruamel` using a deprecated pkg_resources function.
+filterwarnings = [
+    "ignore::DeprecationWarning:pkg_resources.*",
+    # Deprecation warnings from pillow in torchvision.
+    "ignore:.*Pillow.*:DeprecationWarning:torchvision",
+]
