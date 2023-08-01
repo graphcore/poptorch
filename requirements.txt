@@ -11,7 +11,7 @@ lit==0.11.1
 pytest==6.2.5
 setuptools==58.0.4
 tqdm==4.46.1
-transformers==4.12.2
+transformers==4.30.0
 typing-extensions==4.1.1
 # Use old version for wheel.pep425tags support (new versions removed it).
 wheel<0.35
