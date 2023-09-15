@@ -2,7 +2,7 @@ Examples
 ========
 
 You can find PyTorch examples and tutorials in the Graphcore GitHub `examples repository <https://github.com/graphcore/examples>`__.
-This contains
+This contains:
 
 * Examples of popular machine learning models for training and inference
 * :tutorials-repo:`Tutorials <tutorials/pytorch>`
@@ -13,7 +13,7 @@ This contains
 MNIST example
 _____________
 
-The example in :numref:`mnist-example-code` shows how a MNIST model can be run on the IPU. The highlighted lines show the PopTorch-specific code required to run the example on multiple IPUs.
+The example in :numref:`mnist-example-code` shows how an MNIST model can be run on the IPU. The highlighted lines show the PopTorch-specific code required to run the example on multiple IPUs.
 
 You can download the full source code from GitHub: :github-poptorch:`mnist.py <examples/mnist.py>`.
 

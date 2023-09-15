@@ -90,7 +90,7 @@ public:
       typename FloatDef<FT, IT>::FVType const*  cur_grad_out_ptr2 = (typename FloatDef<FT, IT>::FVType*)(&(grad_out[i][0]));
       typename FloatDef<FT, IT>::IVType const*  cur_idx_ptr2      = (typename FloatDef<FT, IT>::IVType*)(&(idx[i][0]));
       typename FloatDef<FT, IT>::FVType*        cur_grad_in_ptr2  = (typename FloatDef<FT, IT>::FVType*)(&(grad_in[i][0]));
-      
+
       FT const*   cur_grad_out_ptr  = (FT*)cur_grad_out_ptr2;
       IT const*   cur_idx_ptr       = (IT const*)cur_idx_ptr2;
       FT*         cur_grad_in_ptr   = (FT*)cur_grad_in_ptr2;
@@ -130,7 +130,7 @@ public:
       typename FloatDef<FT, IT>::FVType const*   cur_grad_out_ptr4 = (typename FloatDef<FT, IT>::FVType*)(&(grad_out[i][0]));
       typename FloatDef<FT, IT>::IVType const*   cur_idx_ptr2      = (typename FloatDef<FT, IT>::IVType const*)(&(idx[i][0]));
       typename FloatDef<FT, IT>::FVType*         cur_grad_in_ptr4  = (typename FloatDef<FT, IT>::FVType*)(&(grad_in[i][0]));
-      
+
       FT const*   cur_grad_out_ptr  = (FT*)cur_grad_out_ptr4;
       IT const*   cur_idx_ptr       = (IT const*)cur_idx_ptr2;
       FT*         cur_grad_in_ptr   = (FT*)cur_grad_in_ptr4;

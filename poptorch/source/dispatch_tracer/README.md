@@ -3,7 +3,7 @@
 Dispatch tracing is our own implementation of torch::jit::trace which allows us
 to sidestep some of the constraints of that API as well as trace autograd functions.
 
-We support two backends. 
+We support two backends.
 
 - JIT : Traces the incoming user model into normal PyTorch JIT IR first then
         canonicalises them into our PopART compatible JIT IR.
@@ -34,7 +34,7 @@ Other than having to faithfully lower more varied legal input than in JIT the ma
 - It can use the JIT path to guarantee it can support at least as much as PopART and reuses our canonicalisation code to break down nodes further.
 - It can directly map a torch operation onto IR without needing canonicalisation.
 
-See CompilerDispatchTable.cpp for all the calls. The API with MLIR is generated automatically by MLIR and can be seen in the poptorch_compiler pytorch_bridge include folder. 
+See CompilerDispatchTable.cpp for all the calls. The API with MLIR is generated automatically by MLIR and can be seen in the poptorch_compiler pytorch_bridge include folder.
 
 - DirectlySupportedOps.h.inc : Maps aten operations directly onto an MLIR operation.
 - PopartAPISupportedOps.h.inc: Maps aten operations onto the PopART subset via unpacking JIT arguments, just like LowerToPopart.

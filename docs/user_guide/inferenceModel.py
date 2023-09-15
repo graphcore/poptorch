@@ -20,7 +20,7 @@ import poptorch
 picture_of_a_cat_here = torch.randn([1, 3, 224, 224])
 
 # The model, in this case a MobileNet model with pretrained weights that comes
-# canned with Pytorch.
+# canned with PyTorch.
 model = torchvision.models.mobilenet_v2(pretrained=True)
 model.train(False)
 

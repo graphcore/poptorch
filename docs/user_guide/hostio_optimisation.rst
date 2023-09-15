@@ -11,11 +11,11 @@ improve I/O performance:
 * prefetch and multibuffering
 * overlapping compute and I/O
 
-Prefetch and Multibuffering
+Prefetch and multibuffering
 ===========================
 
 Poplar supports prefetching and multibuffering to improve I/O performance.
-For more details, see `'Optimising host data transfers' in the Poplar and PopLibs User Guide <https://docs.graphcore.ai/projects/poplar-user-guide/en/latest/poplar_programs.html#optimising-host-data-transfers>`__.
+For more details, see `Optimising host data transfers <https://docs.graphcore.ai/projects/poplar-user-guide/en/latest/poplar_programs.html#optimising-host-data-transfers>`__ in the Poplar and PopLibs User Guide.
 
 Prefetch is enabled by default in Poplar. The default buffer depth is 1. You
 can increase the value for the buffer depth to improve I/O performance:
@@ -61,7 +61,7 @@ Overlapping compute and I/O
 To optimise I/O further, you can choose to dedicate a specified number of tiles
 to communication and leave the rest of the tiles for compute. Computation
 time will be adversely affected by having access to fewer tiles, so there is a
-tradeoff between optimising I/O and optimising compute here.
+trade-off between optimising I/O and optimising compute here.
 
 To overlap compute and I/O:
 

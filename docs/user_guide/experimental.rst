@@ -23,7 +23,7 @@ number of replicas.
   :emphasize-lines: 9, 12, 18
   :linenos:
 
-.. note:: The ``DataLoader`` will automatically select a different subset of the
+.. note:: ``DataLoader`` will automatically select a different subset of the
   dataset based on the process ID.
 
 .. warning:: All the processes must use the same seed if ``shuffle=True`` is used

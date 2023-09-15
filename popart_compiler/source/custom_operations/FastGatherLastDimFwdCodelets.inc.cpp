@@ -110,9 +110,9 @@ public:
       {
         typename FloatDef<FT, IT>::IVType   idx0      = cur_idx_ptrv[2 * j];
         typename FloatDef<FT, IT>::IVType   idx1      = cur_idx_ptrv[2 * j + 1];
-        typename FloatDef<FT, IT>::FVType   cur_val   = { cur_data_ptr[idx0[0]], 
+        typename FloatDef<FT, IT>::FVType   cur_val   = { cur_data_ptr[idx0[0]],
                                                           cur_data_ptr[idx0[1]],
-                                                          cur_data_ptr[idx1[0]], 
+                                                          cur_data_ptr[idx1[0]],
                                                           cur_data_ptr[idx1[1]] };
         cur_out_ptrv[j]   = cur_val;
       }

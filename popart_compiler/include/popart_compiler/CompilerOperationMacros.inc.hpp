@@ -181,4 +181,3 @@ OP_DECL(popart, tanh, tanh, AiOnnxOpset11.tanh, NONE, BODY_ARG(DEBUG_CONTEXT("Ta
 OP_DECL(popart, tile, tile, AiOnnxOpset11.tile, NONE, BODY_ARG(DEBUG_CONTEXT("Tile")))
 OP_DECL(popart, transpose, transpose, AiOnnxOpset11.transpose, ARG(INT_VEC,perm) , BODY_ARG(perm) BODY_ARG(DEBUG_CONTEXT("Transpose")))
 OP_DECL(popart, unsqueeze, unsqueeze, AiOnnxOpset11.unsqueeze, ARG(INT_VEC,axes) , BODY_ARG(axes) BODY_ARG(DEBUG_CONTEXT("Unsqueeze")))
-

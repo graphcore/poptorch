@@ -9,8 +9,7 @@ PopTorch allows you to inspect arbitrary tensors in both inference and
 training models. This is very useful for debugging conditions such as
 overflows, underflows or vanishing gradients.
 
-Numerous tensors are generated during model compilation. In order to have
-their values inspected, you first have to figure out their names. You can
+Numerous tensors are generated during model compilation. In order to inspect their values, you first have to find their names. You can
 retrieve the complete list of tensor names in your model by calling
 :py:func:`~poptorch.PoplarExecutor.getTensorNames`. Note that the model
 must first be compiled.
@@ -31,7 +30,7 @@ be a model output.
 You can create an anchor by calling :py:func:`~poptorch.Options.anchorTensor`.
 It takes two mandatory string parameters: a convenient user-defined name for
 the anchor and the name of the chosen tensor. Optionally, you may specify the
-output mode as well as the output return period. In order for these options setting
+output mode as well as the output return period. In order for these option settings
 to take effect, they must be set before model compilation.
 
 In the example below, two anchors are created: one for a bias gradient tensor
@@ -47,11 +46,11 @@ Retrieving tensors
 ==================
 
 The anchored tensors will be updated after every model invocation. You can
-retrive their values using :py:func:`~poptorch.PoplarExecutor.getAnchoredTensor`.
+retrieve their values using :py:func:`~poptorch.PoplarExecutor.getAnchoredTensor`.
 The function takes a single parameter - the user-defined anchor name.
 
 In the example below, we execute one training run and retrieve the values of
-the two tensors we have anchored previously.
+the two tensors we anchored previously.
 
 .. literalinclude:: debugging.py
   :caption: Anchoring tensors
@@ -59,14 +58,13 @@ the two tensors we have anchored previously.
   :end-before: tensor_retrieve_end
   :emphasize-lines: 4, 5
 
-For a more practical understanding around observing tensors, Graphcore's examples
-repository contains a tutorial you can follow about observing tensors, using anchoring and generating a gradient histogram:
+For a more practical understanding around observing tensors, the `Graphcore  GitHub examples repository <https://github.com/graphcore/examples>`__ contains a tutorial you can follow about observing tensors, using anchoring and generating a gradient histogram:
 :tutorials-repo:`PopTorch tutorial: Observing tensors <tutorials/pytorch/observing_tensors>`.
 
 Inspecting optimiser state
 ==========================
 
-You can inspect optimiser state without using anchoring. After you instantiate a
+You can inspect the optimiser state without using anchoring. After you instantiate a
 :py:func:`~poptorch.trainingModel`, the optimiser's `state_dict()` function will
 return the internal optimiser's state. This state dictionary will be populated
 when the training model is compiled, and is updated after each training step.

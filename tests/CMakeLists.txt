@@ -23,5 +23,3 @@ run_poptorch_install_command(
            --extra-pytest-args=\"${EXTRA_PYTEST_ARGS}\" "
   "${PROJECT_BINARY_DIR}"
   "generate_test_file.py")
-
-

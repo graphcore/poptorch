@@ -3,13 +3,14 @@ Introduction
 ============
 
 PopTorch is a set of extensions for PyTorch to enable PyTorch models to run directly
-on Graphcore IPU hardware. PopTorch has been designed to require as few changes as
+on the Graphcore IPU. PopTorch has been designed to require as few changes as
 possible to your models in order to run on the IPU. However, it does have some
 differences from native PyTorch execution, to get the most out of IPU hardware.
+The `IPU Programmer's Guide <https://docs.graphcore.ai/projects/ipu-programmers-guide/>`__ provides an introduction to the IPU architecture, programming model and tools available.
 
-See the “Getting Started” guide for your IPU system on the Graphcore
-`documentation portal <https://docs.graphcore.ai/>`_ for information on
-installing the Poplar SDK and PopTorch.
+PopTorch is included with the `Poplar SDK <https://docs.graphcore.ai/projects/sdk-overview/>`__.
+See the `Getting Started guide <https://docs.graphcore.ai/en/latest/getting-started.html>`_ for your system for how to
+install the Poplar SDK. Refer to :numref:`installation` for how to install the PopTorch wheel.
 
 In the Graphcore software stack, PyTorch sits at the highest level of
 abstraction. Poplar and PopLibs provide a software interface to operations
@@ -55,8 +56,8 @@ Data batching
 =============
 
 An equivalent training loop executing the model on the IPU with PopTorch is shown
-below. The :py:class:`~poptorch.DataLoader` is used to efficiently load data batches
-on the IPU.  PopTorch follows the data batching semantics of PopART. By default,
+below. The :py:class:`~poptorch.DataLoader` class is used to efficiently load data batches
+on the IPU.  PopTorch follows the data batching semantics of `PopART <https://docs.graphcore.ai/projects/popart-user-guide/>`__. By default,
 this means you will just pass in data of the normal batch size. However, there are a
 number of options provided in PopTorch which will enable more efficient data
 loading. See :numref:`efficient_data_batching` for more information.
@@ -79,22 +80,22 @@ detect the loss value to backpropagate the gradients from.
 Parallel and Distributed execution
 ==================================
 
-To scale your models, you can enable :ref:`execution_strategies` using
-PopTorch's :ref:`annotation_tools` to label or wrap individual parts of your
+To scale your models, you can enable :ref:`execution_strategies` using the
+PopTorch :ref:`annotation_tools` to label or wrap individual parts of your
 model and assign parts of the model to an individual IPU or execution phase.
 You can also use PopTorch's :ref:`available_execution_strategies` to determine how the
 model executes the phases.
 
 Having assigned the model to run on one or more IPUs, you can add additional
-parallelism through replication. Each replica represents an addition copy of the
-entire model, which runs in parallel.
+parallelism with replication. Each replica represents an additional copy of the
+entire model. These copies run in parallel.
 
 PopTorch can also run across multiple hosts. This is necessary for using more
-than 64 IPUs across IPU-PODs and may be beneficial when using a smaller number
-of IPUs such as models involving intensive pre-processing on the CPU. We
+than 64 IPUs across IPU Pod systems and may be beneficial when using a smaller number
+of IPUs, for example with models that involve intensive pre-processing on the CPU. We
 recommend using the PopRun command-line tool and and PopDist configuration
 library, which can automatically set up PopTorch to run across multiple IPU-POD
-hosts. Please refer to the `PopDist and PopRun User Guide
+hosts. Refer to the `PopDist and PopRun User Guide
 <https://docs.graphcore.ai/projects/poprun-user-guide/>`__ for more information,
 including details about the installation of Horovod if you are using the MPI
 communication protocol.
@@ -127,6 +128,8 @@ The following constraints apply when using PopTorch:
 Other resources
 ===============
 
-Please see Graphcore's website for `How-to Videos <https://www.graphcore.ai/resources/how-to-videos>`_ and `Graphcore's examples GitHub repository <https://github.com/graphcore/examples>`_ for PopTorch applications, :tutorials-repo:`feature examples <feature_examples/pytorch>`,
+`Switching from GPUs to IPUs for Machine Learning Models <https://docs.graphcore.ai/projects/differences-ipu-gpu/>`__ provides a high-level overview of the programming changes required when switching from GPUs to IPUs and `Memory and Performance Optimisation on the IPU <https://docs.graphcore.ai/projects/memory-performance-optimisation/>`__ presents guidelines to help you develop high-performance machine learning models running on the IPU.
+
+The Graphcore `Examples GitHub repository <https://github.com/graphcore/examples>`_ contains PopTorch applications, :tutorials-repo:`feature examples <feature_examples/pytorch>`,
 :tutorials-repo:`tutorials <tutorials/pytorch>` and :tutorials-repo:`simple applications <simple_applications/pytorch>`.
 Further developer resources can be found on `Graphcore's developer portal <https://www.graphcore.ai/developer>`_.

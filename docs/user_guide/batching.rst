@@ -80,10 +80,10 @@ Rebatching iterable datasets
 
 There are `two types of datasets in PyTorch <https://pytorch.org/docs/1.10.0/data.html#dataset-types>`_ : map-style datasets and iterable datasets.
 
-As explained in the notes of PyTorch's `Data Loading Order and Sampler <https://pytorch.org/docs/1.10.0/data.html#data-loading-order-and-sampler>`_ : for
-`IterableDataset <https://pytorch.org/docs/1.10.0/data.html#torch.utils.data.IterableDataset>`_ :
+As explained in the notes of PyTorch's `Data Loading Order and Sampler <https://pytorch.org/docs/1.10.0/data.html#data-loading-order-and-sampler>`_: for
+`IterableDataset <https://pytorch.org/docs/1.10.0/data.html#torch.utils.data.IterableDataset>`_:
 "When fetching from iterable-style datasets with multi-processing, the drop_last argument drops the
-last non-full batch of each worker’s dataset replica."
+last non-full batch of each worker's dataset replica."
 
 This means that if the number of elements is naively
 divided among the number of workers (which is the default behaviour) then potentially a significant number of elements will be dropped.
@@ -197,7 +197,7 @@ because the parameters can only be updated between pipeline runs.  You need to
 set the number of accumulations to at least the number of pipeline stages.
 However, with this value, the pipeline will switch into the "ramp-down"
 period as soon as it has finished the "ramp-up" period. Using a larger number
-of gradient accmumulations means that the pipeline will run at full efficiency
+of gradient accumulations means that the pipeline will run at full efficiency
 for longer. However, the increase in batches between parameter updates may
 reduce the overall training efficiency of your model. The optimal number of
 gradient accumulations is a trade off between these two factors.

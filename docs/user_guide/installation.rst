@@ -1,3 +1,5 @@
+.. _installation:
+
 ============
 Installation
 ============
@@ -5,20 +7,17 @@ Installation
 .. contents::
   :local:
 
-PopTorch is part of the Poplar SDK.  It is packaged as a Python wheel
+PopTorch is included with the Poplar SDK (see the `Getting Started guide <https://docs.graphcore.ai/en/latest/getting-started.html>`_ for your system for how to install the Poplar SDK.).  PopTorch is packaged as a Python wheel
 file that can be installed using ``pip``.
 
 .. important:: pip >= 18.1 is required for PopTorch dependencies to be installed properly.
 
-To update `pip`:
+To update ``pip``:
 
 .. code-block:: bash
 
     $ pip install -U pip
 
-For more information about installing the Poplar SDK, see the relevant
-"Getting Started" guide for your IPU system on the Graphcore
-`documentation portal <https://docs.graphcore.ai>`_.
 
 Version compatibility
 =====================
@@ -62,7 +61,7 @@ Based on https://github.com/pytorch/vision/blob/master/README.md
 Using a Python virtual environment
 ==================================
 
-We recommend creating a virtual environment to isolate your PopTorch environment
+We recommend creating and activating a virtual environment to isolate your PopTorch environment
 from the system Python environment. You can use the Python tool ``virtualenv``
 for this. You can create a virtual environment and install PopTorch as shown below:
 
@@ -88,14 +87,17 @@ will need to set the library search paths, using the scripts provided in the SDK
     $ source poptorch_test/bin/activate
 
     # Add the Poplar and PopART runtime libraries to the search path
-    $ source <path to poplar installation>/enable.sh
-    $ source <path to popart installation>/enable.sh
+    $ source <sdk_path>/poplar-ubuntu_<os_ver>-<poplar_ver>+<build>/enable.sh
+    $ source <sdk_path>/popart-ubuntu_<os_ver>-<poplar_ver>+<build>/enable.sh
+
+where ``<sdk_path>`` is the location of the Poplar SDK on your system. ``<os_ver>`` is the version of Ubuntu on your system, ``<poplar_ver>`` is the software version number of the Poplar SDK and ``<build>`` is the build information.
+
 
 Validating the setup
 ====================
 
 You can run this simple example to verify that the system is working as
-expected. This example can be found in the Poplar SDK installation.
+expected. This example can be found in the Poplar SDK ``examples`` directory.
 
 .. literalinclude:: ../../examples/simple_adder.py
   :caption: Simple adder example

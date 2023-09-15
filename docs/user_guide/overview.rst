@@ -168,6 +168,7 @@ Exception type raised by PopTorch: `poptorch.RecoverableError` (inherits from `p
 The exception contains the action required to recover from this error in its `recovery_action` string attribute.
 
 This attribute can contain:
+
  - `IPU_RESET`: Reset the IPU and reload the IPU memory.
  - `LINK_RESET`: Reset the IPU-Links in a non-Pod system. This retrains the IPU-Links between IPUs.
  - `PARTITION_RESET`: Reset the IPU partition in a Pod system. This retrains the IPU-Links between IPUs.
@@ -188,6 +189,7 @@ This kind of error is due to an error in the program or a misuse of an API.
 Exception type raised by PopTorch: `poptorch.Error` if the error was detected in the C++ backend, or some generic Python `Exception` if it happened in the Python layer.
 
 `poptorch.Error` has the following string attributes:
+
  - `message` The error message without any of the context.
  - `type` The part of the software stack that raised the exception and the category of the error if available.
  - `location` Where the exception was raised.
@@ -256,7 +258,7 @@ and how to use them to set up different execution modes.
 .. figure:: stages_summary.png
    :width: 581
 
-   Poptorch model partition summary
+   PopTorch model partition summary
 
 
 Model partitioning using blocks
@@ -499,7 +501,7 @@ Pipelined execution
 When running a model for inference with
 :py:class:`~poptorch.PipelinedExecution`, you must set :py:meth:`~poptorch.Options.deviceIterations` to be greater than or equal to
 the number of pipeline stages used by the model. You can also do this for
-training to improve effiency.
+training to improve efficiency.
 
 Each time you switch IPU, PopTorch adds a new pipeline stage.
 If two consecutive blocks/stages use the same IPU, PopTorch will merge them
@@ -748,7 +750,7 @@ In addition, PopTorch has features to support ``float16`` models, such as loss s
 Loss scaling
 ------------
 
-When training models which use ``half``/``float16`` values, you can use loss scaling  to prevent the gradients from becoming too small and underflowing.
+When training models which use ``half`` or ``float16`` values, you can use loss scaling  to prevent the gradients from becoming too small and causing underflows.
 
 Before calculating the gradients, PopTorch will scale the loss by the value of the ``loss_scaling`` parameter.
 PopTorch will multiply the gradients by the inverse scale prior to updating the optimizer state.

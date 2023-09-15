@@ -184,4 +184,4 @@ passing in the updated optimizer.
 Going further
 =============
 
-For a more detailed example of getting started with PopTorch, see the :tutorials-repo:`Pytorch basics tutorial <tutorials/pytorch/basics>` which walks through training an MNIST model on the IPU.
+For a more detailed example of getting started with PopTorch, see the :tutorials-repo:`PyTorch basics tutorial <tutorials/pytorch/basics>` which walks through training an MNIST model on the IPU.
