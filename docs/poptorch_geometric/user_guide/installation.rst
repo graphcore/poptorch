@@ -1,10 +1,21 @@
+.. _installation:
+
 ============
 Installation
 ============
 
-PopTorch Geometric is part of the Poplar SDK. It is packaged as a Python wheel
-file that can be installed using `pip`. PopTorch Geometric requires the
-installation of PopTorch, which is also part of the Poplar SDK.
+PopTorch Geometric is included as part of the Poplar SDK (see the `Getting
+Started guide
+<https://docs.graphcore.ai/en/latest/getting-started.html#getting-started>`_ for
+your system for how to install the Poplar SDK. ). PopTorch Geometric is packaged
+as a Python wheel file that can be installed using ``pip``. PopTorch Geometric
+requires the installation of PopTorch, which is also a part of the Poplar SDK.
+
+To use PopTorch Geometric you must first install the PopTorch wheel
+and then the PopTorch Geometric wheel. All the necessary
+dependencies (including ``torch`` and ``pytorch_geometric``) will be installed
+automatically.
+
 
 .. important:: pip >= 18.1 is required for PopTorch dependencies to be
     installed properly.
@@ -38,27 +49,28 @@ versions and supported Python versions.
 Installation using Python virtual environment
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-We recommend creating a virtual environment to isolate your PopTorch
-environment from the system Python environment. You can use the Python
-``virtualenv`` tool for this.
+We recommend creating and activating a virtual environment to isolate your
+PopTorch Geometric environment from the system Python environment. You can use
+the Python ``virtualenv`` tool for this.
 
 .. code-block:: bash
 
     $ virtualenv -p python3 poptorch_test
     $ source poptorch_test/bin/activate
 
-After creating the virtual environment, you need to install the PopTorch wheel.
+After activating the virtual environment, you need to first install the PopTorch wheel.
 
 .. code-block:: bash
 
     $ pip install <sdk_path>/poptorch-x.x.x.whl
 
+where ``<sdk_path>`` is the location of the Poplar SDK on your system.
 
 See the
 `PopTorch installation guide <https://docs.graphcore.ai/projects/poptorch-user-guide/en/latest/installation.html>`_
 for more information on installing the PopTorch wheel.
 
-Then the PopTorch Geometric wheel can be installed using the commands below.
+Then, install the PopTorch Geometric wheel:
 
 .. code-block:: bash
 
@@ -66,6 +78,7 @@ Then the PopTorch Geometric wheel can be installed using the commands below.
     $ source poptorch_test/bin/activate
     $ pip install <sdk_path>/poptorch_geometric-x.x.x.whl
 
+where ``<sdk_path>`` is the location of the Poplar SDK on your system.
 
 Setting the environment variables
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -80,13 +93,10 @@ in the SDK:
     $ source poptorch_test/bin/activate
 
     # Add the Poplar and PopART runtime libraries to the search path
-    $ source <path to poplar installation>/enable.sh
-    $ source <path to popart installation>/enable.sh
+    $ source <sdk_path>/poplar-ubuntu_<os_ver>-<poplar_ver>+<build>/enable.sh
+    $ source <sdk_path>/popart-ubuntu_<os_ver>-<poplar_ver>+<build>/enable.sh
 
-To use PopTorch Geometric it is required to first install the PopTorch wheel
-and install the PopTorch Geometric wheel afterward. All the necessary
-dependencies (including ``torch`` and ``pytorch_geometric``) will be installed
-automatically.
+where ``<sdk_path>`` is the location of the Poplar SDK on your system, ``<os_ver>`` is the version of Ubuntu on your system, ``<poplar_ver>`` is the software version number of the Poplar SDK and ``<build>`` is the build information.
 
 
 Validating the setup

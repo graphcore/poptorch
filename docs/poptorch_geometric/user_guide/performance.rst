@@ -4,7 +4,7 @@ Optimizing performance
 
 PopTorch Geometric is an extension of PyTorch Geometric allowing models to
 fully utilize the IPU hardware and provide the best performance. To achieve
-that, PopTorch Geometric uses PopTorch underneath. PopTorch Geometric is
+that, PopTorch Geometric uses PopTorch functionality. PopTorch Geometric is
 designed in such a way that users can run PyTorch Geometric models with the
 least amount of changes to the code and exploit the high performance of IPU
 systems.

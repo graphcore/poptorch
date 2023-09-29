@@ -17,6 +17,5 @@ in order to get the most out of IPU hardware.
 
 PopTorch Geometric depends on the functionality provided by PopTorch.
 
-See the "Getting Started" guide for your IPU system on the Graphcore
-`documentation portal <https://docs.graphcore.ai/en/latest/getting-started.html>`_ for information on
-installing the Poplar SDK, PopTorch and PopTorch Geometric.
+PopTorch and PopTorch Geometric are included in the `Poplar SDK <https://docs.graphcore.ai/projects/sdk-overview/>`__. See the `Getting Started guide <https://docs.graphcore.ai/en/latest/getting-started.html#getting-started>`_ for your system for how to
+install the Poplar SDK. Refer to :numref:`installation` for how to install the PopTorch and PopTorch Geometric wheels.

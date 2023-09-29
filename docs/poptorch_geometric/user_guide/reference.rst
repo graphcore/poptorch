@@ -22,7 +22,7 @@ Cluster data loaders
 
 .. autoclass:: poptorch_geometric.cluster_loader.FixedSizeClusterLoader
 
-Collaters
+Collators
 =========
 
 .. autoclass:: poptorch_geometric.collate.FixedSizeCollater
